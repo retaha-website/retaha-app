@@ -1,0 +1,442 @@
+---
+import Sheet from '../Sheet.astro';
+
+interface Props {
+  lang: 'de' | 'en' | 'fr' | 'es';
+  startTime: string;       // "07:30:00"
+  endTime: string;         // "10:30:00"
+  slotMinutes: number;     // 30
+  location: string;        // "im Wintergarten"
+  accessToken: string;
+  existingBooking: any | null;  // null if none, else booking object
+  conciergeName: string;
+  checkIn: string;   // ISO date "2026-05-21"
+  checkOut: string;  // ISO date "2026-05-24"
+  reservationEnabled: boolean;
+  includedText: string;
+}
+const { lang, startTime, endTime, slotMinutes, location, accessToken, existingBooking, conciergeName, checkIn, checkOut, reservationEnabled, includedText } = Astro.props;
+
+// Local-date ISO string (YYYY-MM-DD) — avoids UTC drift from .toISOString()
+const toLocalIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+console.log('Today ISO:', toLocalIso(new Date()));
+
+// Generate time slots
+function generateSlots(start: string, end: string, step: number): string[] {
+  const slots: string[] = [];
+  const [sH, sM] = start.substring(0, 5).split(':').map(Number);
+  const [eH, eM] = end.substring(0, 5).split(':').map(Number);
+  const startMin = sH * 60 + sM;
+  const endMin = eH * 60 + eM;
+  for (let t = startMin; t <= endMin - step; t += step) {
+    const h = Math.floor(t / 60);
+    const m = t % 60;
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  }
+  return slots;
+}
+// Send raw stay range to client — filtering happens live in Alpine
+const stayRangeDates: { iso: string }[] = [];
+{
+  const cursor = new Date(checkIn);
+  const stayEnd = new Date(checkOut);
+  while (cursor <= stayEnd) {
+    stayRangeDates.push({ iso: toLocalIso(cursor) });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+// Generate ALL possible time slots (no time filtering server-side)
+const allSlots = generateSlots(startTime, endTime, slotMinutes);
+
+const labels = {
+  de: {
+    eyebrow: '— Frühstück —',
+    title: 'Tisch ',
+    titleAccent: 'reservieren',
+    subtitle: `Wir freuen uns auf dich — ${location}.`,
+    whenLabel: 'Wann?',
+    today: 'Heute',
+    tomorrow: 'Morgen',
+    dayAfter: 'Übermorgen',
+    peopleLabel: 'Wie viele Personen?',
+    person: 'Person',
+    persons: 'Personen',
+    morePersons: 'Personen',
+    timeLabel: 'Welche Uhrzeit?',
+    tableLabel: 'Tisch-Wunsch?',
+    tableInside: 'Drinnen',
+    tableOutside: 'Draußen',
+    tableGarden: 'Im Garten',
+    tableAny: 'Egal',
+    notesLabel: 'Etwas, das wir wissen sollten?',
+    notesPlaceholder: 'Z.B. glutenfrei, Geburtstag, …',
+    submit: 'Tisch reservieren',
+    submitting: 'Wird reserviert…',
+    errorPrefix: 'Fehler',
+    pendingTitle: 'Wir haben deine Anfrage.',
+    pendingSub: `${conciergeName} meldet sich gleich mit der Bestätigung.`,
+    confirmedTitle: 'Reservierung bestätigt.',
+    confirmedSub: 'Wir freuen uns auf dich.',
+    cancelledTitle: 'Reservierung abgelehnt.',
+    cancelledSub: 'Bitte sprich mit dem Empfang.',
+    yourBooking: 'Deine Reservierung',
+    bookingDate: 'Tag',
+    bookingTime: 'Uhrzeit',
+    bookingPeople: 'Personen',
+    bookingTable: 'Tisch',
+    cancelBtn: 'Zurücknehmen',
+    rebookBtn: 'Neuen Tisch reservieren',
+    noSlotsAvailable: 'Heute keine freien Plätze mehr — wir freuen uns auf dich morgen.',
+    infoTitle: 'Frühstück ',
+    infoTitleAccent: 'bei uns',
+    infoSubtitle: 'Komm einfach vorbei — kein Tisch nötig.',
+    infoTimeLabel: 'Wann',
+    infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Ort',
+    infoIncludedLabel: 'Was dich erwartet',
+  },
+  en: {
+    eyebrow: '— Breakfast —',
+    title: 'Reserve a ',
+    titleAccent: 'table',
+    subtitle: `Looking forward to having you — ${location}.`,
+    whenLabel: 'When?',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    dayAfter: 'Day after',
+    peopleLabel: 'How many people?',
+    person: 'person',
+    persons: 'people',
+    morePersons: 'people',
+    timeLabel: 'What time?',
+    tableLabel: 'Table preference?',
+    tableInside: 'Inside',
+    tableOutside: 'Outside',
+    tableGarden: 'In the garden',
+    tableAny: 'No preference',
+    notesLabel: 'Anything we should know?',
+    notesPlaceholder: 'E.g. gluten-free, birthday, …',
+    submit: 'Reserve table',
+    submitting: 'Reserving…',
+    errorPrefix: 'Error',
+    pendingTitle: 'We got your request.',
+    pendingSub: `${conciergeName} will confirm shortly.`,
+    confirmedTitle: 'Reservation confirmed.',
+    confirmedSub: 'See you soon.',
+    cancelledTitle: 'Reservation declined.',
+    cancelledSub: 'Please speak with the front desk.',
+    yourBooking: 'Your reservation',
+    bookingDate: 'Day',
+    bookingTime: 'Time',
+    bookingPeople: 'People',
+    bookingTable: 'Table',
+    cancelBtn: 'Cancel',
+    rebookBtn: 'Book a new table',
+    noSlotsAvailable: 'No slots left today — see you tomorrow.',
+    infoTitle: 'Breakfast ',
+    infoTitleAccent: 'with us',
+    infoSubtitle: 'Just drop by — no table needed.',
+    infoTimeLabel: 'When',
+    infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Where',
+    infoIncludedLabel: 'What to expect',
+  },
+  fr: {
+    eyebrow: '— Petit-déjeuner —',
+    title: 'Réserver une ',
+    titleAccent: 'table',
+    subtitle: `Au plaisir de vous accueillir — ${location}.`,
+    whenLabel: 'Quand ?',
+    today: 'Aujourd\'hui',
+    tomorrow: 'Demain',
+    dayAfter: 'Après-demain',
+    peopleLabel: 'Combien de personnes ?',
+    person: 'personne',
+    persons: 'personnes',
+    morePersons: 'personnes',
+    timeLabel: 'À quelle heure ?',
+    tableLabel: 'Préférence de table ?',
+    tableInside: 'Intérieur',
+    tableOutside: 'Extérieur',
+    tableGarden: 'Au jardin',
+    tableAny: 'Peu importe',
+    notesLabel: 'Quelque chose à savoir ?',
+    notesPlaceholder: 'P. ex. sans gluten, anniversaire, …',
+    submit: 'Réserver',
+    submitting: 'Réservation…',
+    errorPrefix: 'Erreur',
+    pendingTitle: 'Nous avons votre demande.',
+    pendingSub: `${conciergeName} confirme bientôt.`,
+    confirmedTitle: 'Réservation confirmée.',
+    confirmedSub: 'À très vite.',
+    cancelledTitle: 'Réservation refusée.',
+    cancelledSub: 'Merci de voir la réception.',
+    yourBooking: 'Votre réservation',
+    bookingDate: 'Jour',
+    bookingTime: 'Heure',
+    bookingPeople: 'Personnes',
+    bookingTable: 'Table',
+    cancelBtn: 'Annuler',
+    rebookBtn: 'Nouvelle réservation',
+    noSlotsAvailable: 'Plus de créneaux aujourd\'hui — à demain.',
+    infoTitle: 'Petit-déjeuner ',
+    infoTitleAccent: 'chez nous',
+    infoSubtitle: 'Passez nous voir — pas besoin de table.',
+    infoTimeLabel: 'Quand',
+    infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Où',
+    infoIncludedLabel: 'Ce qui vous attend',
+  },
+  es: {
+    eyebrow: '— Desayuno —',
+    title: 'Reservar una ',
+    titleAccent: 'mesa',
+    subtitle: `Encantados de recibirte — ${location}.`,
+    whenLabel: '¿Cuándo?',
+    today: 'Hoy',
+    tomorrow: 'Mañana',
+    dayAfter: 'Pasado mañana',
+    peopleLabel: '¿Cuántas personas?',
+    person: 'persona',
+    persons: 'personas',
+    morePersons: 'personas',
+    timeLabel: '¿A qué hora?',
+    tableLabel: '¿Preferencia de mesa?',
+    tableInside: 'Interior',
+    tableOutside: 'Exterior',
+    tableGarden: 'En el jardín',
+    tableAny: 'Sin preferencia',
+    notesLabel: '¿Algo que debamos saber?',
+    notesPlaceholder: 'Ej. sin gluten, cumpleaños, …',
+    submit: 'Reservar',
+    submitting: 'Reservando…',
+    errorPrefix: 'Error',
+    pendingTitle: 'Tenemos tu solicitud.',
+    pendingSub: `${conciergeName} confirma enseguida.`,
+    confirmedTitle: 'Reserva confirmada.',
+    confirmedSub: 'Nos vemos pronto.',
+    cancelledTitle: 'Reserva rechazada.',
+    cancelledSub: 'Habla con recepción, por favor.',
+    yourBooking: 'Tu reserva',
+    bookingDate: 'Día',
+    bookingTime: 'Hora',
+    bookingPeople: 'Personas',
+    bookingTable: 'Mesa',
+    cancelBtn: 'Cancelar',
+    rebookBtn: 'Nueva reserva',
+    noSlotsAvailable: 'No quedan plazas hoy — nos vemos mañana.',
+    infoTitle: 'Desayuno ',
+    infoTitleAccent: 'con nosotros',
+    infoSubtitle: 'Pásate — sin mesa, sin reserva.',
+    infoTimeLabel: 'Cuándo',
+    infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Dónde',
+    infoIncludedLabel: 'Qué te espera',
+  },
+};
+const l = labels[lang];
+
+// Date formatting helper
+const localeMap: Record<string, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+const dateFmt = (iso: string) => new Date(iso).toLocaleDateString(localeMap[lang], { weekday: 'long', day: 'numeric', month: 'short' });
+
+const peopleOptions = [1, 2, 3, 4];
+const tableOptions = [
+  { value: 'inside', label: l.tableInside },
+  { value: 'outside', label: l.tableOutside },
+  { value: 'garden', label: l.tableGarden },
+  { value: 'any', label: l.tableAny },
+];
+
+// Serialize for client-side use
+const sheetData = {
+  stayRangeDates,        // alle ISO-Datums im Aufenthalt
+  allSlots,              // alle möglichen Slots (Server-Zeitfenster)
+  startTime,             // für Anzeige
+  endTime,
+  peopleOptions,
+  tableOptions,
+  labels: l,
+  accessToken,
+  existingBooking,
+  lang,                  // für Locale-Formatting client-side
+  reservationEnabled,
+  includedText,
+  location,
+};
+---
+
+<Sheet
+  id="breakfast"
+  eyebrow={l.eyebrow}
+  title={reservationEnabled ? l.title : l.infoTitle}
+  titleAccent={reservationEnabled ? l.titleAccent : l.infoTitleAccent}
+  subtitle={reservationEnabled ? l.subtitle : l.infoSubtitle}
+>
+  <div x-data={`breakfastForm(${JSON.stringify(sheetData)})`}>
+
+    <!-- View 1: Existing booking status -->
+    <template x-if="view === 'status'">
+      <div class="booking-status">
+        <div class="booking-status-icon" :class="statusInfo.iconClass">
+          <template x-if="statusInfo.icon === 'check'">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </template>
+          <template x-if="statusInfo.icon === 'clock'">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 16 14"/>
+            </svg>
+          </template>
+          <template x-if="statusInfo.icon === 'cross'">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </template>
+        </div>
+
+        <h3 class="booking-status-title" x-text="statusInfo.title"></h3>
+        <p class="booking-status-sub" x-text="statusInfo.sub"></p>
+
+        <div class="booking-summary">
+          <div class="booking-summary-row">
+            <span class="label" x-text="labels.bookingDate"></span>
+            <span class="value" x-text="formatDate(existingBooking.details.date)"></span>
+          </div>
+          <div class="booking-summary-row">
+            <span class="label" x-text="labels.bookingTime"></span>
+            <span class="value" x-text="existingBooking.details.time"></span>
+          </div>
+          <div class="booking-summary-row">
+            <span class="label" x-text="labels.bookingPeople"></span>
+            <span class="value" x-text="existingBooking.details.people"></span>
+          </div>
+          <div class="booking-summary-row" x-show="existingBooking.details.table_preference && existingBooking.details.table_preference !== 'any'">
+            <span class="label" x-text="labels.bookingTable"></span>
+            <span class="value" x-text="tableLabelFor(existingBooking.details.table_preference)"></span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="booking-cancel"
+          @click="startRebook()"
+          x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
+          x-text="labels.rebookBtn"
+        ></button>
+      </div>
+    </template>
+
+    <!-- View 2: Form -->
+    <template x-if="view === 'form'">
+      <div>
+        <template x-if="availableDates.length === 0">
+          <div class="sheet-disabled-message">
+            <p x-text="labels.noSlotsAvailable"></p>
+          </div>
+        </template>
+
+        <form class="booking-form" @submit.prevent="submitBooking()" x-show="availableDates.length > 0">
+
+        <!-- When -->
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.whenLabel"></div>
+          <div class="booking-chip-row">
+            <template x-for="(date, i) in availableDates" :key="date.iso">
+              <button type="button" class="booking-chip"
+                :class="{ active: form.date === date.iso }"
+                @click="setDate(date.iso)">
+                <span x-text="dateLabels[i]"></span>
+                <span class="booking-chip-sub" x-text="formatDateShort(date.iso)"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- People -->
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.peopleLabel"></div>
+          <div class="booking-chip-row">
+            <template x-for="n in peopleOptions" :key="n">
+              <button type="button" class="booking-chip"
+                :class="{ active: form.people === n }"
+                @click="form.people = n"
+                x-text="n"></button>
+            </template>
+            <button type="button" class="booking-chip"
+              :class="{ active: form.people > 4 }"
+              @click="form.people = 5">
+              5+
+            </button>
+          </div>
+        </div>
+
+        <!-- Time -->
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.timeLabel"></div>
+          <div class="booking-chip-row">
+            <template x-for="slot in slots" :key="slot">
+              <button type="button" class="booking-chip"
+                :class="{ active: form.time === slot }"
+                @click="form.time = slot"
+                x-text="slot"></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.tableLabel"></div>
+          <div class="booking-chip-row">
+            <template x-for="opt in tableOptions" :key="opt.value">
+              <button type="button" class="booking-chip"
+                :class="{ active: form.table_preference === opt.value }"
+                @click="form.table_preference = opt.value"
+                x-text="opt.label"></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.notesLabel"></div>
+          <textarea class="booking-textarea"
+            :placeholder="labels.notesPlaceholder"
+            x-model="form.notes"></textarea>
+        </div>
+
+        <div x-show="errorMsg" class="booking-error" x-text="errorMsg"></div>
+
+        <button type="submit" class="booking-submit"
+          :disabled="!canSubmit || submitting"
+          x-text="submitting ? labels.submitting : labels.submit"></button>
+        </form>
+      </div>
+    </template>
+
+    <!-- View 3: Info-Mode (Reservation disabled) -->
+    <template x-if="view === 'info'">
+      <div class="booking-info">
+        <div class="info-row">
+          <div class="info-label" x-text="labels.infoTimeLabel"></div>
+          <div class="info-value" x-text="labels.infoTimeValue"></div>
+        </div>
+        <div class="info-row">
+          <div class="info-label" x-text="labels.infoLocationLabel"></div>
+          <div class="info-value" x-text="location"></div>
+        </div>
+        <div class="info-row info-row-full" x-show="includedText">
+          <div class="info-label" x-text="labels.infoIncludedLabel"></div>
+          <div class="info-value info-value-multiline" x-text="includedText"></div>
+        </div>
+      </div>
+    </template>
+
+  </div>
+</Sheet>

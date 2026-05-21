@@ -1,6 +1,7 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { getUser, getUserHotels } from '../../lib/auth';
+import { loadBookingsForHotel } from '../../lib/queries';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -9,61 +10,354 @@ const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
-const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+// Load filter from URL
+const url = new URL(Astro.request.url);
+const filter = url.searchParams.get('filter') || 'today';
+const typeFilter = url.searchParams.get('type') || 'breakfast';
 
-const { data: bookings } = await client
-  .from('bookings')
-  .select('id, type, status, details, created_at, stay:stays(guest:guests(first_name, last_name))')
-  .eq('hotel_id', hotel.id)
-  .order('created_at', { ascending: false })
-  .limit(50);
+// Load bookings
+const allBookings = await loadBookingsForHotel(hotel.id, typeFilter);
+
+// Date filtering helpers
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const weekFromToday = new Date(today);
+weekFromToday.setDate(weekFromToday.getDate() + 7);
+
+const toLocalIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+const todayIso = toLocalIso(today);
+const weekIso = toLocalIso(weekFromToday);
+
+let filteredBookings = allBookings;
+if (filter === 'today') {
+  filteredBookings = allBookings.filter(b => b.details?.date === todayIso);
+} else if (filter === 'week') {
+  filteredBookings = allBookings.filter(b => {
+    const d = b.details?.date;
+    return d && d >= todayIso && d <= weekIso;
+  });
+}
+// 'all' shows all
+
+// Count for stats
+const counts = {
+  today: allBookings.filter(b => b.details?.date === todayIso).length,
+  week: allBookings.filter(b => {
+    const d = b.details?.date;
+    return d && d >= todayIso && d <= weekIso;
+  }).length,
+  all: allBookings.length,
+  pending: allBookings.filter(b => (b.status || '').toLowerCase() === 'pending').length,
+};
+
+// Format helpers
+const fmtDate = (iso: string) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' });
+};
+const fmtTimeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'gerade eben';
+  if (mins < 60) return `vor ${mins} Min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `vor ${hours} Std`;
+  const days = Math.floor(hours / 24);
+  return `vor ${days} Tag${days > 1 ? 'en' : ''}`;
+};
+
+const tableLabels: Record<string, string> = {
+  inside: 'Drinnen',
+  outside: 'Draußen',
+  garden: 'Garten',
+  any: 'egal',
+};
+
+const statusLabels: Record<string, { label: string; class: string }> = {
+  pending: { label: 'Wartet auf Bestätigung', class: 'bg-amber-50 text-amber-800 border-amber-300' },
+  confirmed: { label: 'Bestätigt', class: 'bg-green-50 text-green-800 border-green-300' },
+  cancelled: { label: 'Abgelehnt', class: 'bg-red-50 text-red-800 border-red-300' },
+};
 ---
 
 <AdminLayout title="Buchungen" hotel={hotel} user={user} activeTab="bookings">
   <div class="mb-8">
     <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Buchungen —</p>
-    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">reserviert haben</span><span class="text-red-700">.</span></h1>
+    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">gerade möchten</span><span class="text-red-700">.</span></h1>
+    <p class="text-sm text-stone-600 mt-3 max-w-xl">
+      Hier siehst du eingehende Reservierungen. Bestätige oder lehne sie ab — der Gast sieht den Status sofort.
+    </p>
   </div>
 
-  {(!bookings || bookings.length === 0) ? (
+  <!-- Stats -->
+  <div class="grid grid-cols-4 gap-3 mb-8">
+    <div class="bg-white border border-stone-200 p-4">
+      <div class="text-xs text-stone-500 italic" style="font-family: Georgia, serif;">Heute</div>
+      <div class="text-2xl font-light mt-1">{counts.today}</div>
+    </div>
+    <div class="bg-white border border-stone-200 p-4">
+      <div class="text-xs text-stone-500 italic" style="font-family: Georgia, serif;">Diese Woche</div>
+      <div class="text-2xl font-light mt-1">{counts.week}</div>
+    </div>
+    <div class="bg-white border border-stone-200 p-4">
+      <div class="text-xs text-stone-500 italic" style="font-family: Georgia, serif;">Gesamt</div>
+      <div class="text-2xl font-light mt-1">{counts.all}</div>
+    </div>
+    <div class="bg-red-50 border border-red-200 p-4">
+      <div class="text-xs text-red-700 italic" style="font-family: Georgia, serif;">Wartet auf dich</div>
+      <div class="text-2xl font-medium mt-1 text-red-800">{counts.pending}</div>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="flex gap-2 mb-6 border-b border-stone-200">
+    <a href="?filter=today" class={`px-4 py-2 text-sm transition border-b-2 ${filter === 'today' ? 'border-stone-900 text-stone-900 font-medium' : 'border-transparent text-stone-500 hover:text-stone-900'}`}>
+      Heute
+    </a>
+    <a href="?filter=week" class={`px-4 py-2 text-sm transition border-b-2 ${filter === 'week' ? 'border-stone-900 text-stone-900 font-medium' : 'border-transparent text-stone-500 hover:text-stone-900'}`}>
+      Diese Woche
+    </a>
+    <a href="?filter=all" class={`px-4 py-2 text-sm transition border-b-2 ${filter === 'all' ? 'border-stone-900 text-stone-900 font-medium' : 'border-transparent text-stone-500 hover:text-stone-900'}`}>
+      Alle
+    </a>
+  </div>
+
+  <!-- Bookings list -->
+  {filteredBookings.length === 0 ? (
     <div class="bg-white border border-stone-200 p-12 text-center">
       <p class="text-stone-500 italic" style="font-family: Georgia, serif;">
-        Noch keine Buchungen.
-      </p>
-      <p class="text-xs text-stone-400 mt-3">
-        Sobald ein Gast einen Tisch reserviert oder eine Anfrage stellt, taucht es hier auf.
+        Keine Buchungen in diesem Zeitraum.
       </p>
     </div>
   ) : (
-    <div class="bg-white border border-stone-200">
-      <table class="w-full text-sm">
-        <thead class="bg-stone-50 border-b border-stone-200">
-          <tr>
-            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Zeit</th>
-            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Gast</th>
-            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Art</th>
-            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Details</th>
-            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-stone-200">
-          {bookings.map((b: any) => (
-            <tr class="hover:bg-stone-50">
-              <td class="p-4 text-stone-500 text-xs">{new Date(b.created_at).toLocaleString('de-DE')}</td>
-              <td class="p-4">{b.stay?.guest?.first_name} {b.stay?.guest?.last_name}</td>
-              <td class="p-4 capitalize">{b.type}</td>
-              <td class="p-4 text-xs text-stone-600 font-mono">{JSON.stringify(b.details)}</td>
-              <td class="p-4">
-                <span class={`px-2 py-1 text-xs rounded ${
-                  b.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                  b.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-stone-100 text-stone-600'
-                }`}>{b.status}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div class="space-y-3">
+      {filteredBookings.map(b => {
+        const guest = b.stay?.guest;
+        const room = b.stay?.room;
+        const guestName = [guest?.first_name, guest?.last_name].filter(Boolean).join(' ') || 'Unbekannter Gast';
+        const roomLabel = room ? `${room.room_number}${room.room_name ? ' · ' + room.room_name : ''}` : '—';
+        const normalizedStatus = (b.status || 'pending').toLowerCase();
+        const status = statusLabels[normalizedStatus] || statusLabels.pending;
+        const details = b.details || {};
+        const tablePref = details.table_preference && details.table_preference !== 'any' ? tableLabels[details.table_preference] || details.table_preference : null;
+
+        return (
+          <div class="bg-white border border-stone-200 p-5" data-booking-id={b.id}>
+            <div class="flex justify-between items-start gap-4 mb-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class={`text-xs px-2 py-1 border ${status?.class || 'bg-stone-100 text-stone-600 border-stone-200'}`} data-status-badge>
+                    {status?.label || `Status: ${b.status}`}
+                  </span>
+                  <span class="text-xs text-stone-400 italic" style="font-family: Georgia, serif;">
+                    {fmtTimeAgo(b.created_at)}
+                  </span>
+                </div>
+                <h3 class="font-medium text-lg">{guestName}</h3>
+                <p class="text-sm text-stone-500 italic" style="font-family: Georgia, serif;">
+                  Zimmer {roomLabel}
+                </p>
+              </div>
+
+              <div class="flex gap-2 flex-shrink-0" data-actions>
+                {b.status !== 'confirmed' && (
+                  <button
+                    type="button"
+                    data-action="confirm"
+                    data-booking-id={b.id}
+                    class="bg-green-700 text-white px-3 py-1.5 text-xs hover:bg-green-800 transition font-medium"
+                  >
+                    Bestätigen
+                  </button>
+                )}
+                {b.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    data-action="cancel"
+                    data-booking-id={b.id}
+                    class="bg-stone-200 text-stone-700 px-3 py-1.5 text-xs hover:bg-stone-300 transition font-medium"
+                  >
+                    Ablehnen
+                  </button>
+                )}
+                {b.status !== 'pending' && (
+                  <button
+                    type="button"
+                    data-action="reset"
+                    data-booking-id={b.id}
+                    class="text-stone-400 hover:text-stone-700 px-2 text-xs"
+                    title="Zurück auf Wartend"
+                  >
+                    ↺
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-4 pt-4 border-t border-stone-100 text-sm">
+              <div>
+                <div class="text-xs text-stone-500 italic mb-1" style="font-family: Georgia, serif;">Datum</div>
+                <div class="font-medium">{fmtDate(details.date)}</div>
+              </div>
+              <div>
+                <div class="text-xs text-stone-500 italic mb-1" style="font-family: Georgia, serif;">Zeit</div>
+                <div class="font-medium">{details.time || '—'}</div>
+              </div>
+              <div>
+                <div class="text-xs text-stone-500 italic mb-1" style="font-family: Georgia, serif;">Personen</div>
+                <div class="font-medium">{details.people || '—'}</div>
+              </div>
+              <div>
+                <div class="text-xs text-stone-500 italic mb-1" style="font-family: Georgia, serif;">Tisch</div>
+                <div class="font-medium">{tablePref || '—'}</div>
+              </div>
+            </div>
+
+            {details.notes && (
+              <div class="mt-4 pt-3 border-t border-stone-100">
+                <div class="text-xs text-stone-500 italic mb-1" style="font-family: Georgia, serif;">Notiz vom Gast</div>
+                <div class="text-sm bg-stone-50 p-3 border-l-2 border-stone-300">{details.notes}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   )}
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <script is:inline>
+    function showToast(message, type) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = type === 'error'
+        ? 'bg-red-700 text-white px-4 py-3 text-sm shadow-lg'
+        : 'bg-green-700 text-white px-4 py-3 text-sm shadow-lg';
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 3500);
+    }
+
+    function statusInfo(status) {
+      const map = {
+        pending: { label: 'Wartet auf Bestätigung', cls: 'bg-amber-50 text-amber-800 border-amber-300' },
+        confirmed: { label: 'Bestätigt', cls: 'bg-green-50 text-green-800 border-green-300' },
+        cancelled: { label: 'Abgelehnt', cls: 'bg-red-50 text-red-800 border-red-300' },
+      };
+      return map[status] || map.pending;
+    }
+
+    function renderActions(container, status, bookingId) {
+      container.innerHTML = '';
+
+      const buttons = [];
+      if (status !== 'confirmed') {
+        buttons.push({
+          action: 'confirm',
+          label: 'Bestätigen',
+          cls: 'bg-green-700 text-white px-3 py-1.5 text-xs hover:bg-green-800 transition font-medium',
+        });
+      }
+      if (status !== 'cancelled') {
+        buttons.push({
+          action: 'cancel',
+          label: 'Ablehnen',
+          cls: 'bg-stone-200 text-stone-700 px-3 py-1.5 text-xs hover:bg-stone-300 transition font-medium',
+        });
+      }
+      if (status !== 'pending') {
+        buttons.push({
+          action: 'reset',
+          label: '↺',
+          cls: 'text-stone-400 hover:text-stone-700 px-2 text-xs',
+          title: 'Zurück auf Wartend',
+        });
+      }
+
+      buttons.forEach(function(b) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.action = b.action;
+        btn.dataset.bookingId = bookingId;
+        btn.className = b.cls;
+        btn.textContent = b.label;
+        if (b.title) btn.title = b.title;
+        btn.addEventListener('click', handleActionClick);
+        container.appendChild(btn);
+      });
+    }
+
+    async function handleActionClick(e) {
+      const target = e.currentTarget;
+      const action = target.dataset.action;
+      const bookingId = target.dataset.bookingId;
+
+      const statusMap = {
+        confirm: 'confirmed',
+        cancel: 'cancelled',
+        reset: 'pending',
+      };
+      const newStatus = statusMap[action];
+      if (!newStatus) return;
+
+      if (action === 'cancel' && !confirm('Wirklich ablehnen? Der Gast sieht das sofort.')) {
+        return;
+      }
+
+      const bookingRow = target.closest('[data-booking-id]');
+      const allButtons = bookingRow ? bookingRow.querySelectorAll('button') : [];
+      allButtons.forEach(function(b) { b.disabled = true; });
+
+      try {
+        const resp = await fetch('/api/bookings/update-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId, status: newStatus }),
+        });
+        const data = await resp.json();
+
+        if (!data.ok) {
+          showToast('Fehler: ' + (data.error || 'unbekannt'), 'error');
+          allButtons.forEach(function(b) { b.disabled = false; });
+          return;
+        }
+
+        // Update status badge
+        const badge = bookingRow ? bookingRow.querySelector('[data-status-badge]') : null;
+        if (badge) {
+          const info = statusInfo(newStatus);
+          badge.textContent = info.label;
+          badge.className = 'text-xs px-2 py-1 border ' + info.cls;
+        }
+
+        // Re-render action buttons (with new handlers attached)
+        const actionsContainer = bookingRow ? bookingRow.querySelector('[data-actions]') : null;
+        if (actionsContainer) {
+          renderActions(actionsContainer, newStatus, bookingId);
+        }
+
+        const msgMap = {
+          confirmed: 'Bestätigt — Gast sieht das beim nächsten Reload.',
+          cancelled: 'Abgelehnt — Gast sieht das beim nächsten Reload.',
+          pending: 'Zurück auf Wartend.',
+        };
+        showToast(msgMap[newStatus] || 'Status geändert.', 'success');
+      } catch (err) {
+        showToast('Netzwerk-Fehler: ' + (err.message || 'unbekannt'), 'error');
+        allButtons.forEach(function(b) { b.disabled = false; });
+      }
+    }
+
+    // Initial binding
+    document.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', handleActionClick);
+    });
+  </script>
 </AdminLayout>

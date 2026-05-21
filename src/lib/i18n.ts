@@ -20,8 +20,8 @@ export const UI_STRINGS = {
     'hero.greetingFallback': 'Willkommen',
     'hero.stay.room': 'Zimmer',
     'hero.stay.departure': 'Abreise',
-    'maria.eyebrow': '— Maria empfiehlt heute —',
-    'maria.text.default': 'Schön, dich wieder bei uns zu haben.',
+    'concierge.eyebrow': '— {name} empfiehlt heute —',
+    'concierge.text.default': 'Schön, dich wieder bei uns zu haben.',
     'rec.eyebrow': '— Empfehlung für dich —',
     'actions.eyebrow': '— Was darf\'s sein —',
     'tile.wifi': 'WLAN', 'tile.wifi.sub': 'Gate-Guest · 320 Mbit/s',
@@ -38,7 +38,7 @@ export const UI_STRINGS = {
   en: {
     'hero.kicker': 'Welcome back', 'hero.greeting': 'Hello', 'hero.greetingFallback': 'Welcome',
     'hero.stay.room': 'Room', 'hero.stay.departure': 'Departure',
-    'maria.eyebrow': '— Maria recommends today —', 'maria.text.default': 'Glad to have you back.',
+    'concierge.eyebrow': '— {name} recommends today —', 'concierge.text.default': 'Glad to have you back.',
     'rec.eyebrow': '— Recommended for you —', 'actions.eyebrow': '— What can we get you —',
     'tile.wifi': 'Wi-Fi', 'tile.wifi.sub': 'Gate-Guest · 320 Mbit/s',
     'tile.concierge': 'Concierge', 'tile.concierge.sub': 'online until 22:00',
@@ -54,7 +54,7 @@ export const UI_STRINGS = {
   fr: {
     'hero.kicker': 'Bon retour', 'hero.greeting': 'Bonjour', 'hero.greetingFallback': 'Bienvenue',
     'hero.stay.room': 'Chambre', 'hero.stay.departure': 'Départ',
-    'maria.eyebrow': '— Maria recommande aujourd\'hui —', 'maria.text.default': 'Ravi de vous revoir.',
+    'concierge.eyebrow': '— {name} recommande aujourd\'hui —', 'concierge.text.default': 'Ravi de vous revoir.',
     'rec.eyebrow': '— Recommandé pour vous —', 'actions.eyebrow': '— Que désirez-vous —',
     'tile.wifi': 'Wi-Fi', 'tile.wifi.sub': 'Gate-Guest · 320 Mbit/s',
     'tile.concierge': 'Conciergerie', 'tile.concierge.sub': 'jusqu\'à 22h',
@@ -70,7 +70,7 @@ export const UI_STRINGS = {
   es: {
     'hero.kicker': 'Bienvenida de nuevo', 'hero.greeting': 'Hola', 'hero.greetingFallback': 'Bienvenida',
     'hero.stay.room': 'Habitación', 'hero.stay.departure': 'Salida',
-    'maria.eyebrow': '— Maria recomienda hoy —', 'maria.text.default': 'Encantada de tenerte de vuelta.',
+    'concierge.eyebrow': '— {name} recomienda hoy —', 'concierge.text.default': 'Encantada de tenerte de vuelta.',
     'rec.eyebrow': '— Recomendado para ti —', 'actions.eyebrow': '— ¿En qué podemos ayudar? —',
     'tile.wifi': 'Wi-Fi', 'tile.wifi.sub': 'Gate-Guest · 320 Mbit/s',
     'tile.concierge': 'Conserjería', 'tile.concierge.sub': 'hasta las 22:00',

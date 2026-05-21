@@ -42,6 +42,17 @@ export type StayContext = {
     wifi_ssid: string | null;
     wifi_password: string | null;
     wifi_speed_mbits: number | null;
+    breakfast_start_time: string | null;
+    breakfast_end_time: string | null;
+    breakfast_slot_minutes: number | null;
+    breakfast_location_de: string | null;
+    breakfast_location_en: string | null;
+    breakfast_location_fr: string | null;
+    breakfast_location_es: string | null;
+    breakfast_included_de: string | null;
+    breakfast_included_en: string | null;
+    breakfast_included_fr: string | null;
+    breakfast_included_es: string | null;
   };
 };
 
@@ -81,7 +92,10 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
       hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
       concierge_name, concierge_online_until,
-      wifi_ssid, wifi_password, wifi_speed_mbits
+      wifi_ssid, wifi_password, wifi_speed_mbits,
+      breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
+      breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es,
+      breakfast_included_de, breakfast_included_en, breakfast_included_fr, breakfast_included_es
     `)
     .eq('hotel_id', (stay.hotel as any).id)
     .maybeSingle();
@@ -98,4 +112,73 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
     hotel: stay.hotel as any,
     settings: settings as any,
   };
+}
+
+export async function loadBookingsForStay(stayId: string, type?: string) {
+  const supabase = createServerClient();
+  let query = supabase
+    .from('bookings')
+    .select('id, type, status, details, created_at, updated_at')
+    .eq('stay_id', stayId)
+    .order('created_at', { ascending: false });
+
+  if (type) {
+    query = query.eq('type', type);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('loadBookingsForStay error:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export interface BookingWithGuest {
+  id: string;
+  type: string;
+  status: string;
+  details: any;
+  created_at: string;
+  updated_at: string;
+  stay: {
+    id: string;
+    check_in: string;
+    check_out: string;
+    room: {
+      room_number: string;
+      room_name: string | null;
+    } | null;
+    guest: {
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
+  } | null;
+}
+
+export async function loadBookingsForHotel(hotelId: string, type?: string): Promise<BookingWithGuest[]> {
+  const supabase = createServerClient();
+  let query = supabase
+    .from('bookings')
+    .select(`
+      id, type, status, details, created_at, updated_at,
+      stay:stays (
+        id, check_in, check_out,
+        room:rooms (room_number, room_name),
+        guest:guests (first_name, last_name)
+      )
+    `)
+    .eq('hotel_id', hotelId)
+    .order('created_at', { ascending: false });
+
+  if (type) {
+    query = query.eq('type', type);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('loadBookingsForHotel error:', error);
+    return [];
+  }
+  return (data || []) as any;
 }

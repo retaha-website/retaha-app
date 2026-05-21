@@ -1,8 +1,9 @@
 ---
-import { loadStayByToken } from '../../lib/queries';
+import { loadStayByToken, loadBookingsForStay } from '../../lib/queries';
 import { normalizeLang, t, dayPart, pick, type Lang } from '../../lib/i18n';
 import WeatherIcon from '../../components/WeatherIcon.astro';
 import WifiSheet from '../../components/sheets/WifiSheet.astro';
+import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import '../../styles/retaha.css';
 
 const { token } = Astro.params;
@@ -13,6 +14,11 @@ if (!ctx) {
 }
 
 const { stay, guest, room, hotel, settings } = ctx;
+
+const existingBreakfastBookings = await loadBookingsForStay(stay.id, 'breakfast');
+// Show the most recent booking regardless of status (pending/confirmed/cancelled)
+// so the guest knows what happened. They can rebook if cancelled.
+const activeBreakfastBooking = existingBreakfastBookings[0] || null;
 
 const langParam = new URL(Astro.request.url).searchParams.get('lang');
 const lang: Lang = normalizeLang(langParam || guest.language || hotel.default_language);
@@ -47,11 +53,30 @@ const visitOrdinals: Record<Lang, string> = {
 };
 const visitText = visitOrdinals[lang];
 
+const checkInDate = new Date(stay.check_in);
 const checkOutDate = new Date(stay.check_out);
 const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
-const checkOutLabel = checkOutDate.toLocaleDateString(localeMap[lang], {
+
+const fmtShort = (d: Date) => d.toLocaleDateString(localeMap[lang], {
   weekday: 'short', day: '2-digit', month: 'short',
 });
+
+const checkInLabel = fmtShort(checkInDate);
+const checkOutLabel = fmtShort(checkOutDate);
+
+// Calculate nights
+const msPerDay = 1000 * 60 * 60 * 24;
+const nightsCount = Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / msPerDay));
+
+// Stay range label
+const stayLabels = {
+  de: { range: 'Aufenthalt', nights: nightsCount === 1 ? 'Nacht' : 'Nächte' },
+  en: { range: 'Stay', nights: nightsCount === 1 ? 'night' : 'nights' },
+  fr: { range: 'Séjour', nights: nightsCount === 1 ? 'nuit' : 'nuits' },
+  es: { range: 'Estancia', nights: nightsCount === 1 ? 'noche' : 'noches' },
+};
+const stayLabel = stayLabels[lang];
+const stayRange = `${checkInLabel} – ${checkOutLabel} · ${nightsCount} ${stayLabel.nights}`;
 
 const now = new Date();
 const dayPartLabel = dayPart(lang, now.getHours());
@@ -75,6 +100,24 @@ const weather = {
 
 const f = settings.features;
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+
+const breakfastLocationMap: Record<Lang, string | null> = {
+  de: settings.breakfast_location_de,
+  en: settings.breakfast_location_en,
+  fr: settings.breakfast_location_fr,
+  es: settings.breakfast_location_es,
+};
+const breakfastLocation = breakfastLocationMap[lang] || settings.breakfast_location_de || 'im Wintergarten';
+
+const breakfastIncludedMap: Record<Lang, string | null> = {
+  de: settings.breakfast_included_de,
+  en: settings.breakfast_included_en,
+  fr: settings.breakfast_included_fr,
+  es: settings.breakfast_included_es,
+};
+const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_included_de || '';
+
+const reservationEnabled = settings.features?.breakfast_reservation !== false;
 ---
 
 <!DOCTYPE html>
@@ -128,18 +171,18 @@ const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
               <div class="value">{room.room_number} · {room.room_name}</div>
             </div>
             <div class="gate-hero-stay-block">
-              <div class="label">{t('hero.stay.departure', lang)}</div>
-              <div class="value">{checkOutLabel}</div>
+              <div class="label">{stayLabel.range}</div>
+              <div class="value">{stayRange}</div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- MARIA'S CARD -->
+      <!-- CONCIERGE CARD -->
       <div class="gate-recommend-card">
         <div class="gate-recommend-card-left">
-          <div class="gate-recommend-eyebrow">{t('maria.eyebrow', lang)}</div>
-          <p class="gate-recommend-text">{t('maria.text.default', lang)}</p>
+          <div class="gate-recommend-eyebrow">{t('concierge.eyebrow', lang).replace('{name}', settings.concierge_name || 'das Team')}</div>
+          <p class="gate-recommend-text">{t('concierge.text.default', lang)}</p>
         </div>
         <div class="gate-recommend-weather">
           <WeatherIcon type={weather.iconType} />
@@ -230,16 +273,14 @@ const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
             </button>
           )}
 
-          {f.breakfast_reservation !== false && (
-            <button class="gate-tile" type="button">
-              <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
-              <span class="gate-tile-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
-              </span>
-              <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
-              <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
-            </button>
-          )}
+          <button class="gate-tile" type="button" @click="openSheet('breakfast')">
+            <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
+            </span>
+            <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
+            <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
+          </button>
 
           {f.conference_booking !== false && (
             <button class="gate-tile" type="button">
@@ -307,6 +348,21 @@ const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
         password={settings.wifi_password || ''}
         speedMbits={settings.wifi_speed_mbits || 320}
         lang={lang}
+      />
+
+      <BreakfastSheet
+        lang={lang}
+        startTime={settings.breakfast_start_time || '07:30:00'}
+        endTime={settings.breakfast_end_time || '10:30:00'}
+        slotMinutes={settings.breakfast_slot_minutes || 30}
+        location={breakfastLocation}
+        accessToken={token!}
+        existingBooking={activeBreakfastBooking}
+        conciergeName={settings.concierge_name || 'das Team'}
+        checkIn={stay.check_in}
+        checkOut={stay.check_out}
+        reservationEnabled={reservationEnabled}
+        includedText={breakfastIncluded}
       />
     </main>
 
@@ -538,6 +594,217 @@ const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
           document.addEventListener('touchmove', onMove, { passive: true });
           document.addEventListener('touchend', onEnd);
           document.addEventListener('touchcancel', onEnd);
+        },
+      }));
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('breakfastForm', (initial: any) => ({
+        view: initial.existingBooking
+          ? 'status'
+          : (initial.reservationEnabled === false ? 'info' : 'form'),
+        reservationEnabled: initial.reservationEnabled !== false,
+        includedText: initial.includedText || '',
+        location: initial.location || '',
+        stayRangeDates: initial.stayRangeDates,
+        allSlots: initial.allSlots,
+        startTime: initial.startTime,
+        endTime: initial.endTime,
+        peopleOptions: initial.peopleOptions,
+        tableOptions: initial.tableOptions,
+        labels: initial.labels,
+        accessToken: initial.accessToken,
+        existingBooking: initial.existingBooking,
+        lang: initial.lang,
+
+        // Live-updating "now" — tick every 60s to handle slot expiration
+        nowTick: 0,
+
+        form: {
+          date: '',
+          people: 2,
+          time: '',
+          table_preference: 'any',
+          notes: '',
+        },
+
+        submitting: false,
+        errorMsg: '',
+
+        init() {
+          // Pre-select first available date
+          const firstAvail = this.availableDates[0];
+          if (firstAvail) this.form.date = firstAvail.iso;
+
+          // Tick every 60s for slot expiry on "today"
+          setInterval(() => {
+            this.nowTick = Date.now();
+            // If currently selected date or slot expired, reset
+            if (!this.availableDates.find((d: any) => d.iso === this.form.date)) {
+              const newFirst = this.availableDates[0];
+              this.form.date = newFirst ? newFirst.iso : '';
+              this.form.time = '';
+            }
+            if (this.form.time && !this.slots.includes(this.form.time)) {
+              this.form.time = '';
+            }
+          }, 60000);
+        },
+
+        // Computed: today as local ISO (recomputes on tick)
+        get todayIso() {
+          // nowTick triggers reactivity
+          this.nowTick;
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        },
+
+        // Filter slots for a given date based on current time
+        slotsForDate(dateIso: string) {
+          if (dateIso !== this.todayIso) return this.allSlots;
+          const now = new Date();
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          return this.allSlots.filter((slot: string) => {
+            const [h, m] = slot.split(':').map(Number);
+            return h * 60 + m > nowMin;
+          });
+        },
+
+        // Available dates: those in stay range, in the present or future, with slots
+        get availableDates() {
+          const today = this.todayIso;
+          return this.stayRangeDates
+            .filter((d: any) => d.iso >= today)
+            .filter((d: any) => this.slotsForDate(d.iso).length > 0)
+            .slice(0, 5);
+        },
+
+        get slots() {
+          return this.slotsForDate(this.form.date);
+        },
+
+        get dateLabels() {
+          // Build labels live based on current today
+          const today = new Date();
+          const todayIso = this.todayIso;
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomIso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}`;
+          const dayAfter = new Date(today);
+          dayAfter.setDate(dayAfter.getDate() + 2);
+          const dayAfterIso = `${dayAfter.getFullYear()}-${String(dayAfter.getMonth()+1).padStart(2,'0')}-${String(dayAfter.getDate()).padStart(2,'0')}`;
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+
+          return this.availableDates.map((d: any) => {
+            if (d.iso === todayIso) return this.labels.today;
+            if (d.iso === tomIso) return this.labels.tomorrow;
+            if (d.iso === dayAfterIso) return this.labels.dayAfter;
+            return new Date(d.iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { weekday: 'long' });
+          });
+        },
+
+        get canSubmit() {
+          return this.form.date && this.form.time && this.form.people > 0;
+        },
+
+        get statusInfo() {
+          if (!this.existingBooking) return { iconClass: '', icon: '', title: '', sub: '' };
+          const status = (this.existingBooking.status || 'pending').toLowerCase();
+          if (status === 'confirmed') {
+            return { iconClass: 'confirmed', icon: 'check', title: this.labels.confirmedTitle, sub: this.labels.confirmedSub };
+          }
+          if (status === 'cancelled') {
+            return { iconClass: 'cancelled', icon: 'cross', title: this.labels.cancelledTitle, sub: this.labels.cancelledSub };
+          }
+          return { iconClass: 'pending', icon: 'clock', title: this.labels.pendingTitle, sub: this.labels.pendingSub };
+        },
+
+        formatDate(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', {
+            weekday: 'long', day: 'numeric', month: 'long'
+          });
+        },
+
+        formatDateShort(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', {
+            day: '2-digit', month: 'short'
+          });
+        },
+
+        tableLabelFor(value: string) {
+          const opt = this.tableOptions.find((o: any) => o.value === value);
+          return opt ? opt.label : value;
+        },
+
+        startRebook() {
+          // Reset form for new booking
+          this.form = {
+            date: this.availableDates[0]?.iso || '',
+            people: 2,
+            time: '',
+            table_preference: 'any',
+            notes: '',
+          };
+          // Mark existingBooking as gone so we land on the form, not the status view
+          this.existingBooking = null;
+          this.view = 'form';
+        },
+
+        setDate(iso: string) {
+          this.form.date = iso;
+          if (this.form.time && !this.slots.includes(this.form.time)) {
+            this.form.time = '';
+          }
+        },
+
+        async submitBooking() {
+          if (!this.canSubmit || this.submitting) return;
+          this.submitting = true;
+          this.errorMsg = '';
+
+          try {
+            const resp = await fetch('/api/bookings/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: this.accessToken,
+                type: 'breakfast',
+                details: {
+                  date: this.form.date,
+                  time: this.form.time,
+                  people: this.form.people,
+                  table_preference: this.form.table_preference,
+                  notes: this.form.notes || null,
+                },
+              }),
+            });
+
+            const data = await resp.json();
+
+            if (!data.ok) {
+              this.errorMsg = `${this.labels.errorPrefix}: ${data.error || 'unknown'}`;
+              this.submitting = false;
+              return;
+            }
+
+            this.existingBooking = {
+              id: data.booking.id,
+              status: 'pending',
+              details: {
+                date: this.form.date,
+                time: this.form.time,
+                people: this.form.people,
+                table_preference: this.form.table_preference,
+                notes: this.form.notes,
+              },
+            };
+            this.view = 'status';
+            this.submitting = false;
+          } catch (e: any) {
+            this.errorMsg = `${this.labels.errorPrefix}: ${e.message || 'network error'}`;
+            this.submitting = false;
+          }
         },
       }));
 
