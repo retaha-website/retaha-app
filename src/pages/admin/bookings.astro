@@ -1,0 +1,69 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+const { data: bookings } = await client
+  .from('bookings')
+  .select('id, type, status, details, created_at, stay:stays(guest:guests(first_name, last_name))')
+  .eq('hotel_id', hotel.id)
+  .order('created_at', { ascending: false })
+  .limit(50);
+---
+
+<AdminLayout title="Buchungen" hotel={hotel} user={user} activeTab="bookings">
+  <div class="mb-8">
+    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Buchungen —</p>
+    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">reserviert haben</span><span class="text-red-700">.</span></h1>
+  </div>
+
+  {(!bookings || bookings.length === 0) ? (
+    <div class="bg-white border border-stone-200 p-12 text-center">
+      <p class="text-stone-500 italic" style="font-family: Georgia, serif;">
+        Noch keine Buchungen.
+      </p>
+      <p class="text-xs text-stone-400 mt-3">
+        Sobald ein Gast einen Tisch reserviert oder eine Anfrage stellt, taucht es hier auf.
+      </p>
+    </div>
+  ) : (
+    <div class="bg-white border border-stone-200">
+      <table class="w-full text-sm">
+        <thead class="bg-stone-50 border-b border-stone-200">
+          <tr>
+            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Zeit</th>
+            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Gast</th>
+            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Art</th>
+            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Details</th>
+            <th class="text-left p-4 font-medium text-stone-500 text-xs uppercase tracking-widest">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-200">
+          {bookings.map((b: any) => (
+            <tr class="hover:bg-stone-50">
+              <td class="p-4 text-stone-500 text-xs">{new Date(b.created_at).toLocaleString('de-DE')}</td>
+              <td class="p-4">{b.stay?.guest?.first_name} {b.stay?.guest?.last_name}</td>
+              <td class="p-4 capitalize">{b.type}</td>
+              <td class="p-4 text-xs text-stone-600 font-mono">{JSON.stringify(b.details)}</td>
+              <td class="p-4">
+                <span class={`px-2 py-1 text-xs rounded ${
+                  b.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                  b.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-stone-100 text-stone-600'
+                }`}>{b.status}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</AdminLayout>

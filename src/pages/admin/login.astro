@@ -1,0 +1,122 @@
+---
+import { getUser } from '../../lib/auth';
+
+// If already logged in, redirect to dashboard
+const user = await getUser(Astro.cookies, Astro.request);
+if (user) {
+  return Astro.redirect('/admin/dashboard');
+}
+
+// Handle form POST
+let message: string | null = null;
+let isError = false;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const email = form.get('email')?.toString().trim();
+
+  if (!email) {
+    message = 'Bitte Email-Adresse eingeben.';
+    isError = true;
+  } else {
+    const { createSupabaseServerInstance } = await import('../../lib/auth');
+    const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${new URL(Astro.request.url).origin}/admin/auth/callback`,
+      },
+    });
+
+    if (error) {
+      message = `Fehler: ${error.message}`;
+      isError = true;
+    } else {
+      message = `Link gesendet an ${email}. Schau in dein Postfach.`;
+      isError = false;
+    }
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>retaha · login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body class="min-h-screen flex items-center justify-center bg-stone-50 font-sans antialiased">
+    <main class="max-w-sm w-full px-8">
+      <div class="mb-12">
+        <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">
+          — retaha · backoffice —
+        </p>
+        <h1 class="text-3xl font-light text-stone-900">
+          Hallo<span class="text-red-700">.</span>
+        </h1>
+        <p class="text-sm text-stone-600 mt-2 italic" style="font-family: Georgia, serif;">
+          Email-Adresse eingeben — wir schicken dir einen Link zum Einloggen.
+        </p>
+      </div>
+
+      <form method="POST" class="space-y-4">
+        <div>
+          <label for="email" class="block text-xs uppercase tracking-widest text-stone-500 mb-2">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+            autofocus
+            class="w-full px-4 py-3 border border-stone-300 bg-white text-stone-900 focus:outline-none focus:border-stone-900 transition"
+            placeholder="du@hotel.de"
+          />
+        </div>
+
+        <button
+          type="submit"
+          class="w-full bg-stone-900 text-stone-50 py-3 px-6 hover:bg-red-900 transition font-medium text-sm tracking-wide"
+        >
+          Link senden
+        </button>
+      </form>
+
+      {message && (
+        <p class={`mt-6 text-sm ${isError ? 'text-red-700' : 'text-green-800'}`}>
+          {message}
+        </p>
+      )}
+
+      <p class="mt-12 text-xs text-stone-400 italic text-center" style="font-family: Georgia, serif;">
+        Du brauchst noch keinen Account? <br />
+        Schreib uns an taha@retaha.de.
+      </p>
+
+      {import.meta.env.DEV && (
+        <div class="mt-12 pt-8 border-t border-dashed border-stone-300">
+          <p class="text-xs uppercase tracking-widest text-stone-400 mb-3">— DEV ONLY —</p>
+          <form method="POST" action="/admin/auth/dev-login" class="space-y-2">
+            <input
+              name="email"
+              type="email"
+              placeholder="dev login: email eingeben"
+              class="w-full px-3 py-2 border border-dashed border-stone-300 bg-stone-50 text-xs"
+            />
+            <button type="submit" class="w-full bg-stone-200 text-stone-700 py-2 text-xs hover:bg-stone-300 transition">
+              Dev-Login (kein Email-Versand)
+            </button>
+          </form>
+          <p class="text-[10px] text-stone-400 mt-2 italic">
+            Dieser Login funktioniert nur lokal. In Production wird das Feld nicht angezeigt.
+          </p>
+        </div>
+      )}
+    </main>
+  </body>
+</html>

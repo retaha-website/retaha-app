@@ -1,0 +1,70 @@
+---
+interface Props {
+  title: string;
+  hotel: { name: string; slug: string };
+  user: { email: string };
+  activeTab: 'overview' | 'recommendations' | 'features' | 'bookings' | 'settings';
+}
+
+const { title, hotel, user, activeTab } = Astro.props;
+
+const tabs = [
+  { id: 'overview', label: 'Übersicht', href: '/admin/dashboard' },
+  { id: 'recommendations', label: 'Empfehlungen', href: '/admin/recommendations' },
+  { id: 'features', label: 'Funktionen', href: '/admin/features' },
+  { id: 'bookings', label: 'Buchungen', href: '/admin/bookings' },
+  { id: 'settings', label: 'Einstellungen', href: '/admin/settings' },
+];
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · retaha backoffice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="min-h-screen bg-stone-50 font-sans antialiased text-stone-900">
+    <!-- Top bar -->
+    <header class="border-b border-stone-200 bg-white sticky top-0 z-10">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="flex items-baseline gap-3">
+          <span class="text-xs italic text-red-700" style="font-family: Georgia, serif;">— retaha</span>
+          <span class="text-base font-medium">{hotel.name}</span>
+          <span class="text-xs text-stone-400 font-mono">/{hotel.slug}</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-xs text-stone-500">{user.email}</span>
+          <form method="POST" action="/admin/auth/logout">
+            <button type="submit" class="text-xs text-stone-500 hover:text-red-700 transition">
+              Abmelden
+            </button>
+          </form>
+        </div>
+      </div>
+      <!-- Tabs -->
+      <nav class="max-w-6xl mx-auto px-6 flex gap-1">
+        {tabs.map(tab => (
+          <a
+            href={tab.href}
+            class={`px-4 py-3 text-sm border-b-2 transition ${
+              activeTab === tab.id
+                ? 'border-red-700 text-stone-900 font-medium'
+                : 'border-transparent text-stone-500 hover:text-stone-900'
+            }`}
+          >
+            {tab.label}
+          </a>
+        ))}
+      </nav>
+    </header>
+
+    <!-- Page content -->
+    <main class="max-w-6xl mx-auto px-6 py-10">
+      <slot />
+    </main>
+  </body>
+</html>

@@ -1,0 +1,339 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+// Handle POST (save)
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const recsJson = form.get('recommendations')?.toString();
+
+  if (recsJson) {
+    try {
+      const recs = JSON.parse(recsJson);
+      if (!Array.isArray(recs)) throw new Error('Empfehlungen müssen Array sein');
+
+      const { error } = await client
+        .from('hotel_settings')
+        .update({ recommendations: recs, updated_at: new Date().toISOString() })
+        .eq('hotel_id', hotel.id);
+
+      if (error) {
+        message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      } else {
+        message = { type: 'success', text: 'Empfehlungen gespeichert.' };
+      }
+    } catch (e) {
+      message = { type: 'error', text: `Ungültige Daten: ${e instanceof Error ? e.message : 'unbekannt'}` };
+    }
+  }
+}
+
+// Load current state
+const { data: settings } = await client
+  .from('hotel_settings')
+  .select('recommendations')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+
+const recommendations = (settings?.recommendations as any[]) || [];
+
+const cardStyles = [
+  { value: 'rec-burgund', label: 'Burgund (Statement)' },
+  { value: 'rec-anthrazit', label: 'Anthrazit (Brücke)' },
+  { value: 'rec-bone', label: 'Bone (Brutalist)' },
+];
+
+const actions = [
+  { value: 'open_breakfast', label: 'Frühstück-Sheet öffnen' },
+  { value: 'open_conference', label: 'Konferenz-Sheet öffnen' },
+  { value: 'open_wallet', label: 'Wallet-Sheet öffnen' },
+  { value: 'open_concierge', label: 'Concierge-Chat öffnen' },
+  { value: 'open_berlin', label: 'Berlin-Tipps öffnen' },
+];
+
+const languages = [
+  { code: 'de', label: 'Deutsch', flag: 'DE' },
+  { code: 'en', label: 'English', flag: 'EN' },
+  { code: 'fr', label: 'Français', flag: 'FR' },
+  { code: 'es', label: 'Español', flag: 'ES' },
+];
+---
+
+<AdminLayout title="Empfehlungen" hotel={hotel} user={user} activeTab="recommendations">
+  <div class="mb-8">
+    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Empfehlungen —</p>
+    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">sehen sollen</span><span class="text-red-700">.</span></h1>
+    <p class="text-sm text-stone-600 mt-3 max-w-xl">
+      Drei Empfehlungs-Karten im Slider direkt unter dem Hero. Jede Karte hat einen Stil
+      (Burgund, Anthrazit, Bone) und führt zu einer Aktion. Du kannst pro Karte vier Sprachen einpflegen.
+    </p>
+  </div>
+
+  {message && (
+    <div class={`mb-6 px-4 py-3 text-sm ${
+      message.type === 'success'
+        ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
+        : 'bg-red-50 border-l-4 border-red-700 text-red-800'
+    }`}>
+      {message.text}
+    </div>
+  )}
+
+  <form method="POST" id="rec-form">
+    <div id="cards-container" class="space-y-4 mb-6"></div>
+
+    <input type="hidden" name="recommendations" id="recommendations-input" />
+
+    <div class="flex justify-between items-center pt-6 border-t border-stone-200">
+      <button
+        type="button"
+        id="add-card-btn"
+        class="text-sm text-stone-700 hover:text-red-700 transition border border-stone-300 px-4 py-2 hover:border-red-700"
+      >
+        + Neue Karte hinzufügen
+      </button>
+      <button
+        type="submit"
+        class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium"
+      >
+        Änderungen speichern
+      </button>
+    </div>
+  </form>
+
+  <script is:inline define:vars={{ initialRecs: recommendations, cardStyles, actions, languages }}>
+    let cards = JSON.parse(JSON.stringify(initialRecs));
+    // Active language per card (default DE)
+    let activeLang = cards.map(() => 'de');
+
+    function render() {
+      const container = document.getElementById('cards-container');
+      container.innerHTML = '';
+
+      cards.forEach((card, idx) => {
+        const lang = activeLang[idx] || 'de';
+        const div = document.createElement('div');
+        div.className = 'bg-white border border-stone-200 p-6';
+
+        // Build language tabs
+        const tabsHtml = languages.map(l => `
+          <button type="button" data-action="lang" data-idx="${idx}" data-lang="${l.code}"
+            class="px-3 py-1.5 text-xs font-mono transition ${
+              lang === l.code
+                ? 'bg-stone-900 text-stone-50'
+                : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+            }">
+            ${l.flag}
+          </button>
+        `).join('');
+
+        div.innerHTML = `
+          <div class="flex justify-between items-start mb-4">
+            <div class="flex items-center gap-3">
+              <span class="bg-stone-100 text-stone-600 text-xs px-2 py-1 font-mono">Karte ${idx + 1}</span>
+              <div class="flex gap-1">${tabsHtml}</div>
+            </div>
+            <button type="button" data-action="delete" data-idx="${idx}" class="text-xs text-stone-400 hover:text-red-700">
+              Entfernen
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <label class="block">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Eyebrow (${lang.toUpperCase()})</span>
+              <input type="text" data-idx="${idx}" data-field="eyebrow_${lang}" value="${escapeHtml(card['eyebrow_' + lang] || '')}"
+                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+            </label>
+
+            <label class="block">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Kartenstil <span class="text-stone-400 normal-case">(alle Sprachen)</span></span>
+              <select data-idx="${idx}" data-field="card_class"
+                class="w-full px-3 py-2 border border-stone-300 text-sm bg-white focus:outline-none focus:border-stone-900">
+                ${cardStyles.map(s => `<option value="${s.value}" ${card.card_class === s.value ? 'selected' : ''}>${s.label}</option>`).join('')}
+              </select>
+            </label>
+
+            <label class="block col-span-2">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Titel (${lang.toUpperCase()})</span>
+              <input type="text" data-idx="${idx}" data-field="title_${lang}" value="${escapeHtml(card['title_' + lang] || '')}"
+                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+            </label>
+
+            <label class="block col-span-2">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Untertitel (${lang.toUpperCase()})</span>
+              <textarea data-idx="${idx}" data-field="sub_${lang}" rows="2"
+                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(card['sub_' + lang] || '')}</textarea>
+            </label>
+
+            <label class="block">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">CTA-Button (${lang.toUpperCase()})</span>
+              <input type="text" data-idx="${idx}" data-field="cta_${lang}" value="${escapeHtml(card['cta_' + lang] || '')}"
+                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+            </label>
+
+            <label class="block">
+              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Aktion bei Klick <span class="text-stone-400 normal-case">(alle Sprachen)</span></span>
+              <select data-idx="${idx}" data-field="action"
+                class="w-full px-3 py-2 border border-stone-300 text-sm bg-white focus:outline-none focus:border-stone-900">
+                ${actions.map(a => `<option value="${a.value}" ${card.action === a.value ? 'selected' : ''}>${a.label}</option>`).join('')}
+              </select>
+            </label>
+
+            <div class="col-span-2 flex items-center justify-between gap-3 pt-4 mt-2 border-t border-stone-100">
+              <div>
+                <p class="text-xs text-stone-500 italic" style="font-family: Georgia, serif;">
+                  DE-Texte automatisch in EN, FR, ES übersetzen
+                </p>
+                <p class="text-[10px] text-stone-400 mt-0.5">
+                  überschreibt vorhandene Übersetzungen
+                </p>
+              </div>
+              <button type="button" data-action="translate" data-idx="${idx}"
+                class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
+                <span>Aus DE übersetzen</span>
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+
+      // Bind inputs
+      container.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', e => {
+          const idx = parseInt(e.target.dataset.idx);
+          const field = e.target.dataset.field;
+          cards[idx][field] = e.target.value;
+        });
+      });
+
+      // Bind language tab buttons
+      container.querySelectorAll('[data-action="lang"]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const idx = parseInt(e.currentTarget.dataset.idx);
+          const lang = e.currentTarget.dataset.lang;
+          activeLang[idx] = lang;
+          render();
+        });
+      });
+
+      // Bind translate buttons
+      container.querySelectorAll('[data-action="translate"]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const idx = parseInt(e.currentTarget.dataset.idx);
+          const card = cards[idx];
+
+          // Visual feedback
+          const originalText = e.currentTarget.innerHTML;
+          e.currentTarget.disabled = true;
+          e.currentTarget.innerHTML = '<span class="text-xs">Übersetze...</span>';
+
+          try {
+            const resp = await fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                source: 'de',
+                targets: ['en', 'fr', 'es'],
+                fields: {
+                  eyebrow_de: card.eyebrow_de || '',
+                  title_de: card.title_de || '',
+                  sub_de: card.sub_de || '',
+                  cta_de: card.cta_de || '',
+                },
+              }),
+            });
+
+            const data = await resp.json();
+
+            if (!data.ok) {
+              alert('Übersetzung fehlgeschlagen: ' + (data.error || 'unbekannt'));
+              return;
+            }
+
+            // Apply translations to the card
+            ['en', 'fr', 'es'].forEach(target => {
+              const trans = data.result[target];
+              if (!trans) return;
+              if (trans.eyebrow !== undefined) cards[idx]['eyebrow_' + target] = trans.eyebrow;
+              if (trans.title !== undefined) cards[idx]['title_' + target] = trans.title;
+              if (trans.sub !== undefined) cards[idx]['sub_' + target] = trans.sub;
+              if (trans.cta !== undefined) cards[idx]['cta_' + target] = trans.cta;
+            });
+
+            // Visual confirmation: re-render
+            render();
+
+            // Show toast-like message
+            const msg = document.createElement('div');
+            msg.className = 'fixed top-4 right-4 bg-green-700 text-white px-4 py-3 text-sm shadow-lg z-50';
+            msg.textContent = 'Übersetzt — vergiss nicht zu speichern.';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 4000);
+          } catch (err) {
+            alert('Fehler: ' + (err.message || 'unbekannt'));
+          } finally {
+            // Restore button if still in DOM (re-render may have replaced it)
+            const btn = document.querySelector(`[data-action="translate"][data-idx="${idx}"]`);
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = originalText;
+            }
+          }
+        });
+      });
+
+      // Bind delete buttons
+      container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const idx = parseInt(e.currentTarget.dataset.idx);
+          if (confirm('Karte wirklich entfernen?')) {
+            cards.splice(idx, 1);
+            activeLang.splice(idx, 1);
+            render();
+          }
+        });
+      });
+
+      document.getElementById('recommendations-input').value = JSON.stringify(cards);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    document.getElementById('add-card-btn').addEventListener('click', () => {
+      cards.push({
+        id: 'card-' + Date.now(),
+        eyebrow_de: '', eyebrow_en: '', eyebrow_fr: '', eyebrow_es: '',
+        title_de: 'Neue Empfehlung', title_en: '', title_fr: '', title_es: '',
+        sub_de: '', sub_en: '', sub_fr: '', sub_es: '',
+        cta_de: 'Mehr erfahren', cta_en: '', cta_fr: '', cta_es: '',
+        card_class: 'rec-bone',
+        action: 'open_breakfast',
+      });
+      activeLang.push('de');
+      render();
+    });
+
+    document.getElementById('rec-form').addEventListener('submit', () => {
+      document.getElementById('recommendations-input').value = JSON.stringify(cards);
+    });
+
+    render();
+  </script>
+</AdminLayout>

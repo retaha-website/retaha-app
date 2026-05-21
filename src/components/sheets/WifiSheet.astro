@@ -1,0 +1,116 @@
+---
+import Sheet from '../Sheet.astro';
+
+interface Props {
+  hotelId: string;
+  ssid: string;
+  password: string;
+  speedMbits: number;
+  lang: 'de' | 'en' | 'fr' | 'es';
+}
+const { hotelId, ssid, password, speedMbits, lang } = Astro.props;
+
+const labels = {
+  de: {
+    eyebrow: '— Verbindung —',
+    title: 'WLAN ist',
+    titleAccent: ' bereit',
+    subtitle: 'Schnell verbunden — direkt loslegen.',
+    networkLabel: 'Netzwerk',
+    passwordLabel: 'Passwort',
+    speedLabel: 'Geschwindigkeit',
+    copy: 'Kopieren',
+    copied: 'Kopiert',
+    qrHint: 'Mit Handy-Kamera scannen für automatische Verbindung.',
+  },
+  en: {
+    eyebrow: '— Connection —',
+    title: 'Wi-Fi is',
+    titleAccent: ' ready',
+    subtitle: 'Connect fast — get started.',
+    networkLabel: 'Network',
+    passwordLabel: 'Password',
+    speedLabel: 'Speed',
+    copy: 'Copy',
+    copied: 'Copied',
+    qrHint: 'Scan with phone camera to auto-connect.',
+  },
+  fr: {
+    eyebrow: '— Connexion —',
+    title: 'Wi-Fi est',
+    titleAccent: ' prêt',
+    subtitle: 'Connexion rapide — c\'est parti.',
+    networkLabel: 'Réseau',
+    passwordLabel: 'Mot de passe',
+    speedLabel: 'Vitesse',
+    copy: 'Copier',
+    copied: 'Copié',
+    qrHint: 'Scannez avec la caméra pour vous connecter automatiquement.',
+  },
+  es: {
+    eyebrow: '— Conexión —',
+    title: 'Wi-Fi está',
+    titleAccent: ' listo',
+    subtitle: 'Conéctate rápido — empieza ya.',
+    networkLabel: 'Red',
+    passwordLabel: 'Contraseña',
+    speedLabel: 'Velocidad',
+    copy: 'Copiar',
+    copied: 'Copiado',
+    qrHint: 'Escanea con la cámara para conectar automáticamente.',
+  },
+};
+const l = labels[lang];
+---
+
+<Sheet id="wifi" eyebrow={l.eyebrow} title={l.title} titleAccent={l.titleAccent} subtitle={l.subtitle}>
+  <div class="wifi-card">
+    <div class="wifi-eyebrow">— The Gate · Wi-Fi —</div>
+
+    <div class="wifi-row">
+      <div>
+        <div class="label">{l.networkLabel}</div>
+        <div class="value">{ssid}</div>
+      </div>
+      <button class="wifi-copy" type="button" @click={`copyText('${ssid}', $event)`} aria-label={l.copy}>
+        <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <div class="wifi-row password">
+      <div>
+        <div class="label">{l.passwordLabel}</div>
+        <div class="value">{password}</div>
+      </div>
+      <button class="wifi-copy" type="button" @click={`copyText('${password}', $event)`} aria-label={l.copy}>
+        <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <div class="wifi-row">
+      <div>
+        <div class="label">{l.speedLabel}</div>
+        <div class="value">{speedMbits} Mbit/s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wifi-qr-section">
+    <p>{l.qrHint}</p>
+    <div class="wifi-qr">
+      <img src={`/api/qr/wifi/${hotelId}`} alt="WiFi QR Code" width="180" height="180" />
+    </div>
+  </div>
+</Sheet>

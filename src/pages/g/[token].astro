@@ -1,0 +1,547 @@
+---
+import { loadStayByToken } from '../../lib/queries';
+import { normalizeLang, t, dayPart, pick, type Lang } from '../../lib/i18n';
+import WeatherIcon from '../../components/WeatherIcon.astro';
+import WifiSheet from '../../components/sheets/WifiSheet.astro';
+import '../../styles/retaha.css';
+
+const { token } = Astro.params;
+const ctx = token ? await loadStayByToken(token) : null;
+
+if (!ctx) {
+  return new Response('Stay not found or expired', { status: 404 });
+}
+
+const { stay, guest, room, hotel, settings } = ctx;
+
+const langParam = new URL(Astro.request.url).searchParams.get('lang');
+const lang: Lang = normalizeLang(langParam || guest.language || hotel.default_language);
+
+const welcomeMap: Record<Lang, string | null> = {
+  de: settings.welcome_message_de,
+  en: settings.welcome_message_en,
+  fr: settings.welcome_message_fr,
+  es: settings.welcome_message_es,
+};
+const welcomeMsg = welcomeMap[lang] || settings.welcome_message_de;
+
+const eyebrowMap: Record<Lang, string | null> = {
+  de: settings.hotel_eyebrow_de,
+  en: settings.hotel_eyebrow_en,
+  fr: settings.hotel_eyebrow_fr,
+  es: settings.hotel_eyebrow_es,
+};
+const hotelEyebrow = eyebrowMap[lang] || settings.hotel_eyebrow_de || (hotel.city || '');
+
+const greetingLabel = t('hero.greeting', lang);
+const greetingFallback = t('hero.greetingFallback', lang);
+const greetingName = guest.first_name
+  ? `${greetingLabel} ${guest.first_name}`
+  : greetingFallback;
+
+const visitOrdinals: Record<Lang, string> = {
+  de: `dein ${guest.visit_count}. Besuch`,
+  en: `your ${guest.visit_count}${guest.visit_count === 1 ? 'st' : guest.visit_count === 2 ? 'nd' : guest.visit_count === 3 ? 'rd' : 'th'} visit`,
+  fr: `votre ${guest.visit_count}${guest.visit_count === 1 ? 'ère' : 'ème'} visite`,
+  es: `tu ${guest.visit_count}ª visita`,
+};
+const visitText = visitOrdinals[lang];
+
+const checkOutDate = new Date(stay.check_out);
+const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+const checkOutLabel = checkOutDate.toLocaleDateString(localeMap[lang], {
+  weekday: 'short', day: '2-digit', month: 'short',
+});
+
+const now = new Date();
+const dayPartLabel = dayPart(lang, now.getHours());
+const dateLabel = now.toLocaleDateString(localeMap[lang], { weekday: 'long', day: 'numeric', month: 'short' });
+
+const recs = (settings.recommendations as any[]).map(rec => ({
+  id: rec.id,
+  eyebrow: pick(rec, 'eyebrow', lang),
+  title: pick(rec, 'title', lang),
+  sub: pick(rec, 'sub', lang),
+  cta: pick(rec, 'cta', lang),
+  cardClass: rec.card_class || 'rec-bone',
+  icon: rec.id === 'garden' ? 'sun' : rec.id === 'conference' ? 'square' : 'triangle',
+}));
+
+const weather = {
+  temperature: 21,
+  iconType: 'partly' as 'sun' | 'partly' | 'cloud' | 'rain' | 'night',
+  labelKey: 'weather.partly' as const,
+};
+
+const f = settings.features;
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1A1A1A" />
+    <title>{hotel.name} · {greetingName}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="gate-guest">
+    <main x-data="guestPage" x-cloak>
+      <!-- HERO -->
+      <section class="gate-hero">
+        <div class="gate-hero-bg"></div>
+        <div class="gate-hero-overlay"></div>
+        <div class="gate-hero-content">
+          <div class="gate-hero-top">
+            <div class="gate-hero-tag">
+              <span class="gate-hero-tag-shapes">
+                <span class="circle"></span>
+                <span class="square"></span>
+                <span class="triangle"></span>
+              </span>
+              <span>{hotelEyebrow}</span>
+            </div>
+            <div class="lang-switcher">
+              <a href={switchUrl('de')} class={`lang-btn ${lang === 'de' ? 'active' : ''}`}>DE</a>
+              <a href={switchUrl('en')} class={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</a>
+              <a href={switchUrl('fr')} class={`lang-btn ${lang === 'fr' ? 'active' : ''}`}>FR</a>
+              <a href={switchUrl('es')} class={`lang-btn ${lang === 'es' ? 'active' : ''}`}>ES</a>
+            </div>
+          </div>
+
+          <img class="gate-hero-logo" src="/hotel-assets/logo-thegate.svg" alt={hotel.name} />
+
+          <div class="gate-hero-welcome">
+            <div class="gate-hero-kicker">{t('hero.kicker', lang)}</div>
+            <h1 class="gate-hero-greeting">
+              {greetingName}<span class="dot">.</span>
+            </h1>
+            <p class="gate-hero-sub">{welcomeMsg} — {visitText}.</p>
+          </div>
+
+          <div class="gate-hero-stay">
+            <div class="gate-hero-stay-block">
+              <div class="label">{t('hero.stay.room', lang)}</div>
+              <div class="value">{room.room_number} · {room.room_name}</div>
+            </div>
+            <div class="gate-hero-stay-block">
+              <div class="label">{t('hero.stay.departure', lang)}</div>
+              <div class="value">{checkOutLabel}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MARIA'S CARD -->
+      <div class="gate-recommend-card">
+        <div class="gate-recommend-card-left">
+          <div class="gate-recommend-eyebrow">{t('maria.eyebrow', lang)}</div>
+          <p class="gate-recommend-text">{t('maria.text.default', lang)}</p>
+        </div>
+        <div class="gate-recommend-weather">
+          <WeatherIcon type={weather.iconType} />
+          <span class="weather-readout">
+            <span class="weather-readout-temp">{weather.temperature}°</span>
+            <span class="weather-readout-label">{t(weather.labelKey, lang)}</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- RECOMMENDATION SLIDER -->
+      {recs.length > 0 && (
+        <section class="rec-slider-section">
+          <div class="rec-slider-eyebrow">{t('rec.eyebrow', lang)}</div>
+          <div class="rec-slider"
+               @pointerdown="startRecSwipe($event)"
+               @touchstart.passive="startRecSwipeTouch($event)">
+            <div class="rec-slider-track"
+                 :style="`transform: translateX(calc(-${recSlideIndex * 100}% + ${recDragOffset}px))`"
+                 :class="{ dragging: recIsDragging }">
+              {recs.map((rec) => (
+                <div class="rec-slide">
+                  <div class={`rec-card ${rec.cardClass}`}>
+                    <span class="rec-card-icon">
+                      {rec.icon === 'sun' && (
+                        <svg viewBox="0 0 100 100" style="overflow:visible">
+                          <circle cx="50" cy="50" r="36" fill="currentColor" opacity="0.18" style="transform-origin:center;animation:sunHaloBreath 3.2s ease-in-out infinite"/>
+                          <circle cx="50" cy="50" r="18" fill="currentColor" style="transform-origin:center;animation:sunOrbBreath 3.2s ease-in-out infinite"/>
+                          <g stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none">
+                            <line class="sun-ray sun-ray-1" x1="50" y1="6"  x2="50" y2="16"/>
+                            <line class="sun-ray sun-ray-2" x1="81" y1="19" x2="74" y2="26"/>
+                            <line class="sun-ray sun-ray-3" x1="94" y1="50" x2="84" y2="50"/>
+                            <line class="sun-ray sun-ray-4" x1="81" y1="81" x2="74" y2="74"/>
+                            <line class="sun-ray sun-ray-5" x1="50" y1="94" x2="50" y2="84"/>
+                            <line class="sun-ray sun-ray-6" x1="19" y1="81" x2="26" y2="74"/>
+                            <line class="sun-ray sun-ray-7" x1="6"  y1="50" x2="16" y2="50"/>
+                            <line class="sun-ray sun-ray-8" x1="19" y1="19" x2="26" y2="26"/>
+                          </g>
+                        </svg>
+                      )}
+                      {rec.icon === 'square' && (
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor"><rect x="5" y="5" width="14" height="14"/></svg>
+                      )}
+                      {rec.icon === 'triangle' && (
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor"><polygon points="12,4 20,18 4,18"/></svg>
+                      )}
+                    </span>
+                    <div class="rec-card-eyebrow">{rec.eyebrow}</div>
+                    <div class="rec-card-title">{rec.title}</div>
+                    <div class="rec-card-sub">{rec.sub}</div>
+                    <button class="rec-card-cta" type="button">{rec.cta}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="rec-slider-dots">
+            {recs.map((_, i) => (
+              <button class="rec-slider-dot" :class={`{ active: recSlideIndex === ${i} }`} @click={`setRecSlide(${i})`} type="button" aria-label={`Slide ${i+1}`}></button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <!-- ACTION TILES -->
+      <section class="gate-actions">
+        <div class="gate-actions-head">
+          <div class="gate-actions-eyebrow">{t('actions.eyebrow', lang)}</div>
+          <div class="gate-actions-time">{dayPartLabel} · {dateLabel}</div>
+        </div>
+
+        <div class="gate-grid">
+          <button class="gate-tile" type="button" @click="openSheet('wifi')">
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5 a16 16 0 0 1 20 0"/><path d="M5 12 a11 11 0 0 1 14 0"/><path d="M8.5 15.5 a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+            </span>
+            <span class="gate-tile-label">{t('tile.wifi', lang)}</span>
+            <span class="gate-tile-sub">{t('tile.wifi.sub', lang)}</span>
+          </button>
+
+          {f.concierge_chat !== false && (
+            <button class="gate-tile" type="button">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.concierge', lang)}</span>
+              <span class="gate-tile-sub">{settings.concierge_name} · {t('tile.concierge.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.breakfast_reservation !== false && (
+            <button class="gate-tile" type="button">
+              <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.conference_booking !== false && (
+            <button class="gate-tile" type="button">
+              <span class="gate-tile-badge burgund">{t('tile.conference.badge', lang)}</span>
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="9" rx="1"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.conference', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.conference.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.service_requests !== false && (
+            <button class="gate-tile" type="button">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.service', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.service.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.berlin_tips !== false && (
+            <button class="gate-tile" type="button">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.berlin', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.berlin.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.checkout_flow !== false && (
+            <button class="gate-tile tile-checkout" type="button">
+              <div class="checkout-left">
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12 L10 17 L19 7"/></svg>
+                </span>
+                <div class="checkout-info">
+                  <span class="gate-tile-label">{t('tile.checkout.label', lang)}</span>
+                  <span class="gate-tile-sub">{t('tile.checkout.sub', lang)}</span>
+                </div>
+              </div>
+              <span class="arrow">›</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      <!-- MADE BY FOOTER -->
+      <div class="gate-made-by">
+        <span class="gate-made-by-shapes">
+          <span class="circle"></span>
+          <span class="square"></span>
+          <span class="triangle"></span>
+        </span>
+        <span>{t('footer.madeBy', lang)} </span>
+        <a href="https://retaha.de" target="_blank" rel="noopener">demo.retaha.de</a>
+      </div>
+
+      <!-- SHEETS (rendered as overlays) -->
+      <WifiSheet
+        hotelId={hotel.id}
+        ssid={settings.wifi_ssid || 'Gate-Guest'}
+        password={settings.wifi_password || ''}
+        speedMbits={settings.wifi_speed_mbits || 320}
+        lang={lang}
+      />
+    </main>
+
+    <script>
+      import Alpine from 'alpinejs';
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('guestPage', () => ({
+        recSlideIndex: 0,
+        recDragOffset: 0,
+        recIsDragging: false,
+        _swipeStart: 0,
+        _swipeStartTime: 0,
+
+        get slideCount() {
+          return document.querySelectorAll('.rec-slide').length;
+        },
+
+        setRecSlide(i: number) {
+          this.recSlideIndex = i;
+        },
+
+        startRecSwipe(event: PointerEvent) {
+          const target = event.target as HTMLElement;
+          if (target.closest('button')) return;
+          event.preventDefault();
+          this._swipeStart = event.clientX;
+          this._swipeStartTime = Date.now();
+          this.recIsDragging = true;
+          this.recDragOffset = 0;
+
+          const onMove = (e: PointerEvent) => {
+            const delta = e.clientX - this._swipeStart;
+            const max = this.slideCount - 1;
+            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
+              this.recDragOffset = delta * 0.3;
+            } else {
+              this.recDragOffset = delta;
+            }
+          };
+          const onEnd = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onEnd);
+            document.removeEventListener('pointercancel', onEnd);
+            this.recIsDragging = false;
+            const delta = this.recDragOffset;
+            const elapsed = Date.now() - this._swipeStartTime;
+            const velocity = Math.abs(delta) / elapsed;
+            const threshold = 60;
+            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
+            const max = this.slideCount - 1;
+            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
+              this.recSlideIndex++;
+            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
+              this.recSlideIndex--;
+            }
+            this.recDragOffset = 0;
+          };
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+          document.addEventListener('pointercancel', onEnd);
+        },
+
+        startRecSwipeTouch(event: TouchEvent) {
+          const target = event.target as HTMLElement;
+          if (target.closest('button')) return;
+          this._swipeStart = event.touches[0].clientX;
+          this._swipeStartTime = Date.now();
+          this.recIsDragging = true;
+          this.recDragOffset = 0;
+
+          const onMove = (e: TouchEvent) => {
+            const delta = e.touches[0].clientX - this._swipeStart;
+            const max = this.slideCount - 1;
+            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
+              this.recDragOffset = delta * 0.3;
+            } else {
+              this.recDragOffset = delta;
+            }
+          };
+          const onEnd = () => {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+            document.removeEventListener('touchcancel', onEnd);
+            this.recIsDragging = false;
+            const delta = this.recDragOffset;
+            const elapsed = Date.now() - this._swipeStartTime;
+            const velocity = Math.abs(delta) / elapsed;
+            const threshold = 60;
+            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
+            const max = this.slideCount - 1;
+            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
+              this.recSlideIndex++;
+            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
+              this.recSlideIndex--;
+            }
+            this.recDragOffset = 0;
+          };
+          document.addEventListener('touchmove', onMove, { passive: true });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
+        },
+
+        // Sheet state
+        activeSheet: null as string | null,
+        sheetDragOffset: 0,
+        sheetIsDragging: false,
+        _sheetDragStart: 0,
+
+        openSheet(id: string) {
+          this.activeSheet = id;
+          this.sheetDragOffset = 0;
+          document.body.style.overflow = 'hidden';
+        },
+
+        closeSheet() {
+          this.activeSheet = null;
+          this.sheetDragOffset = 0;
+          document.body.style.overflow = '';
+        },
+
+        copyText(text: string, event: Event) {
+          // Find the button first — needed for visual feedback regardless of copy method
+          let btn = event.target as HTMLElement;
+          while (btn && !btn.classList.contains('wifi-copy')) {
+            btn = btn.parentElement as HTMLElement;
+          }
+
+          const showFeedback = () => {
+            if (!btn) return;
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.classList.remove('copied');
+            }, 1500);
+          };
+
+          // Method 1: modern clipboard API (works on Chrome, Firefox, Safari macOS)
+          // CRITICAL: must be called synchronously, no await — iOS loses gesture trust on await
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              showFeedback();
+            }).catch((err) => {
+              console.warn('clipboard.writeText failed, trying fallback', err);
+              fallbackCopy(text);
+              showFeedback();
+            });
+          } else {
+            // Method 2: fallback for old iOS / restricted contexts
+            fallbackCopy(text);
+            showFeedback();
+          }
+
+          function fallbackCopy(value: string) {
+            try {
+              const textarea = document.createElement('textarea');
+              textarea.value = value;
+              textarea.setAttribute('readonly', '');
+              textarea.style.position = 'fixed';
+              textarea.style.top = '0';
+              textarea.style.left = '0';
+              textarea.style.opacity = '0';
+              textarea.style.pointerEvents = 'none';
+              document.body.appendChild(textarea);
+
+              // iOS Safari requires selecting via Range, not just .select()
+              const range = document.createRange();
+              range.selectNodeContents(textarea);
+              const selection = window.getSelection();
+              if (selection) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+              textarea.setSelectionRange(0, value.length);
+
+              document.execCommand('copy');
+              document.body.removeChild(textarea);
+            } catch (e) {
+              console.error('Fallback copy failed:', e);
+            }
+          }
+        },
+
+        startSheetDrag(event: PointerEvent) {
+          event.preventDefault();
+          this._sheetDragStart = event.clientY;
+          this.sheetIsDragging = true;
+          this.sheetDragOffset = 0;
+
+          const onMove = (e: PointerEvent) => {
+            const delta = e.clientY - this._sheetDragStart;
+            this.sheetDragOffset = Math.max(0, delta);
+          };
+          const onEnd = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onEnd);
+            document.removeEventListener('pointercancel', onEnd);
+            this.sheetIsDragging = false;
+            if (this.sheetDragOffset > 120) {
+              this.closeSheet();
+            } else {
+              this.sheetDragOffset = 0;
+            }
+          };
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+          document.addEventListener('pointercancel', onEnd);
+        },
+
+        startSheetDragTouch(event: TouchEvent) {
+          this._sheetDragStart = event.touches[0].clientY;
+          this.sheetIsDragging = true;
+          this.sheetDragOffset = 0;
+
+          const onMove = (e: TouchEvent) => {
+            const delta = e.touches[0].clientY - this._sheetDragStart;
+            this.sheetDragOffset = Math.max(0, delta);
+          };
+          const onEnd = () => {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+            document.removeEventListener('touchcancel', onEnd);
+            this.sheetIsDragging = false;
+            if (this.sheetDragOffset > 120) {
+              this.closeSheet();
+            } else {
+              this.sheetDragOffset = 0;
+            }
+          };
+          document.addEventListener('touchmove', onMove, { passive: true });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
+        },
+      }));
+
+      Alpine.start();
+    </script>
+  </body>
+</html>

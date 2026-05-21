@@ -1,0 +1,45 @@
+---
+import { createServerClient } from '../lib/supabase';
+
+const supabase = createServerClient();
+const { data: stays, error } = await supabase
+  .from('stays')
+  .select('access_token, guest:guests(first_name, last_name), hotel:hotels(name)')
+  .eq('is_active', true);
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>retaha-app · dev</title>
+  </head>
+  <body class="min-h-screen flex items-start justify-center font-mono p-8 bg-stone-50">
+    <div class="max-w-2xl space-y-6 mt-12">
+      <h1 class="text-2xl font-light">retaha-app · dev</h1>
+      <p class="text-sm text-stone-600">
+        Active stays. Click a token to open the guest view:
+      </p>
+
+      {error && <pre class="text-xs text-red-700 bg-red-50 p-3">{error.message}</pre>}
+
+      <ul class="space-y-2">
+        {stays?.map((s: any) => (
+          <li class="border border-stone-200 p-4 bg-white">
+            <a href={`/g/${s.access_token}`} class="block hover:bg-stone-50 -m-4 p-4 transition">
+              <div class="font-medium text-sm">
+                {s.guest?.first_name} {s.guest?.last_name}
+                <span class="text-stone-400 font-normal"> · {s.hotel?.name}</span>
+              </div>
+              <code class="text-[10px] text-stone-400">{s.access_token}</code>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {(!stays || stays.length === 0) && (
+        <p class="text-sm text-stone-500 italic">No active stays. Run the seed SQL.</p>
+      )}
+    </div>
+  </body>
+</html>
