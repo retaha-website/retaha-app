@@ -14,8 +14,9 @@ interface Props {
   checkOut: string;  // ISO date "2026-05-24"
   reservationEnabled: boolean;
   includedText: string;
+  menuItems: any[];
 }
-const { lang, startTime, endTime, slotMinutes, location, accessToken, existingBooking, conciergeName, checkIn, checkOut, reservationEnabled, includedText } = Astro.props;
+const { lang, startTime, endTime, slotMinutes, location, accessToken, existingBooking, conciergeName, checkIn, checkOut, reservationEnabled, includedText, menuItems } = Astro.props;
 
 // Local-date ISO string (YYYY-MM-DD) — avoids UTC drift from .toISOString()
 const toLocalIso = (d: Date) =>
@@ -97,6 +98,20 @@ const labels = {
     infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Ort',
     infoIncludedLabel: 'Was dich erwartet',
+    menuTabReservation: 'Reservieren',
+    menuTabInfo: 'Frühstück',
+    menuTabMenu: 'Karte',
+    menuFilterTitle: '— Allergene anzeigen —',
+    menuFilterHint: 'Wähle deine Allergene aus — Speisen mit diesen Zutaten werden markiert.',
+    menuFilterShowAll: 'Alle anzeigen',
+    menuFilterHideShow: 'Filter zurücksetzen',
+    menuWarningPrefix: 'Enthält',
+    menuFlagVegetarian: 'vegetarisch',
+    menuFlagVegan: 'vegan',
+    menuFlagOrganic: 'bio',
+    menuAllergensPrefix: 'Allergene:',
+    menuEmpty: 'Noch keine Speisen im Angebot.',
+    menuDisclaimer: 'Angaben durch das Hotel — bei Unsicherheit bitte direkt mit dem Service sprechen.',
   },
   en: {
     eyebrow: '— Breakfast —',
@@ -143,6 +158,20 @@ const labels = {
     infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Where',
     infoIncludedLabel: 'What to expect',
+    menuTabReservation: 'Reserve',
+    menuTabInfo: 'Breakfast',
+    menuTabMenu: 'Menu',
+    menuFilterTitle: '— Show allergens —',
+    menuFilterHint: 'Select your allergens — dishes with these ingredients will be marked.',
+    menuFilterShowAll: 'Show all',
+    menuFilterHideShow: 'Clear filter',
+    menuWarningPrefix: 'Contains',
+    menuFlagVegetarian: 'vegetarian',
+    menuFlagVegan: 'vegan',
+    menuFlagOrganic: 'organic',
+    menuAllergensPrefix: 'Allergens:',
+    menuEmpty: 'No dishes available yet.',
+    menuDisclaimer: 'Information provided by the hotel — please ask service for any uncertainty.',
   },
   fr: {
     eyebrow: '— Petit-déjeuner —',
@@ -189,6 +218,20 @@ const labels = {
     infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Où',
     infoIncludedLabel: 'Ce qui vous attend',
+    menuTabReservation: 'Réserver',
+    menuTabInfo: 'Petit-déjeuner',
+    menuTabMenu: 'Carte',
+    menuFilterTitle: '— Allergènes —',
+    menuFilterHint: 'Sélectionnez vos allergènes — les plats concernés seront marqués.',
+    menuFilterShowAll: 'Tout afficher',
+    menuFilterHideShow: 'Réinitialiser',
+    menuWarningPrefix: 'Contient',
+    menuFlagVegetarian: 'végétarien',
+    menuFlagVegan: 'végan',
+    menuFlagOrganic: 'bio',
+    menuAllergensPrefix: 'Allergènes :',
+    menuEmpty: 'Aucun plat disponible pour l\'instant.',
+    menuDisclaimer: 'Informations fournies par l\'hôtel — en cas de doute, parlez au service.',
   },
   es: {
     eyebrow: '— Desayuno —',
@@ -235,6 +278,20 @@ const labels = {
     infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Dónde',
     infoIncludedLabel: 'Qué te espera',
+    menuTabReservation: 'Reservar',
+    menuTabInfo: 'Desayuno',
+    menuTabMenu: 'Carta',
+    menuFilterTitle: '— Alérgenos —',
+    menuFilterHint: 'Selecciona tus alérgenos — los platos correspondientes serán marcados.',
+    menuFilterShowAll: 'Mostrar todo',
+    menuFilterHideShow: 'Borrar filtro',
+    menuWarningPrefix: 'Contiene',
+    menuFlagVegetarian: 'vegetariano',
+    menuFlagVegan: 'vegano',
+    menuFlagOrganic: 'ecológico',
+    menuAllergensPrefix: 'Alérgenos:',
+    menuEmpty: 'Aún no hay platos disponibles.',
+    menuDisclaimer: 'Datos proporcionados por el hotel — en caso de duda, hable con el servicio.',
   },
 };
 const l = labels[lang];
@@ -252,6 +309,38 @@ const tableOptions = [
 ];
 
 // Serialize for client-side use
+// Allergen labels for current language
+const allergenLabels: Record<string, string> = {
+  gluten: { de: 'Gluten', en: 'Gluten', fr: 'Gluten', es: 'Gluten' }[lang],
+  crustaceans: { de: 'Krebstiere', en: 'Crustaceans', fr: 'Crustacés', es: 'Crustáceos' }[lang],
+  eggs: { de: 'Eier', en: 'Eggs', fr: 'Œufs', es: 'Huevos' }[lang],
+  fish: { de: 'Fisch', en: 'Fish', fr: 'Poisson', es: 'Pescado' }[lang],
+  peanuts: { de: 'Erdnüsse', en: 'Peanuts', fr: 'Arachides', es: 'Cacahuetes' }[lang],
+  soy: { de: 'Soja', en: 'Soy', fr: 'Soja', es: 'Soja' }[lang],
+  milk: { de: 'Milch', en: 'Milk', fr: 'Lait', es: 'Leche' }[lang],
+  nuts: { de: 'Nüsse', en: 'Tree nuts', fr: 'Fruits à coque', es: 'Frutos secos' }[lang],
+  celery: { de: 'Sellerie', en: 'Celery', fr: 'Céleri', es: 'Apio' }[lang],
+  mustard: { de: 'Senf', en: 'Mustard', fr: 'Moutarde', es: 'Mostaza' }[lang],
+  sesame: { de: 'Sesam', en: 'Sesame', fr: 'Sésame', es: 'Sésamo' }[lang],
+  sulfites: { de: 'Sulfite', en: 'Sulphites', fr: 'Sulfites', es: 'Sulfitos' }[lang],
+  lupins: { de: 'Lupinen', en: 'Lupin', fr: 'Lupin', es: 'Altramuces' }[lang],
+  molluscs: { de: 'Weichtiere', en: 'Molluscs', fr: 'Mollusques', es: 'Moluscos' }[lang],
+};
+
+const ALLERGEN_KEYS = ['gluten','crustaceans','eggs','fish','peanuts','soy','milk','nuts','celery','mustard','sesame','sulfites','lupins','molluscs'];
+
+// Localize menu items
+const localizedItems = menuItems.map(item => ({
+  id: item.id,
+  category: item.category || 'Allgemein',
+  name: item[`name_${lang}`] || item.name_de,
+  description: item[`description_${lang}`] || item.description_de || '',
+  allergens: ALLERGEN_KEYS.filter(key => item[`contains_${key}`]),
+  isVegetarian: item.is_vegetarian,
+  isVegan: item.is_vegan,
+  isOrganic: item.is_organic,
+}));
+
 const sheetData = {
   stayRangeDates,        // alle ISO-Datums im Aufenthalt
   allSlots,              // alle möglichen Slots (Server-Zeitfenster)
@@ -266,6 +355,9 @@ const sheetData = {
   reservationEnabled,
   includedText,
   location,
+  menuItems: localizedItems,
+  allergenLabels,
+  allergenKeys: ALLERGEN_KEYS,
 };
 ---
 
@@ -277,6 +369,23 @@ const sheetData = {
   subtitle={reservationEnabled ? l.subtitle : l.infoSubtitle}
 >
   <div x-data={`breakfastForm(${JSON.stringify(sheetData)})`}>
+
+    <!-- Tab Navigation: nur sichtbar wenn Menu vorhanden -->
+    <div class="sheet-tabs" x-show="menuItems.length > 0">
+      <button type="button" class="sheet-tab"
+        :class="{ active: activeTab === 'main' }"
+        @click="activeTab = 'main'">
+        <span x-text="reservationEnabled ? labels.menuTabReservation : labels.menuTabInfo"></span>
+      </button>
+      <button type="button" class="sheet-tab"
+        :class="{ active: activeTab === 'menu' }"
+        @click="activeTab = 'menu'">
+        <span x-text="labels.menuTabMenu"></span>
+      </button>
+    </div>
+
+    <!-- Main tab: existing views -->
+    <div x-show="activeTab === 'main'">
 
     <!-- View 1: Existing booking status -->
     <template x-if="view === 'status'">
@@ -437,6 +546,86 @@ const sheetData = {
         </div>
       </div>
     </template>
+
+    </div>
+
+    <!-- Menu tab: Speisekarte -->
+    <div x-show="activeTab === 'menu'">
+
+      <!-- Allergen-Filter -->
+      <div class="menu-filter-section" x-show="!filterCollapsed">
+        <div class="menu-filter-title" x-text="labels.menuFilterTitle"></div>
+        <p class="menu-filter-hint" x-text="labels.menuFilterHint"></p>
+        <div class="menu-filter-chips">
+          <template x-for="key in allergenKeys" :key="key">
+            <button type="button" class="menu-filter-chip"
+              :class="{ active: selectedAllergens.includes(key) }"
+              @click="toggleAllergen(key)"
+              x-text="allergenLabels[key]"></button>
+          </template>
+        </div>
+        <button type="button" class="menu-filter-toggle"
+          @click="clearAllergenFilter()"
+          x-show="selectedAllergens.length > 0"
+          x-text="labels.menuFilterHideShow"></button>
+      </div>
+
+      <!-- Menu items grouped by category -->
+      <template x-if="menuItems.length === 0">
+        <div class="menu-empty" x-text="labels.menuEmpty"></div>
+      </template>
+
+      <template x-for="(items, category) in groupedMenuItems" :key="category">
+        <div class="menu-category">
+          <div class="menu-category-title" x-text="category"></div>
+          <div class="menu-items">
+            <template x-for="item in items" :key="item.id">
+              <div class="menu-item">
+                <div class="menu-item-header">
+                  <div class="menu-item-name" x-text="item.name"></div>
+                  <div class="menu-item-flags">
+                    <template x-if="item.isVegan">
+                      <span class="menu-flag" x-text="labels.menuFlagVegan"></span>
+                    </template>
+                    <template x-if="!item.isVegan && item.isVegetarian">
+                      <span class="menu-flag" x-text="labels.menuFlagVegetarian"></span>
+                    </template>
+                    <template x-if="item.isOrganic">
+                      <span class="menu-flag organic" x-text="labels.menuFlagOrganic"></span>
+                    </template>
+                  </div>
+                </div>
+                <div class="menu-item-description" x-text="item.description" x-show="item.description"></div>
+
+                <!-- Warnung nur wenn Allergen-Match -->
+                <template x-if="getMatchingAllergens(item).length > 0">
+                  <div class="menu-item-warning">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+                    </svg>
+                    <span>
+                      <span x-text="labels.menuWarningPrefix"></span>
+                      <span x-text="getMatchingAllergens(item).map(k => allergenLabels[k]).join(', ')"></span>
+                    </span>
+                  </div>
+                </template>
+
+                <!-- Generelle Allergen-Liste (nur wenn keine speziellen Allergene markiert) -->
+                <template x-if="item.allergens.length > 0 && selectedAllergens.length === 0">
+                  <div class="menu-item-allergens">
+                    <span x-text="labels.menuAllergensPrefix"></span>
+                    <span x-text="item.allergens.map(k => allergenLabels[k]).join(', ')"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Disclaimer -->
+      <div class="menu-disclaimer" x-text="labels.menuDisclaimer"></div>
+    </div>
 
   </div>
 </Sheet>
