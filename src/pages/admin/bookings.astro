@@ -1,7 +1,11 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels } from '../../lib/auth';
 import { loadBookingsForHotel } from '../../lib/queries';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -85,12 +89,14 @@ const statusLabels: Record<string, { label: string; class: string }> = {
 ---
 
 <AdminLayout title="Buchungen" hotel={hotel} user={user} activeTab="bookings">
-  <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Buchungen —</p>
-    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">gerade möchten</span><span class="text-red-700">.</span></h1>
-    <p class="text-sm text-stone-600 mt-3 max-w-xl">
-      Hier siehst du eingehende Reservierungen. Bestätige oder lehne sie ab — der Gast sieht den Status sofort.
-    </p>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.bookings.section_number', userLocale)}
+      sectionLabel={t('pages.bookings.section_label', userLocale)}
+      headlineLight={t('pages.bookings.headline_light', userLocale)}
+      headlineBold={t('pages.bookings.headline_bold', userLocale)}
+      subtitle={t('pages.bookings.subtitle', userLocale)}
+    />
   </div>
 
   <!-- Stats -->
@@ -182,7 +188,7 @@ const statusLabels: Record<string, { label: string; class: string }> = {
                     type="button"
                     data-action="confirm"
                     data-booking-id={b.id}
-                    class="bg-green-700 text-white px-3 py-1.5 text-xs hover:bg-green-800 transition font-medium"
+                    class="bauhaus-button bauhaus-button--primary bauhaus-button--small"
                   >
                     Bestätigen
                   </button>
@@ -192,7 +198,7 @@ const statusLabels: Record<string, { label: string; class: string }> = {
                     type="button"
                     data-action="cancel"
                     data-booking-id={b.id}
-                    class="bg-stone-200 text-stone-700 px-3 py-1.5 text-xs hover:bg-stone-300 transition font-medium"
+                    class="bauhaus-button bauhaus-button--secondary bauhaus-button--small"
                   >
                     Ablehnen
                   </button>
@@ -326,14 +332,14 @@ const statusLabels: Record<string, { label: string; class: string }> = {
         buttons.push({
           action: 'confirm',
           label: 'Bestätigen',
-          cls: 'bg-green-700 text-white px-3 py-1.5 text-xs hover:bg-green-800 transition font-medium',
+          cls: 'bauhaus-button bauhaus-button--primary bauhaus-button--small',
         });
       }
       if (status !== 'cancelled') {
         buttons.push({
           action: 'cancel',
           label: 'Ablehnen',
-          cls: 'bg-stone-200 text-stone-700 px-3 py-1.5 text-xs hover:bg-stone-300 transition font-medium',
+          cls: 'bauhaus-button bauhaus-button--secondary bauhaus-button--small',
         });
       }
       if (status !== 'pending') {

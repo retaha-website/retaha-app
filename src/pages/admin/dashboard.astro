@@ -1,13 +1,18 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+// User authenticated aber kein Hotel → Onboarding-Flow (statt Login-Error-Rückwurf)
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
 // Get settings + counts
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
@@ -31,31 +36,36 @@ const { count: stayCount } = await client
 ---
 
 <AdminLayout title="Übersicht" hotel={hotel} user={user} activeTab="overview">
-  <div class="mb-10">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Übersicht —</p>
-    <h1 class="text-3xl font-light">Hier ist <span class="font-medium">{hotel.name}</span><span class="text-red-700">.</span></h1>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.dashboard.section_number', userLocale)}
+      sectionLabel={t('pages.dashboard.section_label', userLocale)}
+      headlineLight={t('pages.dashboard.headline_light', userLocale)}
+      headlineBold={t('pages.dashboard.headline_bold', userLocale)}
+      subtitle={t('pages.dashboard.subtitle', userLocale)}
+    />
   </div>
 
   <div class="grid grid-cols-3 gap-4 mb-10">
-    <a href="/admin/recommendations" class="bg-white border border-stone-200 p-6 hover:border-red-700 transition group">
+    <a href="/admin/recommendations" class="bg-white border border-stone-200 p-6 hover:border-burgund transition group">
       <p class="text-xs italic text-stone-500 mb-3" style="font-family: Georgia, serif;">Empfehlungs-Karten</p>
       <p class="text-3xl font-light mb-1">{recCount}</p>
-      <p class="text-xs text-stone-400 group-hover:text-red-700 transition">bearbeiten →</p>
+      <p class="text-xs text-stone-400 group-hover:text-burgund transition">bearbeiten →</p>
     </a>
-    <a href="/admin/features" class="bg-white border border-stone-200 p-6 hover:border-red-700 transition group">
+    <a href="/admin/features" class="bg-white border border-stone-200 p-6 hover:border-burgund transition group">
       <p class="text-xs italic text-stone-500 mb-3" style="font-family: Georgia, serif;">Funktionen aktiv</p>
       <p class="text-3xl font-light mb-1">{featuresActive} <span class="text-base text-stone-400">/ {featuresTotal}</span></p>
-      <p class="text-xs text-stone-400 group-hover:text-red-700 transition">verwalten →</p>
+      <p class="text-xs text-stone-400 group-hover:text-burgund transition">verwalten →</p>
     </a>
-    <a href="/admin/bookings" class="bg-white border border-stone-200 p-6 hover:border-red-700 transition group">
+    <a href="/admin/bookings" class="bg-white border border-stone-200 p-6 hover:border-burgund transition group">
       <p class="text-xs italic text-stone-500 mb-3" style="font-family: Georgia, serif;">Aktive Gäste</p>
       <p class="text-3xl font-light mb-1">{stayCount ?? 0}</p>
-      <p class="text-xs text-stone-400 group-hover:text-red-700 transition">Buchungen →</p>
+      <p class="text-xs text-stone-400 group-hover:text-burgund transition">Buchungen →</p>
     </a>
   </div>
 
   <section class="bg-white border border-stone-200 p-8">
-    <p class="text-xs italic text-red-700 mb-3" style="font-family: Georgia, serif;">— Erster Schritt —</p>
+    <p class="text-xs italic text-burgund mb-3" style="font-family: Georgia, serif;">— Erster Schritt —</p>
     <h2 class="text-xl font-medium mb-2">Schau dir deine Gast-Ansicht an</h2>
     <p class="text-sm text-stone-600 mb-6 leading-relaxed max-w-xl">
       So sieht das, was deine Gäste sehen, wenn sie den NFC-Tag im Zimmer scannen.
@@ -65,7 +75,7 @@ const { count: stayCount } = await client
     <a
       href="/g/00d5924a16934db28f77a3f570194e24"
       target="_blank"
-      class="inline-block bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition"
+      class="bauhaus-button bauhaus-button--primary"
     >
       Gast-Ansicht öffnen (Hannah, Zimmer 12) →
     </a>

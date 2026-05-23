@@ -1,0 +1,148 @@
+---
+import OnboardingLayout from '../../../layouts/OnboardingLayout.astro';
+import { t } from '../../../i18n/helpers';
+import { getUser } from '../../../lib/auth';
+import type { AdminLocale } from '../../../i18n/types';
+
+const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
+
+// Auth-Guard: User muss eingeloggt sein für Setup
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+let errors: Record<string, string> = {};
+let formData: Record<string, string> = {
+  hotel_name: '',
+  street: '',
+  zip: '',
+  city: '',
+};
+
+// GET: Form-Werte aus Query-Params (Back-Navigation aus Schritt 2)
+if (Astro.request.method === 'GET' && Astro.url.searchParams.size > 0) {
+  formData = {
+    hotel_name: Astro.url.searchParams.get('hotel_name') ?? '',
+    street: Astro.url.searchParams.get('street') ?? '',
+    zip: Astro.url.searchParams.get('zip') ?? '',
+    city: Astro.url.searchParams.get('city') ?? '',
+  };
+}
+
+// POST: validieren + zu Schritt 2 weiter
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  formData = {
+    hotel_name: (data.get('hotel_name')?.toString() ?? '').trim(),
+    street: (data.get('street')?.toString() ?? '').trim(),
+    zip: (data.get('zip')?.toString() ?? '').trim(),
+    city: (data.get('city')?.toString() ?? '').trim(),
+  };
+
+  if (!formData.hotel_name) errors.hotel_name = t('onboarding.setup.error_required', userLocale);
+  if (!formData.street) errors.street = t('onboarding.setup.error_required', userLocale);
+  if (!formData.zip) errors.zip = t('onboarding.setup.error_required', userLocale);
+  if (!formData.city) errors.city = t('onboarding.setup.error_required', userLocale);
+
+  if (Object.keys(errors).length === 0) {
+    const params = new URLSearchParams(formData);
+    return Astro.redirect(`/onboarding/setup/branding?${params.toString()}`);
+  }
+}
+---
+
+<OnboardingLayout title={t('onboarding.setup.step1_page_title', userLocale)} locale={userLocale}>
+  <main class="onboarding-wizard-page">
+
+    <section class="onboarding-wizard-strip">
+      <div class="onboarding-wizard-strip-inner">
+        <div class="onboarding-wizard-progress">
+          <div class="onboarding-wizard-progress-markers" aria-hidden="true">
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--circle is-active is-current"></span>
+            <span class="onboarding-wizard-progress-line"></span>
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--triangle"></span>
+            <span class="onboarding-wizard-progress-line"></span>
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--square"></span>
+          </div>
+          <p class="onboarding-wizard-progress-label">— {t('onboarding.setup.step1_progress', userLocale)} —</p>
+        </div>
+        <p class="onboarding-wizard-brand">retaha</p>
+      </div>
+    </section>
+
+    <section class="onboarding-wizard-form-wrapper">
+      <form method="POST" class="onboarding-wizard-form">
+
+        <p class="onboarding-wizard-eyebrow">— {t('onboarding.setup.step1_eyebrow', userLocale)} —</p>
+        <h1 class="onboarding-wizard-headline">
+          <span class="onboarding-wizard-headline-light">{t('onboarding.setup.step1_headline_light', userLocale)} </span>
+          <span class="onboarding-wizard-headline-bold">{t('onboarding.setup.step1_headline_bold', userLocale)}<span class="onboarding-wizard-headline-punkt">.</span></span>
+        </h1>
+
+        <div class="onboarding-wizard-field">
+          <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_hotel_name', userLocale)} —</p>
+          <input
+            type="text"
+            name="hotel_name"
+            value={formData.hotel_name}
+            placeholder={t('onboarding.setup.placeholder_hotel_name', userLocale)}
+            required
+            class="bauhaus-input"
+            aria-invalid={errors.hotel_name ? 'true' : 'false'}
+          />
+          {errors.hotel_name && <p class="onboarding-wizard-field-error">{errors.hotel_name}</p>}
+        </div>
+
+        <div class="onboarding-wizard-field">
+          <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_street', userLocale)} —</p>
+          <input
+            type="text"
+            name="street"
+            value={formData.street}
+            placeholder={t('onboarding.setup.placeholder_street', userLocale)}
+            required
+            class="bauhaus-input"
+            aria-invalid={errors.street ? 'true' : 'false'}
+          />
+          {errors.street && <p class="onboarding-wizard-field-error">{errors.street}</p>}
+        </div>
+
+        <div class="onboarding-wizard-field-row">
+          <div class="onboarding-wizard-field">
+            <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_zip', userLocale)} —</p>
+            <input
+              type="text"
+              name="zip"
+              value={formData.zip}
+              placeholder="10115"
+              required
+              class="bauhaus-input"
+              aria-invalid={errors.zip ? 'true' : 'false'}
+            />
+            {errors.zip && <p class="onboarding-wizard-field-error">{errors.zip}</p>}
+          </div>
+          <div class="onboarding-wizard-field">
+            <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_city', userLocale)} —</p>
+            <input
+              type="text"
+              name="city"
+              value={formData.city}
+              placeholder={t('onboarding.setup.placeholder_city', userLocale)}
+              required
+              class="bauhaus-input"
+              aria-invalid={errors.city ? 'true' : 'false'}
+            />
+            {errors.city && <p class="onboarding-wizard-field-error">{errors.city}</p>}
+          </div>
+        </div>
+
+        <div class="onboarding-wizard-actions onboarding-wizard-actions--single">
+          <button type="submit" class="bauhaus-button bauhaus-button--primary">
+            {t('onboarding.setup.cta_next', userLocale)} →
+          </button>
+        </div>
+
+      </form>
+    </section>
+
+  </main>
+</OnboardingLayout>

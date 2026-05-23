@@ -291,7 +291,7 @@ const sheetData = {
 
         <button
           type="button"
-          class="booking-cancel"
+          class="bauhaus-button bauhaus-button--secondary"
           @click="startRebook()"
           x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
           x-text="labels.rebookBtn"
@@ -301,11 +301,11 @@ const sheetData = {
 
     <!-- View 2: Form -->
     <template x-if="view === 'form'">
-      <form @submit.prevent="submit()">
+      <form class="booking-form" @submit.prevent="submit()">
 
         <!-- Salon selection -->
-        <div class="form-group">
-          <label class="form-label" x-text="labels.chooseRoom"></label>
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.chooseRoom"></div>
           <div class="conf-rooms">
             <template x-for="room in rooms" :key="room.id">
               <button type="button" class="conf-room"
@@ -320,12 +320,12 @@ const sheetData = {
         </div>
 
         <!-- Date -->
-        <div class="form-group" x-show="form.room_id">
-          <label class="form-label" x-text="labels.dateLabel"></label>
-          <div class="date-pills">
+        <div class="booking-section" x-show="form.room_id">
+          <div class="booking-section-label" x-text="labels.dateLabel"></div>
+          <div class="booking-chip-row">
             <template x-for="d in stayRangeDates" :key="d.iso">
-              <button type="button" class="date-pill"
-                :class="{ active: form.date === d.iso }"
+              <button type="button" class="bauhaus-pill"
+                :data-active="form.date === d.iso"
                 @click="form.date = d.iso"
                 x-text="d.label"></button>
             </template>
@@ -333,12 +333,12 @@ const sheetData = {
         </div>
 
         <!-- Time -->
-        <div class="form-group" x-show="form.date">
-          <label class="form-label" x-text="labels.timeLabel"></label>
-          <div class="time-pills">
+        <div class="booking-section" x-show="form.date">
+          <div class="booking-section-label" x-text="labels.timeLabel"></div>
+          <div class="booking-chip-row">
             <template x-for="slot in allSlots" :key="slot.value">
-              <button type="button" class="time-pill"
-                :class="{ active: form.time === slot.value }"
+              <button type="button" class="bauhaus-pill"
+                :data-active="form.time === slot.value"
                 @click="form.time = slot.value"
                 x-text="slot.label"></button>
             </template>
@@ -346,12 +346,12 @@ const sheetData = {
         </div>
 
         <!-- Duration -->
-        <div class="form-group" x-show="form.time">
-          <label class="form-label" x-text="labels.durationLabel"></label>
-          <div class="duration-pills">
+        <div class="booking-section" x-show="form.time">
+          <div class="booking-section-label" x-text="labels.durationLabel"></div>
+          <div class="booking-chip-row">
             <template x-for="d in durationOptions" :key="d.value">
-              <button type="button" class="duration-pill"
-                :class="{ active: form.duration_hours === d.value }"
+              <button type="button" class="bauhaus-pill"
+                :data-active="form.duration_hours === d.value"
                 @click="form.duration_hours = d.value"
                 x-text="d.label"></button>
             </template>
@@ -359,15 +359,15 @@ const sheetData = {
         </div>
 
         <!-- People -->
-        <div class="form-group" x-show="form.duration_hours">
-          <label class="form-label">
+        <div class="booking-section" x-show="form.duration_hours">
+          <div class="booking-section-label">
             <span x-text="labels.peopleLabel"></span>
             <span class="form-label-max" x-text="`(max ${currentRoomCapacity})`"></span>
-          </label>
-          <div class="people-pills">
+          </div>
+          <div class="booking-chip-row">
             <template x-for="n in peopleOptions" :key="n">
-              <button type="button" class="people-pill"
-                :class="{ active: form.people === n }"
+              <button type="button" class="bauhaus-pill"
+                :data-active="form.people === n"
                 @click="form.people = n"
                 x-text="n"></button>
             </template>
@@ -375,25 +375,24 @@ const sheetData = {
         </div>
 
         <!-- Occasion -->
-        <div class="form-group" x-show="form.people">
-          <label class="form-label" x-text="labels.occasionLabel"></label>
-          <input type="text" class="form-input"
+        <div class="booking-section" x-show="form.people">
+          <div class="booking-section-label" x-text="labels.occasionLabel"></div>
+          <input type="text" class="bauhaus-input"
             :placeholder="labels.occasionPlaceholder"
             x-model="form.occasion" />
         </div>
 
         <!-- Notes -->
-        <div class="form-group" x-show="form.people">
-          <label class="form-label" x-text="labels.notesLabel"></label>
-          <textarea class="form-textarea" rows="3"
+        <div class="booking-section" x-show="form.people">
+          <div class="booking-section-label" x-text="labels.notesLabel"></div>
+          <textarea class="bauhaus-textarea" rows="3"
             :placeholder="labels.notesPlaceholder"
             x-model="form.notes"></textarea>
         </div>
 
         <!-- Submit -->
-        <button type="submit" class="form-submit"
-          :disabled="!canSubmit || submitting"
-          :class="{ disabled: !canSubmit || submitting }">
+        <button type="submit" class="bauhaus-button bauhaus-button--primary bauhaus-button--block"
+          :disabled="!canSubmit || submitting">
           <span x-show="!submitting" x-text="labels.submitBtn"></span>
           <span x-show="submitting">...</span>
         </button>

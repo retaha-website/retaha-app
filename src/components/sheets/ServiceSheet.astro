@@ -220,7 +220,7 @@ const sheetData = {
 
         <button
           type="button"
-          class="booking-cancel"
+          class="bauhaus-button bauhaus-button--secondary"
           @click="startRebook()"
           x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
           x-text="labels.rebookBtn"
@@ -230,11 +230,11 @@ const sheetData = {
 
     <!-- View 2: Form -->
     <template x-if="view === 'form'">
-      <form @submit.prevent="submit()">
+      <form class="booking-form" @submit.prevent="submit()">
 
         <!-- Item selection -->
-        <div class="form-group">
-          <label class="form-label" x-text="labels.chooseItem"></label>
+        <div class="booking-section">
+          <div class="booking-section-label" x-text="labels.chooseItem"></div>
           <div class="service-items">
             <template x-for="item in items" :key="item.id">
               <button type="button" class="service-item"
@@ -248,27 +248,27 @@ const sheetData = {
         </div>
 
         <!-- Timing choice -->
-        <div class="form-group" x-show="form.item_id">
-          <label class="form-label" x-text="labels.timingLabel"></label>
+        <div class="booking-section" x-show="form.item_id">
+          <div class="booking-section-label" x-text="labels.timingLabel"></div>
           <div class="timing-pills">
-            <button type="button" class="timing-pill"
-              :class="{ active: form.timing === 'now' }"
+            <button type="button" class="bauhaus-pill"
+              :data-active="form.timing === 'now'"
               @click="form.timing = 'now'; form.time = ''"
               x-text="labels.timingNow"></button>
-            <button type="button" class="timing-pill"
-              :class="{ active: form.timing === 'scheduled' }"
+            <button type="button" class="bauhaus-pill"
+              :data-active="form.timing === 'scheduled'"
               @click="form.timing = 'scheduled'"
               x-text="labels.timingScheduled"></button>
           </div>
         </div>
 
         <!-- Time slots (only if scheduled) -->
-        <div class="form-group" x-show="form.timing === 'scheduled'">
-          <label class="form-label" x-text="labels.timeLabel"></label>
-          <div class="time-pills">
+        <div class="booking-section" x-show="form.timing === 'scheduled'">
+          <div class="booking-section-label" x-text="labels.timeLabel"></div>
+          <div class="booking-chip-row">
             <template x-for="slot in allSlots" :key="slot.value">
-              <button type="button" class="time-pill"
-                :class="{ active: form.time === slot.value }"
+              <button type="button" class="bauhaus-pill"
+                :data-active="form.time === slot.value"
                 @click="form.time = slot.value"
                 x-text="slot.label"></button>
             </template>
@@ -276,16 +276,15 @@ const sheetData = {
         </div>
 
         <!-- Notes -->
-        <div class="form-group" x-show="form.item_id && form.timing">
-          <label class="form-label" x-text="labels.notesLabel"></label>
-          <textarea class="form-textarea" rows="3"
+        <div class="booking-section" x-show="form.item_id && form.timing">
+          <div class="booking-section-label" x-text="labels.notesLabel"></div>
+          <textarea class="bauhaus-textarea" rows="3"
             :placeholder="labels.notesPlaceholder"
             x-model="form.notes"></textarea>
         </div>
 
-        <button type="submit" class="form-submit"
-          :disabled="!canSubmit || submitting"
-          :class="{ disabled: !canSubmit || submitting }">
+        <button type="submit" class="bauhaus-button bauhaus-button--primary bauhaus-button--block"
+          :disabled="!canSubmit || submitting">
           <span x-show="!submitting" x-text="labels.submitBtn"></span>
           <span x-show="submitting">...</span>
         </button>

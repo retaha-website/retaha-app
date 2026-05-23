@@ -1,5 +1,6 @@
 ---
 import AdminLayout from '../../../components/AdminLayout.astro';
+import BauhausToggle from '../../../components/admin/BauhausToggle.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../lib/auth';
 import { loadBreakfastItem, EU_ALLERGENS } from '../../../lib/queries';
 
@@ -141,17 +142,17 @@ if (url.searchParams.get('created') === '1' && !message) {
 
 <AdminLayout title={isNew ? 'Neue Speise' : data.name_de} hotel={hotel} user={user} activeTab="menu">
   <div class="mb-6">
-    <a href="/admin/menu" class="text-xs text-stone-500 hover:text-red-700 transition">
+    <a href="/admin/menu" class="text-xs text-stone-500 hover:text-burgund transition">
       ← Zurück zur Speisen-Liste
     </a>
   </div>
 
   <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Speise —</p>
+    <p class="text-xs italic text-burgund mb-2" style="font-family: Georgia, serif;">— Speise —</p>
     <h1 class="text-3xl font-light">
       {isNew
-        ? <>Neue <span class="font-medium">Speise</span><span class="text-red-700">.</span></>
-        : <><span class="font-medium">{data.name_de}</span><span class="text-red-700">.</span></>
+        ? <>Neue <span class="font-medium">Speise</span><span class="text-burgund">.</span></>
+        : <><span class="font-medium">{data.name_de}</span><span class="text-burgund">.</span></>
       }
     </h1>
   </div>
@@ -173,49 +174,30 @@ if (url.searchParams.get('created') === '1' && !message) {
       <h2 class="text-lg font-medium mb-4">Allgemein</h2>
 
       <div class="grid grid-cols-12 gap-4">
-        <label class="block col-span-6">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Kategorie</span>
+        <label class="bauhaus-field col-span-6">
+          <span class="bauhaus-field-eyebrow">— Kategorie —</span>
           <input
             type="text"
             name="category"
             value={data.category || ''}
             placeholder="z.B. Brot, Körnig, Warm, Beilagen"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
 
-        <label class="block col-span-3">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Reihenfolge</span>
+        <label class="bauhaus-field col-span-3">
+          <span class="bauhaus-field-eyebrow">— Reihenfolge —</span>
           <input
             type="number"
             name="display_order"
             value={data.display_order || 0}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
 
         <div class="col-span-3 flex items-end">
-          <input type="hidden" name="is_active" value="off" />
-          <label class="flex items-center gap-3 cursor-pointer p-2">
-            {data.is_active !== false ? (
-              <input
-                type="checkbox"
-                name="is_active"
-                value="on"
-                checked
-                class="sr-only peer"
-              />
-            ) : (
-              <input
-                type="checkbox"
-                name="is_active"
-                value="on"
-                class="sr-only peer"
-              />
-            )}
-            <div class="relative w-12 h-6 bg-stone-300 peer-checked:bg-green-700 transition rounded-full">
-              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-6"></div>
-            </div>
+          <label for={`toggle-active-${id}`} class="flex items-center gap-3 cursor-pointer p-2">
+            <BauhausToggle id={`toggle-active-${id}`} name="is_active" checked={data.is_active !== false} label="Aktiv" />
             <span class="text-sm">Aktiv</span>
           </label>
         </div>
@@ -230,52 +212,52 @@ if (url.searchParams.get('created') === '1' && !message) {
           <p class="text-xs text-stone-500 mt-1">In allen 4 Sprachen. Pflichtfeld: Deutsch.</p>
         </div>
         <button type="button" data-translate="name"
-          class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2 self-start whitespace-nowrap">
+          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
           <span>Aus DE übersetzen</span>
         </button>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Deutsch *</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch *</span>
           <input
             type="text"
             name="name_de"
             data-field="name_de"
             value={data.name_de || ''}
             required
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">English</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
           <input
             type="text"
             name="name_en"
             data-field="name_en"
             value={data.name_en || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Français</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
           <input
             type="text"
             name="name_fr"
             data-field="name_fr"
             value={data.name_fr || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Español</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
           <input
             type="text"
             name="name_es"
             data-field="name_es"
             value={data.name_es || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
       </div>
@@ -289,47 +271,47 @@ if (url.searchParams.get('created') === '1' && !message) {
           <p class="text-xs text-stone-500 mt-1">Optional. Z.B. "Hausgemacht mit Roggen-Sauerteig"</p>
         </div>
         <button type="button" data-translate="description"
-          class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2 self-start whitespace-nowrap">
+          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
           <span>Aus DE übersetzen</span>
         </button>
       </div>
 
       <div class="space-y-3">
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Deutsch</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
           <textarea
             name="description_de"
             data-field="description_de"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{data.description_de || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">English</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
           <textarea
             name="description_en"
             data-field="description_en"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{data.description_en || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Français</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
           <textarea
             name="description_fr"
             data-field="description_fr"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{data.description_fr || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Español</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
           <textarea
             name="description_es"
             data-field="description_es"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{data.description_es || ''}</textarea>
         </label>
       </div>
@@ -372,46 +354,22 @@ if (url.searchParams.get('created') === '1' && !message) {
 
       <div class="grid grid-cols-3 gap-4">
         <div>
-          <input type="hidden" name="is_vegetarian" value="off" />
-          <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
-            {data.is_vegetarian ? (
-              <input type="checkbox" name="is_vegetarian" value="on" checked class="sr-only peer" />
-            ) : (
-              <input type="checkbox" name="is_vegetarian" value="on" class="sr-only peer" />
-            )}
-            <div class="relative w-10 h-5 bg-stone-300 peer-checked:bg-green-700 transition rounded-full">
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-            </div>
+          <label for={`toggle-vegetarian-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
+            <BauhausToggle id={`toggle-vegetarian-${id}`} name="is_vegetarian" checked={!!data.is_vegetarian} label="Vegetarisch" />
             <span class="text-sm">Vegetarisch</span>
           </label>
         </div>
 
         <div>
-          <input type="hidden" name="is_vegan" value="off" />
-          <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
-            {data.is_vegan ? (
-              <input type="checkbox" name="is_vegan" value="on" checked class="sr-only peer" />
-            ) : (
-              <input type="checkbox" name="is_vegan" value="on" class="sr-only peer" />
-            )}
-            <div class="relative w-10 h-5 bg-stone-300 peer-checked:bg-green-700 transition rounded-full">
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-            </div>
+          <label for={`toggle-vegan-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
+            <BauhausToggle id={`toggle-vegan-${id}`} name="is_vegan" checked={!!data.is_vegan} label="Vegan" />
             <span class="text-sm">Vegan</span>
           </label>
         </div>
 
         <div>
-          <input type="hidden" name="is_organic" value="off" />
-          <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
-            {data.is_organic ? (
-              <input type="checkbox" name="is_organic" value="on" checked class="sr-only peer" />
-            ) : (
-              <input type="checkbox" name="is_organic" value="on" class="sr-only peer" />
-            )}
-            <div class="relative w-10 h-5 bg-stone-300 peer-checked:bg-amber-700 transition rounded-full">
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
-            </div>
+          <label for={`toggle-organic-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-stone-50 transition border border-stone-200">
+            <BauhausToggle id={`toggle-organic-${id}`} name="is_organic" checked={!!data.is_organic} label="Bio" />
             <span class="text-sm">Bio</span>
           </label>
         </div>
@@ -426,7 +384,7 @@ if (url.searchParams.get('created') === '1' && !message) {
           name="_action"
           value="delete"
           onclick="return confirm('Speise wirklich löschen?')"
-          class="text-sm text-stone-400 hover:text-red-700 transition"
+          class="bauhaus-button bauhaus-button--destructive"
         >
           Löschen
         </button>
@@ -434,13 +392,13 @@ if (url.searchParams.get('created') === '1' && !message) {
         <div></div>
       )}
 
-      <div class="flex gap-3">
-        <a href="/admin/menu" class="px-4 py-3 text-sm text-stone-500 hover:text-stone-900 transition">
+      <div class="flex gap-3 items-center">
+        <a href="/admin/menu" class="bauhaus-button bauhaus-button--ghost">
           Abbrechen
         </a>
         <button
           type="submit"
-          class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium"
+          class="bauhaus-button bauhaus-button--primary"
         >
           {isNew ? 'Speise anlegen' : 'Änderungen speichern'}
         </button>

@@ -1,0 +1,86 @@
+---
+import OnboardingLayout from '../../layouts/OnboardingLayout.astro';
+import { SUPPORTED_ADMIN_LOCALES, LOCALE_CODES, LOCALE_LABELS } from '../../i18n/constants';
+import type { AdminLocale } from '../../i18n/types';
+
+// Display-Locale für die Page selbst:
+// 1. Cookie (User zurück-navigiert nach Pick)
+// 2. Middleware-resolved Locale (Accept-Language oder Default 'de')
+const cookieLocale = Astro.cookies.get('onboarding_locale')?.value;
+const userLocale: AdminLocale =
+  cookieLocale && SUPPORTED_ADMIN_LOCALES.includes(cookieLocale as AdminLocale)
+    ? (cookieLocale as AdminLocale)
+    : ((Astro.locals.locale ?? 'de') as AdminLocale);
+
+// POST-Handler: Locale-Auswahl persistieren
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const selectedLocale = formData.get('locale')?.toString();
+
+  if (selectedLocale && SUPPORTED_ADMIN_LOCALES.includes(selectedLocale as AdminLocale)) {
+    Astro.cookies.set('onboarding_locale', selectedLocale, {
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60,
+      path: '/',
+    });
+
+    // PLATZHALTER bis 8.E (Setup-Wizard) — Route existiert noch nicht, liefert 404.
+    return Astro.redirect('/onboarding/setup/hotel');
+  }
+
+  return Astro.redirect('/onboarding/locale?error=invalid');
+}
+---
+
+<OnboardingLayout title="retaha · Welcome / Willkommen" locale={userLocale}>
+  <main class="onboarding-locale-page">
+
+    <!-- LINKS: Burgund Hero -->
+    <section class="onboarding-locale-hero">
+      <div class="onboarding-locale-hero-top">
+        <div class="onboarding-locale-hero-markers" aria-hidden="true">
+          <span class="onboarding-locale-hero-marker onboarding-locale-hero-marker--circle"></span>
+          <span class="onboarding-locale-hero-marker onboarding-locale-hero-marker--line"></span>
+          <span class="onboarding-locale-hero-marker onboarding-locale-hero-marker--square"></span>
+        </div>
+
+        <p class="onboarding-locale-hero-eyebrow">— Sprache · Language —</p>
+
+        <h1 class="onboarding-locale-hero-headline">
+          <span class="onboarding-locale-hero-headline-light">Willkommen.</span>
+          <span class="onboarding-locale-hero-headline-bold">Welcome<span class="onboarding-locale-hero-headline-punkt">.</span></span>
+        </h1>
+
+        <p class="onboarding-locale-hero-sub">
+          Wähle deine Sprache, dann richten wir gemeinsam ein.<br />
+          <span class="onboarding-locale-hero-sub-en">Choose your language and we'll set up together.</span>
+        </p>
+      </div>
+
+      <div class="onboarding-locale-hero-bottom">
+        <p class="onboarding-locale-hero-brand">retaha</p>
+        <p class="onboarding-locale-hero-brand-sub">Manufaktur · 2026</p>
+      </div>
+    </section>
+
+    <!-- RECHTS: Sprachen-Liste -->
+    <section class="onboarding-locale-list-wrapper">
+      <form method="POST" class="onboarding-locale-list">
+        {SUPPORTED_ADMIN_LOCALES.map(loc => (
+          <button
+            type="submit"
+            name="locale"
+            value={loc}
+            class="onboarding-locale-option"
+            data-active={loc === userLocale ? 'true' : 'false'}
+          >
+            <span class="onboarding-locale-option-code">{LOCALE_CODES[loc]}</span>
+            <span class="onboarding-locale-option-name">{LOCALE_LABELS[loc]}</span>
+          </button>
+        ))}
+      </form>
+    </section>
+
+  </main>
+</OnboardingLayout>

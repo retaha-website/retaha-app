@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '../../../lib/supabase';
 import { createSupabaseServerInstance } from '../../../lib/auth';
+import { SUPPORTED_ADMIN_LOCALES } from '../../../i18n/constants';
+import type { AdminLocale } from '../../../i18n/types';
 
 export const POST: APIRoute = async ({ cookies, request, redirect }) => {
   // Hard guard: only allow in dev mode
@@ -48,6 +50,18 @@ export const POST: APIRoute = async ({ cookies, request, redirect }) => {
 
   if (verifyErr) {
     return redirect(`/admin/login?error=${encodeURIComponent(verifyErr.message)}`);
+  }
+
+  // Onboarding-Cookie → user_metadata.locale übernehmen (falls Cookie da und Metadata noch leer)
+  const onboardingLocale = cookies.get('onboarding_locale')?.value;
+  if (onboardingLocale && SUPPORTED_ADMIN_LOCALES.includes(onboardingLocale as AdminLocale)) {
+    const { data: { user: sessionUser } } = await client.auth.getUser();
+    const currentLocale = (sessionUser?.user_metadata as { locale?: string } | undefined)?.locale;
+    if (sessionUser && !currentLocale) {
+      await client.auth.updateUser({ data: { locale: onboardingLocale } });
+      await client.auth.refreshSession();
+    }
+    cookies.delete('onboarding_locale', { path: '/' });
   }
 
   return redirect('/admin/dashboard');

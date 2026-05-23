@@ -36,15 +36,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // RLS-protected update — user can only update bookings belonging to their hotel
-  const { data, error } = await client
+  const { data: updated, error } = await client
     .from('bookings')
     .update({
       status: payload.status.toLowerCase(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', payload.booking_id)
-    .select('id, status, updated_at')
-    .single();
+    .select('*');
 
   if (error) {
     console.error('Update status error:', error);
@@ -53,7 +52,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
   }
 
-  return new Response(JSON.stringify({ ok: true, booking: data }), {
+  if (!updated || updated.length === 0) {
+    return new Response(JSON.stringify({ ok: false, error: 'Keine Berechtigung oder Datensatz nicht gefunden' }), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response(JSON.stringify({ ok: true, booking: updated[0] }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
 };

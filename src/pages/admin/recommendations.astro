@@ -1,6 +1,10 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -23,13 +27,16 @@ if (Astro.request.method === 'POST') {
       const recs = JSON.parse(recsJson);
       if (!Array.isArray(recs)) throw new Error('Empfehlungen müssen Array sein');
 
-      const { error } = await client
+      const { data: updatedRows, error } = await client
         .from('hotel_settings')
         .update({ recommendations: recs, updated_at: new Date().toISOString() })
-        .eq('hotel_id', hotel.id);
+        .eq('hotel_id', hotel.id)
+        .select('hotel_id');
 
       if (error) {
         message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      } else if (!updatedRows || updatedRows.length === 0) {
+        message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
       } else {
         message = { type: 'success', text: 'Empfehlungen gespeichert.' };
       }
@@ -71,13 +78,14 @@ const languages = [
 ---
 
 <AdminLayout title="Empfehlungen" hotel={hotel} user={user} activeTab="recommendations">
-  <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Empfehlungen —</p>
-    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">sehen sollen</span><span class="text-red-700">.</span></h1>
-    <p class="text-sm text-stone-600 mt-3 max-w-xl">
-      Drei Empfehlungs-Karten im Slider direkt unter dem Hero. Jede Karte hat einen Stil
-      (Burgund, Anthrazit, Bone) und führt zu einer Aktion. Du kannst pro Karte vier Sprachen einpflegen.
-    </p>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.recommendations.section_number', userLocale)}
+      sectionLabel={t('pages.recommendations.section_label', userLocale)}
+      headlineLight={t('pages.recommendations.headline_light', userLocale)}
+      headlineBold={t('pages.recommendations.headline_bold', userLocale)}
+      subtitle={t('pages.recommendations.subtitle', userLocale)}
+    />
   </div>
 
   {message && (
@@ -99,13 +107,13 @@ const languages = [
       <button
         type="button"
         id="add-card-btn"
-        class="text-sm text-stone-700 hover:text-red-700 transition border border-stone-300 px-4 py-2 hover:border-red-700"
+        class="bauhaus-button bauhaus-button--secondary"
       >
         + Neue Karte hinzufügen
       </button>
       <button
         type="submit"
-        class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium"
+        class="bauhaus-button bauhaus-button--primary"
       >
         Änderungen speichern
       </button>
@@ -144,16 +152,16 @@ const languages = [
               <span class="bg-stone-100 text-stone-600 text-xs px-2 py-1 font-mono">Karte ${idx + 1}</span>
               <div class="flex gap-1">${tabsHtml}</div>
             </div>
-            <button type="button" data-action="delete" data-idx="${idx}" class="text-xs text-stone-400 hover:text-red-700">
+            <button type="button" data-action="delete" data-idx="${idx}" class="bauhaus-button bauhaus-button--ghost">
               Entfernen
             </button>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
-            <label class="block">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Eyebrow (${lang.toUpperCase()})</span>
+            <label class="bauhaus-field">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Eyebrow (${lang.toUpperCase()})</span>
               <input type="text" data-idx="${idx}" data-field="eyebrow_${lang}" value="${escapeHtml(card['eyebrow_' + lang] || '')}"
-                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
 
             <label class="block">
@@ -164,22 +172,22 @@ const languages = [
               </select>
             </label>
 
-            <label class="block col-span-2">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Titel (${lang.toUpperCase()})</span>
+            <label class="bauhaus-field col-span-2">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Titel (${lang.toUpperCase()})</span>
               <input type="text" data-idx="${idx}" data-field="title_${lang}" value="${escapeHtml(card['title_' + lang] || '')}"
-                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
 
-            <label class="block col-span-2">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Untertitel (${lang.toUpperCase()})</span>
+            <label class="bauhaus-field col-span-2">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Untertitel (${lang.toUpperCase()})</span>
               <textarea data-idx="${idx}" data-field="sub_${lang}" rows="2"
-                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(card['sub_' + lang] || '')}</textarea>
+                class="bauhaus-textarea">${escapeHtml(card['sub_' + lang] || '')}</textarea>
             </label>
 
-            <label class="block">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">CTA-Button (${lang.toUpperCase()})</span>
+            <label class="bauhaus-field">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">CTA-Button (${lang.toUpperCase()})</span>
               <input type="text" data-idx="${idx}" data-field="cta_${lang}" value="${escapeHtml(card['cta_' + lang] || '')}"
-                class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
 
             <label class="block">
@@ -200,7 +208,7 @@ const languages = [
                 </p>
               </div>
               <button type="button" data-action="translate" data-idx="${idx}"
-                class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2">
+                class="bauhaus-button bauhaus-button--primary bauhaus-button--small">
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
                 <span>Aus DE übersetzen</span>
               </button>

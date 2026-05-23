@@ -1,6 +1,10 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -76,13 +80,14 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
 ---
 
 <AdminLayout title="Service" hotel={hotel} user={user} activeTab="service">
-  <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Service —</p>
-    <h1 class="text-3xl font-light">Was deine Gäste<br /><span class="font-medium">anfragen können</span><span class="text-red-700">.</span></h1>
-    <p class="text-sm text-stone-600 mt-3 max-w-xl">
-      Service-Items wie Handtücher, Wasser, Bügeleisen — der Gast wählt aus, du bekommst die Anfrage.
-      Zeitfenster gibt vor, wann Service möglich ist.
-    </p>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.service.section_number', userLocale)}
+      sectionLabel={t('pages.service.section_label', userLocale)}
+      headlineLight={t('pages.service.headline_light', userLocale)}
+      headlineBold={t('pages.service.headline_bold', userLocale)}
+      subtitle={t('pages.service.subtitle', userLocale)}
+    />
   </div>
 
   {message && (
@@ -115,7 +120,7 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
         </label>
       </div>
       <div class="flex justify-end mt-4">
-        <button type="submit" class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium">
+        <button type="submit" class="bauhaus-button bauhaus-button--primary">
           Zeiten speichern
         </button>
       </div>
@@ -126,8 +131,7 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
   <section class="bg-white border border-stone-200 p-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-medium">Service-Items</h2>
-      <button type="button" id="add-item-btn"
-        class="text-sm border border-stone-300 px-4 py-2 hover:border-red-700 hover:text-red-700 transition">
+      <button type="button" id="add-item-btn" class="bauhaus-button bauhaus-button--secondary">
         + Item hinzufügen
       </button>
     </div>
@@ -139,7 +143,7 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
       <div id="items-container" class="space-y-4 mb-6"></div>
 
       <div class="flex justify-end pt-4 border-t border-stone-200">
-        <button type="submit" class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium">
+        <button type="submit" class="bauhaus-button bauhaus-button--primary">
           Items speichern
         </button>
       </div>
@@ -165,66 +169,66 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
         div.innerHTML = `
           <div class="flex justify-between items-start mb-3">
             <span class="bg-stone-100 text-stone-600 text-xs px-2 py-1 font-mono">Item ${idx + 1}</span>
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center">
               <button type="button" data-action="translate" data-idx="${idx}"
-                class="text-xs bg-stone-900 text-stone-50 px-3 py-1 hover:bg-red-900 transition">
+                class="bauhaus-button bauhaus-button--primary bauhaus-button--small">
                 DE → andere Sprachen
               </button>
               <button type="button" data-action="delete" data-idx="${idx}"
-                class="text-xs text-stone-400 hover:text-red-700">
+                class="bauhaus-button bauhaus-button--ghost">
                 Entfernen
               </button>
             </div>
           </div>
 
           <div class="grid grid-cols-12 gap-3">
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Slug (id)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Slug (id)</span>
               <input type="text" data-idx="${idx}" data-field="id" value="${escapeHtml(item.id || '')}" placeholder="z.B. towels"
-                class="w-full px-2 py-1.5 border border-stone-300 text-xs focus:outline-none focus:border-stone-900 font-mono" />
+                class="bauhaus-input bauhaus-input--mono" />
             </label>
             <div class="col-span-6"></div>
 
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Name (DE)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (DE)</span>
               <input type="text" data-idx="${idx}" data-field="name_de" value="${escapeHtml(item.name_de || '')}"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Name (EN)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (EN)</span>
               <input type="text" data-idx="${idx}" data-field="name_en" value="${escapeHtml(item.name_en || '')}"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Name (FR)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (FR)</span>
               <input type="text" data-idx="${idx}" data-field="name_fr" value="${escapeHtml(item.name_fr || '')}"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Name (ES)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (ES)</span>
               <input type="text" data-idx="${idx}" data-field="name_es" value="${escapeHtml(item.name_es || '')}"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900" />
+                class="bauhaus-input" />
             </label>
 
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Beschreibung (DE)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (DE)</span>
               <textarea data-idx="${idx}" data-field="description_de" rows="2"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(item.description_de || '')}</textarea>
+                class="bauhaus-textarea">${escapeHtml(item.description_de || '')}</textarea>
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Beschreibung (EN)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (EN)</span>
               <textarea data-idx="${idx}" data-field="description_en" rows="2"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(item.description_en || '')}</textarea>
+                class="bauhaus-textarea">${escapeHtml(item.description_en || '')}</textarea>
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Beschreibung (FR)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (FR)</span>
               <textarea data-idx="${idx}" data-field="description_fr" rows="2"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(item.description_fr || '')}</textarea>
+                class="bauhaus-textarea">${escapeHtml(item.description_fr || '')}</textarea>
             </label>
-            <label class="block col-span-6">
-              <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Beschreibung (ES)</span>
+            <label class="bauhaus-field col-span-6">
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (ES)</span>
               <textarea data-idx="${idx}" data-field="description_es" rows="2"
-                class="w-full px-2 py-1.5 border border-stone-300 text-sm focus:outline-none focus:border-stone-900">${escapeHtml(item.description_es || '')}</textarea>
+                class="bauhaus-textarea">${escapeHtml(item.description_es || '')}</textarea>
             </label>
           </div>
         `;

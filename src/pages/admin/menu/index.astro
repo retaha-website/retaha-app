@@ -1,7 +1,11 @@
 ---
 import AdminLayout from '../../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels } from '../../../lib/auth';
 import { loadBreakfastItems, EU_ALLERGENS } from '../../../lib/queries';
+import { t } from '../../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -27,14 +31,14 @@ items.forEach(item => {
 ---
 
 <AdminLayout title="Speisen" hotel={hotel} user={user} activeTab="menu">
-  <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Speisen —</p>
-    <h1 class="text-3xl font-light">Frühstücks-<br /><span class="font-medium">Speisen verwalten</span><span class="text-red-700">.</span></h1>
-    <p class="text-sm text-stone-600 mt-3 max-w-2xl">
-      Hier verwaltest du alle Speisen für dein Frühstück. Pro Speise pflegst du Name, Beschreibung
-      und Allergen-Angaben in vier Sprachen. Diese werden im Gast-Frontend angezeigt —
-      mit optionalem Allergen-Filter für deine Gäste.
-    </p>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.menu.section_number', userLocale)}
+      sectionLabel={t('pages.menu.section_label', userLocale)}
+      headlineLight={t('pages.menu.headline_light', userLocale)}
+      headlineBold={t('pages.menu.headline_bold', userLocale)}
+      subtitle={t('pages.menu.subtitle', userLocale)}
+    />
   </div>
 
   <!-- Disclaimer-Box -->
@@ -59,7 +63,7 @@ items.forEach(item => {
     <p class="text-sm text-stone-500">
       {items.length} Speise{items.length === 1 ? '' : 'n'} insgesamt
     </p>
-    <a href="/admin/menu/new" class="bg-stone-900 text-stone-50 px-4 py-2 text-sm hover:bg-red-900 transition font-medium">
+    <a href="/admin/menu/new" class="bauhaus-button bauhaus-button--primary bauhaus-button--small">
       + Neue Speise hinzufügen
     </a>
   </div>
@@ -69,7 +73,7 @@ items.forEach(item => {
       <p class="text-stone-500 italic mb-4" style="font-family: Georgia, serif;">
         Noch keine Speisen angelegt.
       </p>
-      <a href="/admin/menu/new" class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition inline-block">
+      <a href="/admin/menu/new" class="bauhaus-button bauhaus-button--primary">
         Erste Speise anlegen
       </a>
     </div>

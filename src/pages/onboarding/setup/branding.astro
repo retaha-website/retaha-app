@@ -1,0 +1,256 @@
+---
+import OnboardingLayout from '../../../layouts/OnboardingLayout.astro';
+import { t } from '../../../i18n/helpers';
+import { getUser, createSupabaseServerInstance } from '../../../lib/auth';
+import type { AdminLocale } from '../../../i18n/types';
+
+const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+// Slug-Helper
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[äöü]/g, c => ({ ä: 'ae', ö: 'oe', ü: 'ue' }[c] ?? c))
+    .replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
+}
+
+let errorMessage: string | null = null;
+let formData: Record<string, string> = {
+  hotel_name: Astro.url.searchParams.get('hotel_name') ?? '',
+  street: Astro.url.searchParams.get('street') ?? '',
+  zip: Astro.url.searchParams.get('zip') ?? '',
+  city: Astro.url.searchParams.get('city') ?? '',
+  color: Astro.url.searchParams.get('color') ?? '#8C2128',
+};
+
+// Wenn aus Schritt 1 frisch + Daten fehlen → zurück
+if (Astro.request.method === 'GET' && (!formData.hotel_name || !formData.street || !formData.zip || !formData.city)) {
+  return Astro.redirect('/onboarding/setup/hotel?error=missing_data');
+}
+
+// Error-Param aus Redirects
+const errorParam = Astro.url.searchParams.get('error');
+if (errorParam === 'db_failed' || errorParam === 'session_failed') {
+  errorMessage = t('onboarding.setup.error_db_failed', userLocale);
+}
+
+// POST: DB-INSERT + Redirect zu Done
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const action = data.get('_action')?.toString() ?? 'continue';
+
+  formData = {
+    hotel_name: (data.get('hotel_name')?.toString() ?? '').trim(),
+    street: (data.get('street')?.toString() ?? '').trim(),
+    zip: (data.get('zip')?.toString() ?? '').trim(),
+    city: (data.get('city')?.toString() ?? '').trim(),
+    color: action === 'skip' ? '#8C2128' : (data.get('color')?.toString() ?? '#8C2128').trim(),
+  };
+
+  if (!formData.hotel_name || !formData.street || !formData.zip || !formData.city) {
+    return Astro.redirect('/onboarding/setup/hotel?error=missing_data');
+  }
+
+  const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+  // TODO-REMOVE nach RLS-Diagnose: zeigt Auth-Kontext des INSERT-Clients
+  const { data: { user: authCheck } } = await client.auth.getUser();
+  console.log('[setup-wizard] Auth check before INSERT:', {
+    authenticated: !!authCheck,
+    clientUserId: authCheck?.id ?? null,
+    frontmatterUserId: user.id,
+    match: authCheck?.id === user.id,
+  });
+
+  // Force-set Session damit JWT als Authorization-Header gesendet wird (Supabase-SSR-Edge-Case)
+  const { data: { session }, error: sessionError } = await client.auth.getSession();
+  if (sessionError || !session) {
+    console.error('[setup-wizard] No session available for INSERT:', sessionError);
+    const params = new URLSearchParams({ ...formData, error: 'session_failed' });
+    return Astro.redirect(`/onboarding/setup/branding?${params.toString()}`);
+  }
+
+  const { error: setSessionError } = await client.auth.setSession({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  });
+
+  if (setSessionError) {
+    console.error('[setup-wizard] setSession failed:', setSessionError);
+    const params = new URLSearchParams({ ...formData, error: 'session_failed' });
+    return Astro.redirect(`/onboarding/setup/branding?${params.toString()}`);
+  }
+
+  console.log('[setup-wizard] Session explicitly set, proceeding to INSERT');
+
+  // TODO-DIAGNOSE: nach RLS-Fix entfernen
+  // DIAGNOSE 1: Was sieht Postgres als auth.uid() und auth.role()?
+  const { data: authContext, error: authContextError } = await client.rpc('debug_auth_context');
+  console.log('[diagnose] Postgres auth context:', authContext);
+  console.log('[diagnose] Postgres auth context error:', authContextError);
+
+  // TODO-DIAGNOSE: nach RLS-Fix entfernen
+  // DIAGNOSE 2: Funktioniert ein UPDATE auf einer existierenden Row?
+  const DEMO_HOTEL_ID = '1f30ac02-17e1-47b6-9bda-487e14b07627';
+  const { data: updateTest, error: updateError } = await client
+    .from('hotels')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', DEMO_HOTEL_ID)
+    .select();
+  console.log('[diagnose] UPDATE test:', {
+    rowsUpdated: updateTest?.length ?? 0,
+    errorCode: updateError?.code,
+    errorMessage: updateError?.message,
+  });
+
+  // Slug + Collision-Check
+  let slug = slugify(formData.hotel_name);
+  if (!slug) slug = 'hotel';
+  const { data: existing } = await client.from('hotels').select('slug').eq('slug', slug).maybeSingle();
+  if (existing) {
+    slug = `${slug}-${Date.now().toString(36)}`;
+  }
+
+  // 3-Step-INSERT mit manueller Rollback-Logik
+  try {
+    const { data: hotel, error: hotelError } = await client
+      .from('hotels')
+      .insert({
+        slug,
+        name: formData.hotel_name,
+        city: formData.city,
+        default_language: userLocale,
+        trial_started_at: new Date().toISOString(),
+        subscription_status: 'trial',
+      })
+      .select('id')
+      .single();
+
+    if (hotelError || !hotel) {
+      console.error('[setup-wizard] hotels INSERT failed:', { message: hotelError?.message, code: hotelError?.code, details: hotelError?.details, hint: hotelError?.hint });
+      throw new Error(`hotel_insert: ${hotelError?.message ?? 'no_row'}`);
+    }
+
+    const { error: userError } = await client
+      .from('hotel_users')
+      .insert({ user_id: user.id, hotel_id: hotel.id, role: 'owner' });
+
+    if (userError) {
+      console.error('[setup-wizard] hotel_users INSERT failed:', { message: userError.message, code: userError.code, details: userError.details, hint: userError.hint });
+      await client.from('hotels').delete().eq('id', hotel.id);
+      throw new Error(`hotel_users_insert: ${userError.message}`);
+    }
+
+    const { error: settingsError } = await client
+      .from('hotel_settings')
+      .insert({
+        hotel_id: hotel.id,
+        accent_color: formData.color,
+      });
+
+    if (settingsError) {
+      console.error('[setup-wizard] hotel_settings INSERT failed:', { message: settingsError.message, code: settingsError.code, details: settingsError.details, hint: settingsError.hint });
+      await client.from('hotel_users').delete().eq('hotel_id', hotel.id);
+      await client.from('hotels').delete().eq('id', hotel.id);
+      throw new Error(`hotel_settings_insert: ${settingsError.message}`);
+    }
+
+    return Astro.redirect('/onboarding/setup/done');
+  } catch (err) {
+    console.error('[setup-wizard] DB-INSERT failed:', err);
+    const params = new URLSearchParams({ ...formData, error: 'db_failed' });
+    return Astro.redirect(`/onboarding/setup/branding?${params.toString()}`);
+  }
+}
+---
+
+<OnboardingLayout title={t('onboarding.setup.step2_page_title', userLocale)} locale={userLocale}>
+  <main class="onboarding-wizard-page">
+
+    <section class="onboarding-wizard-strip">
+      <div class="onboarding-wizard-strip-inner">
+        <div class="onboarding-wizard-progress">
+          <div class="onboarding-wizard-progress-markers" aria-hidden="true">
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--circle is-active"></span>
+            <span class="onboarding-wizard-progress-line is-active"></span>
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--triangle is-active is-current"></span>
+            <span class="onboarding-wizard-progress-line"></span>
+            <span class="onboarding-wizard-progress-marker onboarding-wizard-progress-marker--square"></span>
+          </div>
+          <p class="onboarding-wizard-progress-label">— {t('onboarding.setup.step2_progress', userLocale)} —</p>
+        </div>
+        <p class="onboarding-wizard-brand">retaha</p>
+      </div>
+    </section>
+
+    <section class="onboarding-wizard-form-wrapper">
+      <form method="POST" class="onboarding-wizard-form">
+
+        <p class="onboarding-wizard-eyebrow">— {t('onboarding.setup.step2_eyebrow', userLocale)} —</p>
+        <h1 class="onboarding-wizard-headline">
+          <span class="onboarding-wizard-headline-light">{t('onboarding.setup.step2_headline_light', userLocale)} </span>
+          <span class="onboarding-wizard-headline-bold">{t('onboarding.setup.step2_headline_bold', userLocale)}<span class="onboarding-wizard-headline-punkt">.</span></span>
+        </h1>
+
+        {errorMessage && <p class="onboarding-wizard-field-error" style="margin-bottom: 18px;">{errorMessage}</p>}
+
+        <!-- Hidden: Schritt-1-Daten weitergeben -->
+        <input type="hidden" name="hotel_name" value={formData.hotel_name} />
+        <input type="hidden" name="street" value={formData.street} />
+        <input type="hidden" name="zip" value={formData.zip} />
+        <input type="hidden" name="city" value={formData.city} />
+
+        <!-- Logo (Platzhalter) -->
+        <div class="onboarding-wizard-field">
+          <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_logo', userLocale)} —</p>
+          <div class="onboarding-wizard-logo-dropzone is-placeholder" aria-disabled="true">
+            <p class="onboarding-wizard-logo-dropzone-text">{t('onboarding.setup.logo_placeholder_text', userLocale)}</p>
+            <p class="onboarding-wizard-logo-dropzone-hint">{t('onboarding.setup.logo_placeholder_hint', userLocale)}</p>
+          </div>
+        </div>
+
+        <!-- Akzentfarbe -->
+        <div class="onboarding-wizard-field">
+          <p class="onboarding-wizard-field-eyebrow">— {t('onboarding.setup.field_color', userLocale)} —</p>
+          <div class="onboarding-wizard-color-input">
+            <div class="onboarding-wizard-color-swatch" style={`background-color: ${formData.color}`}></div>
+            <input
+              type="text"
+              name="color"
+              value={formData.color}
+              pattern="^#[0-9A-Fa-f]{6}$"
+              class="bauhaus-input"
+            />
+          </div>
+          <p class="onboarding-wizard-field-help">{t('onboarding.setup.color_hint', userLocale)}</p>
+        </div>
+
+        <div class="onboarding-wizard-actions onboarding-wizard-actions--triple">
+          <a
+            href={`/onboarding/setup/hotel?${new URLSearchParams({ hotel_name: formData.hotel_name, street: formData.street, zip: formData.zip, city: formData.city }).toString()}`}
+            class="onboarding-wizard-back-link"
+          >
+            ← {t('onboarding.setup.cta_back', userLocale)}
+          </a>
+
+          <button type="submit" name="_action" value="skip" class="onboarding-wizard-skip-link">
+            {t('onboarding.setup.cta_skip', userLocale)} →
+          </button>
+
+          <button type="submit" name="_action" value="continue" class="bauhaus-button bauhaus-button--primary">
+            {t('onboarding.setup.cta_complete', userLocale)} →
+          </button>
+        </div>
+
+      </form>
+    </section>
+
+  </main>
+</OnboardingLayout>

@@ -1,5 +1,12 @@
 ---
 import '../styles/global.css';
+import '../styles/components/buttons.css';
+import '../styles/components/inputs.css';
+import '../styles/components/pills.css';
+import '../styles/components/menu.css';
+import '../styles/components/settings.css';
+import AdminFooter from './AdminFooter.astro';
+import { t } from '../i18n/helpers';
 
 interface Props {
   title: string;
@@ -9,18 +16,19 @@ interface Props {
 }
 
 const { title, hotel, user, activeTab } = Astro.props;
+const userLocale = Astro.locals.locale;
 
 const tabs = [
-  { id: 'overview', label: 'Übersicht', href: '/admin/dashboard' },
-  { id: 'recommendations', label: 'Empfehlungen', href: '/admin/recommendations' },
-  { id: 'breakfast', label: 'Frühstück', href: '/admin/breakfast' },
-  { id: 'menu', label: 'Speisen', href: '/admin/menu' },
-  { id: 'conference', label: 'Konferenz', href: '/admin/conference' },
-  { id: 'service', label: 'Service', href: '/admin/service' },
-  { id: 'features', label: 'Funktionen', href: '/admin/features' },
-  { id: 'bookings', label: 'Buchungen', href: '/admin/bookings' },
-  { id: 'settings', label: 'Einstellungen', href: '/admin/settings' },
-];
+  { id: 'overview', href: '/admin/dashboard' },
+  { id: 'recommendations', href: '/admin/recommendations' },
+  { id: 'breakfast', href: '/admin/breakfast' },
+  { id: 'menu', href: '/admin/menu' },
+  { id: 'conference', href: '/admin/conference' },
+  { id: 'service', href: '/admin/service' },
+  { id: 'features', href: '/admin/features' },
+  { id: 'bookings', href: '/admin/bookings' },
+  { id: 'settings', href: '/admin/settings' },
+] as const;
 ---
 
 <!DOCTYPE html>
@@ -33,44 +41,79 @@ const tabs = [
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="min-h-screen bg-stone-50 font-sans antialiased text-stone-900">
-    <!-- Top bar -->
-    <header class="border-b border-stone-200 bg-white sticky top-0 z-10">
-      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-        <div class="flex items-baseline gap-3">
-          <span class="text-xs italic text-red-700" style="font-family: Georgia, serif;">— retaha</span>
-          <span class="text-base font-medium">{hotel.name}</span>
-          <span class="text-xs text-stone-400 font-mono">/{hotel.slug}</span>
+  <body
+    class="min-h-screen bg-stone-50 font-sans antialiased text-stone-900"
+    x-data="{ menuOpen: false }"
+    @keydown.escape.window="menuOpen = false"
+    x-init="$watch('menuOpen', v => { document.body.style.overflow = v ? 'hidden' : '' })"
+  >
+    <!-- Top bar: Hotel-Name links, Marker-Trigger rechts (Header-Kind, kein position:fixed mehr) -->
+    <header class="border-b border-stone-200 bg-white sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center gap-3">
+        <div class="flex items-baseline gap-3 min-w-0">
+          <p class="font-light text-[15px] tracking-[-0.005em] text-anthrazit truncate m-0">{hotel.name}</p>
+          <span class="text-xs text-stone-400 font-mono hidden sm:inline">/{hotel.slug}</span>
         </div>
-        <div class="flex items-center gap-4">
-          <span class="text-xs text-stone-500">{user.email}</span>
-          <form method="POST" action="/admin/auth/logout">
-            <button type="submit" class="text-xs text-stone-500 hover:text-red-700 transition">
-              Abmelden
-            </button>
-          </form>
-        </div>
+
+        <button
+          type="button"
+          class="menu-trigger"
+          :class="{ 'menu-trigger-active': menuOpen }"
+          aria-label="Navigation"
+          :aria-expanded="menuOpen.toString()"
+          @click="menuOpen = !menuOpen"
+        >
+          <span class="menu-trigger-shapes">
+            <span class="menu-trigger-circle"></span>
+            <span class="menu-trigger-line"></span>
+            <span class="menu-trigger-square"></span>
+          </span>
+          <span class="menu-trigger-label">menu</span>
+        </button>
       </div>
-      <!-- Tabs -->
-      <nav class="max-w-6xl mx-auto px-6 flex gap-1">
+    </header>
+
+    <!-- Editorial Menu (Sub-Header-Overlay, bone-Background, öffnet unter Header) -->
+    <div
+      class="editorial-menu"
+      :class="{ 'is-open': menuOpen }"
+      aria-label="Hauptmenü"
+    >
+      <!-- Top-Bar: User-Email + Logout (kein × — Burger im Header übernimmt) -->
+      <div class="editorial-menu-topbar">
+        <p class="editorial-menu-user-email">{user.email}</p>
+        <form method="POST" action="/admin/auth/logout">
+          <button type="submit" class="editorial-menu-logout">Abmelden</button>
+        </form>
+      </div>
+
+      <!-- Items (Hero-Pattern: 24px anthrazit, 22px gap) -->
+      <nav class="editorial-menu-items">
         {tabs.map(tab => (
           <a
             href={tab.href}
-            class={`px-4 py-3 text-sm border-b-2 transition ${
-              activeTab === tab.id
-                ? 'border-red-700 text-stone-900 font-medium'
-                : 'border-transparent text-stone-500 hover:text-stone-900'
-            }`}
+            class="editorial-menu-item"
+            data-active={activeTab === tab.id ? 'true' : 'false'}
           >
-            {tab.label}
+            <span class="editorial-menu-item-label">{t(`nav.${tab.id}`, userLocale)}</span>
+            <span class="editorial-menu-item-strich"></span>
           </a>
         ))}
       </nav>
-    </header>
+    </div>
 
     <!-- Page content -->
     <main class="max-w-6xl mx-auto px-6 py-10">
       <slot />
     </main>
+
+    <AdminFooter />
+
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error - expose for debugging
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
   </body>
 </html>

@@ -1,6 +1,11 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
+import BauhausToggle from '../../components/admin/BauhausToggle.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -45,13 +50,16 @@ if (Astro.request.method === 'POST') {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await client
+  const { data: updatedRows, error } = await client
     .from('hotel_settings')
     .update(updates)
-    .eq('hotel_id', hotel.id);
+    .eq('hotel_id', hotel.id)
+    .select('hotel_id');
 
   if (error) {
     message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+  } else if (!updatedRows || updatedRows.length === 0) {
+    message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
   } else {
     message = { type: 'success', text: 'Frühstücks-Einstellungen gespeichert.' };
   }
@@ -78,13 +86,14 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
 ---
 
 <AdminLayout title="Frühstück" hotel={hotel} user={user} activeTab="breakfast">
-  <div class="mb-8">
-    <p class="text-xs italic text-red-700 mb-2" style="font-family: Georgia, serif;">— Frühstück —</p>
-    <h1 class="text-3xl font-light">Frühstücks-<br /><span class="font-medium">Konfiguration</span><span class="text-red-700">.</span></h1>
-    <p class="text-sm text-stone-600 mt-3 max-w-xl">
-      Hier verwaltest du alles rund ums Frühstück: Zeiten, Ort, was inkludiert ist,
-      und ob deine Gäste einen Tisch reservieren können.
-    </p>
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.breakfast.section_number', userLocale)}
+      sectionLabel={t('pages.breakfast.section_label', userLocale)}
+      headlineLight={t('pages.breakfast.headline_light', userLocale)}
+      headlineBold={t('pages.breakfast.headline_bold', userLocale)}
+      subtitle={t('pages.breakfast.subtitle', userLocale)}
+    />
   </div>
 
   {message && (
@@ -102,7 +111,7 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
     <!-- Reservierungs-Schalter -->
     <section class="bg-white border border-stone-200 p-8">
       <div class="mb-6">
-        <p class="text-xs italic text-red-700 mb-1" style="font-family: Georgia, serif;">— Reservierung —</p>
+        <p class="text-xs italic text-burgund mb-1" style="font-family: Georgia, serif;">— Reservierung —</p>
         <h2 class="text-xl font-medium">Können Gäste einen Tisch reservieren?</h2>
         <p class="text-xs text-stone-500 mt-1 max-w-lg">
           Wenn aktiviert, sehen Gäste ein Formular zum Reservieren. Wenn deaktiviert, sehen sie nur
@@ -110,37 +119,24 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
         </p>
       </div>
 
-      <input type="hidden" name="breakfast_reservation" value="off" />
-      <label class="flex items-center justify-between p-4 cursor-pointer bg-stone-50 hover:bg-stone-100 transition">
-        <div>
-          <p class="font-medium text-stone-900">Tisch-Reservierung aktiv</p>
-          <p class="text-sm text-stone-500 italic mt-1" id="toggle-status-text" style="font-family: Georgia, serif;">
+      <label
+        for="reservation-toggle"
+        class="flex items-center gap-5 py-[26px] cursor-pointer"
+      >
+        <span
+          data-toggle-accent
+          class="w-1.5 h-1.5 rounded-full bg-anthrazit/30 transition-colors duration-200 ease-in-out flex-shrink-0 pointer-events-none"
+          aria-hidden="true"
+        ></span>
+
+        <div class="flex-1 min-w-0">
+          <p class="text-[15px] font-medium text-anthrazit leading-tight tracking-tight mb-1.5">Tisch-Reservierung aktiv</p>
+          <p class="text-[13px] italic font-serif text-anthrazit/55 leading-[1.55]" id="toggle-status-text">
             {reservationOn ? 'Gäste können Tische reservieren' : 'Gäste sehen nur Infos, kein Reservierungs-Formular'}
           </p>
         </div>
-        <div class="ml-6">
-          {reservationOn ? (
-            <input
-              type="checkbox"
-              name="breakfast_reservation"
-              value="on"
-              checked
-              class="sr-only peer"
-              id="reservation-toggle"
-            />
-          ) : (
-            <input
-              type="checkbox"
-              name="breakfast_reservation"
-              value="on"
-              class="sr-only peer"
-              id="reservation-toggle"
-            />
-          )}
-          <div class="relative w-12 h-6 bg-stone-300 peer-checked:bg-red-700 transition rounded-full">
-            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition peer-checked:translate-x-6"></div>
-          </div>
-        </div>
+
+        <BauhausToggle id="reservation-toggle" name="breakfast_reservation" checked={reservationOn} label="Tisch-Reservierung aktiv" />
       </label>
 
       <script is:inline>
@@ -160,7 +156,7 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
     <!-- Zeiten -->
     <section class="bg-white border border-stone-200 p-8">
       <div class="mb-6">
-        <p class="text-xs italic text-red-700 mb-1" style="font-family: Georgia, serif;">— Zeiten —</p>
+        <p class="text-xs italic text-burgund mb-1" style="font-family: Georgia, serif;">— Zeiten —</p>
         <h2 class="text-xl font-medium">Wann gibt es Frühstück?</h2>
       </div>
 
@@ -183,8 +179,8 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
             class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Slot-Länge (Min)</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Slot-Länge (Min)</span>
           <input
             type="number"
             name="breakfast_slot_minutes"
@@ -192,7 +188,7 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
             min="5"
             max="120"
             step="5"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
       </div>
@@ -206,56 +202,56 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
     <section class="bg-white border border-stone-200 p-8" data-translate-section="location">
       <div class="mb-6 flex justify-between items-start gap-4">
         <div>
-          <p class="text-xs italic text-red-700 mb-1" style="font-family: Georgia, serif;">— Ort —</p>
+          <p class="text-xs italic text-burgund mb-1" style="font-family: Georgia, serif;">— Ort —</p>
           <h2 class="text-xl font-medium">Wo wird gefrühstückt?</h2>
           <p class="text-xs text-stone-500 mt-1">Z.B. "im Wintergarten" — wird zusammen mit der Begrüßung gezeigt.</p>
         </div>
         <button type="button" data-translate="location"
-          class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2 self-start">
+          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
           <span>Aus DE übersetzen</span>
         </button>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Deutsch</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
           <input
             type="text"
             name="breakfast_location_de"
             data-field="location_de"
             value={(s as any).breakfast_location_de || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">English</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
           <input
             type="text"
             name="breakfast_location_en"
             data-field="location_en"
             value={(s as any).breakfast_location_en || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Français</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
           <input
             type="text"
             name="breakfast_location_fr"
             data-field="location_fr"
             value={(s as any).breakfast_location_fr || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Español</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
           <input
             type="text"
             name="breakfast_location_es"
             data-field="location_es"
             value={(s as any).breakfast_location_es || ''}
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-input"
           />
         </label>
       </div>
@@ -265,54 +261,54 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
     <section class="bg-white border border-stone-200 p-8" data-translate-section="included">
       <div class="mb-6 flex justify-between items-start gap-4">
         <div>
-          <p class="text-xs italic text-red-700 mb-1" style="font-family: Georgia, serif;">— Was inkludiert ist —</p>
+          <p class="text-xs italic text-burgund mb-1" style="font-family: Georgia, serif;">— Was inkludiert ist —</p>
           <h2 class="text-xl font-medium">Was bekommen deine Gäste?</h2>
           <p class="text-xs text-stone-500 mt-1 max-w-lg">
             Z.B. "Frische Backwaren, regionaler Honig, Bio-Eier, …" — wird im Info-Mode prominent gezeigt.
           </p>
         </div>
         <button type="button" data-translate="included"
-          class="bg-stone-900 text-stone-50 px-4 py-2 text-xs hover:bg-red-900 transition font-medium flex items-center gap-2 self-start whitespace-nowrap">
+          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
           <span>Aus DE übersetzen</span>
         </button>
       </div>
 
       <div class="space-y-3">
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Deutsch</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
           <textarea
             name="breakfast_included_de"
             data-field="included_de"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{(s as any).breakfast_included_de || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">English</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
           <textarea
             name="breakfast_included_en"
             data-field="included_en"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{(s as any).breakfast_included_en || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Français</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
           <textarea
             name="breakfast_included_fr"
             data-field="included_fr"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{(s as any).breakfast_included_fr || ''}</textarea>
         </label>
-        <label class="block">
-          <span class="text-xs uppercase tracking-widest text-stone-500 block mb-1">Español</span>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
           <textarea
             name="breakfast_included_es"
             data-field="included_es"
             rows="2"
-            class="w-full px-3 py-2 border border-stone-300 text-sm focus:outline-none focus:border-stone-900"
+            class="bauhaus-textarea"
           >{(s as any).breakfast_included_es || ''}</textarea>
         </label>
       </div>
@@ -321,7 +317,7 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
     <div class="flex justify-end pt-4">
       <button
         type="submit"
-        class="bg-stone-900 text-stone-50 px-6 py-3 text-sm hover:bg-red-900 transition font-medium"
+        class="bauhaus-button bauhaus-button--primary"
       >
         Änderungen speichern
       </button>
