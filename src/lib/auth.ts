@@ -1,5 +1,6 @@
 import type { AstroCookies } from 'astro';
 import { createServerClient as createSupabaseClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
 const COOKIE_NAME_PREFIX = 'sb-';
 
@@ -93,6 +94,32 @@ export function createSupabaseServerInstance(cookies: AstroCookies, request: Req
     },
     global: {
       fetch: customFetch,
+    },
+  });
+}
+
+/**
+ * Service-Role-Client: bypassed RLS. ONLY for trusted server-side INSERTs
+ * where the input is fully derived from a session-validated user.
+ *
+ * SECURITY: Never accept user_id from form-input — always pass the session
+ * user.id from getUser(). Caller is responsible for that invariant.
+ *
+ * Currently used by: onboarding/setup/branding.astro (Setup-Wizard INSERT-Transaktion).
+ * RLS-Bug-Workaround — siehe Phase 8.E.
+ */
+export function createSupabaseServiceRoleInstance() {
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   });
 }
