@@ -1,99 +1,28 @@
 import type { AstroCookies } from 'astro';
-import { createServerClient as createSupabaseClient } from '@supabase/ssr';
+import { createServerClient, parseCookieHeader } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
-const COOKIE_NAME_PREFIX = 'sb-';
-
-function parseCookies(cookieHeader: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  cookieHeader.split(';').forEach(c => {
-    const [k, ...v] = c.trim().split('=');
-    if (k) out[k] = v.join('=');
-  });
-  return out;
-}
-
 /**
- * Extrahiert den access_token aus den Supabase-Auth-Cookies.
- * Supabase chunked lange JWTs auf mehrere `sb-{ref}-auth-token.<N>`-Cookies —
- * diese müssen nach Index sortiert + concateniert + ggf. base64-decoded werden.
- *
- * Returnt null wenn keine Auth-Cookies vorhanden oder Reassembly fehlschlägt.
- */
-function extractAccessTokenFromCookies(parsedCookies: Record<string, string>): string | null {
-  const chunks: { idx: number; value: string }[] = [];
-
-  for (const [name, value] of Object.entries(parsedCookies)) {
-    const match = name.match(/^sb-.*-auth-token(?:\.(\d+))?$/);
-    if (match) {
-      chunks.push({ idx: match[1] ? parseInt(match[1], 10) : 0, value });
-    }
-  }
-
-  if (chunks.length === 0) return null;
-
-  chunks.sort((a, b) => a.idx - b.idx);
-  const combined = chunks.map(c => c.value).join('');
-
-  try {
-    let jsonString = combined;
-    if (jsonString.startsWith('base64-')) {
-      jsonString = Buffer.from(jsonString.slice(7), 'base64').toString('utf-8');
-    }
-    const parsed = JSON.parse(jsonString);
-    return typeof parsed.access_token === 'string' ? parsed.access_token : null;
-  } catch (e) {
-    console.error('[auth] Token reassembly failed:', e);
-    return null;
-  }
-}
-
-/**
- * Creates a Supabase client bound to the current request's cookies.
- * Custom-Fetch injiziert Authorization-Header manuell aus den Auth-Cookies,
- * weil @supabase/ssr in Astro-SSR-Context den Header nicht zuverlässig setzt
- * (PostgREST sieht sonst anon-Role statt authenticated → RLS-Block).
+ * Creates a Supabase server client bound to the current request's cookies.
+ * Standard @supabase/ssr-Pattern — kein customFetch, keine handgebaute Token-Reassembly.
  */
 export function createSupabaseServerInstance(cookies: AstroCookies, request: Request) {
   const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-  const cookieHeader = request.headers.get('cookie') || '';
-  const parsedCookies = parseCookies(cookieHeader);
-  const accessToken = extractAccessTokenFromCookies(parsedCookies);
-
-  const customFetch: typeof fetch = (input, init) => {
-    const headers = new Headers(init?.headers);
-    if (accessToken && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${accessToken}`);
-    }
-    return fetch(input, { ...init, headers });
-  };
-
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        const header = request.headers.get('cookie') || '';
-        if (!header) return [];
-        const parsed = parseCookies(header);
-        return Object.entries(parsed)
-          .filter(([name]) => name.startsWith(COOKIE_NAME_PREFIX))
-          .map(([name, value]) => ({ name, value }));
+        return parseCookieHeader(request.headers.get('cookie') ?? '')
+          .map(c => ({ name: c.name, value: c.value ?? '' }));
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, _headers) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          cookies.set(name, value, {
-            ...options,
-            path: '/',
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: import.meta.env.PROD,
-          });
+          cookies.set(name, value, options);
         });
+        // TODO: _headers (Cache-Control/Expires/Pragma) auf Astro.response.headers setzen,
+        // sobald Helper das Response-Objekt erreicht. Aktuell nicht im Scope.
       },
-    },
-    global: {
-      fetch: customFetch,
     },
   });
 }
@@ -143,7 +72,7 @@ export async function getUserHotels(cookies: AstroCookies, request: Request) {
 
   const { data, error } = await client
     .from('hotel_users')
-    .select('role, hotel:hotels(id, slug, name, city)')
+    .select('role, hotel:hotels(id, slug, name, city, trial_started_at, subscription_status)')
     .eq('user_id', user.id);
 
   if (error || !data) return null;

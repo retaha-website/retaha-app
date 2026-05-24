@@ -1,7 +1,7 @@
 ---
 import OnboardingLayout from '../../../layouts/OnboardingLayout.astro';
 import { t } from '../../../i18n/helpers';
-import { getUser, createSupabaseServiceRoleInstance } from '../../../lib/auth';
+import { getUser, createSupabaseServerInstance } from '../../../lib/auth';
 import type { AdminLocale } from '../../../i18n/types';
 
 const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
@@ -58,78 +58,40 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect('/onboarding/setup/hotel?error=missing_data');
   }
 
-  // SECURITY: User-ID kommt aus session-validierter getUser()-Response (oben).
-  // NIEMALS aus Form-Input — sonst kann ein POST mit gefälschter user_id ein
-  // hotel_users-Mapping für einen fremden User erstellen.
-  const sessionUserId = user.id;
+  const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-  // ============================================================
-  // SECURITY: Service-Role-Client bypassed RLS.
-  // NUR session-validierte user_id verwenden, NIEMALS Form-Input.
-  // Wenn diese Page erweitert wird (z.B. User einladen):
-  // Service-Role abschaffen, RLS-Bug richtig fixen.
-  // ============================================================
-  const adminClient = createSupabaseServiceRoleInstance();
-
-  // Slug + Collision-Check
+  // Slug-Collision-Check (RLS lässt fresh User nur eigene hotels sehen — bei
+  // cross-user-Kollision fängt der UNIQUE-Constraint im RPC den Error)
   let slug = slugify(formData.hotel_name);
   if (!slug) slug = 'hotel';
-  const { data: existing } = await adminClient.from('hotels').select('slug').eq('slug', slug).maybeSingle();
+  const { data: existing } = await client.from('hotels').select('slug').eq('slug', slug).maybeSingle();
   if (existing) {
     slug = `${slug}-${Date.now().toString(36)}`;
   }
 
-  // 3-Step-INSERT mit manueller Rollback-Logik
-  try {
-    const { data: hotel, error: hotelError } = await adminClient
-      .from('hotels')
-      .insert({
-        slug,
-        name: formData.hotel_name,
-        city: formData.city,
-        default_language: userLocale,
-        trial_started_at: new Date().toISOString(),
-        subscription_status: 'trial',
-      })
-      .select('id')
-      .single();
+  // Atomare Hotel-Anlage via SECURITY DEFINER RPC.
+  // Umgeht das RLS-Chicken-and-Egg von INSERT...RETURNING (siehe Migration
+  // 20260524_onboarding_phase8e_hotel_rpc.sql). Auth-Gate via auth.uid() in der Function.
+  const { error: rpcError } = await client.rpc('create_hotel_with_owner', {
+    p_slug: slug,
+    p_name: formData.hotel_name,
+    p_city: formData.city,
+    p_default_language: userLocale,
+    p_accent_color: formData.color,
+  });
 
-    if (hotelError || !hotel) {
-      console.error('[setup-wizard] hotels INSERT failed:', { message: hotelError?.message, code: hotelError?.code, details: hotelError?.details, hint: hotelError?.hint });
-      throw new Error(`hotel_insert: ${hotelError?.message ?? 'no_row'}`);
-    }
-
-    // SECURITY: user_id MUSS sessionUserId sein, niemals aus Form/Request.
-    const { error: userError } = await adminClient
-      .from('hotel_users')
-      .insert({ user_id: sessionUserId, hotel_id: hotel.id, role: 'owner' });
-
-    if (userError) {
-      console.error('[setup-wizard] hotel_users INSERT failed:', { message: userError.message, code: userError.code, details: userError.details, hint: userError.hint });
-      await adminClient.from('hotels').delete().eq('id', hotel.id);
-      throw new Error(`hotel_users_insert: ${userError.message}`);
-    }
-
-    const { error: settingsError } = await adminClient
-      .from('hotel_settings')
-      .insert({
-        hotel_id: hotel.id,
-        accent_color: formData.color,
-      });
-
-    if (settingsError) {
-      console.error('[setup-wizard] hotel_settings INSERT failed:', { message: settingsError.message, code: settingsError.code, details: settingsError.details, hint: settingsError.hint });
-      await adminClient.from('hotel_users').delete().eq('hotel_id', hotel.id);
-      await adminClient.from('hotels').delete().eq('id', hotel.id);
-      throw new Error(`hotel_settings_insert: ${settingsError.message}`);
-    }
-
-    return Astro.redirect('/onboarding/setup/done');
-  } catch (err) {
-    console.error('[setup-wizard] DB-INSERT failed:', err);
+  if (rpcError) {
+    console.error('[setup-wizard] create_hotel_with_owner failed:', {
+      message: rpcError.message,
+      code: rpcError.code,
+      details: rpcError.details,
+      hint: rpcError.hint,
+    });
     const params = new URLSearchParams({ ...formData, error: 'db_failed' });
     return Astro.redirect(`/onboarding/setup/branding?${params.toString()}`);
   }
+
+  return Astro.redirect('/onboarding/setup/done');
 }
 ---
 

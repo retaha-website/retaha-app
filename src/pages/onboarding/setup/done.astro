@@ -2,6 +2,7 @@
 import OnboardingLayout from '../../../layouts/OnboardingLayout.astro';
 import { t } from '../../../i18n/helpers';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../lib/auth';
+import { calculateTrialStatus } from '../../../lib/trial-status';
 import type { AdminLocale } from '../../../i18n/types';
 
 const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
@@ -13,18 +14,18 @@ const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/onboarding/setup/hotel?error=no_hotel_yet');
 
-// Trial-End-Datum aus DB (trial_started_at + 30 Tage)
+// Trial-End-Datum via zentralem Helper (single source of truth)
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 const { data: hotelRow } = await client
   .from('hotels')
-  .select('trial_started_at')
+  .select('trial_started_at, subscription_status')
   .eq('id', hotel.id)
   .maybeSingle();
 
-const trialStartedAt = (hotelRow as { trial_started_at?: string } | null)?.trial_started_at;
-const trialEndDate = trialStartedAt
-  ? new Date(new Date(trialStartedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+const trialStatus = hotelRow
+  ? calculateTrialStatus(hotelRow as { trial_started_at: string | null; subscription_status: string })
   : null;
+const trialEndDate = trialStatus?.endsAt ?? null;
 
 const trialEndFormatted = trialEndDate?.toLocaleDateString(userLocale === 'en' ? 'en-US' : 'de-DE', {
   day: 'numeric',

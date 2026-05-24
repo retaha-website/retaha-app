@@ -1,0 +1,136 @@
+---
+// Bell — retaha Maskottchen. Specs: BELL_STYLEGUIDE.md (Root).
+// SVG-Paths-Source-of-truth: public/bell-icons.svg.
+
+export type BellState = 'resting' | 'ringing' | 'waiting' | 'sleeping' | 'joyful' | 'ready' | 'discreet' | 'alert';
+export type BellSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type BellColor = 'burgund' | 'bone' | 'anthrazit';
+
+interface Props {
+  state?: BellState;
+  size?: BellSize;
+  color?: BellColor;
+  class?: string;
+}
+
+const { state = 'resting', size = 'md', color = 'burgund', class: className = '' } = Astro.props;
+
+const SIZE_MAP: Record<BellSize, number> = {
+  xs: 20,
+  sm: 32,
+  md: 56,
+  lg: 112,
+  xl: 240,
+};
+
+const COLOR_MAP: Record<BellColor, string> = {
+  burgund: '#8C2128',
+  bone: '#FAF8F2',
+  anthrazit: '#1A1A1A',
+};
+
+const ARIA_LABELS: Record<BellState, string> = {
+  resting: 'Bell ruht',
+  ringing: 'Bell klingelt',
+  waiting: 'Bell wartet',
+  sleeping: 'Bell schläft',
+  joyful: 'Bell freut sich',
+  ready: 'Bell bereit',
+  discreet: 'Bell diskret',
+  alert: 'Bell Achtung',
+};
+
+const widthPx = SIZE_MAP[size];
+const colorHex = COLOR_MAP[color];
+const ariaLabel = ARIA_LABELS[state];
+// sleeping: opacity per Styleguide auf 0.4 (gedämpft). Sonst 1.
+const opacity = state === 'sleeping' ? 0.4 : 1;
+---
+
+<svg
+  viewBox="0 0 120 140"
+  xmlns="http://www.w3.org/2000/svg"
+  fill="currentColor"
+  role="img"
+  aria-label={ariaLabel}
+  class={`bell ${className}`.trim()}
+  style={`width: ${widthPx}px; color: ${colorHex}; opacity: ${opacity}`}
+>
+  {state === 'resting' && (
+    <Fragment>
+      <path d="M 30 95 Q 30 25, 60 25 Q 90 25, 90 95 L 30 95 Z"/>
+      <rect x="20" y="95" width="80" height="8"/>
+      <rect x="56" y="12" width="8" height="13"/>
+      <circle cx="60" cy="9" r="4"/>
+    </Fragment>
+  )}
+  {state === 'ringing' && (
+    <Fragment>
+      <g transform="rotate(-8 60 65)">
+        <path d="M 30 95 Q 30 25, 60 25 Q 90 25, 90 95 L 30 95 Z"/>
+        <rect x="20" y="95" width="80" height="8"/>
+        <rect x="56" y="12" width="8" height="13"/>
+        <circle cx="60" cy="9" r="4"/>
+      </g>
+      <path d="M 16 60 Q 6 60, 10 50" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 104 60 Q 114 60, 110 50" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    </Fragment>
+  )}
+  {state === 'waiting' && (
+    <g transform="rotate(8 60 65)">
+      <path d="M 30 95 Q 30 25, 60 25 Q 90 25, 90 95 L 30 95 Z"/>
+      <rect x="20" y="95" width="80" height="8"/>
+      <rect x="56" y="12" width="8" height="13"/>
+      <circle cx="60" cy="9" r="4"/>
+    </g>
+  )}
+  {state === 'sleeping' && (
+    <Fragment>
+      <path d="M 30 95 Q 30 25, 60 25 Q 90 25, 90 95 L 30 95 Z"/>
+      <rect x="20" y="95" width="80" height="8"/>
+      <rect x="56" y="12" width="8" height="13"/>
+      <circle cx="60" cy="9" r="4"/>
+    </Fragment>
+  )}
+  {state === 'joyful' && (
+    <Fragment>
+      <path d="M 30 95 Q 30 18, 60 18 Q 90 18, 90 95 L 30 95 Z"/>
+      <rect x="20" y="95" width="80" height="8"/>
+      <rect x="56" y="5" width="8" height="13"/>
+      <circle cx="60" cy="2" r="4"/>
+    </Fragment>
+  )}
+  {state === 'ready' && (
+    <Fragment>
+      <path d="M 25 95 Q 22 28, 60 22 Q 98 28, 95 95 L 25 95 Z"/>
+      <rect x="14" y="95" width="92" height="8"/>
+      <rect x="56" y="9" width="8" height="13"/>
+      <circle cx="60" cy="6" r="4"/>
+    </Fragment>
+  )}
+  {state === 'discreet' && (
+    <Fragment>
+      <path d="M 38 95 Q 38 32, 60 28 Q 82 32, 82 95 L 38 95 Z"/>
+      <rect x="30" y="95" width="60" height="8"/>
+      <rect x="56" y="15" width="8" height="13"/>
+      <circle cx="60" cy="12" r="4"/>
+    </Fragment>
+  )}
+  {state === 'alert' && (
+    <Fragment>
+      <path d="M 30 95 Q 30 25, 60 25 Q 90 25, 90 95 L 30 95 Z"/>
+      <rect x="20" y="95" width="80" height="8"/>
+      <rect x="56" y="12" width="8" height="13"/>
+      <circle cx="60" cy="9" r="4"/>
+      <circle cx="60" cy="65" r="58" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+    </Fragment>
+  )}
+</svg>
+
+<style>
+  .bell {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+</style>

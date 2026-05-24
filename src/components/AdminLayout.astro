@@ -6,11 +6,17 @@ import '../styles/components/pills.css';
 import '../styles/components/menu.css';
 import '../styles/components/settings.css';
 import AdminFooter from './AdminFooter.astro';
+import TrialBanner from './admin/TrialBanner.astro';
 import { t } from '../i18n/helpers';
 
 interface Props {
   title: string;
-  hotel: { name: string; slug: string };
+  hotel: {
+    name: string;
+    slug: string;
+    trial_started_at?: string | null;
+    subscription_status?: string;
+  };
   user: { email: string };
   activeTab: 'overview' | 'recommendations' | 'breakfast' | 'menu' | 'conference' | 'service' | 'features' | 'bookings' | 'settings';
 }
@@ -47,31 +53,36 @@ const tabs = [
     @keydown.escape.window="menuOpen = false"
     x-init="$watch('menuOpen', v => { document.body.style.overflow = v ? 'hidden' : '' })"
   >
-    <!-- Top bar: Hotel-Name links, Marker-Trigger rechts (Header-Kind, kein position:fixed mehr) -->
-    <header class="border-b border-stone-200 bg-white sticky top-0 z-50">
-      <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center gap-3">
-        <div class="flex items-baseline gap-3 min-w-0">
-          <p class="font-light text-[15px] tracking-[-0.005em] text-anthrazit truncate m-0">{hotel.name}</p>
-          <span class="text-xs text-stone-400 font-mono hidden sm:inline">/{hotel.slug}</span>
-        </div>
+    <!-- Sticky-Wrapper: Banner (wenn im Trial) + Header zusammen oben fixed -->
+    <div class="sticky top-0 z-50">
+      <TrialBanner hotel={hotel} locale={userLocale} />
 
-        <button
-          type="button"
-          class="menu-trigger"
-          :class="{ 'menu-trigger-active': menuOpen }"
-          aria-label="Navigation"
-          :aria-expanded="menuOpen.toString()"
-          @click="menuOpen = !menuOpen"
-        >
-          <span class="menu-trigger-shapes">
-            <span class="menu-trigger-circle"></span>
-            <span class="menu-trigger-line"></span>
-            <span class="menu-trigger-square"></span>
-          </span>
-          <span class="menu-trigger-label">menu</span>
-        </button>
-      </div>
-    </header>
+      <!-- Top bar: Hotel-Name links, Marker-Trigger rechts -->
+      <header class="border-b border-stone-200 bg-white">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center gap-3">
+          <div class="flex items-baseline gap-3 min-w-0">
+            <p class="font-light text-[15px] tracking-[-0.005em] text-anthrazit truncate m-0">{hotel.name}</p>
+            <span class="text-xs text-stone-400 font-mono hidden sm:inline">/{hotel.slug}</span>
+          </div>
+
+          <button
+            type="button"
+            class="menu-trigger"
+            :class="{ 'menu-trigger-active': menuOpen }"
+            aria-label="Navigation"
+            :aria-expanded="menuOpen.toString()"
+            @click="menuOpen = !menuOpen"
+          >
+            <span class="menu-trigger-shapes">
+              <span class="menu-trigger-circle"></span>
+              <span class="menu-trigger-line"></span>
+              <span class="menu-trigger-square"></span>
+            </span>
+            <span class="menu-trigger-label">menu</span>
+          </button>
+        </div>
+      </header>
+    </div>
 
     <!-- Editorial Menu (Sub-Header-Overlay, bone-Background, öffnet unter Header) -->
     <div

@@ -1,0 +1,234 @@
+---
+import Bell, { type BellState } from '../Bell.astro';
+import { t } from '../../i18n/helpers';
+import { calculateTrialStatus, TRIAL_DURATION_DAYS } from '../../lib/trial-status';
+import type { AdminLocale } from '../../i18n/types';
+
+interface Props {
+  hotel: { trial_started_at: string | null; subscription_status: string };
+  locale: AdminLocale;
+}
+
+const { hotel, locale } = Astro.props;
+const status = calculateTrialStatus(hotel);
+
+if (!status.isInTrial) {
+  return null;
+}
+
+const isExpired = status.urgencyLevel === 'expired';
+const isCritical = status.urgencyLevel === 'critical';
+const isCriticalOrExpired = isCritical || isExpired;
+const dismissible = status.urgencyLevel === 'normal' || status.urgencyLevel === 'warning';
+
+// Tag-Counter: current = elapsed + 1, gecappt auf [1..total]
+const currentDay = isExpired
+  ? TRIAL_DURATION_DAYS
+  : Math.max(1, Math.min(TRIAL_DURATION_DAYS - status.daysRemaining + 1, TRIAL_DURATION_DAYS));
+const displayRemaining = isExpired ? 0 : TRIAL_DURATION_DAYS - currentDay;
+const progressPct = isExpired ? 100 : Math.min(100, (currentDay / TRIAL_DURATION_DAYS) * 100);
+
+// Bell-State per Urgency
+const bellStateMap: Record<typeof status.urgencyLevel, BellState> = {
+  normal: 'resting',
+  warning: 'ready',
+  critical: 'alert',
+  expired: 'alert',
+};
+const bellState = bellStateMap[status.urgencyLevel];
+
+// Zeile 1: drei Varianten — Testphase-Label nur normal/warning, kompakter Counter im critical, statisch im expired
+let line1: string;
+if (isExpired) {
+  line1 = t('trial_banner.day_counter_expired', locale);
+} else if (isCritical) {
+  line1 = t('trial_banner.day_counter_critical', locale).replace('{current}', String(currentDay));
+} else {
+  line1 = t('trial_banner.day_counter', locale).replace('{current}', String(currentDay));
+}
+
+// Zeile 2: Headline kontextspezifisch (unverändert ggü. v4)
+let line2: string;
+if (isExpired) {
+  line2 = t('trial_banner.headline_expired_line2', locale);
+} else if (status.urgencyLevel === 'normal') {
+  line2 = t('trial_banner.headline_normal', locale);
+} else if (status.urgencyLevel === 'warning') {
+  line2 = t('trial_banner.headline_warning', locale);
+} else {
+  // critical: letzter Tag → "Heute der letzte Tag.", sonst "Noch X Tage."
+  line2 = displayRemaining === 0
+    ? t('trial_banner.headline_critical_one_day', locale)
+    : t('trial_banner.headline_critical_days', locale).replace('{remaining}', String(displayRemaining));
+}
+
+// CTA — critical + expired teilen sich cta_critical
+const ctaLabel = isCriticalOrExpired
+  ? t('trial_banner.cta_critical', locale)
+  : t('trial_banner.cta_normal', locale);
+const dismissAria = t('trial_banner.dismiss_aria', locale);
+
+const urgencyClass = `trial-banner--${status.urgencyLevel}`;
+---
+
+<aside
+  class={`trial-banner ${urgencyClass}`}
+  role="region"
+  aria-label="Trial status"
+  x-data="{ dismissed: false }"
+  x-init={dismissible
+    ? "dismissed = Number(localStorage.getItem('trial-banner-dismissed-until') || '0') > Date.now()"
+    : "dismissed = false"}
+  x-show="!dismissed"
+  x-cloak
+>
+  <div class="trial-banner-row">
+    <Bell state={bellState} size="sm" color="bone" />
+
+    <div class="trial-banner-text">
+      <span class="trial-banner-line1">{line1}</span>
+      <span class="trial-banner-line2">{line2}</span>
+    </div>
+
+    <div class="trial-banner-progress" role="progressbar" aria-valuenow={Math.round(progressPct)} aria-valuemin="0" aria-valuemax="100">
+      <div class="trial-banner-progress-fill" style={`width: ${progressPct}%`}></div>
+    </div>
+
+    <a href="/admin/subscription" class="trial-banner-cta">{ctaLabel}</a>
+
+    {dismissible && (
+      <button
+        type="button"
+        class="trial-banner-dismiss"
+        aria-label={dismissAria}
+        @click="localStorage.setItem('trial-banner-dismissed-until', String(Date.now() + 24*60*60*1000)); dismissed = true"
+      >
+        ×
+      </button>
+    )}
+  </div>
+</aside>
+
+<style>
+  /* OUTER: vollflächig Burgund (normal/warning) oder Anthrazit (critical/expired) */
+  .trial-banner {
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-burgund);
+    color: var(--color-bone);
+  }
+  .trial-banner--critical,
+  .trial-banner--expired {
+    background-color: var(--color-anthrazit);
+  }
+
+  /* INNER ROW: horizontale Flex-Reihe — alles in einer Zeile, ~72px hoch */
+  .trial-banner-row {
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 18px 32px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* Text-Block: zwei Zeilen vertikal, kein flex-grow */
+  .trial-banner-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    flex-shrink: 0;
+  }
+  .trial-banner-line1 {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--color-bone);
+  }
+  .trial-banner-line2 {
+    font-family: 'Georgia', serif;
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.3;
+    color: var(--color-bone);
+    opacity: 0.85;
+  }
+
+  /* Progress-Bar: füllt den Rest zwischen Text und CTA, 4px subtil */
+  .trial-banner-progress {
+    flex: 1;
+    height: 4px;
+    background-color: rgba(250, 248, 242, 0.2);
+    overflow: hidden;
+    min-width: 40px;
+  }
+  .trial-banner-progress-fill {
+    height: 100%;
+    background-color: var(--color-bone);
+    transition: width 240ms ease-out;
+  }
+  .trial-banner--critical .trial-banner-progress-fill,
+  .trial-banner--expired .trial-banner-progress-fill {
+    background-color: var(--color-burgund);
+  }
+
+  /* CTA-Stempel — kein flex-grow, harte Kanten */
+  .trial-banner-cta {
+    display: inline-block;
+    padding: 10px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background-color: var(--color-bone);
+    color: var(--color-burgund);
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+    flex-shrink: 0;
+  }
+  .trial-banner-cta:hover { opacity: 0.85; }
+  .trial-banner--critical .trial-banner-cta,
+  .trial-banner--expired .trial-banner-cta {
+    background-color: var(--color-burgund);
+    color: var(--color-bone);
+  }
+
+  /* Dismiss-X (nur normal/warning gerendert) */
+  .trial-banner-dismiss {
+    background: transparent;
+    border: 0;
+    color: var(--color-bone);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    opacity: 0.5;
+    transition: opacity 120ms ease;
+    flex-shrink: 0;
+  }
+  .trial-banner-dismiss:hover { opacity: 0.8; }
+
+  /* Pulse-Animation NUR critical/expired CTA — scale 1↔1.04 */
+  .trial-banner--critical .trial-banner-cta,
+  .trial-banner--expired .trial-banner-cta {
+    animation: trial-pulse 1.8s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes trial-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.04); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .trial-banner--critical .trial-banner-cta,
+    .trial-banner--expired .trial-banner-cta {
+      animation: none;
+    }
+  }
+</style>
