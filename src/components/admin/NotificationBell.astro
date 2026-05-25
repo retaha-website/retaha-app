@@ -1,0 +1,400 @@
+---
+import { t } from '../../i18n/helpers';
+import { calculateTrialStatus, TRIAL_DURATION_DAYS } from '../../lib/trial-status';
+import type { AdminLocale } from '../../i18n/types';
+
+interface Props {
+  hotel: {
+    trial_started_at: string | null;
+    subscription_status: string;
+  };
+  locale: AdminLocale;
+}
+
+const { hotel, locale } = Astro.props;
+const status = calculateTrialStatus(hotel);
+
+// Tag-Berechnung
+const currentDay = Math.max(1, Math.min(TRIAL_DURATION_DAYS - status.daysRemaining + 1, TRIAL_DURATION_DAYS));
+
+// State-Bestimmung
+const hasTrialNotification = status.isInTrial || status.urgencyLevel === 'expired';
+const urgency = status.urgencyLevel;
+
+// Bell-Animation basierend auf urgency
+let bellSwingClass = 'bell-idle';
+if (urgency === 'normal') bellSwingClass = 'bell-normal';
+if (urgency === 'warning') bellSwingClass = 'bell-warning';
+if (urgency === 'critical') bellSwingClass = 'bell-critical';
+if (urgency === 'expired') bellSwingClass = 'bell-expired';
+
+// Popover-Inhalte
+let headlineKey = 'notification_bell.headline_normal';
+if (urgency === 'warning') headlineKey = 'notification_bell.headline_warning';
+if (urgency === 'critical') headlineKey = 'notification_bell.headline_critical';
+if (urgency === 'expired') headlineKey = 'notification_bell.headline_expired';
+
+let bodyKey = 'notification_bell.body_normal';
+if (urgency === 'warning') bodyKey = 'notification_bell.body_warning';
+if (urgency === 'critical') bodyKey = 'notification_bell.body_critical';
+if (urgency === 'expired') bodyKey = 'notification_bell.body_expired';
+
+const headlineText = t(headlineKey, locale);
+const bodyText = t(bodyKey, locale);
+
+let ctaText = t('notification_bell.cta_normal', locale);
+if (urgency === 'critical' || urgency === 'expired') {
+  ctaText = t('notification_bell.cta_critical', locale);
+}
+
+// Stable Key für localStorage — wechselt bei State-Wechsel
+const notificationKey = hasTrialNotification ? `${urgency}` : '';
+const isExpired = urgency === 'expired';
+---
+
+<div
+  class="notification-bell-wrapper"
+  x-data={`{
+    open: false,
+    notificationKey: '${notificationKey}',
+    isExpired: ${isExpired},
+    hasNotification: ${hasTrialNotification},
+    dotVisible: false,
+    init() {
+      if (!this.hasNotification) {
+        this.dotVisible = false;
+        return;
+      }
+      if (this.isExpired) {
+        this.dotVisible = true;
+        return;
+      }
+      const lastSeenKey = localStorage.getItem('bell_last_seen_state');
+      this.dotVisible = lastSeenKey !== this.notificationKey;
+    },
+    togglePopover() {
+      this.open = !this.open;
+      if (this.open && this.hasNotification && !this.isExpired) {
+        localStorage.setItem('bell_last_seen_state', this.notificationKey);
+        this.dotVisible = false;
+      }
+    },
+    closePopover() {
+      this.open = false;
+    }
+  }`}
+  @click.outside="closePopover()"
+  @keydown.escape.window="closePopover()"
+>
+  <button
+    type="button"
+    class="bell-button"
+    @click="togglePopover()"
+    aria-label={t('notification_bell.aria_label', locale)}
+    :aria-expanded="open"
+  >
+    <span class="bell-icon-wrapper">
+      <svg
+        class={`bell-svg ${bellSwingClass}`}
+        width="20"
+        height="22"
+        viewBox="0 0 120 140"
+        fill="#8C2128"
+        aria-hidden="true"
+      >
+        <path d="M 30 95 Q 30 25 60 25 Q 90 25 90 95 L 30 95 Z" />
+        <rect x="20" y="95" width="80" height="8" />
+        <rect x="56" y="12" width="8" height="13" />
+        <circle cx="60" cy="9" r="4" />
+      </svg>
+
+      <span
+        class="bell-dot"
+        x-show="dotVisible"
+        x-cloak
+        aria-hidden="true"
+      ></span>
+    </span>
+  </button>
+
+  {hasTrialNotification && (
+    <div
+      class="bell-popover"
+      x-show="open"
+      x-cloak
+      x-transition:enter="popover-enter"
+      x-transition:enter-start="popover-enter-start"
+      x-transition:enter-end="popover-enter-end"
+      role="dialog"
+      aria-label={t('notification_bell.popover_aria', locale)}
+    >
+      <div class="popover-header">
+        <p class="popover-eyebrow">— Bell —</p>
+        <p class="popover-headline">{headlineText}</p>
+      </div>
+
+      <div class="popover-body">
+        <p class="popover-label">{t('notification_bell.testphase_label', locale)}</p>
+        <div class="popover-counter">
+          <span class="counter-current">{String(currentDay).padStart(2, '0')}</span>
+          <span class="counter-total">/ {TRIAL_DURATION_DAYS} {t('notification_bell.days_label', locale)}</span>
+        </div>
+        <p class="popover-body-text">{bodyText}</p>
+      </div>
+
+      <div class="popover-footer">
+        <a href="/admin/subscription" class={urgency === 'critical' || urgency === 'expired' ? 'popover-cta-urgent' : 'popover-cta-link'}>
+          {ctaText}
+        </a>
+      </div>
+    </div>
+  )}
+</div>
+
+<style>
+  .notification-bell-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .bell-button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+
+  .bell-button:hover {
+    opacity: 0.75;
+  }
+
+  .bell-icon-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+
+  .bell-svg {
+    transform-origin: center 10%;
+    display: block;
+    fill: #8C2128 !important;
+  }
+
+  /* Bell-Animations je State */
+  .bell-idle {
+    animation: bell-swing-idle 60s ease-in-out infinite;
+  }
+
+  .bell-normal {
+    animation: bell-swing-normal 15s ease-in-out infinite;
+  }
+
+  .bell-warning {
+    animation: bell-swing-warning 10s ease-in-out infinite;
+  }
+
+  .bell-critical {
+    animation: bell-swing-critical 6s ease-in-out infinite;
+  }
+
+  .bell-expired {
+    animation: bell-swing-expired 4s ease-in-out infinite;
+  }
+
+  .bell-dot {
+    position: absolute;
+    top: -1px;
+    right: -2px;
+    width: 7px;
+    height: 7px;
+    background: #8C2128;
+    border-radius: 50%;
+    border: 1.5px solid #FAF8F2;
+    pointer-events: none;
+  }
+
+  /* Popover */
+  .bell-popover {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    width: 320px;
+    background: #FAF8F2;
+    border: 1px solid #E8E4DD;
+    z-index: 100;
+  }
+
+  .popover-enter {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .popover-enter-start {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  .popover-enter-end {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .popover-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid #E8E4DD;
+  }
+
+  .popover-eyebrow {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 9px;
+    color: #8C2128;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1;
+  }
+
+  .popover-headline {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: #1A1A1A;
+    margin: 6px 0 0;
+    line-height: 1.2;
+  }
+
+  .popover-body {
+    padding: 18px 22px;
+    border-bottom: 1px solid #E8E4DD;
+  }
+
+  .popover-label {
+    font-size: 9px;
+    color: #1A1A1A;
+    opacity: 0.5;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 8px;
+  }
+
+  .popover-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .counter-current {
+    font-size: 28px;
+    font-weight: 300;
+    color: #1A1A1A;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .counter-total {
+    font-size: 12px;
+    color: #1A1A1A;
+    opacity: 0.4;
+  }
+
+  .popover-body-text {
+    font-size: 11px;
+    color: #1A1A1A;
+    opacity: 0.7;
+    margin: 8px 0 0;
+    line-height: 1.5;
+  }
+
+  .popover-footer {
+    padding: 14px 22px;
+  }
+
+  .popover-cta-link {
+    font-size: 10px;
+    color: #8C2128;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #8C2128;
+    padding-bottom: 1px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.2s ease;
+    display: inline-block;
+  }
+
+  .popover-cta-link:hover {
+    opacity: 0.7;
+  }
+
+  .popover-cta-urgent {
+    font-size: 10px;
+    color: #FAF8F2;
+    background: #8C2128;
+    padding: 6px 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    transition: opacity 0.2s ease;
+  }
+
+  .popover-cta-urgent:hover {
+    opacity: 0.85;
+  }
+
+  [x-cloak] {
+    display: none !important;
+  }
+
+  /* Bell-Animations */
+  @keyframes bell-swing-idle {
+    0%, 96%, 100% { transform: rotate(0deg); }
+    97% { transform: rotate(-2deg); }
+    98.5% { transform: rotate(1deg); }
+  }
+
+  @keyframes bell-swing-normal {
+    0%, 88%, 100% { transform: rotate(0deg); }
+    91% { transform: rotate(-5deg); }
+    94% { transform: rotate(4deg); }
+    97% { transform: rotate(-2deg); }
+  }
+
+  @keyframes bell-swing-warning {
+    0%, 85%, 100% { transform: rotate(0deg); }
+    88% { transform: rotate(-6deg); }
+    92% { transform: rotate(5deg); }
+    96% { transform: rotate(-2deg); }
+  }
+
+  @keyframes bell-swing-critical {
+    0%, 80%, 100% { transform: rotate(0deg); }
+    85% { transform: rotate(-8deg); }
+    90% { transform: rotate(7deg); }
+    95% { transform: rotate(-3deg); }
+  }
+
+  @keyframes bell-swing-expired {
+    0%, 75%, 100% { transform: rotate(0deg); }
+    82% { transform: rotate(-9deg); }
+    88% { transform: rotate(8deg); }
+    94% { transform: rotate(-4deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bell-svg {
+      animation: none !important;
+    }
+  }
+</style>

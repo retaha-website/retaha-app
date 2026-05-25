@@ -6,7 +6,7 @@ import '../styles/components/pills.css';
 import '../styles/components/menu.css';
 import '../styles/components/settings.css';
 import AdminFooter from './AdminFooter.astro';
-import TrialBanner from './admin/TrialBanner.astro';
+import NotificationBell from './admin/NotificationBell.astro';
 import { t } from '../i18n/helpers';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   hotel: {
     name: string;
     slug: string;
+    logo_url?: string | null;
     trial_started_at?: string | null;
     subscription_status?: string;
   };
@@ -48,23 +49,39 @@ const tabs = [
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet" />
   </head>
   <body
-    class="min-h-screen bg-stone-50 font-sans antialiased text-stone-900"
+    class="min-h-screen bg-bone font-sans antialiased text-anthrazit"
     x-data="{ menuOpen: false }"
     @keydown.escape.window="menuOpen = false"
     x-init="$watch('menuOpen', v => { document.body.style.overflow = v ? 'hidden' : '' })"
   >
-    <!-- Sticky-Wrapper: Banner (wenn im Trial) + Header zusammen oben fixed -->
-    <div class="sticky top-0 z-50">
-      <TrialBanner hotel={hotel} locale={userLocale} />
+    <!-- Top bar: Slug links, Logo/Name zentriert, Bell+Burger rechts -->
+    <header class="border-b border-stein bg-bone">
+      <div class="max-w-6xl mx-auto px-6 py-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
-      <!-- Top bar: Hotel-Name links, Marker-Trigger rechts -->
-      <header class="border-b border-stone-200 bg-white">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center gap-3">
-          <div class="flex items-baseline gap-3 min-w-0">
-            <p class="font-light text-[15px] tracking-[-0.005em] text-anthrazit truncate m-0">{hotel.name}</p>
-            <span class="text-xs text-stone-400 font-mono hidden sm:inline">/{hotel.slug}</span>
-          </div>
+        <!-- LINKS: Slug -->
+        <div class="justify-self-start min-w-0">
+          <span class="text-xs text-stone-400 font-mono truncate hidden sm:inline">/{hotel.slug}</span>
+        </div>
 
+        <!-- MITTE: Hotel-Logo oder Fallback auf Hotel-Name -->
+        <div class="justify-self-center min-w-0 max-w-md">
+          {hotel.logo_url ? (
+            <img
+              src={hotel.logo_url}
+              alt={hotel.name}
+              class="h-7 w-auto object-contain"
+              style="max-height: 28px;"
+            />
+          ) : (
+            <p class="m-0 truncate" style="font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 300; color: #1A1A1A; letter-spacing: -0.01em; line-height: 1;">
+              {hotel.name}
+            </p>
+          )}
+        </div>
+
+        <!-- RECHTS: Bell + Burger -->
+        <div class="justify-self-end flex items-center gap-6">
+          <NotificationBell hotel={hotel} locale={userLocale} />
           <button
             type="button"
             class="menu-trigger"
@@ -81,8 +98,9 @@ const tabs = [
             <span class="menu-trigger-label">menu</span>
           </button>
         </div>
-      </header>
-    </div>
+
+      </div>
+    </header>
 
     <!-- Editorial Menu (Sub-Header-Overlay, bone-Background, öffnet unter Header) -->
     <div
