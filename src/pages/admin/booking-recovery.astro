@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Booking-Recovery" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Booking-Recovery"
+    headlineLight=""
+    headlineBold="Booking-Recovery"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Gäste die ihre Buchung nicht abgeschlossen haben, bekommen 24 Stunden später eine erinnernde Email mit einem direkten Link zurück zur Auswahl. Optional mit einem kleinen Anreiz — Frühstück gratis, später einchecken, Welcome-Drink.
+    </p>
+  </div>
+
+</AdminLayout>

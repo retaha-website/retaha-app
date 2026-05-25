@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="WhatsApp" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="WhatsApp"
+    headlineLight=""
+    headlineBold="WhatsApp"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Verbinde deinen WhatsApp-Business-Account mit retaha. Eingehende Nachrichten erscheinen in der Concierge-Inbox. Ausgehende Kampagnen — Pre-Stay-Info, Geburtstags-Wunsch, Empfehlungen — kannst du direkt über WhatsApp senden, wo deine Gäste sowieso schon sind.
+    </p>
+  </div>
+
+</AdminLayout>

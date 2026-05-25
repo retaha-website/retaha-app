@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Wallet-Schlüssel" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Wallet-Schlüssel"
+    headlineLight=""
+    headlineBold="Wallet-Schlüssel"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Verbindung mit deinem Schließsystem von SALTO, dormakaba oder Assa Abloy. Gäste bekommen ihren Zimmer-Schlüssel direkt in Apple Wallet oder Google Wallet — kein Aushändigen, kein verlorener Schlüssel, kein Plastik-Müll.
+    </p>
+  </div>
+
+</AdminLayout>

@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="PMS-Integration" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="PMS-Integration"
+    headlineLight=""
+    headlineBold="PMS-Integration"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Verbinde dein bestehendes Property-Management-System mit retaha. Buchungen, Gäste-Daten, Zimmer-Status werden in beide Richtungen synchronisiert. Du arbeitest weiter wie gewohnt — retaha ergänzt die Gäste-Schnittstelle, ohne dein PMS zu ersetzen.
+    </p>
+  </div>
+
+</AdminLayout>

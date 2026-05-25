@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Loyalty-Programm" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Loyalty-Programm"
+    headlineLight=""
+    headlineBold="Loyalty-Programm"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Lege Stempel-Karten oder Punkt-Systeme an, definiere Belohnungen, und entscheide ob du nach jedem Aufenthalt automatisch belohnst oder bei Schwellenwerten. Die Wallet-Karte deiner Gäste zeigt den aktuellen Stand — kein App-Download, kein Plastik.
+    </p>
+  </div>
+
+</AdminLayout>

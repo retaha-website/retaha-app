@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Restaurant-Reservierungen" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Restaurant-Reservierungen"
+    headlineLight=""
+    headlineBold="Restaurant-Reservierungen"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Lege Öffnungszeiten und Tisch-Kapazitäten an, definiere welche Reservierungen automatisch bestätigt werden, und sehe alle Anfragen — von Hausgästen via NFC-Karte oder von Externen via Buchungsmaschine — an einem Ort.
+    </p>
+  </div>
+
+</AdminLayout>

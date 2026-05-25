@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Bewertungs-Trichter" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Bewertungs-Trichter"
+    headlineLight=""
+    headlineBold="Bewertungs-Trichter"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Nach dem Aufenthalt fragt retaha deine Gäste was sie erlebt haben. Wer zufrieden war, wird auf Google geleitet. Wer nicht ganz zufrieden war, schreibt dir direkt — bevor er es öffentlich tut. Hier siehst du beides: deine Sterne-Entwicklung und das ehrliche Feedback.
+    </p>
+  </div>
+
+</AdminLayout>

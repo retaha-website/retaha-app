@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Best-Price-Banner" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Best-Price-Banner"
+    headlineLight=""
+    headlineBold="Best-Price-Banner"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Vergleiche live die Preise auf Booking.com, HRS und anderen Portalen mit deinem Direkt-Preis. Wenn du günstiger bist, zeigt dein Banner es prominent — "10€ günstiger als Booking.com". Wenn nicht, wird das Banner ausgeblendet.
+    </p>
+  </div>
+
+</AdminLayout>

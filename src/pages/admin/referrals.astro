@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Empfehlungs-Programm" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Empfehlungs-Programm"
+    headlineLight=""
+    headlineBold="Empfehlungs-Programm"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Jeder Gast bekommt einen persönlichen Empfehlungs-Code. Wer einen neuen Gast bringt, bekommt eine Belohnung — ein Upgrade, einen Drink an der Bar, einen Rabatt auf den nächsten Aufenthalt. Du entscheidest was, retaha verfolgt automatisch wer wen gebracht hat.
+    </p>
+  </div>
+
+</AdminLayout>

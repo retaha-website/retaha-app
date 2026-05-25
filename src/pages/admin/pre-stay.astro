@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Pre-Stay-Versand" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Pre-Stay-Versand"
+    headlineLight=""
+    headlineBold="Pre-Stay-Versand"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Versende automatisch 3 Tage vor Anreise eine Wallet-Karte an deine Gäste — mit Anfahrt, WLAN-Code, Spa-Buchungs-Link und einem persönlichen Wort von dir. So beginnt der Aufenthalt nicht erst an der Rezeption.
+    </p>
+  </div>
+
+</AdminLayout>

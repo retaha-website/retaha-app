@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Wallet-Karten" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Wallet-Karten"
+    headlineLight=""
+    headlineBold="Wallet-Karten"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Gäste fügen eine Hotel-Karte zu Apple Wallet oder Google Wallet hinzu — kein App-Download, keine Anmeldung. Du siehst hier wer eine Karte hat, kannst Push-Nachrichten verschicken und welche Karten regelmäßig geöffnet werden.
+    </p>
+  </div>
+
+</AdminLayout>

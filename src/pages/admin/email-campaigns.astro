@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Wiederkehr-Kampagnen" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Wiederkehr-Kampagnen"
+    headlineLight=""
+    headlineBold="Wiederkehr-Kampagnen"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Erstelle Email-Kampagnen die automatisch zur richtigen Zeit ausgespielt werden — 6 Monate nach dem letzten Aufenthalt, zur eigenen Saison, an Geburtstagen. Du schreibst einmal, retaha verschickt persönlich an den richtigen Empfänger.
+    </p>
+  </div>
+
+</AdminLayout>

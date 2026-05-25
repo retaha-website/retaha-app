@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Spa-Termine" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Spa-Termine"
+    headlineLight=""
+    headlineBold="Spa-Termine"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Konfiguriere welche Behandlungen ihr anbietet, zu welchen Zeiten Spa-Slots verfügbar sind, und welche Räume oder Therapeut:innen dahinter stehen. Deine Gäste sehen die Verfügbarkeit live in der Speisekarte oder via NFC-Karte am Zimmer und buchen mit zwei Tipps.
+    </p>
+  </div>
+
+</AdminLayout>

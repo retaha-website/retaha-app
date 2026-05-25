@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Google Business Sync" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Google Business Sync"
+    headlineLight="Google Business"
+    headlineBold="Sync"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Verbinde dein Google-Business-Profil mit retaha. Öffnungszeiten, Speisekarten-Updates, neue Fotos und Antworten auf Bewertungen werden automatisch synchronisiert. Du pflegst einmal, Google zeigt überall.
+    </p>
+  </div>
+
+</AdminLayout>

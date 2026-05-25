@@ -19,23 +19,12 @@ interface Props {
     subscription_status?: string;
   };
   user: { email: string };
-  activeTab: 'overview' | 'recommendations' | 'breakfast' | 'menu' | 'conference' | 'service' | 'features' | 'bookings' | 'settings';
+  activeTab?: string;
 }
 
-const { title, hotel, user, activeTab } = Astro.props;
+const { title, hotel, user } = Astro.props;
 const userLocale = Astro.locals.locale;
-
-const tabs = [
-  { id: 'overview', href: '/admin/dashboard' },
-  { id: 'recommendations', href: '/admin/recommendations' },
-  { id: 'breakfast', href: '/admin/breakfast' },
-  { id: 'menu', href: '/admin/menu' },
-  { id: 'conference', href: '/admin/conference' },
-  { id: 'service', href: '/admin/service' },
-  { id: 'features', href: '/admin/features' },
-  { id: 'bookings', href: '/admin/bookings' },
-  { id: 'settings', href: '/admin/settings' },
-] as const;
+const currentPath = Astro.url.pathname;
 ---
 
 <!DOCTYPE html>
@@ -102,32 +91,220 @@ const tabs = [
       </div>
     </header>
 
-    <!-- Editorial Menu (Sub-Header-Overlay, bone-Background, öffnet unter Header) -->
+    <!-- Editorial Menu (Sub-Header-Overlay) -->
     <div
       class="editorial-menu"
       :class="{ 'is-open': menuOpen }"
       aria-label="Hauptmenü"
     >
-      <!-- Top-Bar: User-Email + Logout (kein × — Burger im Header übernimmt) -->
-      <div class="editorial-menu-topbar">
-        <p class="editorial-menu-user-email">{user.email}</p>
-        <form method="POST" action="/admin/auth/logout">
-          <button type="submit" class="editorial-menu-logout">Abmelden</button>
-        </form>
-      </div>
+      <nav
+        class="editorial-menu-nav"
+        x-data="{ expandedGroup: null, toggle(g) { this.expandedGroup = this.expandedGroup === g ? null : g } }"
+        aria-label="Backoffice Navigation"
+      >
+        <!-- User-Email + Logout -->
+        <div class="menu-user-section">
+          <span class="menu-user-email">{user.email}</span>
+          <form method="POST" action="/admin/auth/logout">
+            <button type="submit" class="menu-logout-btn">{t('nav.logout', userLocale)}</button>
+          </form>
+        </div>
 
-      <!-- Items (Hero-Pattern: 24px anthrazit, 22px gap) -->
-      <nav class="editorial-menu-items">
-        {tabs.map(tab => (
-          <a
-            href={tab.href}
-            class="editorial-menu-item"
-            data-active={activeTab === tab.id ? 'true' : 'false'}
-          >
-            <span class="editorial-menu-item-label">{t(`nav.${tab.id}`, userLocale)}</span>
-            <span class="editorial-menu-item-strich"></span>
-          </a>
-        ))}
+        <!-- ÜBERSICHT — direkter Link, kein Akkordeon -->
+        <a
+          href="/admin/dashboard"
+          class={`menu-direct-link${currentPath === '/admin/dashboard' ? ' is-active' : ''}`}
+        >
+          {currentPath === '/admin/dashboard' && <span class="active-dot" aria-hidden="true"></span>}
+          {t('nav.overview', userLocale)}
+        </a>
+
+        <!-- GRUPPE: GÄSTE -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('gaeste')" :class="{ 'is-expanded': expandedGroup === 'gaeste' }" :aria-expanded="expandedGroup === 'gaeste'">
+            <span class="group-label">{t('nav.group_gaeste', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'gaeste'">
+            <a href="/admin/concierge" class={`menu-item${currentPath === '/admin/concierge' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/concierge' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.concierge', userLocale)}
+            </a>
+            <a href="/admin/guests" class={`menu-item${currentPath === '/admin/guests' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/guests' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.guests', userLocale)}
+            </a>
+            <a href="/admin/wallet" class={`menu-item${currentPath === '/admin/wallet' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/wallet' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.wallet', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: BUCHUNGEN & SERVICES -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('buchungen')" :class="{ 'is-expanded': expandedGroup === 'buchungen' }" :aria-expanded="expandedGroup === 'buchungen'">
+            <span class="group-label">{t('nav.group_buchungen', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'buchungen'">
+            <a href="/admin/bookings" class={`menu-item${currentPath === '/admin/bookings' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/bookings' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.bookings', userLocale)}
+            </a>
+            <a href="/admin/breakfast" class={`menu-item${currentPath === '/admin/breakfast' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/breakfast' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.breakfast', userLocale)}
+            </a>
+            <a href="/admin/menu" class={`menu-item${currentPath?.startsWith('/admin/menu') ? ' is-active' : ''}`}>
+              {currentPath?.startsWith('/admin/menu') && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.menu', userLocale)}
+            </a>
+            <a href="/admin/service" class={`menu-item${currentPath === '/admin/service' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/service' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.service', userLocale)}
+            </a>
+            <a href="/admin/conference" class={`menu-item${currentPath === '/admin/conference' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/conference' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.conference', userLocale)}
+            </a>
+            <a href="/admin/spa" class={`menu-item${currentPath === '/admin/spa' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/spa' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.spa', userLocale)}
+            </a>
+            <a href="/admin/restaurant" class={`menu-item${currentPath === '/admin/restaurant' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/restaurant' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.restaurant', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: INHALTE -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('inhalte')" :class="{ 'is-expanded': expandedGroup === 'inhalte' }" :aria-expanded="expandedGroup === 'inhalte'">
+            <span class="group-label">{t('nav.group_inhalte', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'inhalte'">
+            <a href="/admin/recommendations" class={`menu-item${currentPath === '/admin/recommendations' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/recommendations' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.recommendations', userLocale)}
+            </a>
+            <a href="/admin/microsite" class={`menu-item${currentPath === '/admin/microsite' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/microsite' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.microsite', userLocale)}
+            </a>
+            <a href="/admin/seo" class={`menu-item${currentPath === '/admin/seo' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/seo' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.seo', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: MARKETING -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('marketing')" :class="{ 'is-expanded': expandedGroup === 'marketing' }" :aria-expanded="expandedGroup === 'marketing'">
+            <span class="group-label">{t('nav.group_marketing', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'marketing'">
+            <a href="/admin/email-campaigns" class={`menu-item${currentPath === '/admin/email-campaigns' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/email-campaigns' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.email_campaigns', userLocale)}
+            </a>
+            <a href="/admin/reviews" class={`menu-item${currentPath === '/admin/reviews' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/reviews' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.reviews', userLocale)}
+            </a>
+            <a href="/admin/pre-stay" class={`menu-item${currentPath === '/admin/pre-stay' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/pre-stay' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.pre_stay', userLocale)}
+            </a>
+            <a href="/admin/referrals" class={`menu-item${currentPath === '/admin/referrals' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/referrals' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.referrals', userLocale)}
+            </a>
+            <a href="/admin/loyalty" class={`menu-item${currentPath === '/admin/loyalty' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/loyalty' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.loyalty', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: VERKAUF -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('verkauf')" :class="{ 'is-expanded': expandedGroup === 'verkauf' }" :aria-expanded="expandedGroup === 'verkauf'">
+            <span class="group-label">{t('nav.group_verkauf', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'verkauf'">
+            <a href="/admin/booking-engine" class={`menu-item${currentPath === '/admin/booking-engine' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/booking-engine' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.booking_engine', userLocale)}
+            </a>
+            <a href="/admin/best-price" class={`menu-item${currentPath === '/admin/best-price' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/best-price' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.best_price', userLocale)}
+            </a>
+            <a href="/admin/booking-recovery" class={`menu-item${currentPath === '/admin/booking-recovery' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/booking-recovery' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.booking_recovery', userLocale)}
+            </a>
+            <a href="/admin/self-checkout" class={`menu-item${currentPath === '/admin/self-checkout' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/self-checkout' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.self_checkout', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: INTEGRATIONEN -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('integrationen')" :class="{ 'is-expanded': expandedGroup === 'integrationen' }" :aria-expanded="expandedGroup === 'integrationen'">
+            <span class="group-label">{t('nav.group_integrationen', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'integrationen'">
+            <a href="/admin/whatsapp" class={`menu-item${currentPath === '/admin/whatsapp' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/whatsapp' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.whatsapp', userLocale)}
+            </a>
+            <a href="/admin/gmb" class={`menu-item${currentPath === '/admin/gmb' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/gmb' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.gmb', userLocale)}
+            </a>
+            <a href="/admin/wallet-keys" class={`menu-item${currentPath === '/admin/wallet-keys' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/wallet-keys' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.wallet_keys', userLocale)}
+            </a>
+            <a href="/admin/pms" class={`menu-item${currentPath === '/admin/pms' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/pms' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.pms', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: EINSTELLUNGEN -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('einstellungen')" :class="{ 'is-expanded': expandedGroup === 'einstellungen' }" :aria-expanded="expandedGroup === 'einstellungen'">
+            <span class="group-label">{t('nav.group_einstellungen', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'einstellungen'">
+            <a href="/admin/features" class={`menu-item${currentPath === '/admin/features' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/features' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.features', userLocale)}
+            </a>
+            <a href="/admin/settings" class={`menu-item${currentPath === '/admin/settings' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/settings' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.settings', userLocale)}
+            </a>
+            <a href="/admin/subscription" class={`menu-item${currentPath === '/admin/subscription' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/subscription' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.subscription', userLocale)}
+            </a>
+          </div>
+        </div>
+
       </nav>
     </div>
 
@@ -140,6 +317,8 @@ const tabs = [
 
     <script>
       import Alpine from 'alpinejs';
+      import collapse from '@alpinejs/collapse';
+      Alpine.plugin(collapse);
       // @ts-expect-error - expose for debugging
       window.Alpine = Alpine;
       Alpine.start();

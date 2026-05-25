@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Stammgäste" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Stammgäste"
+    headlineLight=""
+    headlineBold="Stammgäste"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Jeder Gast bekommt ein Profil mit Aufenthalts-Historie, Sprache und persönlichen Notizen — die Lieblings-Suite, die Allergie, die Vorliebe für ruhige Zimmer Richtung Garten. So begrüßt dein Team Wiederkehrende mit Namen und Geste, nicht mit Datenbank-Abfragen.
+    </p>
+  </div>
+
+</AdminLayout>

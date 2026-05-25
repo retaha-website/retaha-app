@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="SEO-Pages" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="SEO-Pages"
+    headlineLight=""
+    headlineBold="SEO-Pages"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Generiere automatisch SEO-optimierte Landing-Pages für relevante Suchen — "Romantik-Wochenende Berlin", "Hochzeit Boutique-Hotel", "Familien-Suite mit Spa". Du gibst die Themen vor, retaha baut die Pages mit deinem Content und deiner Buchungsmaschine.
+    </p>
+  </div>
+
+</AdminLayout>

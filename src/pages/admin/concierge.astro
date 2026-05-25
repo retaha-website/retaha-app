@@ -1,0 +1,29 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Concierge-Anfragen" hotel={hotel} user={user}>
+
+  <EditorialPageHeader
+    sectionNumber="—"
+    sectionLabel="Concierge-Anfragen"
+    headlineLight=""
+    headlineBold="Concierge-Anfragen"
+  />
+
+  <div class="max-w-3xl mt-12">
+    <p class="text-anthrazit/85 leading-relaxed text-base">
+      Hier landen Nachrichten deiner Gäste — Anfragen zum WLAN, Restaurant-Empfehlungen, Wünsche fürs Zimmer. Du beantwortest direkt, archivierst was erledigt ist, und siehst auf einen Blick was noch offen ist. Bei wiederkehrenden Fragen lernt die KI-Antwortfunktion mit deinem Tonfall.
+    </p>
+  </div>
+
+</AdminLayout>
