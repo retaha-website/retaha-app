@@ -86,24 +86,11 @@ if (Astro.request.method === 'POST') {
           return Astro.redirect(`/admin/menu/${data.id}?created=1`);
         }
       } else {
-        console.log('=== UPDATE ATTEMPT ===');
-        console.log('item id:', id);
-        console.log('hotel id:', hotel.id);
-        console.log('updates name_de:', updates.name_de);
-        console.log('updates contains_sesame:', updates.contains_sesame);
-
         const { data: updatedRows, error } = await client
           .from('breakfast_items')
           .update(updates)
           .eq('id', id)
           .select('id');
-
-        console.log('=== UPDATE RESULT ===');
-        console.log('error:', error);
-        console.log('error code:', error?.code);
-        console.log('error message:', error?.message);
-        console.log('error details:', error?.details);
-        console.log('returned rows:', updatedRows?.length ?? 0);
 
         if (error) {
           message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
