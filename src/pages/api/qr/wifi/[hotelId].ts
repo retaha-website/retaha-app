@@ -35,7 +35,7 @@ export const GET: APIRoute = async ({ params }) => {
       width: 180,
       color: {
         dark: '#1A1A1A',
-        light: '#FAF8F2',
+        light: '#FFFFFF',
       },
     });
 
