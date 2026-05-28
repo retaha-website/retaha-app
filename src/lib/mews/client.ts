@@ -123,6 +123,26 @@ export class MewsClient {
     return this.post<MewsResourcesResponse>('resources/getAll', params);
   }
 
+  /** Services (Orderable + Reservable). Limitation pflicht. Sprint C: Mapping pro Booking-Typ. */
+  getServices(params: MewsServicesParams = { Limitation: { Count: 100 } }) {
+    return this.post<MewsServicesResponse>('services/getAll', params);
+  }
+
+  /** Products. Sprint C: nur als Counter (mews_products_count), Pfad C+ später. */
+  getProducts(params: MewsProductsParams = { Limitation: { Count: 100 } }) {
+    return this.post<MewsProductsResponse>('products/getAll', params);
+  }
+
+  /** Taxations. Sprint C Phase 2c: liefert TaxRates (Code + Strategy) für orders/add. */
+  getTaxations(params: MewsTaxationsParams = { Limitation: { Count: 100 } }) {
+    return this.post<MewsTaxationsResponse>('taxations/getAll', params);
+  }
+
+  /** orders/add — Custom-Items mit Brutto-Preis. Sprint C Phase 3. */
+  addOrder(params: MewsAddOrderParams) {
+    return this.post<MewsAddOrderResponse>('orders/add', params);
+  }
+
   // ============================================================
   // Pagination — AsyncGenerators yield page-für-page
   // ============================================================
@@ -311,6 +331,104 @@ export interface MewsResourcesResponse {
   ResourceCategories?: Array<Record<string, unknown>>;
   /** Verknüpfung Resource ↔ Category (separates Top-Level-Array in der Response). */
   ResourceCategoryAssignments?: Array<Record<string, unknown>>;
+  Cursor?: string | null;
+  [key: string]: unknown;
+}
+
+// ─── Services (Sprint C) ─────────────────────────────────────────────
+
+export interface MewsServicesParams {
+  ServiceIds?: string[];
+  Limitation: { Count: number; Cursor?: string };
+}
+
+export interface MewsService {
+  Id: string;
+  Name?: string;
+  Names?: Record<string, string>;
+  Type?: 'Orderable' | 'Reservable' | string;
+  IsActive?: boolean;
+  [key: string]: unknown;
+}
+
+export interface MewsServicesResponse {
+  Services?: MewsService[];
+  Cursor?: string | null;
+  [key: string]: unknown;
+}
+
+// ─── Products (Sprint C — nur Counter; Pfad C+ später) ───────────────
+
+export interface MewsProductsParams {
+  ServiceIds?: string[];
+  Limitation: { Count: number; Cursor?: string };
+}
+
+export interface MewsProductsResponse {
+  Products?: Array<Record<string, unknown>>;
+  CustomerProducts?: Array<Record<string, unknown>>;
+  Cursor?: string | null;
+  [key: string]: unknown;
+}
+
+// ─── orders/add (Sprint C Phase 3) ───────────────────────────────────
+
+// UnitAmount: bei Gross-Pricing-Hotels GrossValue, bei Net-Pricing NetValue.
+// Discriminated über Vorhandensein. Genau eines der beiden Felder muss
+// gesetzt sein — Mews lehnt sonst mit "Invalid GrossValue."/"Invalid NetValue." ab.
+export type MewsUnitAmount =
+  | { Currency: string; GrossValue: number; TaxCodes: string[] }
+  | { Currency: string; NetValue: number;   TaxCodes: string[] };
+
+export interface MewsOrderItem {
+  Name: string;
+  UnitCount: number;
+  UnitAmount: MewsUnitAmount;
+  AccountingCategoryId?: string;
+}
+
+export interface MewsAddOrderParams {
+  ServiceId: string;
+  AccountId: string;
+  LinkedReservationId?: string;
+  Items: MewsOrderItem[];
+  ConsumptionUtc?: string;
+  Notes?: string;
+}
+
+export interface MewsAddOrderResponse {
+  OrderId: string;
+  [key: string]: unknown;
+}
+
+// ─── Taxations (Sprint C Phase 2c — TaxCode-Lookup) ───────────────────
+
+export interface MewsTaxationsParams {
+  TaxEnvironmentCodes?: string[];
+  Limitation: { Count: number; Cursor?: string };
+}
+
+export interface MewsTaxation {
+  Code: string;
+  Name?: string;
+  LocalName?: string;
+  [key: string]: unknown;
+}
+
+export interface MewsTaxRate {
+  Code: string;
+  TaxationCode: string;
+  Strategy?: {
+    Discriminator?: string;  // z.B. 'Relative', 'Fixed'
+    Value?: unknown;          // bei Relative: number (0.20 = 20%)
+  };
+  ValidityIntervalsUtc?: Array<{ StartUtc: string; EndUtc: string | null }>;
+  [key: string]: unknown;
+}
+
+export interface MewsTaxationsResponse {
+  Taxations?: MewsTaxation[];
+  TaxRates?: MewsTaxRate[];
   Cursor?: string | null;
   [key: string]: unknown;
 }
