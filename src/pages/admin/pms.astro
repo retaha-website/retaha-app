@@ -9,6 +9,7 @@ import {
 } from '../../lib/auth';
 import { encryptToken } from '../../lib/encryption';
 import { MewsClient } from '../../lib/mews/client';
+import { getMewsClientForHotel } from '../../lib/mews/factory';
 import { getEnv } from '../../lib/env';
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -69,7 +70,30 @@ if (Astro.request.method === 'POST') {
               text: 'Mews API antwortete ohne Enterprise.Id — Token möglicherweise ungültig oder Account ohne Enterprise.',
             };
           } else {
-            // 3) Token verschlüsseln + Row upserten
+            // 3) Default-Currency aus Enterprise.Currencies (IsDefault=true)
+            const currencies = (config.Enterprise as any)?.Currencies as
+              | Array<{ Currency?: string; IsDefault?: boolean }>
+              | undefined;
+            const defaultCurrency = currencies?.find(c => c.IsDefault)?.Currency ?? null;
+
+            // 3b) Pricing-Mode aus Enterprise.Pricing — bestimmt ob orders/add
+            //     GrossValue oder NetValue als Feldname braucht (Sprint C Phase 3).
+            const enterprisePricing = (config.Enterprise as any)?.Pricing as string | undefined;
+            const pricingMode = enterprisePricing === 'Gross' || enterprisePricing === 'Net'
+              ? enterprisePricing
+              : null;
+
+            // 4) Products-Count (für Toggle-Disable in UI). Best-effort — wenn der Call
+            //    fehlschlägt, bleibt Counter 0 = Pfad C+ disabled (sicherer Default).
+            let productsCount = 0;
+            try {
+              const productsResp = await testClient.getProducts({ Limitation: { Count: 100 } });
+              productsCount = (productsResp.Products ?? []).length;
+            } catch {
+              // ignored — Products sind optional, Pfad C+ ist eh out-of-scope für Sprint C
+            }
+
+            // 5) Token verschlüsseln + Row upserten
             const encryptedToken = await encryptToken(accessToken);
             const { error } = await ssrClient
               .from('mews_integrations')
@@ -79,6 +103,9 @@ if (Astro.request.method === 'POST') {
                   enterprise_id: enterpriseId,
                   access_token_encrypted: encryptedToken,
                   environment,
+                  default_currency: defaultCurrency,
+                  pricing_mode: pricingMode,
+                  mews_products_count: productsCount,
                   sync_status: 'idle',
                   sync_error_message: null,
                   updated_at: new Date().toISOString(),
@@ -100,6 +127,34 @@ if (Astro.request.method === 'POST') {
             text: `Mews-Verbindungstest fehlgeschlagen: ${(err as Error).message}`,
           };
         }
+      }
+    }
+  } else if (action === 'save_config') {
+    // Service-Mapping + TaxCode + Pricing-Source speichern
+    const serviceBreakfast = form.get('service_id_breakfast')?.toString().trim() || null;
+    const serviceService = form.get('service_id_service')?.toString().trim() || null;
+    const serviceConference = form.get('service_id_conference')?.toString().trim() || null;
+    const taxCode = form.get('default_tax_code')?.toString().trim() || null;
+    const pricingSource = form.get('pricing_source')?.toString();
+
+    if (pricingSource !== 'retaha' && pricingSource !== 'mews') {
+      message = { type: 'error', text: 'Ungültige Preis-Quelle.' };
+    } else {
+      const { error } = await ssrClient
+        .from('mews_integrations')
+        .update({
+          service_id_breakfast: serviceBreakfast,
+          service_id_service: serviceService,
+          service_id_conference: serviceConference,
+          default_tax_code: taxCode,
+          pricing_source: pricingSource,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('hotel_id', hotel.id);
+      if (error) {
+        message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      } else {
+        return Astro.redirect('/admin/pms?saved=config');
       }
     }
   } else if (action === 'disconnect') {
@@ -129,13 +184,20 @@ if (savedParam === 'connected' && !message) {
   message = { type: 'success', text: 'Mews-Integration getrennt. Bisher synchronisierte Daten bleiben erhalten.' };
 } else if (savedParam === 'sync' && !message) {
   message = { type: 'success', text: 'Synchronisation erfolgreich abgeschlossen.' };
+} else if (savedParam === 'config' && !message) {
+  message = { type: 'success', text: 'Order-Konfiguration gespeichert.' };
 }
 
 // Integration via SSR-Client (RLS) — access_token_encrypted bewusst NICHT selektiert,
 // bleibt server-side, geht nie ans Frontend.
 const { data: integration } = await ssrClient
   .from('mews_integrations')
-  .select('enterprise_id, environment, last_sync_at, sync_status, sync_error_message, created_at, updated_at')
+  .select(`
+    enterprise_id, environment, last_sync_at, sync_status, sync_error_message, created_at, updated_at,
+    pricing_source, default_currency, default_tax_code, pricing_mode,
+    service_id_breakfast, service_id_service, service_id_conference,
+    mews_products_count
+  `)
   .eq('hotel_id', hotel.id)
   .maybeSingle();
 
@@ -155,6 +217,45 @@ if (integration) {
     guests: guestsRes.count ?? 0,
   };
 }
+
+// Services live aus Mews für die Mapping-Dropdowns. Best-effort —
+// bei Fehler bleibt die Liste leer + Hinweis im UI.
+let orderableServices: Array<{ Id: string; Name: string; IsActive: boolean }> = [];
+let servicesError: string | null = null;
+if (integration) {
+  try {
+    const mews = await getMewsClientForHotel(hotel.id);
+    if (mews) {
+      const resp = await mews.getServices({ Limitation: { Count: 100 } });
+      orderableServices = (resp.Services ?? [])
+        .filter(s => s.Type === 'Orderable')
+        .map(s => ({
+          Id: s.Id,
+          Name: (s.Name as string) || (s.Names && Object.values(s.Names)[0]) || s.Id,
+          IsActive: s.IsActive !== false,
+        }))
+        // Aktive zuerst, dann alphabetisch
+        .sort((a, b) => Number(b.IsActive) - Number(a.IsActive) || a.Name.localeCompare(b.Name));
+    }
+  } catch (err) {
+    servicesError = (err as Error).message;
+  }
+}
+
+const productsCount = integration?.mews_products_count ?? 0;
+const productsAvailable = productsCount > 0;
+const pricingMewsLabelClass = productsAvailable
+  ? 'flex items-start gap-3 cursor-pointer'
+  : 'flex items-start gap-3 opacity-50 cursor-not-allowed';
+
+type ServiceMappingField = { name: string; label: string; current: string | null };
+const serviceMappingFields: ServiceMappingField[] = integration
+  ? [
+      { name: 'service_id_breakfast', label: 'Frühstück-Buchungen', current: integration.service_id_breakfast ?? null },
+      { name: 'service_id_service', label: 'Service-Anfragen', current: integration.service_id_service ?? null },
+      { name: 'service_id_conference', label: 'Konferenz-Buchungen', current: integration.service_id_conference ?? null },
+    ]
+  : [];
 
 const lastSyncLabel = integration?.last_sync_at
   ? new Date(integration.last_sync_at).toLocaleString('de-DE', {
@@ -255,6 +356,137 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
           </div>
         </section>
       )}
+
+      <!-- Order-Konfiguration (Sprint C — Charge-to-Room) -->
+      <section>
+        <p class="eyebrow text-pink-shock mb-4">— Order-Konfiguration —</p>
+        <p class="text-sm text-anthrazit/70 mb-6 max-w-2xl leading-relaxed">
+          Wenn der Hotelier eine Buchung bestätigt, schickt retaha sie als Order
+          auf das Mews-Gast-Konto („Charge to Room"). Damit das funktioniert,
+          ordne pro Buchungstyp einen Mews-Service zu und setze deinen Tax-Code.
+        </p>
+
+        {servicesError && (
+          <div class="mb-6 px-4 py-3 text-sm bg-amber-50 border-l-4 border-amber-500 text-amber-800">
+            <strong>Services konnten nicht geladen werden:</strong> {servicesError}
+            <br />
+            Trotzdem speicherbar — Dropdowns sind leer. Bei nächstem Page-Load nochmal probieren.
+          </div>
+        )}
+
+        <form method="POST" class="space-y-6 max-w-2xl">
+          <input type="hidden" name="_action" value="save_config" />
+
+          <!-- Service-Mapping (3 Dropdowns) -->
+          <p class="text-xs italic text-anthrazit/55 mb-4 max-w-xl leading-relaxed">
+            Leer lassen wenn ein Buchungstyp <strong>nicht</strong> über Mews abgerechnet werden soll
+            — der Push für diesen Typ wird dann übersprungen, die Buchung bleibt nur in retaha.
+          </p>
+          <div class="space-y-5">
+            {serviceMappingFields.map(field => (
+              <label class="block">
+                <span class="eyebrow text-anthrazit/55 block mb-2">— Mews-Service für {field.label} —</span>
+                <select name={field.name} class="bauhaus-input">
+                  <option value="">— nicht zugeordnet —</option>
+                  {orderableServices.map(s => (
+                    <option value={s.Id} selected={field.current === s.Id}>
+                      {s.Name}{!s.IsActive ? ' (inaktiv)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+
+          <!-- Tax-Code -->
+          <label class="block">
+            <span class="eyebrow text-anthrazit/55 block mb-2">— Tax-Code (Default) —</span>
+            <input
+              type="text"
+              name="default_tax_code"
+              value={integration.default_tax_code ?? ''}
+              placeholder="z.B. UK-S, UK-V, DE-19, …"
+              autocomplete="off"
+              spellcheck="false"
+              class="bauhaus-input bauhaus-input--mono"
+            />
+            <span class="text-xs italic text-anthrazit/55 mt-2 block">
+              Wird iterativ per Test-Order ermittelt (Phase 2c). Tax-Environment dieses Hotels:
+              {' '}<span class="font-mono">{integration.environment === 'demo' ? 'UK-2022 (Demo)' : '— prüfe configuration.Enterprise.TaxEnvironmentCode'}</span>
+            </span>
+          </label>
+
+          <!-- Currency + Pricing-Mode (read-only Anzeige) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <span class="eyebrow text-anthrazit/55 block mb-2">— Default-Currency —</span>
+              <p class="text-base font-mono text-anthrazit m-0">
+                {integration.default_currency ?? '(nicht gesetzt)'}
+              </p>
+              <span class="text-xs italic text-anthrazit/55 mt-1 block">Aus configuration.Enterprise.Currencies (IsDefault=true).</span>
+            </div>
+            <div>
+              <span class="eyebrow text-anthrazit/55 block mb-2">— Pricing-Mode —</span>
+              <p class="text-base font-mono text-anthrazit m-0">
+                {integration.pricing_mode ?? '(nicht gesetzt)'}
+              </p>
+              <span class="text-xs italic text-anthrazit/55 mt-1 block">
+                Aus Enterprise.Pricing. Gross = orders/add nutzt UnitAmount.GrossValue; Net = NetValue.
+              </span>
+            </div>
+          </div>
+
+          <!-- Pricing-Source-Toggle -->
+          <fieldset class="border-t border-anthrazit/[0.12] pt-6">
+            <legend class="eyebrow text-anthrazit/55 mb-3">— Preis-Quelle —</legend>
+            <div class="space-y-3">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="pricing_source"
+                  value="retaha"
+                  checked={integration.pricing_source !== 'mews'}
+                  class="mt-1"
+                />
+                <span>
+                  <span class="block text-sm font-medium text-anthrazit">Preise in retaha pflegen</span>
+                  <span class="block text-xs text-anthrazit/55 mt-0.5">
+                    Hotelier pflegt Preise direkt in den retaha-Modulen. Push als Custom-Items.
+                  </span>
+                </span>
+              </label>
+
+              <label class={pricingMewsLabelClass}>
+                <input
+                  type="radio"
+                  name="pricing_source"
+                  value="mews"
+                  checked={integration.pricing_source === 'mews'}
+                  disabled={!productsAvailable}
+                  class="mt-1"
+                />
+                <span>
+                  <span class="block text-sm font-medium text-anthrazit">
+                    Preise aus Mews-Products abrufen
+                    <span class="text-xs font-mono text-anthrazit/55 ml-2">({productsCount} Products in Mews)</span>
+                  </span>
+                  <span class="block text-xs text-anthrazit/55 mt-0.5">
+                    {productsAvailable
+                      ? 'Verfügbar. Hinweis: Pfad C+ ist noch nicht implementiert (Backlog) — auswählbar, aber wird beim Push einen Fehler werfen.'
+                      : 'Nicht verfügbar — dein Mews-Hotel hat keine Products angelegt. Lege Products in Mews an und verbinde neu.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="pt-2">
+            <button type="submit" class="bauhaus-button bauhaus-button--primary">
+              Order-Konfiguration speichern
+            </button>
+          </div>
+        </form>
+      </section>
 
       <!-- Aktionen -->
       <section class="flex gap-6 flex-wrap items-center pt-2">

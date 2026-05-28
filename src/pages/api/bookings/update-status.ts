@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
-import { createSupabaseServerInstance } from '../../../lib/auth';
+import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '../../../lib/auth';
+import { pushBookingToMews, PushSkipped } from '../../../lib/mews/orders';
 
 const VALID_STATUSES = ['pending', 'confirmed', 'cancelled'];
 
@@ -29,17 +30,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
   }
 
-  if (!VALID_STATUSES.includes(payload.status)) {
+  const newStatus = payload.status.toLowerCase();
+  if (!VALID_STATUSES.includes(newStatus)) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid status' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  // RLS-protected update — user can only update bookings belonging to their hotel
+  // Pre-Update: alten Status lesen, damit wir den Übergang pending→confirmed
+  // erkennen (Sprint C Phase 3 — Mews-Charge nur beim *neuen* confirm).
+  const { data: existing } = await client
+    .from('bookings')
+    .select('id, status')
+    .eq('id', payload.booking_id)
+    .maybeSingle();
+  const oldStatus = existing?.status ?? null;
+
+  // RLS-protected update
   const { data: updated, error } = await client
     .from('bookings')
     .update({
-      status: payload.status.toLowerCase(),
+      status: newStatus,
       updated_at: new Date().toISOString(),
     })
     .eq('id', payload.booking_id)
@@ -58,7 +69,49 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
   }
 
-  return new Response(JSON.stringify({ ok: true, booking: updated[0] }), {
+  // Mews-Push beim Übergang pending → confirmed.
+  // KRITISCH: niemals re-throw. Status-Update ist erfolgreich, Push ist best-effort.
+  let pushOutcome: { ok: true; orderId: string } | { ok: false; reason: string; error: string } | null = null;
+  if (oldStatus !== 'confirmed' && newStatus === 'confirmed') {
+    pushOutcome = await tryPushBookingToMews(payload.booking_id);
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    booking: updated[0],
+    mews_push: pushOutcome,
+  }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
 };
+
+async function tryPushBookingToMews(bookingId: string): Promise<{ ok: true; orderId: string } | { ok: false; reason: string; error: string }> {
+  const admin = createSupabaseServiceRoleInstance();
+  const attemptedAt = new Date().toISOString();
+
+  try {
+    const { orderId } = await pushBookingToMews(bookingId);
+    await admin.from('bookings').update({
+      mews_order_id: orderId,
+      mews_push_attempted_at: attemptedAt,
+      mews_push_error: null,
+    }).eq('id', bookingId);
+    console.info(`[mews-push] booking ${bookingId} → order ${orderId}`);
+    return { ok: true, orderId };
+  } catch (err) {
+    const isSkip = err instanceof PushSkipped;
+    const reason = isSkip ? err.reason : 'error';
+    const message = (err as Error).message ?? String(err);
+    if (isSkip) {
+      console.info(`[mews-push] skip booking ${bookingId} (${reason}): ${message}`);
+    } else {
+      console.error(`[mews-push] booking ${bookingId} failed:`, err);
+    }
+    // Logging der Failure auf bookings — Status-Update bleibt erfolgreich
+    await admin.from('bookings').update({
+      mews_push_attempted_at: attemptedAt,
+      mews_push_error: `${reason}: ${message}`,
+    }).eq('id', bookingId);
+    return { ok: false, reason, error: message };
+  }
+}
