@@ -16,7 +16,7 @@ export type StayContext = {
   };
   room: {
     id: string;
-    room_number: string;
+    room_number: string | null;
     room_name: string | null;
   };
   hotel: {
@@ -155,7 +155,7 @@ export interface BookingWithGuest {
     check_in: string;
     check_out: string;
     room: {
-      room_number: string;
+      room_number: string | null;
       room_name: string | null;
     } | null;
     guest: {
