@@ -15,7 +15,29 @@ const { token } = Astro.params;
 const ctx = token ? await loadStayByToken(token) : null;
 
 if (!ctx) {
-  return new Response('Stay not found or expired', { status: 404 });
+  // Fix 4: graceful Fallback statt 404. Gestalteter Showcase kommt im Design-Sprint.
+  return new Response(
+    `<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>retaha</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body style="margin:0;font-family:'Space Grotesk',system-ui,sans-serif;background:#FFFFFF;color:#1A1A1A;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
+    <div style="text-align:center;max-width:420px">
+      <p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#FF4A82;margin:0 0 20px 0">retaha</p>
+      <h1 style="font-size:26px;font-weight:300;letter-spacing:-0.02em;line-height:1.2;margin:0 0 12px 0">Diese Einladung ist nicht (mehr) gültig.</h1>
+      <p style="opacity:0.55;font-size:14px;line-height:1.5;margin:0">Bitte frag an der Rezeption nach einem neuen Link.</p>
+    </div>
+  </body>
+</html>`,
+    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
 }
 
 const { stay, guest, room, hotel, settings } = ctx;
@@ -34,7 +56,7 @@ const existingServiceBookings = await loadBookingsForStay(stay.id, 'service');
 const activeServiceBooking = existingServiceBookings[0] || null;
 
 const langParam = new URL(Astro.request.url).searchParams.get('lang');
-const lang: Lang = normalizeLang(langParam || guest.language || hotel.default_language);
+const lang: Lang = normalizeLang(langParam || guest?.language || hotel.default_language);
 
 const welcomeMap: Record<Lang, string | null> = {
   de: settings.welcome_message_de,
@@ -54,17 +76,21 @@ const hotelEyebrow = eyebrowMap[lang] || settings.hotel_eyebrow_de || (hotel.cit
 
 const greetingLabel = t('hero.greeting', lang);
 const greetingFallback = t('hero.greetingFallback', lang);
-const greetingName = guest.first_name
+const greetingName = guest?.first_name
   ? `${greetingLabel} ${guest.first_name}`
   : greetingFallback;
 
-const visitOrdinals: Record<Lang, string> = {
-  de: `dein ${guest.visit_count}. Besuch`,
-  en: `your ${guest.visit_count}${guest.visit_count === 1 ? 'st' : guest.visit_count === 2 ? 'nd' : guest.visit_count === 3 ? 'rd' : 'th'} visit`,
-  fr: `votre ${guest.visit_count}${guest.visit_count === 1 ? 'ère' : 'ème'} visite`,
-  es: `tu ${guest.visit_count}ª visita`,
-};
-const visitText = visitOrdinals[lang];
+// Visit-Ordinals nur wenn guest existiert (sonst kein Besuch-Counter)
+let visitText = '';
+if (guest) {
+  const visitOrdinals: Record<Lang, string> = {
+    de: `dein ${guest.visit_count}. Besuch`,
+    en: `your ${guest.visit_count}${guest.visit_count === 1 ? 'st' : guest.visit_count === 2 ? 'nd' : guest.visit_count === 3 ? 'rd' : 'th'} visit`,
+    fr: `votre ${guest.visit_count}${guest.visit_count === 1 ? 'ère' : 'ème'} visite`,
+    es: `tu ${guest.visit_count}ª visita`,
+  };
+  visitText = visitOrdinals[lang];
+}
 
 const checkInDate = new Date(stay.check_in);
 const checkOutDate = new Date(stay.check_out);
@@ -113,12 +139,6 @@ const weather = {
 
 const f = settings.features;
 
-console.log('=== CONFERENCE DEBUG ===');
-console.log('f.conference_booking:', f?.conference_booking);
-console.log('settings.conference_rooms exists:', !!settings.conference_rooms);
-console.log('settings.conference_rooms length:', settings.conference_rooms?.length);
-console.log('settings.conference_rooms first item:', settings.conference_rooms?.[0]);
-console.log('settings keys:', Object.keys(settings || {}));
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
 
 const breakfastLocationMap: Record<Lang, string | null> = {
@@ -175,21 +195,23 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
             </div>
           </div>
 
-          <img class="gate-hero-logo" src="/hotel-assets/logo-thegate.svg" alt={hotel.name} />
+          <img class="gate-hero-logo" src={hotel.logo_url || '/specht-anthrazit.svg'} alt={hotel.name} />
 
           <div class="gate-hero-welcome">
             <div class="gate-hero-kicker">{t('hero.kicker', lang)}</div>
             <h1 class="gate-hero-greeting">
               {greetingName}<span class="dot">.</span>
             </h1>
-            <p class="gate-hero-sub">{welcomeMsg} — {visitText}.</p>
+            <p class="gate-hero-sub">{welcomeMsg}{visitText && ` — ${visitText}`}.</p>
           </div>
 
           <div class="gate-hero-stay">
-            <div class="gate-hero-stay-block">
-              <div class="label">{t('hero.stay.room', lang)}</div>
-              <div class="value">{[room.room_number, room.room_name].filter(Boolean).join(' · ')}</div>
-            </div>
+            {room && (
+              <div class="gate-hero-stay-block">
+                <div class="label">{t('hero.stay.room', lang)}</div>
+                <div class="value">{[room.room_number, room.room_name].filter(Boolean).join(' · ')}</div>
+              </div>
+            )}
             <div class="gate-hero-stay-block">
               <div class="label">{stayLabel.range}</div>
               <div class="value">{stayRange}</div>
