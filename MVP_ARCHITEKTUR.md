@@ -1,255 +1,173 @@
-# retaha-app · MVP-Architektur-Skizze
-> Stand: 26.05.2026 · Tag 8
-> Basis: Brain-Dump-Antworten + Mews-API-Recherche + Component-Gap-Inventur
-> Strategie: Functionality-First, dann Design
+# retaha-app · MVP-Architektur
+> Stand: 26.05.2026 · Tag 8 (Entscheidungen) · ergänzt
+> Strategie: Premium-Vision Maximum-Flexibility, Functionality-First
+> Realistischer MVP-Zeitrahmen: **12-15 Wochen** (3-4 Monate) Vollzeit mit Claude Code
+> Demo mit Kirstin: ca. September/Oktober 2026
+>
+> **Haupt-Referenz** für Entscheidungen + Sprint-Plan. Technische Detail-Specs
+> (Eve-Prompts, Auth-Flow, Sync-Strategie, Stripe, Wallet, API-Endpoints):
+> siehe `MVP_ARCHITEKTUR_DETAIL.md`.
 
 ---
 
-## 0 · Executive Summary
+## 0 · Decision-Log (12 Entscheidungen)
 
-retaha ist die **Gast-Schnittstelle für Premium-Hotels (90€+/Nacht)** mit:
-- **Drei Frontends** — Backoffice (Hotelier), Gast-App (NFC/QR), Admin (Taha)
-- **Mews PMS** als einziger Sync-Partner (Phase 1) — kein eigenes PMS
-- **Eve** als KI-Concierge mit Tool-Use für Aktionen
-- **Stripe** nur für eigene Subscription (Hotelier ↔ retaha)
-- **Charge to Room** für Gast-Add-ons (Frühstück, Service, Konferenz) → kein Stripe für Gäste
-
-**Realistische MVP-Zeit:** 6-8 Wochen Vollzeit mit Claude Code.
-**Demo-fertig:** NFC-Login + Frühstück-Buchung + Eve-Antwort + Wallet-Card nach Check-out.
-
----
-
-## 1 · Domain Model
-
-### Entities + Beziehungen
-
-```
-hotel (1) ──< hotel_settings (1)
-       │
-       ├──< hotel_users (n)     [Owner, Mitarbeiter incl. Hannah]
-       ├──< rooms (n)            [aus Mews gesynct]
-       ├──< stays (n)            [aus Mews gesynct: aktive Buchungen mit Check-in/out]
-       │      │
-       │      ├──< guests (n)    [Personen pro Stay]
-       │      ├──< bookings (n)  [unsere Bookings: Frühstück, Service, Konferenz]
-       │      ├──< eve_conversations (1..n)
-       │      └──< wallet_passes (1)
-       │
-       ├──< mews_integration (1) [Token, Webhook-Config, last_sync_at]
-       ├──< subscription (1)    [Stripe customer_id, plan, status]
-       └──< nfc_tags (n)         [physische Tags pro Zimmer + lobby + lounge]
-```
-
-### Datenherkunft
-
-| Entity | Owner | Sync-Richtung |
+### Vision + Strategie
+| # | Frage | Entscheidung |
 |---|---|---|
-| `hotels` | retaha | manuell (Onboarding) |
-| `hotel_settings` | retaha | manuell (Settings-Tab) |
-| `rooms` | **Mews** | Mews → retaha (initial + periodic) |
-| `stays` | **Mews** | Mews → retaha (Webhook on Reservation events) |
-| `guests` | **Mews** | Mews → retaha (Webhook on Customer events) |
-| `bookings` (Frühstück, etc.) | retaha | retaha → Mews (Charge to Room via Add Order) |
-| `eve_conversations` | retaha | nur retaha |
-| `wallet_passes` | retaha | nur retaha |
-| `nfc_tags` | retaha | manuell (Hotelier registriert Tags) |
-| `subscription` | retaha + Stripe | Stripe Webhook → retaha |
+| V1 | Bookings-Flow | **Hybrid:** Frühstück/Service Self-Service, Konferenz Hotelier-First |
+| V2 | PMS-Integration | **Mews-only Phase 1**, später offen für andere PMS |
+| V3 | Zahlungsfluss | **Stripe nur für Hotelier-Subscription**, Gast-Add-ons via Mews "Charge to Room" |
+| V4 | Begriffe | **Cockpit** (Hotelier-Default) + **Backoffice** (Settings) + **Gast-Frontend** + **Master-Console** (Taha, NICHT MVP) |
+
+### User-Management
+| # | Frage | Entscheidung |
+|---|---|---|
+| Q1 | Hannah-Login | **Gemeinsamer Hotel-Account** (keine Rollen-Komplexität im MVP) |
+| Q2 | Multi-Hotel | **Hotel-Switcher im Header** (Dropdown) |
+| Q3 | Apple Developer | **Heute beantragen** (5-10 Tage Vorlauf) |
+
+### Eve + Sprachen
+| # | Frage | Entscheidung |
+|---|---|---|
+| Q4 | Eve-Modell | **Hybrid Haiku 4.5 / Sonnet 4.6** mit Router-Logic |
+| Q5 | Gast-Sprachen | **6 voll:** DE, EN, TR, AR, FR, ES |
+| Q6 | Backoffice-Sprachen | **6 voll** (wie Gast) |
+| Q7 | Eve-Speicher-Dauer | **Hotelier konfiguriert** (Setting, Default 30 Tage) |
+| Q7b | RTL Arabisch | **MVP-Pflicht** (Demo-relevant) |
+
+### Features + UX
+| # | Frage | Entscheidung |
+|---|---|---|
+| Q8 | Empfehlungen-Datenquelle | **Hybrid+:** eigene + Google Places + auto-Vorschläge nach Standort |
+| Q9 | Wallet-Inhalt | **Hotelier konfiguriert** (4 Templates: Discount/Loyalty/Booking-Link/Visitenkarte) |
+| Q10 | Wallet-Branding-Color | **Hotelier wählt** (Hotel-Branding oder retaha-Branding) |
+| Q11 | Showcase-Modus | **Hybrid Toggle** (Hotelier aktiviert in Settings) |
+| Q12 | Notifications | **Hotelier konfiguriert** pro Typ (Bell/Email/Push/SMS) |
 
 ---
 
-## 2 · System-Architektur
+## 1 · System-Architektur
 
+### Stack (unverändert)
+- **Frontend:** Astro 4 + Vercel SSR + Alpine.js
+- **Backend:** Vercel Edge Functions + Supabase (PostgreSQL + Auth + Storage)
+- **PMS:** Mews Connector API + Webhooks
+- **KI:** Anthropic API (Claude Haiku 4.5 + Sonnet 4.6)
+- **Payments:** Stripe (Subscription) + Mews (Charge to Room)
+- **Wallet:** Apple PassKit + Google Wallet API
+- **Geo:** Google Places API
+- **Translation:** DeepL Pro API (UI-Strings) + Claude (dynamische Inhalte)
+- **Email:** Resend (transactional)
+- **SMS:** Twilio (kritische Notifications)
+- **Push:** Web Push API (Browser) + ggf. Mobile-App in Phase 2
+
+### URL-Struktur
 ```
-                  ┌─────────────────────────────────────┐
-                  │     ANTHROPIC API (Eve)             │
-                  │     STRIPE API (Subscription)       │
-                  │     MEWS CONNECTOR API (PMS)        │
-                  │     APPLE/GOOGLE WALLET API         │
-                  └──────────────┬──────────────────────┘
-                                 │
-                  ┌──────────────▼──────────────────────┐
-                  │  VERCEL EDGE FUNCTIONS              │
-                  │  ├ /api/webhooks/mews               │
-                  │  ├ /api/webhooks/stripe             │
-                  │  ├ /api/eve/chat                    │
-                  │  ├ /api/bookings/create             │
-                  │  ├ /api/wallet/generate             │
-                  │  └ /api/auth/guest-token            │
-                  └──────────────┬──────────────────────┘
-                                 │
-                  ┌──────────────▼──────────────────────┐
-                  │  SUPABASE                           │
-                  │  ├ PostgreSQL (RLS)                 │
-                  │  ├ Auth (für Hotelier)              │
-                  │  └ Storage (Logos, Hero-Images)     │
-                  └──────────────┬──────────────────────┘
-                                 │
-       ┌─────────────────────────┼─────────────────────────┐
-       │                         │                         │
-┌──────▼──────┐         ┌────────▼──────┐         ┌────────▼────────┐
-│ admin       │         │ [hotel]       │         │ [hotel]         │
-│ retaha.de   │         │ retaha.de     │         │ retaha.de/g/    │
-│ (Taha)      │         │ (Hotelier)    │         │ (Gast)          │
-│ Astro SSR   │         │ Astro SSR     │         │ Astro SSR       │
-└─────────────┘         └───────────────┘         └─────────────────┘
+[hotel].retaha.de/                  → Cockpit (Hauptansicht)
+[hotel].retaha.de/dashboard         → Cockpit (alias)
+[hotel].retaha.de/settings/*        → Backoffice (alle Konfig-Tabs)
+[hotel].retaha.de/g/[token]         → Gast-Frontend (NFC/QR)
+admin.retaha.de                     → Master-Console (Phase 2)
 ```
+
+**Aktuelle Realität:** alles unter `/admin/*` → bleibt im MVP, Refactor in Phase 1.5.
 
 ---
 
-## 3 · DB-Schema-Erweiterungen
+## 2 · Domain Model + DB-Schema
 
-### Existierend (Bestand prüfen + ergänzen)
+### Bestehende Tabellen (laut DB-Inspektion)
+- `hotels` (id, slug, name, city, country, timezone, etc.)
+- `hotel_settings` (mit JSONB-Feldern `features`, `recommendations`, `conference_rooms`, `service_items`)
+- `hotel_users` (many-to-many Hotel ↔ User)
+- `bookings` (mit `details` JSONB — wird erweitert)
+- `breakfast_items`, `chat_messages`, `guests`, `rooms`, `stays`
+- `marketing_waitlist` (Coming-Soon)
 
-| Tabelle | Aktion |
-|---|---|
-| `hotels` | ergänzen: `mews_enterprise_id`, `mews_access_token` (encrypted) |
-| `hotel_settings` | bestehend nutzen — schon viele Felder vorhanden |
-| `hotel_users` | bestehend nutzen |
-| `bookings` | umstrukturieren — siehe unten |
-| `marketing_waitlist` | bestehend, kein Eingriff |
+### Neue Tabellen
 
-### Bestehende `bookings`-Tabelle (laut DB-Inspektion)
-
-`bookings.details` ist `jsonb` — aber wahrscheinlich zu wenig strukturiert. Wir definieren ein klares Schema:
-
+**A. Mews-Integration**
 ```sql
--- bookings (vermutlich erweitern oder neu strukturieren)
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS booking_type TEXT NOT NULL DEFAULT 'breakfast'
-  CHECK (booking_type IN ('breakfast', 'service', 'conference'));
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'confirmed'
-  CHECK (status IN ('confirmed', 'pending', 'rejected', 'cancelled', 'fulfilled'));
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS stay_id UUID REFERENCES stays(id);
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS slot_start TIMESTAMPTZ;
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS slot_end TIMESTAMPTZ;
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mews_order_id TEXT;
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS charged_amount NUMERIC(10, 2);
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS charged_currency CHAR(3) DEFAULT 'EUR';
-```
-
-### Neu zu erstellen
-
-```sql
--- Mews Integration Config pro Hotel
 CREATE TABLE mews_integrations (
   hotel_id UUID PRIMARY KEY REFERENCES hotels(id) ON DELETE CASCADE,
-  mews_enterprise_id TEXT NOT NULL,
-  mews_access_token_encrypted TEXT NOT NULL,
+  enterprise_id TEXT NOT NULL,
+  access_token_encrypted TEXT NOT NULL,
   environment TEXT NOT NULL CHECK (environment IN ('demo', 'production')),
   webhook_endpoint_id TEXT,
   last_sync_at TIMESTAMPTZ,
-  sync_status TEXT DEFAULT 'idle' CHECK (sync_status IN ('idle', 'syncing', 'error')),
+  sync_status TEXT DEFAULT 'idle',
   sync_error_message TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
 
--- Stays (aus Mews gesynct)
-CREATE TABLE stays (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  hotel_id UUID NOT NULL REFERENCES hotels(id),
-  mews_reservation_id TEXT UNIQUE NOT NULL,
-  mews_customer_id TEXT NOT NULL,
-  room_id UUID REFERENCES rooms(id),
-  start_utc TIMESTAMPTZ NOT NULL,
-  end_utc TIMESTAMPTZ NOT NULL,
-  state TEXT NOT NULL,  -- 'enquired', 'requested', 'optional', 'confirmed', 'started', 'processed', 'canceled'
-  checked_in_at TIMESTAMPTZ,
-  checked_out_at TIMESTAMPTZ,
-  guest_count INTEGER DEFAULT 1,
-  language_preference TEXT,
-  primary_guest_id UUID REFERENCES guests(id),
-  raw_mews_data JSONB,  -- vollständige Mews-Response für Debug
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_stays_hotel_active ON stays(hotel_id) WHERE checked_out_at IS NULL;
-
--- Guests (aus Mews gesynct)
-CREATE TABLE guests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  hotel_id UUID NOT NULL REFERENCES hotels(id),
-  mews_customer_id TEXT UNIQUE NOT NULL,
-  first_name TEXT,
-  last_name TEXT,
-  email TEXT,
-  language TEXT DEFAULT 'en',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Rooms (aus Mews gesynct, schon in hotel_settings.rooms? -> ggf. ergänzen)
-CREATE TABLE IF NOT EXISTS rooms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  hotel_id UUID NOT NULL REFERENCES hotels(id),
-  mews_resource_id TEXT UNIQUE NOT NULL,
-  name TEXT,                   -- "Room 12", "Suite Birnbaum"
-  room_number TEXT,
-  category TEXT,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- NFC-Tags pro Hotel
+**B. NFC-Tags + Guest-Tokens**
+```sql
 CREATE TABLE nfc_tags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hotel_id UUID NOT NULL REFERENCES hotels(id),
-  tag_uid TEXT UNIQUE NOT NULL,    -- physische UID des NFC-Chips
+  tag_uid TEXT UNIQUE NOT NULL,
   location_type TEXT NOT NULL CHECK (location_type IN ('room', 'lobby', 'lounge', 'restaurant', 'spa', 'other')),
-  room_id UUID REFERENCES rooms(id),  -- nur wenn location_type='room'
-  label TEXT,                         -- "Room 12 Nachttisch"
+  room_id UUID REFERENCES rooms(id),
+  label TEXT,
   active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Gast-Token (Session pro Gast pro Stay)
 CREATE TABLE guest_tokens (
-  token TEXT PRIMARY KEY,             -- der URL-Token aus /g/[token]
-  stay_id UUID NOT NULL REFERENCES stays(id),
+  token TEXT PRIMARY KEY,
+  stay_id UUID REFERENCES stays(id),  -- NULL = Showcase-Modus
   hotel_id UUID NOT NULL REFERENCES hotels(id),
-  nfc_tag_id UUID REFERENCES nfc_tags(id),  -- wenn via NFC, sonst NULL
+  nfc_tag_id UUID REFERENCES nfc_tags(id),
+  is_showcase BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ NOT NULL,    -- typically end of stay + 7 days for wallet
+  expires_at TIMESTAMPTZ NOT NULL,
   last_used_at TIMESTAMPTZ,
   is_revoked BOOLEAN DEFAULT FALSE
 );
+```
 
-CREATE INDEX idx_guest_tokens_active ON guest_tokens(stay_id) WHERE NOT is_revoked;
-
--- Eve Konversationen
+**C. Eve KI**
+```sql
 CREATE TABLE eve_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hotel_id UUID NOT NULL REFERENCES hotels(id),
   stay_id UUID REFERENCES stays(id),
+  guest_token TEXT REFERENCES guest_tokens(token),
   started_at TIMESTAMPTZ DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   escalated_at TIMESTAMPTZ,
   escalation_reason TEXT,
   total_messages INTEGER DEFAULT 0,
-  total_tokens INTEGER DEFAULT 0,    -- für Cost-Tracking
-  language TEXT DEFAULT 'de'
+  total_tokens_haiku INTEGER DEFAULT 0,
+  total_tokens_sonnet INTEGER DEFAULT 0,
+  total_cost_usd NUMERIC(10, 4) DEFAULT 0,
+  language TEXT DEFAULT 'de',
+  delete_at TIMESTAMPTZ  -- für DSGVO-Auto-Delete
 );
 
--- Eve Messages
 CREATE TABLE eve_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id UUID NOT NULL REFERENCES eve_conversations(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'tool')),
-  content JSONB NOT NULL,             -- text + tool_uses + tool_results
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  token_count INTEGER
+  content JSONB NOT NULL,
+  model_used TEXT,  -- 'haiku-4-5' oder 'sonnet-4-6'
+  token_count INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
+```
 
-CREATE INDEX idx_eve_messages_conv ON eve_messages(conversation_id, created_at);
-
--- Subscription (Stripe)
+**D. Subscription + Wallet + Notifications**
+```sql
 CREATE TABLE subscriptions (
   hotel_id UUID PRIMARY KEY REFERENCES hotels(id) ON DELETE CASCADE,
   stripe_customer_id TEXT UNIQUE,
   stripe_subscription_id TEXT UNIQUE,
   stripe_price_id TEXT,
   plan TEXT NOT NULL CHECK (plan IN ('trial', 'basic', 'pro', 'enterprise')),
-  status TEXT NOT NULL,               -- active, past_due, canceled, trialing, etc.
+  status TEXT NOT NULL,
   trial_ends_at TIMESTAMPTZ,
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN DEFAULT FALSE,
@@ -257,474 +175,309 @@ CREATE TABLE subscriptions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Wallet Passes
 CREATE TABLE wallet_passes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   stay_id UUID NOT NULL REFERENCES stays(id),
   hotel_id UUID NOT NULL REFERENCES hotels(id),
   pass_type TEXT NOT NULL CHECK (pass_type IN ('apple', 'google')),
   pass_serial TEXT UNIQUE NOT NULL,
-  pass_url TEXT,                      -- für Apple .pkpass URL
-  google_jwt TEXT,                    -- für Google Pay
+  template_used TEXT NOT NULL,  -- 'discount', 'loyalty', 'booking_link', 'business_card'
+  branding TEXT NOT NULL CHECK (branding IN ('hotel', 'retaha')),
+  pass_url TEXT,
+  google_jwt TEXT,
   generated_at TIMESTAMPTZ DEFAULT NOW(),
   downloaded_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ
 );
 
--- Notifications (Bell-Icon im Backoffice)
 CREATE TABLE notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hotel_id UUID NOT NULL REFERENCES hotels(id),
-  user_id UUID REFERENCES hotel_users(id),   -- NULL = an alle
-  type TEXT NOT NULL,                        -- 'eve_escalation', 'pending_booking', 'service_request', etc.
+  user_id UUID REFERENCES hotel_users(id),
+  type TEXT NOT NULL,
+  channel TEXT NOT NULL CHECK (channel IN ('bell', 'email', 'push', 'sms')),
   title TEXT NOT NULL,
   body TEXT,
-  link TEXT,                                 -- /admin/bookings/[id]
+  link TEXT,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
   read_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  delivered_at TIMESTAMPTZ,
   related_entity_type TEXT,
   related_entity_id UUID
 );
+```
 
-CREATE INDEX idx_notifications_unread ON notifications(hotel_id, user_id) WHERE read_at IS NULL;
+**E. Notification-Preferences (pro Hotel + Typ)**
+```sql
+CREATE TABLE notification_preferences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  hotel_id UUID NOT NULL REFERENCES hotels(id),
+  notification_type TEXT NOT NULL,  -- 'eve_escalation', 'pending_booking', etc.
+  channels JSONB NOT NULL DEFAULT '["bell"]',  -- ["bell", "email", "push", "sms"]
+  enabled BOOLEAN DEFAULT TRUE,
+  UNIQUE(hotel_id, notification_type)
+);
+```
+
+**F. i18n-Refactor (kritisch wegen 6 Sprachen)**
+
+Bestehende `hotel_settings.welcome_message_de/en/fr/es` Spalten **müssen migriert werden** auf JSONB:
+
+```sql
+-- Neue Spalte
+ALTER TABLE hotel_settings ADD COLUMN translations JSONB DEFAULT '{}'::jsonb;
+
+-- Migration der bestehenden Daten
+UPDATE hotel_settings
+SET translations = jsonb_build_object(
+  'welcome_message', jsonb_build_object(
+    'de', welcome_message_de,
+    'en', welcome_message_en,
+    'fr', welcome_message_fr,
+    'es', welcome_message_es
+  ),
+  'hotel_eyebrow', jsonb_build_object(
+    'de', hotel_eyebrow_de,
+    'en', hotel_eyebrow_en,
+    'fr', hotel_eyebrow_fr,
+    'es', hotel_eyebrow_es
+  ),
+  'breakfast_location', jsonb_build_object(
+    'de', breakfast_location_de,
+    'en', breakfast_location_en,
+    'fr', breakfast_location_fr,
+    'es', breakfast_location_es
+  )
+);
+
+-- Alte Spalten nach Verifikation löschen
+-- ALTER TABLE hotel_settings DROP COLUMN welcome_message_de;
+-- ... etc.
+```
+
+**Plus:** Tabelle `translations` für UI-Strings:
+```sql
+CREATE TABLE ui_translations (
+  namespace TEXT NOT NULL,  -- 'common', 'cockpit', 'backoffice', 'guest'
+  key TEXT NOT NULL,         -- 'button.save', 'modal.confirm.title'
+  language TEXT NOT NULL,    -- 'de', 'en', 'tr', 'ar', 'fr', 'es'
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (namespace, key, language)
+);
+
+CREATE INDEX idx_ui_translations_lookup ON ui_translations(namespace, language);
 ```
 
 ---
 
-## 4 · API-Endpoints
+## 3 · Sprint-Plan (12-15 Wochen)
 
-### Webhooks (Eingehend von externen Services)
+### Sprint 0 · Foundation Setup (2-3 Tage)
 
-| Route | Wer | Zweck |
-|---|---|---|
-| `POST /api/webhooks/mews` | Mews | Reservation/Customer/Resource/Payment-Events |
-| `POST /api/webhooks/stripe` | Stripe | Subscription-Updates (created, updated, deleted, payment_failed) |
-| `POST /api/webhooks/apple-wallet` | Apple | Pass-Update-Lifecycle |
+- [ ] **Mews Demo-Hotel anlegen** ([help.mews.com](https://help.mews.com/en/articles/4622361-how-to-connect-an-integration-in-mews-demo))
+- [ ] **Apple Developer Account bestellen** (auf retaha GmbH, $99/Jahr)
+- [ ] **Stripe Test-Account einrichten**
+- [ ] **Anthropic API-Key** in Vercel-Env-Variables
+- [ ] **Google Places API** Key + Billing-Account
+- [ ] **DeepL Pro API** Account (49€/Monat für Translation)
+- [ ] **Resend Account** (für Email)
+- [ ] **Webhook-Endpoint-Skeleton** `/api/webhooks/mews` + signature verification
+- [ ] **Encryption-Setup** für Mews-Token (Supabase Vault)
 
-### Gast-Facing (von NFC/QR-Frontend aufgerufen)
-
-| Route | Auth | Zweck |
-|---|---|---|
-| `GET /api/auth/guest-token/[nfcId]` | NFC-UID | Token-Generation oder Lookup, Stay-Match |
-| `POST /api/bookings/breakfast` | Guest-Token | Frühstücks-Slot buchen → Mews Add Order |
-| `POST /api/bookings/service` | Guest-Token | Service anfragen → Mews Add Order |
-| `POST /api/bookings/conference` | Guest-Token | Konferenz anfragen (pending) |
-| `POST /api/eve/chat` | Guest-Token | Eve-Konversation (streaming) |
-| `GET /api/wallet/[stayId]/generate` | Guest-Token | Wallet-Pass generieren |
-
-### Hotelier-Facing (von Backoffice aufgerufen)
-
-| Route | Auth | Zweck |
-|---|---|---|
-| `POST /api/admin/bookings/[id]/accept` | Hotelier-Session | Konferenz-Buchung akzeptieren → Mews Sync |
-| `POST /api/admin/bookings/[id]/reject` | Hotelier-Session | Konferenz-Buchung ablehnen |
-| `POST /api/admin/mews/connect` | Hotelier-Session | Mews-Integration aktivieren (Token speichern) |
-| `POST /api/admin/mews/sync` | Hotelier-Session | Manuellen Sync triggern |
-| `POST /api/admin/subscription/checkout` | Hotelier-Session | Stripe Checkout-Session erstellen |
-| `POST /api/admin/subscription/portal` | Hotelier-Session | Stripe Customer Portal |
-| `GET /api/admin/notifications` | Hotelier-Session | Unread Notifications |
-| `POST /api/admin/notifications/[id]/read` | Hotelier-Session | Notification als gelesen markieren |
-
-### Admin-Facing (Taha's Master-Backoffice)
-
-| Route | Auth | Zweck |
-|---|---|---|
-| `GET /api/master/hotels` | Admin-Session | Alle Hotels mit Status |
-| `POST /api/master/hotels` | Admin-Session | Neues Hotel anlegen |
-| `GET /api/master/metrics` | Admin-Session | System-Health, API-Usage, Eve-Costs |
-
----
-
-## 5 · Mews-Sync-Strategie
-
-### Initial-Sync (beim Onboarding eines Hotels)
-
-```typescript
-// Pseudo-Flow
-await mewsClient.getAllResources()      // → rooms speichern
-await mewsClient.getAllCustomers()      // → guests speichern (nur aktive)
-await mewsClient.getAllReservations({   // → stays speichern
-  StartUtc: now,
-  EndUtc: now + 30days,
-  State: ['Confirmed', 'Started']
-})
-await registerWebhook({
-  endpointUrl: 'https://app.retaha.de/api/webhooks/mews',
-  events: ['ServiceOrderUpdated', 'CustomerUpdated', 'PaymentUpdated']
-})
-```
-
-### Continuous-Sync via Webhooks
-
-```typescript
-// /api/webhooks/mews
-on ServiceOrderUpdated:
-  fetchReservation(event.Value.Id)
-  upsertStay(...)
-  if newCheckIn: triggerWelcomeNotification()
-  if newCheckOut: triggerWalletGeneration()
-  if newReservation: createGuestTokenForRoom()
-
-on CustomerUpdated:
-  fetchCustomer(event.Value.Id)
-  upsertGuest(...)
-
-on PaymentUpdated:
-  // optional: für Bookings-Status-Updates
-```
-
-### Outbound (retaha → Mews)
-
-```typescript
-// Wenn Gast Frühstück bucht
-const breakfastOrder = await mewsClient.addOrder({
-  ServiceId: 'breakfast-service-id',
-  CustomerId: guest.mews_customer_id,
-  StartUtc: slot.start,
-  EndUtc: slot.end,
-  Items: [{
-    Name: 'Frühstück',
-    UnitCount: 1,
-    Amount: { GrossValue: 25.00, Currency: 'EUR' }
-  }]
-})
-// Mews fügt das zur Zimmerrechnung
-```
-
----
-
-## 6 · Stripe-Subscription-Flow
-
-### Pläne (Empfehlung — anpassen nach deinen Vorstellungen)
-
-| Plan | Preis/Monat | Limits |
-|---|---|---|
-| **Trial** | 0€ (14 Tage) | Volle Features, danach Pause |
-| **Basic** | 49€ | Bis 20 Zimmer, Eve mit 500 Konversationen/Monat |
-| **Pro** | 129€ | Bis 60 Zimmer, Eve unlimited, Wallet, Multi-Language |
-| **Enterprise** | individuell | Multi-Property, dedizierte Eve-Persona, SLA |
-
-### Flow
-
-```
-1. Hotelier signt up → trial subscription auto-created
-2. Nach 14 Tagen: trial ends → status='trial_expired'
-3. Hotelier klickt "Plan wählen" in /admin/subscription
-4. Stripe Checkout Session → Hotelier zahlt
-5. Stripe Webhook → unsere subscription-Tabelle aktualisieren
-6. Hotelier zurück in App, hat aktiven Plan
-7. Stripe Customer Portal für Cancellation/Downgrade
-```
-
----
-
-## 7 · NFC/QR-Auth-Flow
-
-### Schritt-für-Schritt
-
-```
-1. Hotelier registriert NFC-Tags im Backoffice (UID, Location, Room)
-   → speichert in nfc_tags-Tabelle
-
-2. Gast hält Smartphone an Tag (NDEF-Record: https://[hotel].retaha.de/g/nfc/[tagUID])
-   ODER scannt QR-Code auf gleicher URL
-
-3. Edge Function /api/auth/guest-token/[nfcId]:
-   - Lookup nfc_tag by UID
-   - Lookup aktive Stay für room_id (heute zwischen check-in und check-out)
-   - Wenn Stay gefunden: 
-     → Generate Token (kryptografisch sicher)
-     → Speichern in guest_tokens mit stay_id + expires_at = check-out + 7 Tage
-     → Redirect zu /g/[token]
-   - Wenn kein aktiver Stay:
-     → Show "Bitte Rezeption kontaktieren"
-     → Optional: Demo-Modus (Hotel-Showcase)
-
-4. /g/[token] lädt:
-   - Welcome-Screen (1-Tap-Continue)
-   - Sheet-Übersicht (Frühstück, Service, Konferenz, Recommendations, Concierge)
-```
-
-### Sicherheit
-
-- Token ist **Stay-spezifisch**, nicht Tag-spezifisch
-- Token läuft mit Check-out + 7 Tage Wallet-Periode ab
-- Diebstahl des Tags ≠ Diebstahl der Daten — wer den Tag hat, sieht nur den Welcome-Screen wenn kein aktiver Stay vorliegt
-- Optional: Geofencing-Check (Tag muss in Hotel-Lobby/Zimmer gescannt werden — via Mews-Standort)
-
----
-
-## 8 · Eve · KI-Modul
-
-### Stack
-
-- **LLM:** Anthropic Claude (Sonnet für Standard, Haiku für günstige Fälle)
-- **Streaming:** Server-Sent Events oder Fetch-Stream im Frontend
-- **Tool-Use:** Function-Calling für konkrete Aktionen
-- **Context:** Hotel-spezifischer Prompt + Gast-Stay-Daten + Konversations-Verlauf
-- **Storage:** `eve_conversations` + `eve_messages` Tabellen
-- **Cost-Tracking:** Token-Count pro Message → monatlicher Cost-Report pro Hotel
-
-### System-Prompt-Struktur
-
-```
-Du bist Eve, die digitale Concierge-Assistentin im [Hotel-Name] in [Stadt].
-
-Stil: gelassen, eloquent, du-form (oder sie-form je nach guest_address_form).
-Sprache: [language_preference des Gasts].
-
-Verfügbare Features:
-- Frühstück-Buchung (Slots: 07:30-10:30, alle 30min)
-- Service-Anfragen (Liste: ...)
-- Konferenz-Anfragen (an Hotelier weiterleiten)
-- Empfehlungen für [Stadt]: ...
-- WLAN-Info: SSID [...], Password [...]
-
-Aktueller Gast: [first_name] in Zimmer [room_number], 
-Check-in [start_utc], Check-out [end_utc].
-
-Bekannte Buchungen heute: [...]
-
-Eskaliere an Menschen wenn:
-- Beschwerde über Hotel-Personal
-- Medizinischer Notfall
-- Sicherheits-relevante Anfrage
-- Spezielle Allergien/Diät
-- Wunsch nach persönlichem Gespräch
-```
-
-### Tool-Use Definitions
-
-```typescript
-const tools = [
-  {
-    name: 'book_breakfast_slot',
-    description: 'Bucht einen Frühstücks-Slot für den Gast',
-    input_schema: {
-      type: 'object',
-      properties: {
-        slot_start: { type: 'string', format: 'date-time' },
-        guest_count: { type: 'integer' }
-      },
-      required: ['slot_start']
-    }
-  },
-  {
-    name: 'request_service',
-    description: 'Erstellt eine Service-Anfrage',
-    input_schema: { /* ... */ }
-  },
-  {
-    name: 'escalate_to_human',
-    description: 'Eskaliert die Konversation an einen Menschen',
-    input_schema: {
-      type: 'object',
-      properties: {
-        reason: { type: 'string' },
-        urgency: { type: 'string', enum: ['low', 'medium', 'high'] }
-      },
-      required: ['reason']
-    }
-  },
-  {
-    name: 'get_recommendations',
-    description: 'Holt Hotel-Empfehlungen für die Umgebung'
-  },
-  {
-    name: 'get_wifi_info',
-    description: 'Gibt WLAN-Zugangsdaten zurück'
-  }
-]
-```
-
-### Eskalations-UX
-
-Wenn Eve eskaliert:
-- `eve_conversations.escalated_at = NOW()` + `escalation_reason`
-- Notification in `notifications`-Tabelle für Hotelier
-- Im Gast-Frontend: "Ich hole gerade die Concierge — Hannah meldet sich gleich"
-- Im Hotelier-Backoffice: Bell-Icon klingelt, Konversation öffnen, Antwort senden
-
----
-
-## 9 · Wallet-Card-Flow
-
-### Trigger: Check-out-Event aus Mews
-
-```
-1. Mews Webhook → Stay.checked_out_at gesetzt
-2. Edge Function generiert Apple Wallet Pass (.pkpass)
-3. Apple Wallet Pass enthält:
-   - Hotel-Logo
-   - "Danke für deinen Aufenthalt — [Hotel-Name]"
-   - "10% auf deinen nächsten Aufenthalt — Code XYZ"
-   - Link zur Hotel-Direct-Booking-Page
-   - Expiration: 90 Tage
-4. Pass-URL gesendet an Gast-Frontend
-5. Gast klickt "Zu Apple Wallet hinzufügen" / "Zu Google Wallet"
-6. wallet_passes-Eintrag: downloaded_at = NOW()
-```
-
-### Technical Implementation
-
-- **Apple:** PassKit Format (.pkpass) — gezipped JSON + Bilder + Manifest + Signatur
-- **Google:** Google Wallet API (JWT mit Pass-Daten)
-- **Library:** `node-passkit-generator` für Apple, `google-pay-pass` für Google
-- **Cert-Management:** Apple verlangt Developer-Certs ($99/Jahr) + Pass-Type-ID
-
-**Risiko:** Apple Wallet braucht **WWDR-Zertifikat + Pass-Type-ID**, das ist Setup-Aufwand. Google ist einfacher.
-
----
-
-## 10 · Sprint-Plan
-
-### Sprint 0 · Foundation Setup (1-2 Tage)
-
-- [ ] Mews Demo-Hotel anlegen, Access Token holen
-- [ ] Stripe Test-Account einrichten
-- [ ] Anthropic API-Key in Vercel-Env-Variables
-- [ ] Apple Developer Account + WWDR-Cert beantragen (für Wallet — dauert eh ein paar Tage)
-- [ ] Webhook-Endpoint-Skeleton `/api/webhooks/mews` + signature verification
-- [ ] Encryption für Mews-Token (Supabase Vault oder eigene Encryption-Function)
-
-### Sprint 1 · Mews-Foundation (3-5 Tage)
+### Sprint 1 · Mews-Foundation (5 Tage)
 
 - [ ] Mews Connector API Client (TypeScript Wrapper)
-- [ ] DB-Migration: stays, guests, rooms, mews_integrations
-- [ ] Hotel Onboarding: Mews-Token-Eingabe + Validierung + Initial-Sync
-- [ ] Webhook Receiver: ServiceOrderUpdated → upsertStay
-- [ ] Webhook Receiver: CustomerUpdated → upsertGuest
-- [ ] Live-Test mit Demo-Hotel: Reservation erstellen in Mews → sehen ob retaha-DB updated
+- [ ] DB-Migrationen: `mews_integrations`, `stays` erweitern, `rooms` erweitern, `guests` erweitern
+- [ ] Hotel-Onboarding: Mews-Token-Eingabe + Initial-Sync (Resources, Customers, Reservations)
+- [ ] Webhook Receiver: `ServiceOrderUpdated`, `CustomerUpdated`, `PaymentUpdated`
+- [ ] Polling-Fallback für Webhook-Ausfälle (alle 5min, aktive Stays)
+- [ ] Live-Test mit Demo-Hotel
 
-### Sprint 2 · Gast-Auth-Flow (2-3 Tage)
+### Sprint 2 · i18n-Infrastruktur (5-7 Tage)
 
-- [ ] DB-Migration: nfc_tags, guest_tokens
-- [ ] Hotelier UI: NFC-Tag-Verwaltung (CRUD in /admin/settings/nfc-tags)
-- [ ] Edge Function: /api/auth/guest-token/[nfcId]
-- [ ] Token-Validierung Middleware für /g/[token]
+- [ ] Astro i18n routing aufsetzen (6 Sprachen)
+- [ ] DB-Migration: `hotel_settings` → JSONB-translations
+- [ ] DB-Migration: `ui_translations`-Tabelle
+- [ ] Translation-Helper-Library (`t(key, lang)` + Fallback-Logic)
+- [ ] DeepL-Pipeline für initial Bulk-Translation der UI-Strings
+- [ ] Sprach-Auto-Detection (Browser-Locale + Mews-Guest-Language)
+- [ ] Sprach-Switcher-Komponente (Header)
+- [ ] Hotel-Switcher-Komponente (für Q2 Multi-Hotel)
+
+### Sprint 3 · RTL-Support (3-5 Tage)
+
+- [ ] CSS-Architektur auf Logical Properties (`margin-inline-start` statt `margin-left`)
+- [ ] `dir`-Attribute pro Sprache setzen (`<html dir="rtl" lang="ar">`)
+- [ ] Bauhaus-Status-Marker RTL-aware (Kreis/Quadrat/Linie/Dreieck Spiegelung)
+- [ ] Layout-Tests in Arabisch
+- [ ] Burger-Menu, Sidebars, Buttons RTL-Verifikation
+- [ ] Icons mit Richtung (Pfeile, Chevrons) RTL-Mirror
+
+### Sprint 4 · Gast-Auth-Flow + Showcase-Modus (3 Tage)
+
+- [ ] DB-Migration: `nfc_tags`, `guest_tokens`
+- [ ] Hotelier UI: NFC-Tag-Verwaltung (in /admin/settings/nfc-tags)
+- [ ] Edge Function: `/api/auth/guest-token/[nfcId]`
+- [ ] Token-Validierung Middleware für `/g/[token]`
 - [ ] Welcome-Screen (1-Tap)
-- [ ] Sheet-Übersicht statisch (Frühstück, Service, Konferenz, etc.)
+- [ ] Showcase-Modus (kein aktiver Stay → Demo-Ansicht)
+- [ ] Showcase-Toggle in Settings
+- [ ] Sheet-Übersicht statisch (Frühstück, Service, Konferenz, Empfehlungen)
 
-### Sprint 3 · Frühstück Self-Service (2-3 Tage)
+### Sprint 5 · Frühstück Self-Service (3 Tage)
 
 - [ ] Slot-Management (basierend auf hotel_settings.breakfast_*)
-- [ ] Gast-Frontend Frühstück-Sheet (Datum + Slot-Auswahl + Personen)
-- [ ] Edge Function: /api/bookings/breakfast
-- [ ] Mews `Add Order` Integration
+- [ ] Gast-Frontend Frühstück-Sheet (Datum + Slot + Personen)
+- [ ] Edge Function: `/api/bookings/breakfast`
+- [ ] Mews "Add Order" Integration (Charge to Room)
 - [ ] Bookings-Eintrag in DB
-- [ ] Confirmation-UI im Gast-Frontend
-- [ ] Hotelier Backoffice: Frühstück-Buchungen anzeigen
+- [ ] Cockpit: Frühstück-Buchungen anzeigen
 
-### Sprint 4 · Service Self-Service (2 Tage)
+### Sprint 6 · Service Self-Service (2-3 Tage)
 
-- [ ] hotel_settings.service_items als strukturiertes Schema
+- [ ] `hotel_settings.service_items` strukturieren
 - [ ] Gast-Frontend Service-Sheet
-- [ ] Edge Function: /api/bookings/service
-- [ ] Hotelier Backoffice mit Status-Update-Buttons
+- [ ] Edge Function: `/api/bookings/service`
+- [ ] Mews "Add Order" Integration
+- [ ] Cockpit mit Status-Update-Buttons
 
-### Sprint 5 · Konferenz Hotelier-First (3 Tage)
+### Sprint 7 · Konferenz Hotelier-First (3-4 Tage)
 
-- [ ] hotel_settings.conference_rooms strukturieren
+- [ ] `hotel_settings.conference_rooms` strukturieren
 - [ ] Gast-Frontend Konferenz-Sheet mit Anfrage-Form
-- [ ] Booking erstellt mit status='pending'
+- [ ] Booking erstellt mit `status='pending'`
 - [ ] Notification an Hotelier
-- [ ] Hotelier Backoffice: accept/reject mit Mews-Sync nach accept
-- [ ] Gast bekommt Push/Email-Update bei Status-Change
+- [ ] Cockpit: accept/reject mit Mews-Sync nach accept
+- [ ] Gast bekommt Status-Update
 
-### Sprint 6 · Stripe-Subscription (2-3 Tage)
+### Sprint 8 · Empfehlungen mit Google Places (3-5 Tage)
 
-- [ ] DB-Migration: subscriptions
-- [ ] Stripe Pricing in /admin/subscription anzeigen
+- [ ] Google Places API Client
+- [ ] Caching-Layer (30 Tage)
+- [ ] Backoffice: Hotelier sucht Restaurant → autocomplete → speichert
+- [ ] Auto-Anreicherung (Bild, Adresse, Öffnungszeiten, Bewertung)
+- [ ] Auto-Vorschläge basierend auf Hotel-Standort (Tab "Top in der Nähe")
+- [ ] Gast-Frontend: Empfehlungen-Sheet mit Karten-Ansicht
+
+### Sprint 9 · Stripe-Subscription (3-4 Tage)
+
+- [ ] DB-Migration: `subscriptions`
+- [ ] Pricing-Page in `/admin/settings/subscription`
 - [ ] Stripe Checkout-Session erstellen
-- [ ] Webhook: Subscription created/updated/canceled
+- [ ] Webhook: subscription.created/updated/canceled
 - [ ] Trial-Logic (14 Tage)
-- [ ] Pricing-Page mit Feature-Vergleich
+- [ ] Customer-Portal-Link für Self-Service
 
-### Sprint 7 · Eve KI (5-8 Tage)
+### Sprint 10 · Eve KI · Foundation (5 Tage)
 
-- [ ] DB-Migration: eve_conversations, eve_messages
+- [ ] DB-Migration: `eve_conversations`, `eve_messages`
 - [ ] Anthropic API Client (Streaming)
-- [ ] System-Prompt-Builder (Hotel-Kontext)
-- [ ] Tool-Definitions
-- [ ] Tool-Handlers (book_breakfast, request_service, etc.)
-- [ ] Edge Function: /api/eve/chat (Streaming-Response)
+- [ ] Router-Logic: Haiku vs Sonnet
+- [ ] System-Prompt-Builder (Hotel-Kontext + Gast-Stay + 6 Sprachen)
+- [ ] Edge Function: `/api/eve/chat` (Streaming-Response)
 - [ ] Gast-Frontend Eve-Chat-Interface
-- [ ] Eskalations-Flow (notification + UI-Update)
-- [ ] Hotelier Backoffice: Eve-Konversationen ansehen + intervenieren
-- [ ] Cost-Tracking pro Hotel
+- [ ] DSGVO: Auto-Delete-Logic + Setting im Backoffice
 
-### Sprint 8 · Admin To-Dos (2 Tage)
+### Sprint 11 · Eve KI · Tool-Use + Eskalation (5 Tage)
 
-- [ ] /admin Page (Aggregations-Logic)
-- [ ] Pending Bookings, Escalated Eve, Service Requests
-- [ ] Notifications Bell mit Realtime (Supabase Realtime)
+- [ ] Tool-Definitions (book_breakfast, request_service, get_wifi, escalate_to_human, etc.)
+- [ ] Tool-Handlers
+- [ ] Eskalations-Flow → Notification an Hotelier
+- [ ] Cockpit: Eve-Konversationen ansehen + Antworten
+- [ ] Cost-Tracking pro Hotel + Konversation
 
-### Sprint 9 · Wallet Card (3-5 Tage)
+### Sprint 12 · Notifications-System (3-4 Tage)
 
-- [ ] Apple Wallet Setup (Cert, Pass-Type-ID)
-- [ ] Pass-Template Design (passt zur Hotel-Branding-Color)
-- [ ] Pass-Generation-Function
-- [ ] Check-out-Webhook-Trigger
-- [ ] Gast-Frontend Wallet-Sheet
-- [ ] Google Wallet (zweite Iteration)
+- [ ] DB-Migration: `notifications`, `notification_preferences`
+- [ ] Backoffice: Notification-Preferences UI (pro Typ → Kanäle)
+- [ ] Bell-Icon im Header mit Realtime (Supabase Realtime)
+- [ ] Email-Versand via Resend
+- [ ] Push-Notifications (Web Push API)
+- [ ] SMS-Versand via Twilio (kritische Notifications)
 
-### Sprint 10 · Polish + Bug Fixes (3-5 Tage)
+### Sprint 13 · Cockpit · To-Dos + Aggregation (2-3 Tage)
 
-- [ ] Component-Familie aufbauen (SaveFeedback, Toast, EmptyState — siehe Component-Gap-Inventur)
-- [ ] EditorialPageHeader-Rollout auf restliche Tabs
-- [ ] Mobile-Tauglichkeit
+- [ ] `/admin/dashboard` als Cockpit-Page (umbenennen?)
+- [ ] Aggregations-Logic: pending Konferenz, eskalierte Eve, neue Service-Requests, Check-Ins heute
+- [ ] To-Do-Cards mit Quick-Actions
+- [ ] Live-Updates via Realtime
+
+### Sprint 14 · Wallet · Apple (3-5 Tage, abhängig von Apple-Approval)
+
+- [ ] Apple Pass-Setup (Cert, Pass-Type-ID, Manifest)
+- [ ] DB-Migration: `wallet_passes`
+- [ ] 4 Pass-Templates (Discount, Loyalty, Booking-Link, Visitenkarte)
+- [ ] Hotelier Settings: Template-Auswahl + Konfiguration + Branding-Color-Toggle
+- [ ] Check-out-Webhook-Trigger → Pass-Generierung
+- [ ] Pass-URL an Gast-Frontend (Wallet-Sheet)
+
+### Sprint 15 · Wallet · Google (2-3 Tage)
+
+- [ ] Google Wallet API Setup
+- [ ] Pass-JWT-Generation
+- [ ] Parallel-Pass-Erstellung Apple + Google
+
+### Sprint 16 · Component-Familie + Polish (5-7 Tage)
+
+(Aus Component-Gap-Inventur:)
+- [ ] SaveFeedback-Komponente (ersetzt 6 Inline-Banner)
+- [ ] BauhausToast / Alert / Modal / EmptyState / LoadingState
+- [ ] EditorialPageHeader-Rollout auf alle Tabs
+- [ ] Mobile-Responsive Audit
 - [ ] Error-Handling und Logging
-- [ ] Mit Kirstin demo-fertig machen
+- [ ] Deutsche/Englische UI-Strings final + DeepL Review
 
-**Gesamt: ~30-40 Tage Vollzeit = 6-8 Wochen**
+### Sprint 17 · End-to-End Testing + Demo-Prep (5 Tage)
+
+- [ ] Komplette Customer-Journey-Tests (Demo-Hotel anlegen → NFC → Frühstück → Eve → Wallet)
+- [ ] Performance-Testing
+- [ ] Bug-Fixing
+- [ ] Kirstin-Demo-Vorbereitung mit Gate-Garden-Daten
+
+**Gesamt: ~60-75 Tage Vollzeit = 12-15 Wochen**
 
 ---
 
-## 11 · Risiken + Mitigations
+## 4 · Konkrete nächste Schritte (heute/morgen)
+
+1. **Apple Developer Account JETZT bestellen** ([developer.apple.com](https://developer.apple.com/programs/)) — der Verifizierungs-Prozess (DUNS) dauert mehrere Tage
+2. **Mews Demo-Hotel anlegen** ([help.mews.com](https://help.mews.com/en/articles/4622361)) — 30min
+3. **Anthropic API Key** generieren ([console.anthropic.com](https://console.anthropic.com)) — 5min
+4. **Stripe Test-Account** anlegen — 10min
+5. **Google Places API + Billing** einrichten — 15min
+6. **DeepL Pro Account** — 5min
+7. **Resend Account** — 5min
+
+Dann: Sprint 0 Briefing für Claude Code → Foundation-Code aufsetzen.
+
+---
+
+## 5 · Risiken + Mitigations
 
 | Risiko | Wahrscheinlichkeit | Impact | Mitigation |
 |---|---|---|---|
-| Mews API Rate-Limits (429) | mittel | mittel | Caching, exponential backoff, queue für nicht-zeitkritische Calls |
-| Apple Wallet Cert-Setup-Verzögerung | hoch | mittel | Apple Developer Account heute bestellen, parallel arbeiten |
-| Eve halluciniert Buchungen | mittel | hoch | Strikte Tool-Use-Validation, Audit-Log, Hotelier sieht alle Eve-Aktionen |
-| Stripe-Webhook-Reihenfolge | mittel | mittel | Idempotenz-Keys, replay-fähige Logic |
-| Mews-Webhook fällt aus | niedrig | hoch | Polling-Fallback alle 5min für aktive Stays |
-| Hotelier verliert Mews-Token | niedrig | hoch | UI für Token-Re-Generation in /admin/settings/integrations |
-| Multi-Hotel-Owners brauchen Switching | hoch | niedrig | Hotel-Switcher im AdminLayout bereits prepared? |
-| DSGVO: Eve speichert Gast-Daten | hoch | hoch | Gast-Konversationen löschen 30 Tage nach Check-out, Hotelier kann früher löschen |
-| Eve-Kosten explodieren bei Missbrauch | mittel | mittel | Rate-Limit pro Stay (z.B. 50 Messages/Tag), Cost-Cap pro Hotel |
-| NFC-Tag-Diebstahl | niedrig | niedrig | Token Stay-spezifisch, läuft mit Check-out ab |
+| Mews-Approval für Production dauert länger | hoch | hoch | Demo-Hotel reicht für Entwicklung; Marketplace-Approval parallel beantragen |
+| RTL führt zu Layout-Bugs in 200+ Komponenten | hoch | mittel | Logical Properties von Anfang an, dediziertes RTL-Testing |
+| Translation-Quality bei 6 Sprachen | mittel | mittel | DeepL für Bulk, manueller Review für kritische Strings durch native Sprecher |
+| Apple Wallet Cert-Setup-Verzögerung | hoch | hoch | Heute bestellen, parallel andere Sprints |
+| Eve halluciniert Buchungen | mittel | hoch | Strikte Tool-Validation, Audit-Log, Hotelier-Override |
+| Google Places API Kosten explodieren | mittel | mittel | Aggressives Caching (30 Tage), Cost-Cap pro Hotel |
+| DSGVO bei Eve-Speicherung | hoch | hoch | Hotelier-konfigurierbare Speicher-Dauer, Default 30 Tage, Auto-Delete-Job |
+| MVP-Zeit explodiert über 15 Wochen | mittel | hoch | Wöchentliche Sprint-Reviews, Scope-Cuts wenn nötig |
+| Eve-Kosten explodieren | mittel | mittel | Rate-Limit pro Stay (z.B. 50 Messages/Tag), Hybrid Haiku/Sonnet spart 70% |
+| Kirstin will früher Demo sehen | mittel | mittel | "Demo-Reife" zwischendurch zeigen (Sprint 5-7 = Basis-Demo, dann iterativ) |
 
 ---
 
-## 12 · Open Questions
+## 6 · Was JETZT zu klären ist (vor Sprint 0)
 
-Wo wir noch Entscheidungen brauchen:
+Drei Sachen die du heute/morgen entscheiden/erledigen solltest:
 
-1. **Hannah-Login:** Hat Hannah einen eigenen Account oder loggt sie sich mit gemeinsamem Hotel-Account ein?
-2. **Multi-Hotel-Switching:** Owner mit mehreren Hotels — UI-Flow?
-3. **Sprachen Phase 1:** Welche Sprachen muss das Gast-Frontend mindestens können? (DE, EN sicher — FR, ES?)
-4. **Eve-Modell:** Default Sonnet oder Haiku? Sonnet ist 5× teurer aber bedeutend besser bei Tool-Use.
-5. **Wallet-Inhalt:** Was genau drauf? Discount-Code? Loyalty-Punkte? Direct-Booking-Link?
-6. **Empfehlungs-Karten-Datenquelle:** Hotelier-eigene Daten oder API-Anreicherung (Google Places, OpenTable)?
-7. **Notifications:** Bell-Icon reicht oder auch Email/Push für mobile App des Hoteliers?
-8. **Branding-Color für Apple Wallet Pass:** Hotel-individuell (aus hotel_settings.accent_color) oder retaha-konsistent?
-9. **Demo-Hotel-Daten:** Bauen wir einen "Showcase-Modus" mit Demo-Reservation auch wenn kein NFC-Tag-Match?
-10. **Apple Developer Account:** Anthropic vs persönlich? Wer bezahlt die $99/Jahr?
+1. **Apple Developer Account bestellen** — auf retaha GmbH, $99/Jahr
+2. **Mews-Marketplace-Registration parallel weiter** — falls noch nicht abgeschickt
+3. **Budget-Check externe APIs:** Stripe (Gebühr-basiert, ok), Anthropic API (Eve, variabel), Google Places ($0.017-0.05 per Request), DeepL Pro (49€/Monat), Twilio (SMS-basiert), Resend (Tier abhängig) — geschätzt 100-200€/Monat fix + variable Kosten
 
 ---
 
-## 13 · Nächste konkrete Schritte
-
-1. **Heute oder morgen:** Mews Demo-Hotel anlegen (10min Setup, Token holen)
-2. **Diese Woche:** Sprint 0 Foundation
-3. **Nächste Woche:** Sprint 1 Mews-Foundation
-4. **Wochen 3-4:** Sprints 2-5 (Auth + Bookings)
-5. **Wochen 5-6:** Sprints 6-7 (Stripe + Eve)
-6. **Wochen 7-8:** Sprints 8-10 (Admin + Wallet + Polish)
-
-**Demo mit Kirstin realistisch in 6-8 Wochen.**
-
----
-
-*Ende der Architektur-Skizze · Tag 8 · 26.05.2026*
+*Ende der finalen Architektur · Tag 8 · 26.05.2026 23:30*
