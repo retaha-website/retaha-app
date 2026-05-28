@@ -13,18 +13,19 @@ export type StayContext = {
     last_name: string | null;
     language: string;
     visit_count: number;
-  };
+  } | null;
   room: {
     id: string;
     room_number: string | null;
     room_name: string | null;
-  };
+  } | null;
   hotel: {
     id: string;
     slug: string;
     name: string;
     city: string | null;
     default_language: string;
+    logo_url: string | null;
   };
   settings: {
     features: Record<string, boolean>;
@@ -81,14 +82,17 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       id, check_in, check_out, is_active,
       guest:guests(id, first_name, last_name, language, visit_count),
       room:rooms(id, room_number, room_name),
-      hotel:hotels(id, slug, name, city, default_language)
+      hotel:hotels(id, slug, name, city, default_language, logo_url)
     `)
     .eq('access_token', token)
     .eq('is_active', true)
     .maybeSingle();
 
-  if (stayErr || !stay || !stay.guest || !stay.room || !stay.hotel) {
-    console.error('loadStayByToken: stay lookup failed', stayErr);
+  // Mews-tolerant: guest und room dürfen null sein (Reservation ohne
+  // AssignedResource / Company-Account ohne Customer-Link). Nur stay + hotel
+  // sind Pflicht — wenn die fehlen, ist die Einladung ungültig.
+  if (stayErr || !stay || !stay.hotel) {
+    if (stayErr) console.error('loadStayByToken: stay lookup failed', stayErr);
     return null;
   }
 
