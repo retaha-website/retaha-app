@@ -738,3 +738,66 @@ Wo wir noch Entscheidungen brauchen:
 ---
 
 *Ende der Architektur-Skizze · Tag 8 · 26.05.2026*
+
+---
+
+## 14 · Backlog Sprint C+ — Charge-to-Room Erweiterungen
+
+### Net-Pricing-Mode (für deutsche Hotels, z.B. Gate Garden)
+
+**Trigger zum Aktivieren:** sobald ein Hotel mit `Enterprise.Pricing === 'Net'` onboarded wird (deutsche Hotels).
+
+**Was zu tun ist:**
+- In `src/lib/mews/orders.ts` → `buildOrderItems.makeUnitAmount`: aktuell wirft `PushSkipped('unknown_pricing_mode')` bei Net.
+- Rückwärtsrechnung: wir speichern in unserer DB den **Brutto-Preis** (`price_cents`) — bei Net-Hotels müssen wir `Net = brutto / (1 + tax_rate_value)` berechnen.
+- Tax-Rate-Wert holen: entweder live via `taxations/getAll` → finde TaxRate by Code → `Strategy.Value.Value`, oder beim Connect mit-cachen in einer neuen Spalte `mews_integrations.default_tax_rate_value` (Decimal, z.B. 0.19 für 19% DE-VAT).
+- Letzteres ist sauberer (1 Wert pro Hotel, ändert sich nur bei Tax-Code-Wechsel).
+
+**Aufwand-Schätzung:** ~2-3h. Erfordert ein DE-Hotel-Setup zum Testen + den exakten DE-Tax-Code (vermutlich `DE-2024-19%` oder Ähnliches — analog zu UK-Discovery in Phase 2c).
+
+### Pfad C+ Activation (Mews-Products als Preis-Source-of-Truth)
+
+**Trigger:** Hotelier-Mews-Hotel hat gepflegte Products (counter > 0) UND Toggle auf 'mews' im Backoffice.
+
+**Was zu tun ist:**
+1. `products/getAll` Client-Methode existiert schon (Phase 1). Plus Sync-Funktion ergänzen.
+2. Cache-Tabelle `mews_products` (oder Mapping-Spalte `mews_product_id` in `breakfast_items` / `hotel_settings`-JSONB).
+3. UI: Toggle 'aus Mews' aktivierbar machen wenn Products > 0 (Bedingung schon implementiert).
+4. `pushBookingToMews` if-Zweig 'mews' implementieren: `ProductOrders: [{ ProductId, ConsumptionUtc, ... }]` statt Custom Items. Aktuell wirft `PushSkipped('pfad_c_plus_not_implemented')`.
+5. Optional: 'Inkludiert'-Detection via `orders/getAll` für die Reservation — wenn schon ein Order mit gleichem Service/Product existiert, kein Doppel-Push.
+
+**Aufwand-Schätzung:** ~6-8h. Erfordert testbares Setup mit Products.
+
+### Push-Failure-Retry-UI
+
+**Trigger:** sobald mehr als 10 Bookings mit `mews_push_error IS NOT NULL` in Production sind.
+
+**Was zu tun ist:**
+- `/admin/bookings` zeigt für confirmed Bookings einen Indikator wenn `mews_order_id IS NULL && mews_push_error IS NOT NULL` (z.B. roter Punkt + Hover-Tooltip mit error).
+- Retry-Button pro Booking → POST `/api/admin/bookings/[id]/mews-push-retry` → ruft `pushBookingToMews` direkt.
+- Optional: Cron-Job für automatische Retries bei Network-Errors (nicht bei PushSkipped — die sind konfiguratorisch).
+
+**Aufwand-Schätzung:** ~2-3h.
+
+### Cancel-Symmetrie
+
+**Trigger:** Hotelier-Feedback dass stornierte Bookings in Mews dort nicht abgeräumt werden.
+
+**Was zu tun ist:**
+- Beim Übergang `confirmed → cancelled` → `orders/cancel` mit `mews_order_id` aufrufen.
+- Neue MewsClient-Methode `cancelOrder(orderId)` → POST `orders/cancel`.
+- Failure-Logging analog zu Push.
+
+**Aufwand-Schätzung:** ~1h.
+
+### UI: Tax-Code als Dropdown statt Input
+
+**Trigger:** sobald taxations/getAll im Backoffice live gecached wird.
+
+**Was zu tun ist:**
+- Aktuell in `/admin/pms` ist `default_tax_code` ein Text-Input ("z.B. UK-S, UK-V, …") — kann der Hotelier falsch tippen.
+- Replace mit Dropdown: beim Page-Load `taxations/getAll` aufrufen + manuell filtern auf `TaxationCode === integration.environment === 'demo' ? 'UK-2022' : <konfiguriert>`.
+- Dropdown-Optionen: `{Code} ({Strategy.Discriminator} {Value*100}%)` z.B. "UK-2022-20% (20%)".
+- Default-Pick: aktuell selected wenn schon gesetzt, sonst Standard-20%-Heuristik (siehe Phase 2c Heuristik).
+
+**Aufwand-Schätzung:** ~1h.
