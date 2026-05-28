@@ -37,8 +37,11 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     });
     return jsonResponse({ ok: true, ...result }, 200);
   } catch (err) {
-    console.error('[api/admin/mews/sync] failed:', err);
-    return jsonResponse({ ok: false, error: (err as Error).message }, 500);
+    const e = err as Error & { cause?: unknown };
+    console.error('[api/admin/mews/sync] failed:', e.message);
+    if (e.cause) console.error('[api/admin/mews/sync] cause:', e.cause);
+    if (e.stack) console.error('[api/admin/mews/sync] stack:', e.stack);
+    return jsonResponse({ ok: false, error: e.message }, 500);
   }
 };
 

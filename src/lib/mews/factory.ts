@@ -6,6 +6,7 @@
 
 import { createSupabaseServiceRoleInstance } from '../auth';
 import { decryptToken } from '../encryption';
+import { getEnv } from '../env';
 import { MewsClient } from './client';
 
 const DEFAULT_CLIENT_NAME = 'retaha 1.0.0';
@@ -15,10 +16,10 @@ const DEFAULT_CLIENT_NAME = 'retaha 1.0.0';
  * Onboarding-Flow (Sprint 6) bevor das Hotel seine eigene Integration angelegt hat.
  */
 export function getMewsClientFromEnv(): MewsClient {
-  const baseUrl = process.env.MEWS_API_BASE_URL;
-  const clientToken = process.env.MEWS_DEMO_CLIENT_TOKEN;
-  const accessToken = process.env.MEWS_DEMO_ACCESS_TOKEN;
-  const client = process.env.MEWS_CLIENT_NAME ?? DEFAULT_CLIENT_NAME;
+  const baseUrl = getEnv('MEWS_API_BASE_URL');
+  const clientToken = getEnv('MEWS_DEMO_CLIENT_TOKEN');
+  const accessToken = getEnv('MEWS_DEMO_ACCESS_TOKEN');
+  const client = getEnv('MEWS_CLIENT_NAME') ?? DEFAULT_CLIENT_NAME;
 
   if (!baseUrl || !clientToken || !accessToken) {
     throw new Error(
@@ -63,17 +64,17 @@ export async function getMewsClientForHotel(hotelId: string): Promise<MewsClient
   }
 
   const baseUrl = data.environment === 'demo'
-    ? process.env.MEWS_API_BASE_URL
+    ? getEnv('MEWS_API_BASE_URL')
     : 'https://api.mews.com';
   const clientToken = data.environment === 'demo'
-    ? process.env.MEWS_DEMO_CLIENT_TOKEN
-    : process.env.MEWS_PROD_CLIENT_TOKEN;
+    ? getEnv('MEWS_DEMO_CLIENT_TOKEN')
+    : getEnv('MEWS_PROD_CLIENT_TOKEN');
 
   if (!baseUrl || !clientToken) {
     console.error(`[mews/factory] Missing ENV for environment "${data.environment}"`);
     return null;
   }
 
-  const client = process.env.MEWS_CLIENT_NAME ?? DEFAULT_CLIENT_NAME;
+  const client = getEnv('MEWS_CLIENT_NAME') ?? DEFAULT_CLIENT_NAME;
   return new MewsClient({ clientToken, accessToken, client, baseUrl });
 }

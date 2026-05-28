@@ -423,7 +423,10 @@ async function syncStaysFromReservations(
     .filter((id): id is string => typeof id === 'string');
 
   const existingIds = new Set<string>();
-  for (const batch of chunk(reservationIds, 500)) {
+  // Batch-Size 100: PostgREST .in() serialisiert IDs als Query-String;
+  // bei UUIDs (~37 chars) wird die URL bei 500 IDs ~18 KB groß und
+  // überschreitet undici's HTTP-Header-Limit (16 KB) → TypeError: fetch failed.
+  for (const batch of chunk(reservationIds, 100)) {
     const { data, error } = await supabase
       .from('stays')
       .select('mews_reservation_id')

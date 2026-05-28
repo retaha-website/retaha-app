@@ -8,17 +8,19 @@
 //   - tag:        16 Bytes Auth-Tag (Integritäts-Check)
 //   - ciphertext: variabel (= plaintext-Länge)
 //
-// Key kommt aus process.env.ENCRYPTION_KEY (32 Bytes base64).
+// Key kommt aus ENCRYPTION_KEY (32 Bytes base64) — über getEnv() weil Astro+Vite
+// ENV-Vars in import.meta.env injecten, nicht in process.env.
 // Generieren mit:  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
+import { getEnv } from './env';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
-  const keyB64 = process.env.ENCRYPTION_KEY;
+  const keyB64 = getEnv('ENCRYPTION_KEY');
   if (!keyB64) {
     throw new Error(
       'ENCRYPTION_KEY env-variable not set. ' +
