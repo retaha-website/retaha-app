@@ -1,14 +1,18 @@
 import type { AstroCookies } from 'astro';
 import { createServerClient, parseCookieHeader } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { getEnv } from './env';
 
 /**
  * Creates a Supabase server client bound to the current request's cookies.
  * Standard @supabase/ssr-Pattern — kein customFetch, keine handgebaute Token-Reassembly.
  */
 export function createSupabaseServerInstance(cookies: AstroCookies, request: Request) {
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getEnv('PUBLIC_SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase env vars missing: PUBLIC_SUPABASE_URL and/or PUBLIC_SUPABASE_ANON_KEY');
+  }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -38,11 +42,11 @@ export function createSupabaseServerInstance(cookies: AstroCookies, request: Req
  * RLS-Bug-Workaround — siehe Phase 8.E.
  */
 export function createSupabaseServiceRoleInstance() {
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
+  const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!serviceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Supabase env vars missing: PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY');
   }
 
   return createClient(supabaseUrl, serviceRoleKey, {
