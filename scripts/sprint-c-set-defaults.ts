@@ -47,13 +47,16 @@ const DEMO_HOTEL_IDS = integrations.map(i => i.hotel_id);
 console.log('Hotel-IDs:', DEMO_HOTEL_IDS);
 console.log('');
 
-// 1) UPDATE
+// 1) UPDATE — inkl. Service-Mappings (aus Phase-2c-Probe + Brief-Empfehlung)
 const { error: upErr } = await supabase
   .from('mews_integrations')
   .update({
     default_currency: 'GBP',
     default_tax_code: 'UK-2022-20%',
     pricing_mode: 'Gross',
+    service_id_breakfast:  '15ea4f49-ae4a-49be-ad39-b3d3009d184a',  // Breakfast Voucher (Active)
+    service_id_service:    '5e431b44-1ac3-4f26-805f-b323006bab01',  // Washing and Drying Service (Active)
+    service_id_conference: '13ac7699-a751-497e-8ab4-b35c007fa0c8',  // Mice Service (Active — MICE = Conferences)
     updated_at: new Date().toISOString(),
   })
   .in('hotel_id', DEMO_HOTEL_IDS);
