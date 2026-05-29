@@ -743,6 +743,24 @@ Wo wir noch Entscheidungen brauchen:
 
 ## 14 · Backlog Sprint C+ — Charge-to-Room Erweiterungen
 
+### Scope-Korrektur: Service + Konferenz aus Push-Default raus (UI-Aufräumen)
+
+**Hintergrund:** Sprint C hat Mews-Push für alle 3 Booking-Typen technisch verifiziert (3/3 push grün, siehe [SPRINT_C_VERIFICATION.md](SPRINT_C_VERIFICATION.md)). Die Geschäftsrealität ist aber:
+
+- **Frühstück:** echtes B2C-Charge-to-Room — Gast bucht, Hotel kassiert. **Sprint-C-Kern-Use-Case.**
+- **Service-Anfragen** (Spa, Wäsche, Shuttle): in der Praxis meist **kostenfrei oder pauschal im Zimmerpreis enthalten**. Mews-Push ist Overkill.
+- **Konferenz-Räume:** **B2B-Vertrieb** — wird im direkten Verkaufsgespräch + manueller Rechnung abgewickelt, nicht per Gast-Self-Service-Sheet.
+
+**Was zu tun ist:**
+1. **Code bleibt unangetastet** — `pushBookingToMews` macht graceful skip wenn `service_id_breakfast/service/conference` NULL ist (`PushSkipped('no_service_id_for_type')`). Der Mechanismus funktioniert: wenn Hotelier einen Typ nicht mappt, wird er übersprungen ohne Crash.
+2. **UI-Cleanup `/admin/pms`:**
+   - Service- und Konferenz-Mapping-Dropdowns aus der „Order-Konfiguration"-Sektion **rausnehmen** ODER hinter „Erweitert"-Toggle verbergen.
+   - Standard-Setup: nur `service_id_breakfast` ist sichtbar + Pflicht für Charge-to-Room.
+3. **Service-/Konferenz-Konfiguration umziehen:** gehört in eigene Tabs `/admin/service` und `/admin/conference` (die existieren schon), nicht in die Mews-Settings. Die Mews-Mapping-UI lädt nur dann die anderen beiden, wenn der Hotelier explizit „Premium-Charge" aktiviert.
+4. **Falls je ein Hotel Premium-Service/Konferenz-Charge will:** Toggle pro Modul ergänzen (`hotel_settings.charge_service_via_mews` / `charge_conference_via_mews`, default false). Sichtbar im jeweiligen Admin-Tab.
+
+**Aufwand-Schätzung:** ~1-2h für UI-Cleanup + Toggle-Mechanik. Migration nicht zwingend nötig (Spalten existieren, einfach NULL lassen). Plus `scripts/sprint-c-set-defaults.ts` entsprechend anpassen (kein Auto-Mapping für service/conference).
+
 ### Net-Pricing-Mode (für deutsche Hotels, z.B. Gate Garden)
 
 **Trigger zum Aktivieren:** sobald ein Hotel mit `Enterprise.Pricing === 'Net'` onboarded wird (deutsche Hotels).
