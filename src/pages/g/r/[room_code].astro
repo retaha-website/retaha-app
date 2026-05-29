@@ -100,6 +100,7 @@ if (session) {
 }
 
 // 3) Kein Cookie → aktuellen Stay im Zimmer finden
+// Defensiv: hotel_id-Filter (siehe Doku in /api/gast/start-stay).
 const { data: activeStay } = await supabase
   .from('stays')
   .select(`
@@ -107,6 +108,7 @@ const { data: activeStay } = await supabase
     guests(first_name, last_name)
   `)
   .eq('room_id', room.id)
+  .eq('hotel_id', room.hotel_id)
   .eq('is_active', true)
   .in('state', ['Confirmed', 'Started'])
   .order('check_in', { ascending: true })
