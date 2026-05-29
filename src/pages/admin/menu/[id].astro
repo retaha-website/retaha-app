@@ -51,6 +51,11 @@ if (Astro.request.method === 'POST') {
       is_active: form.getAll('is_active').includes('on'),
       category: form.get('category')?.toString().trim() || null,
 
+      // Sprint D Phase 6d — Preis in Brutto-EUR aus Form-Input parsen,
+      // als Cents speichern. Wird beim Mews-Charge-Push als GrossValue genutzt
+      // (Gross-Pricing-Hotels) oder via Net-Rückrechnung (Net-Hotels).
+      price_cents: Math.max(0, Math.round(parseFloat(form.get('price_eur')?.toString().replace(',', '.') || '0') * 100) || 0),
+
       name_de: form.get('name_de')?.toString().trim() || '',
       name_en: form.get('name_en')?.toString().trim() || null,
       name_fr: form.get('name_fr')?.toString().trim() || null,
@@ -110,6 +115,7 @@ const data = item || {
   display_order: 0,
   is_active: true,
   category: '',
+  price_cents: 0,
   name_de: '', name_en: '', name_fr: '', name_es: '',
   description_de: '', description_en: '', description_fr: '', description_es: '',
   contains_gluten: false, contains_crustaceans: false, contains_eggs: false,
@@ -127,7 +133,7 @@ if (url.searchParams.get('created') === '1' && !message) {
 }
 ---
 
-<AdminLayout title={isNew ? 'Neue Speise' : data.name_de} hotel={hotel} user={user} activeTab="menu">
+<AdminLayout title={isNew ? 'Neue Speise' : data.name_de} hotel={hotel} user={{ email: user.email ?? '' }} activeTab="menu">
   <div class="mb-6">
     <a href="/admin/menu" class="text-xs text-anthrazit/55 hover:text-pink-shock transition">
       ← Zurück zur Speisen-Liste
@@ -161,7 +167,7 @@ if (url.searchParams.get('created') === '1' && !message) {
       <h2 class="text-lg font-medium mb-4">Allgemein</h2>
 
       <div class="grid grid-cols-12 gap-4">
-        <label class="bauhaus-field col-span-6">
+        <label class="bauhaus-field col-span-5">
           <span class="bauhaus-field-eyebrow">— Kategorie —</span>
           <input
             type="text"
@@ -172,7 +178,20 @@ if (url.searchParams.get('created') === '1' && !message) {
           />
         </label>
 
-        <label class="bauhaus-field col-span-3">
+        <label class="bauhaus-field col-span-2">
+          <span class="bauhaus-field-eyebrow">— Preis (EUR) —</span>
+          <input
+            type="number"
+            name="price_eur"
+            value={((data.price_cents ?? 0) / 100).toFixed(2)}
+            min="0"
+            step="0.01"
+            placeholder="0,00"
+            class="bauhaus-input"
+          />
+        </label>
+
+        <label class="bauhaus-field col-span-2">
           <span class="bauhaus-field-eyebrow">— Reihenfolge —</span>
           <input
             type="number"
