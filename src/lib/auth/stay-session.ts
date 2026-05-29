@@ -140,7 +140,7 @@ export { COOKIE_NAME as STAY_COOKIE_NAME };
 // gestohlener Pair-Token darf nie als Stay-Session akzeptiert werden).
 
 const PAIR_AUDIENCE = 'pair-link';
-const PAIR_TTL_SECONDS = 30 * 60;  // 30 Minuten
+const PAIR_TTL_SECONDS_DEFAULT = 30 * 60;  // 30 Minuten (Backoffice-QR-Default)
 
 export interface PairTokenPayload {
   stay_id: string;
@@ -148,19 +148,29 @@ export interface PairTokenPayload {
   exp: number;
 }
 
+/**
+ * Signiert einen Pair-Token mit konfigurierbarer TTL.
+ *
+ * - Backoffice-QR (Phase 5): ttlSeconds default = 30 min — kurz weil Hotelier
+ *   den Code direkt vor dem Gast generiert.
+ * - Pre-Arrival-Mail (Phase 6a): ttlSeconds = bis check_in_date + 1 Tag.
+ *   Lang weil Gast die Mail Tage vorher öffnet.
+ */
 export async function signPairToken(params: {
   stay_id: string;
   hotel_id: string;
+  ttlSeconds?: number;
 }): Promise<string | null> {
   const secret = getSecret();
   if (!secret) return null;
+  const ttl = Math.max(60, Math.floor(params.ttlSeconds ?? PAIR_TTL_SECONDS_DEFAULT));
 
   return new SignJWT({ stay_id: params.stay_id, hotel_id: params.hotel_id })
     .setProtectedHeader({ alg: ALGORITHM })
     .setIssuer(ISSUER)
     .setAudience(PAIR_AUDIENCE)
     .setIssuedAt()
-    .setExpirationTime(`${PAIR_TTL_SECONDS}s`)
+    .setExpirationTime(`${ttl}s`)
     .sign(secret);
 }
 

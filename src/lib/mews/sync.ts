@@ -185,6 +185,20 @@ export async function syncHotelFromMews(
         .eq('hotel_id', hotelId);
     }
 
+    // Sprint D Phase 6a — Pre-Arrival-Mail-Trigger nach erfolgreichem Sync.
+    // Lazy-Import um Circular-Import-Risiken zu vermeiden + um den Sync-Pfad
+    // nicht durch Email-Code zu poluten wenn Hotel keine Mails nutzen will.
+    try {
+      const { sendPreArrivalInvitesForHotel } = await import('../email/send-pre-arrival-invites');
+      const preStats = await sendPreArrivalInvitesForHotel(hotelId);
+      if (preStats.found > 0) {
+        console.info(`[mews/sync] pre-arrival: ${preStats.sent} sent / ${preStats.skipped} skipped / ${preStats.failed} failed (of ${preStats.found} eligible)`);
+      }
+    } catch (err) {
+      // Best-effort — Sync-Result darf nicht an Pre-Arrival hängen
+      console.warn('[mews/sync] pre-arrival trigger failed:', (err as Error).message);
+    }
+
     stats.durationMs = Date.now() - startMs;
     return stats;
   } catch (err) {
