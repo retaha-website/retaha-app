@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '../../../lib/supabase';
+import { sendBookingNotification } from '../../../lib/email/send-booking-notification';
 
 interface CreateBookingPayload {
   access_token: string;
@@ -63,6 +64,17 @@ export const POST: APIRoute = async ({ request }) => {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Best-Effort Notification — sendBookingNotification fängt alle Fehler intern.
+  // Await damit Vercel-Edge die Promise nicht beendet — der Wrapper ist schnell
+  // (parallel queries + 1 Resend-POST), Gast-Response verzögert sich um ~100-300ms.
+  await sendBookingNotification({
+    bookingId: booking.id,
+    hotelId: stay.hotel_id,
+    stayId: stay.id,
+    bookingType: payload.type,
+    details: payload.details,
+  });
 
   return new Response(JSON.stringify({ ok: true, booking }), {
     status: 200, headers: { 'Content-Type': 'application/json' },

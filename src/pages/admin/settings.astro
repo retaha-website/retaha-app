@@ -64,6 +64,7 @@ if (Astro.request.method === 'POST') {
   } else {
     // Default: Bulk-Update (WLAN + Concierge + Eyebrows + Welcome)
     const updates: Record<string, any> = {
+      notification_email: form.get('notification_email')?.toString().trim() || null,
       wifi_ssid: form.get('wifi_ssid')?.toString().trim() || null,
       wifi_password: form.get('wifi_password')?.toString().trim() || null,
       wifi_speed_mbits: parseInt(form.get('wifi_speed_mbits')?.toString() || '0') || null,
@@ -108,6 +109,7 @@ if (savedParam === 'locale' && !message) {
 const { data: settings } = await client
   .from('hotel_settings')
   .select(`
+    notification_email,
     wifi_ssid, wifi_password, wifi_speed_mbits,
     concierge_name, concierge_online_until,
     hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
@@ -235,6 +237,33 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
 
   <form method="POST">
     <input type="hidden" name="_action" value="save_general" />
+
+    <!-- Notifications (Sprint D Phase 2) -->
+    <section class="settings-section">
+      <div class="settings-section-marker-bar">
+        <span class="settings-section-marker settings-section-marker--triangle"></span>
+        <p class="settings-section-eyebrow">— Benachrichtigungen —</p>
+        <span class="settings-section-line"></span>
+      </div>
+      <h2 class="settings-section-headline">Email bei neuen Buchungen</h2>
+      <p class="settings-section-description">
+        An welche Adresse(n) soll retaha bei neuen Frühstücks-, Service- oder Konferenz-Anfragen
+        eine Benachrichtigung schicken? Mehrere Adressen mit Komma trennen. Leer lassen = keine Mails.
+      </p>
+
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow">— Empfänger-Email(s) —</span>
+        <input
+          type="text"
+          name="notification_email"
+          value={(s as any).notification_email || ''}
+          placeholder="hannah@hotel.de, kirstin@hotel.de"
+          autocomplete="off"
+          spellcheck="false"
+          class="bauhaus-input"
+        />
+      </label>
+    </section>
 
     <!-- WLAN -->
     <section class="settings-section">
