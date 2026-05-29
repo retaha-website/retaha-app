@@ -13,7 +13,7 @@
 import { createSupabaseServiceRoleInstance } from '../auth';
 import { signPairToken } from '../auth/stay-session';
 import { getEnv } from '../env';
-import { sendEmail } from './microsoft-smtp';
+import { routeEmail } from './router';
 import {
   preArrivalInviteHtml,
   preArrivalInviteSubject,
@@ -147,11 +147,13 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
           pairUrl,
         };
 
-        const result = await sendEmail({
+        const result = await routeEmail({
+          type: 'guest_pre_arrival',
+          hotelId: s.hotel_id,
           to: s.guest_email,
           subject: preArrivalInviteSubject(data),
           html: preArrivalInviteHtml(data),
-          fromName: hotel.name ?? undefined,
+          fromName: hotel.name ?? 'Hotel',
         });
 
         if (result.ok) {
@@ -159,10 +161,10 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
             .update({ pre_arrival_sent_at: new Date().toISOString() })
             .eq('id', s.id);
           stats.sent++;
-          console.info(`[pre-arrival] sent stay ${s.id} → ${s.guest_email}`);
+          console.info(`[pre-arrival] sent stay ${s.id} → ${s.guest_email} (via ${result.provider})`);
         } else {
           stats.failed++;
-          console.warn(`[pre-arrival] send failed stay ${s.id}:`, result.error);
+          console.warn(`[pre-arrival] send failed stay ${s.id} (via ${result.provider}):`, result.error);
         }
       } catch (err) {
         stats.failed++;

@@ -3,7 +3,7 @@
 
 import { createSupabaseServiceRoleInstance } from '../auth';
 import { getEnv } from '../env';
-import { sendEmail } from './microsoft-smtp';
+import { routeEmail } from './router';
 import {
   bookingNotificationHtml,
   bookingNotificationSubject,
@@ -108,19 +108,20 @@ export async function sendBookingNotification(ctx: BookingNotificationContext): 
       .map((s: string) => s.trim())
       .filter((s: string) => s.length > 0);
 
-    const result = await sendEmail({
+    // Hotelier-Notification = internal → Router schickt via Microsoft 365 SMTP.
+    const result = await routeEmail({
+      type: 'hotelier_notification',
+      hotelId: ctx.hotelId,
       to: recipients,
       subject: bookingNotificationSubject(data),
       html: bookingNotificationHtml(data),
-      // Multi-Hotel: Display-Name = Hotel-Name, Absender bleibt noreply@retaha.de
-      // (Phase 7: Custom-Domain pro Hotel mit Send-As).
-      fromName: hotel.name ?? undefined,
+      fromName: hotel.name ?? 'Hotel',
     });
 
     if (result.ok) {
-      console.info(`[notif] booking ${ctx.bookingId} → ${recipients.length} recipient(s), id=${result.id}`);
+      console.info(`[notif] booking ${ctx.bookingId} → ${recipients.length} recipient(s), id=${result.id} (via ${result.provider})`);
     } else {
-      console.warn(`[notif] booking ${ctx.bookingId} email failed: ${result.error}`);
+      console.warn(`[notif] booking ${ctx.bookingId} email failed (via ${result.provider}): ${result.error}`);
     }
   } catch (err) {
     // Niemals throwen — Best-Effort
