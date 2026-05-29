@@ -205,9 +205,21 @@ if (Astro.request.method === 'POST') {
       }
     }
   } else if (action === 'disconnect') {
+    // Sprint D Phase 6b — Reconnect-Symmetrie: Row NICHT löschen, nur Auth-Felder
+    // nullen. Service-Mappings + Tax/Currency/Pricing-Defaults bleiben erhalten.
+    // Bei Reconnect setzt der Connect-Handler einfach access_token_encrypted +
+    // enterprise_id neu, die Mappings sind sofort wieder da.
     const { error } = await ssrClient
       .from('mews_integrations')
-      .delete()
+      .update({
+        access_token_encrypted: null,
+        enterprise_id: null,
+        last_sync_at: null,
+        sync_status: 'idle',
+        sync_error_message: null,
+        mews_products_count: 0,
+        updated_at: new Date().toISOString(),
+      })
       .eq('hotel_id', hotel.id);
     if (error) {
       message = { type: 'error', text: `Trennen fehlgeschlagen: ${error.message}` };
@@ -228,7 +240,7 @@ if (savedParam === 'connected' && !message) {
       : 'Mews-Integration verbunden. Klicke „Jetzt synchronisieren" um Daten zu laden.',
   };
 } else if (savedParam === 'disconnected' && !message) {
-  message = { type: 'success', text: 'Mews-Integration getrennt. Bisher synchronisierte Daten bleiben erhalten.' };
+  message = { type: 'success', text: 'Mews-Integration getrennt. Service-Mappings, Tax-Code und Sync-Daten bleiben für einen Reconnect erhalten.' };
 } else if (savedParam === 'sync' && !message) {
   message = { type: 'success', text: 'Synchronisation erfolgreich abgeschlossen.' };
 } else if (savedParam === 'config' && !message) {
@@ -251,10 +263,14 @@ const { data: integration } = await ssrClient
   .eq('hotel_id', hotel.id)
   .maybeSingle();
 
+// Sprint D Phase 6b: integration.enterprise_id NULL = disconnected, Mappings
+// bleiben erhalten in der Row. UI behandelt isConnected statt rohen integration-Existenz.
+const isConnected = integration?.enterprise_id != null;
+
 // Counts via Service-Role (rooms/stays/guests-RLS uneinheitlich) — hotel.id-Filter
 // kommt aus authentifizierter Session, also sicher.
 let counts: { rooms: number; stays: number; guests: number } | null = null;
-if (integration) {
+if (isConnected) {
   const adminClient = createSupabaseServiceRoleInstance();
   const [roomsRes, staysRes, guestsRes] = await Promise.all([
     adminClient.from('rooms').select('*', { count: 'exact', head: true }).eq('hotel_id', hotel.id),
@@ -272,20 +288,22 @@ if (integration) {
 // bei Fehler bleibt die Liste leer + Hinweis im UI.
 let orderableServices: Array<{ Id: string; Name: string; IsActive: boolean }> = [];
 let servicesError: string | null = null;
-if (integration) {
+if (isConnected) {
   try {
     const mews = await getMewsClientForHotel(hotel.id);
     if (mews) {
       const resp = await mews.getServices({ Limitation: { Count: 100 } });
+      // Sprint D Phase 6c: nur Orderable+Active zeigen. Inaktive Services im
+      // Demo-Hotel sind häufig Test-Reste — Mews lehnt orders/add bei ihnen ab
+      // mit "Invalid ServiceId" (siehe Sprint-C-Verifikation §3 Befund).
       orderableServices = (resp.Services ?? [])
-        .filter(s => s.Type === 'Orderable')
+        .filter(s => s.Type === 'Orderable' && s.IsActive !== false)
         .map(s => ({
           Id: s.Id,
           Name: (s.Name as string) || (s.Names && Object.values(s.Names)[0]) || s.Id,
-          IsActive: s.IsActive !== false,
+          IsActive: true,
         }))
-        // Aktive zuerst, dann alphabetisch
-        .sort((a, b) => Number(b.IsActive) - Number(a.IsActive) || a.Name.localeCompare(b.Name));
+        .sort((a, b) => a.Name.localeCompare(b.Name));
     }
   } catch (err) {
     servicesError = (err as Error).message;
@@ -346,7 +364,7 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
     </div>
   )}
 
-  {integration ? (
+  {isConnected && integration ? (
     <div class="space-y-10 max-w-3xl">
 
       <!-- Status-Block -->

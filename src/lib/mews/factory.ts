@@ -54,6 +54,9 @@ export async function getMewsClientForHotel(hotelId: string): Promise<MewsClient
     return null;
   }
   if (!data) return null;
+  // Sprint D Phase 6b: Disconnected Hotel = Row da aber token null. Defensive
+  // skip — sonst würde decryptToken auf null einen unsprechenden Fehler werfen.
+  if (!data.access_token_encrypted) return null;
 
   let accessToken: string;
   try {
