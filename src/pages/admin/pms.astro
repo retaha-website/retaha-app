@@ -140,6 +140,48 @@ if (Astro.request.method === 'POST') {
     if (pricingSource !== 'retaha' && pricingSource !== 'mews') {
       message = { type: 'error', text: 'Ungültige Preis-Quelle.' };
     } else {
+      // Bei Tax-Code-Set: Tax-Rate via taxations/getAll auflösen (Sprint D Phase 1).
+      // Wir filtern manuell auf TaxationCode === TaxEnvironmentCode (Mews ignoriert
+      // den TaxEnvironmentCodes-Param) und matchen den exakten Code.
+      let resolvedTaxRate: number | null = null;
+      let taxRateLookupError: string | null = null;
+      if (taxCode) {
+        try {
+          const mews = await getMewsClientForHotel(hotel.id);
+          if (mews) {
+            const config = await mews.getConfiguration();
+            const taxEnv = (config.Enterprise as any)?.TaxEnvironmentCode as string | undefined;
+            const taxResp = await mews.getTaxations({
+              ...(taxEnv ? { TaxEnvironmentCodes: [taxEnv] } : {}),
+              Limitation: { Count: 100 },
+            });
+            const allRates = (taxResp.TaxRates ?? []) as Array<{
+              Code: string;
+              TaxationCode?: string;
+              Value?: number;
+              Strategy?: { Discriminator?: string; Value?: unknown };
+            }>;
+            const filtered = taxEnv ? allRates.filter(r => r.TaxationCode === taxEnv) : allRates;
+            const match = filtered.find(r => r.Code === taxCode);
+            if (match) {
+              const flat = typeof match.Value === 'number' ? match.Value : null;
+              const sv = match.Strategy?.Value as any;
+              const nested = sv && typeof sv === 'object' && typeof sv.Value === 'number' ? sv.Value : null;
+              const numericRate = flat ?? nested;
+              if (typeof numericRate === 'number' && numericRate >= 0 && numericRate < 1) {
+                resolvedTaxRate = numericRate;
+              } else {
+                taxRateLookupError = `Tax-Code "${taxCode}" gefunden, aber kein numerischer Rate-Wert (Strategy=${JSON.stringify(match.Strategy?.Discriminator)})`;
+              }
+            } else {
+              taxRateLookupError = `Tax-Code "${taxCode}" nicht in taxations/getAll für TaxEnvironment "${taxEnv}" gefunden`;
+            }
+          }
+        } catch (err) {
+          taxRateLookupError = `taxations/getAll fehlgeschlagen: ${(err as Error).message}`;
+        }
+      }
+
       const { error } = await ssrClient
         .from('mews_integrations')
         .update({
@@ -147,12 +189,17 @@ if (Astro.request.method === 'POST') {
           service_id_service: serviceService,
           service_id_conference: serviceConference,
           default_tax_code: taxCode,
+          default_tax_rate: resolvedTaxRate,
           pricing_source: pricingSource,
           updated_at: new Date().toISOString(),
         })
         .eq('hotel_id', hotel.id);
       if (error) {
         message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      } else if (taxRateLookupError && taxCode) {
+        // Soft-Warning: gespeichert, aber Tax-Rate konnte nicht aufgelöst werden.
+        // Bei Net-Hotels wirft pushBookingToMews dann PushSkipped(no_default_tax_rate).
+        return Astro.redirect(`/admin/pms?saved=config_warn&warn=${encodeURIComponent(taxRateLookupError)}`);
       } else {
         return Astro.redirect('/admin/pms?saved=config');
       }
@@ -186,6 +233,9 @@ if (savedParam === 'connected' && !message) {
   message = { type: 'success', text: 'Synchronisation erfolgreich abgeschlossen.' };
 } else if (savedParam === 'config' && !message) {
   message = { type: 'success', text: 'Order-Konfiguration gespeichert.' };
+} else if (savedParam === 'config_warn' && !message) {
+  const warn = Astro.url.searchParams.get('warn') ?? 'Tax-Rate konnte nicht aufgelöst werden.';
+  message = { type: 'error', text: `Konfiguration gespeichert mit Warnung — ${warn}. Bei Net-Hotels wird der Mews-Push fehlschlagen bis der Rate-Wert da ist.` };
 }
 
 // Integration via SSR-Client (RLS) — access_token_encrypted bewusst NICHT selektiert,
@@ -194,7 +244,7 @@ const { data: integration } = await ssrClient
   .from('mews_integrations')
   .select(`
     enterprise_id, environment, last_sync_at, sync_status, sync_error_message, created_at, updated_at,
-    pricing_source, default_currency, default_tax_code, pricing_mode,
+    pricing_source, default_currency, default_tax_code, default_tax_rate, pricing_mode,
     service_id_breakfast, service_id_service, service_id_conference,
     mews_products_count
   `)
@@ -411,8 +461,15 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
               class="bauhaus-input bauhaus-input--mono"
             />
             <span class="text-xs italic text-anthrazit/55 mt-2 block">
-              Wird iterativ per Test-Order ermittelt (Phase 2c). Tax-Environment dieses Hotels:
+              Beim Speichern wird der Tax-Rate-Wert automatisch aus Mews aufgelöst (taxations/getAll).
+              Tax-Environment dieses Hotels:
               {' '}<span class="font-mono">{integration.environment === 'demo' ? 'UK-2022 (Demo)' : '— prüfe configuration.Enterprise.TaxEnvironmentCode'}</span>
+              {integration.default_tax_rate != null && (
+                <>
+                  <br />Aktueller Rate: <span class="font-mono">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span>
+                  {' '}(= {Number(integration.default_tax_rate)}). Net-Pricing-Hotels brauchen diesen Wert für die Rückrechnung.
+                </>
+              )}
             </span>
           </label>
 

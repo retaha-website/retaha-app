@@ -31,6 +31,7 @@ export type PushSkipReason =
   | 'no_mews_customer'
   | 'no_service_id_for_type'
   | 'no_default_tax_code'
+  | 'no_default_tax_rate'
   | 'unknown_pricing_mode';
 
 export class PushSkipped extends Error {
@@ -46,7 +47,7 @@ export async function loadHotelMewsIntegration(hotelId: string) {
     .from('mews_integrations')
     .select(`
       hotel_id, enterprise_id, environment, access_token_encrypted,
-      default_currency, default_tax_code, pricing_mode,
+      default_currency, default_tax_code, default_tax_rate, pricing_mode,
       service_id_breakfast, service_id_service, service_id_conference,
       pricing_source
     `)
@@ -122,19 +123,24 @@ export function buildOrderItems(
 
   const centsToValue = (cents: number) => Math.round(cents) / 100;
   const makeUnitAmount = (cents: number) => {
-    const value = centsToValue(cents);
+    const grossValue = centsToValue(cents);
     if (pricingMode === 'Gross') {
-      return { Currency, GrossValue: value, TaxCodes } as const;
+      return { Currency, GrossValue: grossValue, TaxCodes } as const;
     }
     if (pricingMode === 'Net') {
-      // TODO Sprint Backlog: Net-Pricing für deutsche Hotels (Gate Garden).
-      // Brutto-Preis in unserer DB → Net = brutto / (1 + tax_rate_value).
-      // Erfordert TaxRate-Value live nachladen (taxations/getAll → finde
-      // TaxRate by Code → Strategy.Value.Value). Aktuell out-of-scope.
-      throw new PushSkipped(
-        'unknown_pricing_mode',
-        'Net-Pricing-Mode (price_cents brutto → NetValue berechnen) ist Sprint-Backlog',
-      );
+      // DB hält Brutto-Preis (`price_cents` = was der Gast bezahlt). Net-Hotels
+      // pushen aber NetValue → wir rechnen rückwärts: Net = Gross / (1 + Rate).
+      // Mews rechnet die Steuer dann auf den Net-Wert drauf — Endbetrag muss
+      // wieder dem Brutto-Preis entsprechen (Toleranz 1 Cent durch Rundung).
+      const rate = Number(integration.default_tax_rate);
+      if (!Number.isFinite(rate) || rate < 0 || rate >= 1) {
+        throw new PushSkipped(
+          'no_default_tax_rate',
+          `mews_integrations.default_tax_rate fehlt oder ungültig (= ${JSON.stringify(integration.default_tax_rate)}). Setze den Tax-Code in /admin/pms — der Rate wird dann automatisch aus taxations/getAll geholt.`,
+        );
+      }
+      const netValue = Math.round((grossValue / (1 + rate)) * 100) / 100;
+      return { Currency, NetValue: netValue, TaxCodes } as const;
     }
     throw new PushSkipped(
       'unknown_pricing_mode',
