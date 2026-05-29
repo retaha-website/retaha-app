@@ -97,9 +97,27 @@ if (Astro.request.method === 'POST') {
   }
 }
 
+// Sprint D Phase 6e — Logo-Upload-Flash + Error-Codes
+const logoError = Astro.url.searchParams.get('logo_error');
+if (logoError && !message) {
+  const errorTexts: Record<string, string> = {
+    no_file: 'Bitte eine Datei auswählen.',
+    too_large: 'Datei zu groß — maximal 2 MB.',
+    invalid_type: 'Ungültiger Dateityp — erlaubt: PNG, JPEG, SVG, WebP.',
+    storage: 'Upload zum Storage fehlgeschlagen — bitte erneut versuchen.',
+    db_save: 'Logo hochgeladen, aber Speichern fehlgeschlagen.',
+    invalid_form: 'Formular-Daten ungültig.',
+  };
+  message = { type: 'error', text: errorTexts[logoError] ?? `Upload-Fehler: ${logoError}` };
+}
+
 // Saved-Flash aus URL-Param (nach Redirect)
 const savedParam = Astro.url.searchParams.get('saved');
-if (savedParam === 'locale' && !message) {
+if (savedParam === 'logo' && !message) {
+  message = { type: 'success', text: 'Logo aktualisiert.' };
+} else if (savedParam === 'logo_removed' && !message) {
+  message = { type: 'success', text: 'Logo entfernt.' };
+} else if (savedParam === 'locale' && !message) {
   message = { type: 'success', text: t('settings.language.saved', userLocale) };
 } else if (savedParam === 'address' && !message) {
   message = { type: 'success', text: t('settings.guest_address.saved', userLocale) };
@@ -129,7 +147,7 @@ const currentLocale: AdminLocale = (Astro.locals.user?.locale ?? userLocale ?? '
 const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAULT_ADDRESS_FORM) as AddressForm;
 ---
 
-<AdminLayout title="Einstellungen" hotel={hotel} user={user} activeTab="settings">
+<AdminLayout title="Einstellungen" hotel={hotel} user={{ email: user.email ?? '' }} activeTab="settings">
   <div class="-mt-10">
     <EditorialPageHeader
       sectionNumber={t('pages.settings.section_number', userLocale)}
@@ -233,6 +251,82 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
         {t('settings.guest_address.submit', userLocale)}
       </button>
     </form>
+  </section>
+
+  <!-- Logo-Upload (Sprint D Phase 6e) — eigenes Form wegen multipart/form-data -->
+  <section class="settings-section mb-8">
+    <div class="settings-section-marker-bar">
+      <span class="settings-section-marker settings-section-marker--triangle"></span>
+      <p class="settings-section-eyebrow">— Hotel-Logo —</p>
+      <span class="settings-section-line"></span>
+    </div>
+    <h2 class="settings-section-headline">Logo</h2>
+    <p class="settings-section-description">
+      Wird im Gast-Frontend (Hero), Backoffice (Header) und in Email-Notifications gezeigt.
+    </p>
+    <div class="text-xs text-anthrazit/70 mb-6 leading-relaxed bg-anthrazit/[0.03] border-l-2 border-pink-shock pl-3 py-2 max-w-2xl">
+      <strong>Empfehlung:</strong> Querformat- oder quadratisches Logo · mindestens 400 × 200 Pixel
+      (besser 800 × 400) · PNG mit transparentem Hintergrund bevorzugt · SVG-Vektor ideal weil
+      verlustfrei skalierbar · max. 2 MB · Formate PNG / JPEG / SVG / WebP.<br />
+      <span class="italic">Sehr hohe Bilder (Portrait) wirken im Hero gestreckt — falls dein Logo
+      portrait ist: in ein Querformat-Layout setzen (mit Padding).</span>
+    </div>
+
+    <div class="flex items-start gap-6 flex-wrap">
+      {hotel.logo_url ? (
+        <div class="flex-shrink-0 bg-white border border-stein p-4">
+          <img
+            src={hotel.logo_url}
+            alt={`Logo ${hotel.name}`}
+            style="max-width: 200px; max-height: 120px; display: block;"
+          />
+        </div>
+      ) : (
+        <div class="flex-shrink-0 border border-dashed border-anthrazit/30 p-6 text-center" style="min-width: 200px">
+          <p class="text-xs italic text-anthrazit/55 m-0">Noch kein Logo</p>
+        </div>
+      )}
+
+      <div class="flex-1 min-w-0 space-y-3">
+        <form
+          method="POST"
+          action="/api/admin/upload-logo"
+          enctype="multipart/form-data"
+          class="flex flex-col gap-2"
+          x-data="{ fileName: '' }"
+        >
+          <label class="bauhaus-field">
+            <span class="bauhaus-field-eyebrow">— Neue Datei wählen —</span>
+            <input
+              type="file"
+              name="logo"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              required
+              class="bauhaus-input"
+              @change="fileName = $event.target.files[0]?.name ?? ''"
+            />
+          </label>
+          <button
+            type="submit"
+            x-show="fileName.length > 0"
+            x-cloak
+            x-transition
+            class="bauhaus-button bauhaus-button--primary self-start"
+          >
+            <span x-text="`Speichern: ${fileName}`"></span>
+          </button>
+        </form>
+
+        {hotel.logo_url && (
+          <form method="POST" action="/api/admin/upload-logo" onsubmit="return confirm('Logo wirklich entfernen?')" class="m-0">
+            <input type="hidden" name="_action" value="remove" />
+            <button type="submit" class="text-sm text-red-700 hover:text-red-900 underline">
+              Logo entfernen
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
   </section>
 
   <form method="POST">
