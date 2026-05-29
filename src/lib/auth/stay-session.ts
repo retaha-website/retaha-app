@@ -133,3 +133,55 @@ export function clearStaySessionCookie(cookies: AstroCookies): void {
 }
 
 export { COOKIE_NAME as STAY_COOKIE_NAME };
+
+// ─── Pair-Token (Sprint D Phase 5) ─────────────────────────────────────
+// Kurzlebiger Token (30 min) für QR-Code-Pairing aus dem Backoffice.
+// Andere Audience als Stay-Session — verhindert Cross-Use (z.B. ein
+// gestohlener Pair-Token darf nie als Stay-Session akzeptiert werden).
+
+const PAIR_AUDIENCE = 'pair-link';
+const PAIR_TTL_SECONDS = 30 * 60;  // 30 Minuten
+
+export interface PairTokenPayload {
+  stay_id: string;
+  hotel_id: string;
+  exp: number;
+}
+
+export async function signPairToken(params: {
+  stay_id: string;
+  hotel_id: string;
+}): Promise<string | null> {
+  const secret = getSecret();
+  if (!secret) return null;
+
+  return new SignJWT({ stay_id: params.stay_id, hotel_id: params.hotel_id })
+    .setProtectedHeader({ alg: ALGORITHM })
+    .setIssuer(ISSUER)
+    .setAudience(PAIR_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${PAIR_TTL_SECONDS}s`)
+    .sign(secret);
+}
+
+export async function verifyPairToken(jwt: string): Promise<PairTokenPayload | null> {
+  const secret = getSecret();
+  if (!secret) return null;
+
+  try {
+    const { payload } = await jwtVerify(jwt, secret, {
+      algorithms: [ALGORITHM],
+      issuer: ISSUER,
+      audience: PAIR_AUDIENCE,
+    });
+    if (typeof payload.stay_id !== 'string' || typeof payload.hotel_id !== 'string' || typeof payload.exp !== 'number') {
+      return null;
+    }
+    return { stay_id: payload.stay_id, hotel_id: payload.hotel_id, exp: payload.exp };
+  } catch (err) {
+    if (!(err instanceof joseErrors.JOSEError)) {
+      console.warn('[pair-token] verify unexpected error:', (err as Error).message);
+    }
+    return null;
+  }
+}
