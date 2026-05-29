@@ -763,6 +763,8 @@ Wo wir noch Entscheidungen brauchen:
 
 ### Net-Pricing-Mode (für deutsche Hotels, z.B. Gate Garden)
 
+> **Update 2026-05-29 (Sprint D Phase 1):** Code + Unit-Tests grün (7/7 mit Roundtrip-Check), Live-Test gegen Demo nicht möglich (Demo-Enterprise ist Gross-konfiguriert — Mews lehnt NetValue ab). Echter Live-Test beim ersten Net-Hotel-Connect (z.B. Gate Garden Pilot). Backlog reduziert auf den Live-Verification-Schritt.
+
 **Trigger zum Aktivieren:** sobald ein Hotel mit `Enterprise.Pricing === 'Net'` onboarded wird (deutsche Hotels).
 
 **Was zu tun ist:**
