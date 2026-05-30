@@ -301,19 +301,12 @@ const LANG_LABELS: Record<Lang, string> = {
   es: 'Español',
 };
 
-function buildLanguageInstruction(lang: Lang, hasDeKnowledge: boolean): string {
+function buildLanguageInstruction(lang: Lang, _hasDeKnowledge: boolean): string {
   const label = LANG_LABELS[lang] ?? 'Deutsch';
-
-  if (lang === 'de') {
-    return `# Sprache\n\nAntworte ausschließlich auf Deutsch.`;
-  }
-
-  // Phase-6: einfache Übersetzungs-Instruktion. Phase 12 baut Cache.
-  const translationHint = hasDeKnowledge
-    ? `\n\nDas oben aufgeführte hotel-spezifische Wissen ist auf Deutsch geschrieben. Übersetze die relevanten Inhalte beim Antworten ad-hoc nach ${label} — der Gast bekommt nur die ${label}-Version zu sehen.`
-    : '';
-
-  return `# Sprache\n\nAntworte ausschließlich auf ${label}.${translationHint}`;
+  // Sprint E4 Phase 12: Knowledge wird vom Translator (lib/eve/translator.ts)
+  // bereits in target-lang übersetzt eingebettet — kein ad-hoc-Übersetzungs-
+  // Hint mehr nötig.
+  return `# Sprache\n\nAntworte ausschließlich auf ${label}.`;
 }
 
 function buildFallbackInstruction(): string {

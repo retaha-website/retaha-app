@@ -13,6 +13,7 @@ import AdminLayout from '../../../components/AdminLayout.astro';
 import EditorialPageHeader from '../../../components/admin/EditorialPageHeader.astro';
 import EveSubNav from '../../../components/admin/EveSubNav.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../lib/auth';
+import { invalidateTranslationsForKnowledge } from '../../../lib/eve/translator';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -71,6 +72,8 @@ if (Astro.request.method === 'POST') {
       if (error) {
         message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
       } else {
+        // Sprint E4 Phase 12 — Cache invalidieren bei FAQ-Edit
+        await invalidateTranslationsForKnowledge(id);
         message = { type: 'success', text: 'FAQ-Eintrag aktualisiert.' };
         highlightId = id;
       }
@@ -82,6 +85,9 @@ if (Astro.request.method === 'POST') {
     if (!id) {
       message = { type: 'error', text: 'Keine ID übergeben.' };
     } else {
+      // Cache erst invalidieren (ON DELETE CASCADE würde es eh löschen, aber
+      // explizit ist sauberer + log-bar)
+      await invalidateTranslationsForKnowledge(id);
       const { error } = await client
         .from('eve_knowledge')
         .delete()

@@ -11,6 +11,7 @@ import { getStaySession } from '../../../lib/auth/stay-session';
 import { createSupabaseServiceRoleInstance } from '../../../lib/auth';
 import { eveComplete, EVE_MODEL_HAIKU } from '../../../lib/eve/anthropic-client';
 import { buildSystemPrompt, type EveContext } from '../../../lib/eve/system-prompt';
+import { getTranslatedKnowledge } from '../../../lib/eve/translator';
 import type { Lang } from '../../../lib/i18n';
 import { normalizeLang } from '../../../lib/i18n';
 
@@ -108,6 +109,11 @@ async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string): 
   if (!hotelRes.data || !settingsRes.data) return null;
   const guest = stayRes.data?.guests as any;
   const lang: Lang = normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
+
+  const knowledge = lang === 'de'
+    ? (knowledgeRes.data ?? []) as any
+    : await getTranslatedKnowledge(hotelId, lang as 'en' | 'fr' | 'es');
+
   return {
     hotel: hotelRes.data,
     hotelSettings: settingsRes.data,
@@ -119,7 +125,7 @@ async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string): 
     } : null,
     guest,
     room: (stayRes.data?.rooms as any) ?? null,
-    knowledge: (knowledgeRes.data ?? []) as any,
+    knowledge,
     language: lang,
   };
 }

@@ -36,6 +36,7 @@ import {
 import { buildSystemPrompt, type EveContext } from '../../../lib/eve/system-prompt';
 import { EVE_TOOLS, isActionTool } from '../../../lib/eve/tools';
 import { executeTool, type EveExecutionContext } from '../../../lib/eve/tool-executors';
+import { getTranslatedKnowledge } from '../../../lib/eve/translator';
 import type { Lang } from '../../../lib/i18n';
 import { normalizeLang } from '../../../lib/i18n';
 
@@ -293,6 +294,13 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string): Pro
   const guest = stayRes.data?.guests as any;
   const lang: Lang = normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
 
+  // Sprint E4 Phase 12 — Knowledge in Gast-Sprache übersetzen wenn != DE.
+  // Cache in eve_knowledge_translations — erster EN/FR/ES-Call zahlt Tokens,
+  // alle weiteren sind frei (bis Hotelier das FAQ editiert).
+  const knowledge = lang === 'de'
+    ? (knowledgeRes.data ?? []) as any
+    : await getTranslatedKnowledge(hotelId, lang as 'en' | 'fr' | 'es');
+
   return {
     hotel: hotelRes.data,
     hotelSettings: settingsRes.data,
@@ -304,7 +312,7 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string): Pro
     } : null,
     guest,
     room: (stayRes.data?.rooms as any) ?? null,
-    knowledge: (knowledgeRes.data ?? []) as any,
+    knowledge,
     language: lang,
   };
 }
