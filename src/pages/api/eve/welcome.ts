@@ -22,11 +22,18 @@ const WELCOME_PROMPT_BY_LANG: Record<Lang, string> = {
   es: 'Por favor saluda al huésped ahora con un mensaje de bienvenida corto y personal. Máximo 2 frases. Usa su nombre de pila si lo conoces. No enumeres todo lo que puedes hacer — solo una invitación amable ("No dudes en preguntarme por …").',
 };
 
-export const POST: APIRoute = async ({ cookies }) => {
+export const POST: APIRoute = async ({ request, cookies }) => {
   const session = await getStaySession(cookies);
   if (!session) {
     return json({ ok: false, error: 'Unauthorized — no stay session' }, 401);
   }
+
+  // UI-Lang aus Body — überschreibt guest.language (User-Choice > Mews-Default)
+  let requestedLang: Lang | undefined;
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (body?.lang) requestedLang = normalizeLang(body.lang);
+  } catch { /* body optional */ }
 
   const supabase = createSupabaseServiceRoleInstance();
 
@@ -41,7 +48,7 @@ export const POST: APIRoute = async ({ cookies }) => {
   }
 
   // 2. Eve-Enabled-Check
-  const ctx = await loadEveWelcomeContext(supabase, session.hotel_id, session.stay_id);
+  const ctx = await loadEveWelcomeContext(supabase, session.hotel_id, session.stay_id, requestedLang);
   if (!ctx) return json({ ok: false, error: 'Context-Load fehlgeschlagen' }, 500);
   if (!ctx.hotelSettings.eve_enabled) {
     return json({ ok: false, error: 'Eve nicht aktiviert' }, 403);
@@ -87,7 +94,7 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string): Promise<EveContext | null> {
+async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string, requestedLang?: Lang): Promise<EveContext | null> {
   const [hotelRes, settingsRes, knowledgeRes, stayRes] = await Promise.all([
     sb.from('hotels').select('id, name, city, country, default_language').eq('id', hotelId).maybeSingle(),
     sb.from('hotel_settings').select(`
@@ -108,7 +115,7 @@ async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string): 
 
   if (!hotelRes.data || !settingsRes.data) return null;
   const guest = stayRes.data?.guests as any;
-  const lang: Lang = normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
+  const lang: Lang = requestedLang ?? normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
 
   const knowledge = lang === 'de'
     ? (knowledgeRes.data ?? []) as any

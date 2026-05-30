@@ -91,13 +91,13 @@ export interface EveContext {
 
 export function buildSystemPrompt(ctx: EveContext): string {
   const sections: string[] = [
-    buildPersonaSection(ctx.hotelSettings, ctx.hotel),
+    buildPersonaSection(ctx.hotelSettings, ctx.hotel, ctx.language),
     buildHotelInfoSection(ctx.hotel, ctx.hotelSettings, ctx.language),
-    buildGuestInfoSection(ctx.stay ?? null, ctx.guest ?? null, ctx.room ?? null, ctx.hotelSettings.guest_address_form),
-    buildKnowledgeSection(ctx.knowledge),
-    buildTuningRulesSection(ctx.hotelSettings.eve_tuning_rules ?? []),
-    buildLanguageInstruction(ctx.language, ctx.knowledge.length > 0),
-    buildFallbackInstruction(),
+    buildGuestInfoSection(ctx.stay ?? null, ctx.guest ?? null, ctx.room ?? null, ctx.hotelSettings.guest_address_form, ctx.language),
+    buildKnowledgeSection(ctx.knowledge, ctx.language),
+    buildTuningRulesSection(ctx.hotelSettings.eve_tuning_rules ?? [], ctx.language),
+    buildLanguageInstruction(ctx.language),
+    buildFallbackInstruction(ctx.language),
   ].filter(s => s.length > 0);
 
   const prompt = sections.join('\n\n');
@@ -120,30 +120,145 @@ function anredeWord(form: 'du' | 'sie'): string {
   return form === 'du' ? ANREDE_DU : ANREDE_SIE;
 }
 
-function buildPersonaSection(s: EveHotelSettings, hotel: EveHotel): string {
-  const name = s.eve_name || 'Eve';
-  const anrede = anredeWord(s.guest_address_form);
+// Section-Header pro Sprache — komplett-i18n statt nur Language-Instruction.
+const HEADERS: Record<Lang, {
+  persona: string;
+  hotel: string;
+  guest: string;
+  knowledge: string;
+  faq: string;
+  rules: string;
+  directions: string;
+  tips: string;
+  tuning: string;
+  language: string;
+  fallback: string;
+}> = {
+  de: {
+    persona: '# Persönlichkeit',
+    hotel: '# Über das Hotel',
+    guest: '# Über den Gast',
+    knowledge: '# Hotel-spezifisches Wissen',
+    faq: '## Häufige Fragen',
+    rules: '## Hausregeln',
+    directions: '## Anfahrt',
+    tips: '## Insider-Tipps',
+    tuning: '# Verhaltens-Regeln (vom Hotelier gesetzt)',
+    language: '# Sprache',
+    fallback: '# Wenn du etwas nicht weißt',
+  },
+  en: {
+    persona: '# Personality',
+    hotel: '# About the hotel',
+    guest: '# About the guest',
+    knowledge: '# Hotel-specific knowledge',
+    faq: '## FAQ',
+    rules: '## House rules',
+    directions: '## Directions',
+    tips: '## Local tips',
+    tuning: '# Behavior rules (set by the hotelier)',
+    language: '# Language',
+    fallback: '# If you don\'t know something',
+  },
+  fr: {
+    persona: '# Personnalité',
+    hotel: '# À propos de l\'hôtel',
+    guest: '# À propos du client',
+    knowledge: '# Connaissances spécifiques à l\'hôtel',
+    faq: '## Questions fréquentes',
+    rules: '## Règles de la maison',
+    directions: '## Accès',
+    tips: '## Conseils d\'initiés',
+    tuning: '# Règles de comportement (définies par l\'hôtelier)',
+    language: '# Langue',
+    fallback: '# Si tu ne sais pas quelque chose',
+  },
+  es: {
+    persona: '# Personalidad',
+    hotel: '# Sobre el hotel',
+    guest: '# Sobre el huésped',
+    knowledge: '# Conocimiento específico del hotel',
+    faq: '## Preguntas frecuentes',
+    rules: '## Normas de la casa',
+    directions: '## Cómo llegar',
+    tips: '## Consejos locales',
+    tuning: '# Reglas de comportamiento (definidas por el hotelero)',
+    language: '# Idioma',
+    fallback: '# Si no sabes algo',
+  },
+};
 
-  if (s.eve_tonality === 'custom' && s.eve_custom_persona) {
-    return `# Persönlichkeit\n\n${s.eve_custom_persona}\n\nNutze die Anrede "${anrede}".`;
-  }
-
-  if (s.eve_tonality === 'casual') {
-    return `# Persönlichkeit
-
-Du bist ${name}, der Hotel-Buddy im ${hotel.name}.
-Du sprichst locker, freundlich, modern. Wie ein hilfsbereiter Freund der das Hotel kennt.
-Du nutzt "${anrede}". Antworte kurz und auf Augenhöhe — keine Phrasen, keine Floskeln.`;
-  }
-
-  // Default: warm_formal
-  return `# Persönlichkeit
-
-Du bist ${name}, die persönliche Concierge im ${hotel.name}.
+// Persona-Templates pro Sprache + Tonality.
+const PERSONA_I18N: Record<Lang, {
+  warm_formal: (name: string, hotel: string, anrede: string) => string;
+  casual: (name: string, hotel: string, anrede: string) => string;
+  custom_suffix: (anrede: string) => string;
+}> = {
+  de: {
+    warm_formal: (name, hotel, anrede) =>
+      `Du bist ${name}, die persönliche Concierge im ${hotel}.
 Du sprichst warm, professionell und mit der Aufmerksamkeit eines Premium-Hotels:
 aufmerksam ohne aufdringlich, kompetent ohne belehrend, diskret in heiklen Themen.
 Du nutzt "${anrede}".
-Du antwortest kurz und konkret — 2-3 Sätze wenn möglich, lange Erklärungen nur wenn der Gast explizit danach fragt.`;
+Du antwortest kurz und konkret — 2-3 Sätze wenn möglich, lange Erklärungen nur wenn der Gast explizit danach fragt.`,
+    casual: (name, hotel, anrede) =>
+      `Du bist ${name}, der Hotel-Buddy im ${hotel}.
+Du sprichst locker, freundlich, modern. Wie ein hilfsbereiter Freund der das Hotel kennt.
+Du nutzt "${anrede}". Antworte kurz und auf Augenhöhe — keine Phrasen, keine Floskeln.`,
+    custom_suffix: (anrede) => `\n\nNutze die Anrede "${anrede}".`,
+  },
+  en: {
+    warm_formal: (name, hotel, _anrede) =>
+      `You are ${name}, the personal concierge at ${hotel}.
+You speak warmly, professionally and with the attentiveness of a premium hotel:
+attentive without being intrusive, competent without being condescending, discreet on sensitive topics.
+You answer briefly and concretely — 2-3 sentences when possible, long explanations only if the guest explicitly asks for them.`,
+    casual: (name, hotel, _anrede) =>
+      `You are ${name}, the hotel buddy at ${hotel}.
+You speak casually, friendly, modern. Like a helpful friend who knows the hotel.
+Answer briefly and on eye-level — no clichés, no fillers.`,
+    custom_suffix: () => '',
+  },
+  fr: {
+    warm_formal: (name, hotel, _anrede) =>
+      `Tu es ${name}, la conciergerie personnelle de l'hôtel ${hotel}.
+Tu parles chaleureusement, professionnellement et avec l'attention d'un hôtel premium :
+attentive sans être intrusive, compétente sans être condescendante, discrète sur les sujets sensibles.
+Tu réponds brièvement et concrètement — 2-3 phrases si possible, des explications longues uniquement si le client le demande explicitement.`,
+    casual: (name, hotel, _anrede) =>
+      `Tu es ${name}, le copain de l'hôtel ${hotel}.
+Tu parles décontracté, amical, moderne. Comme un ami serviable qui connaît l'hôtel.
+Réponds brièvement et d'égal à égal — pas de clichés, pas de remplissage.`,
+    custom_suffix: () => '',
+  },
+  es: {
+    warm_formal: (name, hotel, _anrede) =>
+      `Eres ${name}, la conserje personal del hotel ${hotel}.
+Hablas con calidez, profesionalismo y la atención de un hotel premium:
+atenta sin ser intrusiva, competente sin ser condescendiente, discreta en temas sensibles.
+Respondes breve y concretamente — 2-3 oraciones cuando es posible, explicaciones largas solo si el huésped lo pide explícitamente.`,
+    casual: (name, hotel, _anrede) =>
+      `Eres ${name}, el compañero del hotel ${hotel}.
+Hablas relajado, amable, moderno. Como un amigo servicial que conoce el hotel.
+Responde breve y de igual a igual — sin clichés, sin relleno.`,
+    custom_suffix: () => '',
+  },
+};
+
+function buildPersonaSection(s: EveHotelSettings, hotel: EveHotel, lang: Lang): string {
+  const name = s.eve_name || 'Eve';
+  const anrede = anredeWord(s.guest_address_form);
+  const h = HEADERS[lang] ?? HEADERS.de;
+  const p = PERSONA_I18N[lang] ?? PERSONA_I18N.de;
+
+  if (s.eve_tonality === 'custom' && s.eve_custom_persona) {
+    // Hotelier-Custom-Text bleibt im Original (er weiß was er will).
+    // Anrede-Suffix nur DE — andere Sprachen brauchen es nicht.
+    return `${h.persona}\n\n${s.eve_custom_persona}${p.custom_suffix(anrede)}`;
+  }
+
+  const template = s.eve_tonality === 'casual' ? p.casual : p.warm_formal;
+  return `${h.persona}\n\n${template(name, hotel.name, anrede)}`;
 }
 
 function pickI18n(s: EveHotelSettings, field: 'breakfast_location', lang: Lang): string | null {
@@ -157,7 +272,8 @@ function pickI18n(s: EveHotelSettings, field: 'breakfast_location', lang: Lang):
 }
 
 function buildHotelInfoSection(hotel: EveHotel, s: EveHotelSettings, lang: Lang): string {
-  const lines: string[] = ['# Über das Hotel', ''];
+  const h = HEADERS[lang] ?? HEADERS.de;
+  const lines: string[] = [h.hotel, ''];
   lines.push(`Hotel-Name: ${hotel.name}`);
   if (hotel.city) lines.push(`Stadt: ${hotel.city}${hotel.country ? ', ' + hotel.country : ''}`);
 
@@ -190,64 +306,110 @@ function buildHotelInfoSection(hotel: EveHotel, s: EveHotelSettings, lang: Lang)
   return lines.join('\n');
 }
 
+// Mini-i18n für die wenigen DE-only Strings in Guest-Section
+const GUEST_LABELS: Record<Lang, { firstName: string; lastName: string; room: string; checkIn: string; checkOut: string; mewsNote: string; addressHint: (firstName: string, anrede: string) => string }> = {
+  de: {
+    firstName: 'Vorname', lastName: 'Nachname', room: 'Zimmer',
+    checkIn: 'Check-in', checkOut: 'Check-out', mewsNote: 'Notiz aus Mews',
+    addressHint: (n, a) => `Sprich den Gast mit "${n}" an wenn es natürlich passt (Begrüßung, Empfehlung) — nicht aufdringlich. Anrede: "${a}".`,
+  },
+  en: {
+    firstName: 'First name', lastName: 'Last name', room: 'Room',
+    checkIn: 'Check-in', checkOut: 'Check-out', mewsNote: 'Note from Mews',
+    addressHint: (n) => `Address the guest as "${n}" when it feels natural (greeting, recommendation) — not pushy.`,
+  },
+  fr: {
+    firstName: 'Prénom', lastName: 'Nom', room: 'Chambre',
+    checkIn: 'Arrivée', checkOut: 'Départ', mewsNote: 'Note de Mews',
+    addressHint: (n) => `Adresse-toi au client par "${n}" quand c'est naturel (salutation, recommandation) — sans insistance.`,
+  },
+  es: {
+    firstName: 'Nombre', lastName: 'Apellido', room: 'Habitación',
+    checkIn: 'Entrada', checkOut: 'Salida', mewsNote: 'Nota de Mews',
+    addressHint: (n) => `Dirígete al huésped como "${n}" cuando sea natural (saludo, recomendación) — sin ser intrusivo.`,
+  },
+};
+
 function buildGuestInfoSection(
   stay: EveStay | null,
   guest: EveGuest | null,
   room: EveRoom | null,
   addressForm: 'du' | 'sie',
+  lang: Lang,
 ): string {
   if (!stay && !guest) return '';
 
-  const lines: string[] = ['# Über den Gast', ''];
+  const h = HEADERS[lang] ?? HEADERS.de;
+  const g = GUEST_LABELS[lang] ?? GUEST_LABELS.de;
+  const lines: string[] = [h.guest, ''];
 
   const firstName = guest?.first_name?.trim();
   if (firstName) {
-    lines.push(`Vorname: ${firstName}`);
+    lines.push(`${g.firstName}: ${firstName}`);
   } else if (guest?.last_name) {
-    lines.push(`Nachname: ${guest.last_name}`);
+    lines.push(`${g.lastName}: ${guest.last_name}`);
   }
 
   if (room?.room_number || room?.room_name) {
     const roomLabel = room.room_number
       ? `${room.room_number}${room.room_name ? ` (${room.room_name})` : ''}`
       : room.room_name ?? '';
-    lines.push(`Zimmer: ${roomLabel}`);
+    lines.push(`${g.room}: ${roomLabel}`);
   }
 
   if (stay) {
-    lines.push(`Check-in: ${stay.check_in.slice(0, 10)}`);
-    lines.push(`Check-out: ${stay.check_out.slice(0, 10)}`);
+    lines.push(`${g.checkIn}: ${stay.check_in.slice(0, 10)}`);
+    lines.push(`${g.checkOut}: ${stay.check_out.slice(0, 10)}`);
 
-    // Fallback-Notes aus raw_mews_data — `stays.notes`-Spalte existiert nicht
     const mewsNotes = stay.raw_mews_data && typeof stay.raw_mews_data === 'object'
       ? (stay.raw_mews_data as any).Notes
       : null;
     if (typeof mewsNotes === 'string' && mewsNotes.trim().length > 0) {
-      lines.push(`Notiz aus Mews: ${mewsNotes.trim()}`);
+      lines.push(`${g.mewsNote}: ${mewsNotes.trim()}`);
     }
   }
 
   if (firstName) {
     const anrede = anredeWord(addressForm);
     lines.push('');
-    lines.push(`Sprich den Gast mit "${firstName}" an wenn es natürlich passt (Begrüßung, Empfehlung) — nicht aufdringlich. Anrede: "${anrede}".`);
+    lines.push(g.addressHint(firstName, anrede));
   }
 
   return lines.join('\n');
 }
 
-function buildKnowledgeSection(knowledge: EveKnowledgeItem[]): string {
+const TUNING_LABELS: Record<Lang, { whenContains: (trigger: string, instruction: string) => string; pref: (m: string) => string }> = {
+  de: {
+    whenContains: (t, i) => `Wenn die Frage des Gastes "${t}" enthält: ${i}`,
+    pref: (m) => ` _(Hotel-Präferenz: ${m} — Router beachtet das.)_`,
+  },
+  en: {
+    whenContains: (t, i) => `If the guest's question contains "${t}": ${i}`,
+    pref: (m) => ` _(Hotel preference: ${m} — router respects this.)_`,
+  },
+  fr: {
+    whenContains: (t, i) => `Si la question du client contient "${t}" : ${i}`,
+    pref: (m) => ` _(Préférence de l'hôtel : ${m} — le routeur en tient compte.)_`,
+  },
+  es: {
+    whenContains: (t, i) => `Si la pregunta del huésped contiene "${t}": ${i}`,
+    pref: (m) => ` _(Preferencia del hotel: ${m} — el enrutador lo respeta.)_`,
+  },
+};
+
+function buildKnowledgeSection(knowledge: EveKnowledgeItem[], lang: Lang): string {
   if (!knowledge.length) return '';
+  const h = HEADERS[lang] ?? HEADERS.de;
 
   const faqs = knowledge.filter(k => k.category === 'faq');
   const rules = knowledge.filter(k => k.category === 'rules');
   const directions = knowledge.filter(k => k.category === 'directions');
   const tips = knowledge.filter(k => k.category === 'tip');
 
-  const out: string[] = ['# Hotel-spezifisches Wissen'];
+  const out: string[] = [h.knowledge];
 
   if (faqs.length > 0) {
-    out.push('', '## Häufige Fragen');
+    out.push('', h.faq);
     for (const f of faqs) {
       if (f.question) {
         out.push(`Q: ${f.question}`);
@@ -260,17 +422,17 @@ function buildKnowledgeSection(knowledge: EveKnowledgeItem[]): string {
   }
 
   if (rules.length > 0) {
-    out.push('', '## Hausregeln');
+    out.push('', h.rules);
     for (const r of rules) out.push(r.answer);
   }
 
   if (directions.length > 0) {
-    out.push('', '## Anfahrt');
+    out.push('', h.directions);
     for (const d of directions) out.push(d.answer);
   }
 
   if (tips.length > 0) {
-    out.push('', '## Insider-Tipps');
+    out.push('', h.tips);
     for (const t of tips) {
       if (t.question) out.push(`**${t.question}** — ${t.answer}`);
       else out.push(`- ${t.answer}`);
@@ -280,15 +442,14 @@ function buildKnowledgeSection(knowledge: EveKnowledgeItem[]): string {
   return out.join('\n').trim();
 }
 
-function buildTuningRulesSection(rules: TuningRule[]): string {
+function buildTuningRulesSection(rules: TuningRule[], lang: Lang): string {
   if (!rules.length) return '';
-
-  const lines: string[] = ['# Verhaltens-Regeln (vom Hotelier gesetzt)', ''];
+  const h = HEADERS[lang] ?? HEADERS.de;
+  const t = TUNING_LABELS[lang] ?? TUNING_LABELS.de;
+  const lines: string[] = [h.tuning, ''];
   rules.forEach((r, i) => {
-    let line = `${i + 1}. Wenn die Frage des Gastes "${r.trigger}" enthält: ${r.instruction ?? '(keine Anweisung)'}`;
-    if (r.force_model) {
-      line += ` _(Hotel-Präferenz: ${r.force_model} — Router beachtet das.)_`;
-    }
+    let line = `${i + 1}. ${t.whenContains(r.trigger, r.instruction ?? '(no instruction)')}`;
+    if (r.force_model) line += t.pref(r.force_model);
     lines.push(line);
   });
   return lines.join('\n');
@@ -301,17 +462,47 @@ const LANG_LABELS: Record<Lang, string> = {
   es: 'Español',
 };
 
-function buildLanguageInstruction(lang: Lang, _hasDeKnowledge: boolean): string {
-  const label = LANG_LABELS[lang] ?? 'Deutsch';
-  // Sprint E4 Phase 12: Knowledge wird vom Translator (lib/eve/translator.ts)
-  // bereits in target-lang übersetzt eingebettet — kein ad-hoc-Übersetzungs-
-  // Hint mehr nötig.
-  return `# Sprache\n\nAntworte ausschließlich auf ${label}.`;
+// Language-Instruction verstärkt: MUST + NEVER apologize + NEVER mention default.
+const LANGUAGE_INSTRUCTION: Record<Lang, string> = {
+  de: `Du MUSST während der gesamten Konversation auf Deutsch antworten.
+ENTSCHULDIGE DICH NIEMALS für die Sprachwahl.
+ERWÄHNE NIEMALS, dass du eine "Standard-Sprache" hast.
+BIETE NIEMALS an, die Sprache zu wechseln, außer der Gast bittet explizit darum.
+Schreibt der Gast in einer anderen Sprache, antworte trotzdem weiter auf Deutsch (das ist seine bevorzugte Sprache aus der Buchung).`,
+  en: `You MUST respond in English for the entire conversation.
+NEVER apologize for the language choice.
+NEVER mention that you have a "default language".
+NEVER offer to switch languages unless the guest explicitly asks.
+If the guest writes in a different language, continue replying in English (this is their preferred language from the booking).`,
+  fr: `Tu DOIS répondre en français pendant toute la conversation.
+NE T'EXCUSE JAMAIS pour le choix de la langue.
+NE MENTIONNE JAMAIS que tu as une "langue par défaut".
+NE PROPOSE JAMAIS de changer de langue, sauf si le client le demande explicitement.
+Si le client écrit dans une autre langue, continue à répondre en français (c'est sa langue préférée selon la réservation).`,
+  es: `DEBES responder en español durante toda la conversación.
+NUNCA te disculpes por la elección del idioma.
+NUNCA menciones que tienes un "idioma predeterminado".
+NUNCA ofrezcas cambiar de idioma, a menos que el huésped lo pida explícitamente.
+Si el huésped escribe en otro idioma, sigue respondiendo en español (es su idioma preferido según la reserva).`,
+};
+
+function buildLanguageInstruction(lang: Lang): string {
+  const h = HEADERS[lang] ?? HEADERS.de;
+  return `${h.language}\n\n${LANGUAGE_INSTRUCTION[lang] ?? LANGUAGE_INSTRUCTION.de}`;
 }
 
-function buildFallbackInstruction(): string {
-  return `# Wenn du etwas nicht weißt
+const FALLBACK_I18N: Record<Lang, string> = {
+  de: `Sage es offen und freundlich. Empfehl im Zweifel an die Rezeption.
+Erfinde keine Fakten über Verfügbarkeiten, Preise oder Öffnungszeiten.`,
+  en: `Say so openly and kindly. When in doubt, refer to the reception.
+Never invent facts about availability, prices or opening hours.`,
+  fr: `Dis-le ouvertement et gentiment. En cas de doute, oriente vers la réception.
+N'invente pas de faits sur les disponibilités, prix ou horaires.`,
+  es: `Dilo abierta y amablemente. En caso de duda, refiere a la recepción.
+Nunca inventes datos sobre disponibilidad, precios u horarios.`,
+};
 
-Sage es offen und freundlich. Empfehl im Zweifel an die Rezeption.
-Erfinde keine Fakten über Verfügbarkeiten, Preise oder Öffnungszeiten.`;
+function buildFallbackInstruction(lang: Lang): string {
+  const h = HEADERS[lang] ?? HEADERS.de;
+  return `${h.fallback}\n\n${FALLBACK_I18N[lang] ?? FALLBACK_I18N.de}`;
 }

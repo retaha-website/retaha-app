@@ -484,7 +484,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
       {(settings as any).eve_enabled && (
         <>
-          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages })};`} />
+          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang })};`} />
           <EveChatSheet
             lang={lang}
             eveName={settings.eve_name || 'Eve'}
@@ -613,6 +613,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
         eveSeenBefore: typeof window !== 'undefined' ? !!localStorage.getItem('retaha_eve_seen') : false,
         _eveLastConversation: '' as string,  // für Audit-Context
         _eveWelcomeTried: false,  // Phase 10: idempotenter Welcome-Trigger
+        _eveLang: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.lang) || 'de',
 
         async eveSend(text: string) {
           const message = (text || '').trim();
@@ -632,7 +633,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
             const res = await fetch('/api/eve/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message }),
+              body: JSON.stringify({ message, lang: this._eveLang }),
             });
             if (!res.ok) {
               const errBody = await res.text().catch(() => '');
@@ -740,7 +741,11 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
           this.eveTyping = true;
           try {
-            const res = await fetch('/api/eve/welcome', { method: 'POST' });
+            const res = await fetch('/api/eve/welcome', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lang: this._eveLang }),
+            });
             if (!res.ok) {
               console.warn('[eve/welcome] HTTP', res.status);
               return;

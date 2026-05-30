@@ -50,7 +50,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // 2. Body parsen
-  let body: { message?: string };
+  let body: { message?: string; lang?: string };
   try {
     body = await request.json();
   } catch {
@@ -60,10 +60,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   if (!userMessage) {
     return json({ ok: false, error: 'Missing message' }, 400);
   }
+  // UI-gewählte Sprache überschreibt guest.language (User-Choice > Mews-Default)
+  const requestedLang = normalizeLang(body.lang);
 
   // 3. Context laden + Eve-Enabled-Check
   const supabase = createSupabaseServiceRoleInstance();
-  const ctx = await loadEveChatContext(supabase, session.hotel_id, session.stay_id);
+  const ctx = await loadEveChatContext(supabase, session.hotel_id, session.stay_id, requestedLang);
   if (!ctx) {
     return json({ ok: false, error: 'Context-Load fehlgeschlagen' }, 500);
   }
@@ -270,7 +272,7 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-async function loadEveChatContext(sb: any, hotelId: string, stayId: string): Promise<EveContext | null> {
+async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requestedLang?: Lang): Promise<EveContext | null> {
   const [hotelRes, settingsRes, knowledgeRes, stayRes] = await Promise.all([
     sb.from('hotels').select('id, name, city, country, default_language').eq('id', hotelId).maybeSingle(),
     sb.from('hotel_settings').select(`
@@ -292,7 +294,9 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string): Pro
   if (!hotelRes.data || !settingsRes.data) return null;
 
   const guest = stayRes.data?.guests as any;
-  const lang: Lang = normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
+  // Sprint E4 Sprach-Konsistenz-Fix: Priorität requestedLang (UI-Wahl)
+  // > guest.language (Mews-Default) > hotel.default_language > 'de'
+  const lang: Lang = requestedLang ?? normalizeLang(guest?.language ?? hotelRes.data.default_language ?? 'de');
 
   // Sprint E4 Phase 12 — Knowledge in Gast-Sprache übersetzen wenn != DE.
   // Cache in eve_knowledge_translations — erster EN/FR/ES-Call zahlt Tokens,
