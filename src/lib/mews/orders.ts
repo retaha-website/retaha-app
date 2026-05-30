@@ -41,6 +41,43 @@ export class PushSkipped extends Error {
   }
 }
 
+// Sprint E1 Phase 4 — Cancel-Symmetrie.
+export type CancelSkipReason =
+  | 'no_integration'
+  | 'no_mews_order_id'
+  | 'already_cancelled'
+  | 'no_order_items_found'
+  | 'editable_history_expired';
+
+export class CancelSkipped extends Error {
+  constructor(public readonly reason: CancelSkipReason, message: string) {
+    super(message);
+    this.name = 'CancelSkipped';
+  }
+}
+
+// Mews-Doku liefert keinen dezidierten Error-Code wenn die Editable-History
+// abgelaufen ist (2-7 Tage je nach Enterprise-Config). Wir matchen die
+// Response-Message konservativ — bei Nicht-Match fällt der Fehler auf generic
+// 'error' zurück (kein False-Positive). Wenn wir den exakten Wortlaut im
+// Pilot beobachten, Patterns verschärfen.
+const EDITABLE_HISTORY_PATTERNS: RegExp[] = [
+  /editable\s+history/i,
+  /outside\s+(of\s+)?editable/i,
+  /not\s+editable/i,
+  /history\s+window/i,
+];
+
+function isEditableHistoryError(message: string): boolean {
+  return EDITABLE_HISTORY_PATTERNS.some(p => p.test(message));
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 export async function loadHotelMewsIntegration(hotelId: string) {
   const supabase = createSupabaseServiceRoleInstance();
   const { data, error } = await supabase
@@ -252,4 +289,93 @@ export async function pushBookingToMews(bookingId: string): Promise<{ orderId: s
 
   const result = await mews.addOrder(params);
   return { orderId: result.OrderId };
+}
+
+/**
+ * Sprint E1 Phase 4 — Symmetrie zu pushBookingToMews().
+ *
+ * Cancelt die OrderItems des Mews-Orders der zur Booking gehört
+ * (bookings.mews_order_id). 2-Step weil orders/add keine OrderItemIds in
+ * der Response liefert:
+ *   1. orderItems/getAll mit ServiceOrderIds=[mews_order_id] → Item-IDs
+ *   2. orderItems/cancel mit den IDs (max 10 pro Call, ggf. chunked)
+ *
+ * Wirft CancelSkipped wenn nichts zu cancellen ist:
+ *   · no_integration / no_mews_order_id / already_cancelled (Pre-Checks)
+ *   · no_order_items_found (Mews kennt den Order nicht oder schon storniert)
+ *   · editable_history_expired (Mews-API-Fehler matched bekanntes Pattern)
+ * Wirft generische Error bei echten Mews-API-Fehlern.
+ *
+ * Returns OrderItemIds die tatsächlich gecancelt wurden (Bookkeeping).
+ */
+export async function cancelBookingInMews(bookingId: string): Promise<{ orderId: string; itemIds: string[] }> {
+  const supabase = createSupabaseServiceRoleInstance();
+  const { data: booking, error } = await supabase
+    .from('bookings')
+    .select('id, hotel_id, mews_order_id, mews_cancelled_at')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (error) {
+    console.error('[mews/orders] cancelBookingInMews load error:', error);
+    throw new Error(`Booking ${bookingId} konnte nicht geladen werden: ${error.message}`);
+  }
+  if (!booking) throw new Error(`Booking ${bookingId} nicht gefunden`);
+
+  if (!booking.mews_order_id) {
+    throw new CancelSkipped('no_mews_order_id', `Booking ${bookingId} hat keine mews_order_id (Push lief nicht oder Pfad C+/skip)`);
+  }
+  if (booking.mews_cancelled_at) {
+    throw new CancelSkipped('already_cancelled', `Booking ${bookingId} (Order ${booking.mews_order_id}) wurde bereits am ${booking.mews_cancelled_at} gecancelt`);
+  }
+
+  const integration = await loadHotelMewsIntegration(booking.hotel_id);
+  if (!integration) {
+    throw new CancelSkipped('no_integration', `Hotel ${booking.hotel_id} ohne Mews-Integration`);
+  }
+
+  const mews = await getMewsClientForHotel(booking.hotel_id);
+  if (!mews) {
+    throw new Error(`Mews-Client für Hotel ${booking.hotel_id} konnte nicht erstellt werden (Token-Decrypt?)`);
+  }
+
+  // Step 1: OrderItem-IDs auflösen
+  const lookup = await mews.getOrderItems({
+    ServiceOrderIds: [booking.mews_order_id],
+    Limitation: { Count: 100 },
+  });
+  const items = lookup.OrderItems ?? [];
+  // Defensive: nicht alle Items haben evtl. Status "Open" — wir cancellen
+  // pragmatisch alle die nicht bereits 'Canceled' sind (Mews-Schreibweise).
+  const cancellable = items.filter(it => {
+    const state = (it.State ?? '').toString();
+    return state !== 'Canceled' && state !== 'Cancelled';
+  });
+  const itemIds = cancellable.map(it => it.Id).filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  if (itemIds.length === 0) {
+    throw new CancelSkipped(
+      'no_order_items_found',
+      `Order ${booking.mews_order_id} hat keine cancelbaren Items in Mews (Order existiert nicht oder ist schon komplett storniert). Geladen: ${items.length} Items.`,
+    );
+  }
+
+  // Step 2: Cancel in Chunks à max 10 IDs
+  try {
+    for (const batch of chunk(itemIds, 10)) {
+      await mews.cancelOrderItems({ OrderItemIds: batch });
+    }
+  } catch (err) {
+    const message = (err as Error).message ?? String(err);
+    // Full message immer loggen — Pattern-Verfeinerung im Pilot
+    console.warn('[mews/cancel] full error:', message);
+    if (isEditableHistoryError(message)) {
+      throw new CancelSkipped(
+        'editable_history_expired',
+        `Editable-History-Window für Order ${booking.mews_order_id} abgelaufen — Mews lehnt Cancel ab: ${message}`,
+      );
+    }
+    throw err;
+  }
+
+  return { orderId: booking.mews_order_id, itemIds };
 }

@@ -143,6 +143,19 @@ export class MewsClient {
     return this.post<MewsAddOrderResponse>('orders/add', params);
   }
 
+  /** orderItems/getAll — Sprint E1 Phase 4. Mindestens ein Filter Pflicht.
+   *  Wir nutzen ServiceOrderIds für die ID-Auflösung beim Cancel. */
+  getOrderItems(params: MewsOrderItemsParams) {
+    return this.post<MewsOrderItemsResponse>('orderItems/getAll', params);
+  }
+
+  /** orderItems/cancel — Sprint E1 Phase 4 Cancel-Symmetrie. Max 10 IDs pro
+   *  Call (Caller chunked). Mews liefert leeren Response bei Erfolg, 400 mit
+   *  Message bei abgelaufenem Editable-History-Window (siehe orders.ts). */
+  cancelOrderItems(params: MewsCancelOrderItemsParams) {
+    return this.post<MewsCancelOrderItemsResponse>('orderItems/cancel', params);
+  }
+
   // ============================================================
   // Pagination — AsyncGenerators yield page-für-page
   // ============================================================
@@ -398,6 +411,39 @@ export interface MewsAddOrderParams {
 
 export interface MewsAddOrderResponse {
   OrderId: string;
+  [key: string]: unknown;
+}
+
+// ─── orderItems/getAll + orderItems/cancel (Sprint E1 Phase 4 — Cancel-Symmetrie) ─
+
+export interface MewsOrderItemsParams {
+  // Mindestens einer der Filter ist Pflicht.
+  ServiceOrderIds?: string[];
+  OrderItemIds?: string[];
+  ServiceIds?: string[];
+  BillIds?: string[];
+  Limitation?: { Count: number; Cursor?: string };
+}
+
+export interface MewsOrderItem_Read {
+  Id: string;
+  ServiceOrderId?: string;
+  State?: string;
+  [key: string]: unknown;
+}
+
+export interface MewsOrderItemsResponse {
+  OrderItems?: MewsOrderItem_Read[];
+  Cursor?: string | null;
+  [key: string]: unknown;
+}
+
+export interface MewsCancelOrderItemsParams {
+  // Max 10 IDs pro Call laut Mews-Doku — Caller chunked.
+  OrderItemIds: string[];
+}
+
+export interface MewsCancelOrderItemsResponse {
   [key: string]: unknown;
 }
 
