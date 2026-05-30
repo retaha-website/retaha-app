@@ -288,6 +288,9 @@ if (isConnected) {
 // bei Fehler bleibt die Liste leer + Hinweis im UI.
 let orderableServices: Array<{ Id: string; Name: string; IsActive: boolean }> = [];
 let servicesError: string | null = null;
+// Sprint E1 Phase 2 — Tax-Code-Dropdown statt freier Input.
+let taxRateOptions: Array<{ code: string; rate: number; label: string }> = [];
+let taxEnvironmentCode: string | null = null;
 if (isConnected) {
   try {
     const mews = await getMewsClientForHotel(hotel.id);
@@ -304,6 +307,39 @@ if (isConnected) {
           IsActive: true,
         }))
         .sort((a, b) => a.Name.localeCompare(b.Name));
+
+      // Tax-Rates für das Enterprise — Filter auf TaxationCode === TaxEnvironment
+      // (Mews ignoriert TaxEnvironmentCodes-Param im Request, manuell filtern).
+      try {
+        const config = await mews.getConfiguration();
+        taxEnvironmentCode = (config.Enterprise as any)?.TaxEnvironmentCode ?? null;
+        if (taxEnvironmentCode) {
+          const taxResp = await mews.getTaxations({
+            TaxEnvironmentCodes: [taxEnvironmentCode],
+            Limitation: { Count: 100 },
+          });
+          const allRates = (taxResp.TaxRates ?? []) as Array<{
+            Code: string;
+            TaxationCode?: string;
+            Value?: number;
+            Strategy?: { Discriminator?: string; Value?: unknown };
+          }>;
+          taxRateOptions = allRates
+            .filter(tr => tr.TaxationCode === taxEnvironmentCode)
+            .map(tr => {
+              const flat = typeof tr.Value === 'number' ? tr.Value : null;
+              const sv = tr.Strategy?.Value as any;
+              const nested = sv && typeof sv === 'object' && typeof sv.Value === 'number' ? sv.Value : null;
+              const rate = flat ?? nested ?? 0;
+              const pct = (rate * 100).toFixed(rate < 0.1 ? 1 : 0);
+              return { code: tr.Code, rate, label: `${pct}% (${tr.Code})` };
+            })
+            .filter(opt => typeof opt.rate === 'number' && opt.rate >= 0 && opt.rate < 1)
+            .sort((a, b) => b.rate - a.rate);  // höchster Rate zuerst (Standard meist 20%)
+        }
+      } catch {
+        // Tax-Lookup-Fehler nicht-fatal — Dropdown bleibt leer, Fallback-Input greift
+      }
     }
   } catch (err) {
     servicesError = (err as Error).message;
@@ -466,26 +502,39 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
             ))}
           </div>
 
-          <!-- Tax-Code -->
+          <!-- Tax-Code (Sprint E1 Phase 2 — Dropdown wenn Liste da, sonst Input-Fallback) -->
           <label class="block">
             <span class="eyebrow text-anthrazit/55 block mb-2">— Tax-Code (Default) —</span>
-            <input
-              type="text"
-              name="default_tax_code"
-              value={integration.default_tax_code ?? ''}
-              placeholder="z.B. UK-S, UK-V, DE-19, …"
-              autocomplete="off"
-              spellcheck="false"
-              class="bauhaus-input bauhaus-input--mono"
-            />
+            {taxRateOptions.length > 0 ? (
+              <select
+                name="default_tax_code"
+                class="bauhaus-input bauhaus-input--mono"
+              >
+                <option value="">— bitte wählen —</option>
+                {taxRateOptions.map(opt => (
+                  <option value={opt.code} selected={integration.default_tax_code === opt.code}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                name="default_tax_code"
+                value={integration.default_tax_code ?? ''}
+                placeholder="z.B. UK-2022-20%, DE-2020-1-S, …"
+                autocomplete="off"
+                spellcheck="false"
+                class="bauhaus-input bauhaus-input--mono"
+              />
+            )}
             <span class="text-xs italic text-anthrazit/55 mt-2 block">
-              Beim Speichern wird der Tax-Rate-Wert automatisch aus Mews aufgelöst (taxations/getAll).
-              Tax-Environment dieses Hotels:
-              {' '}<span class="font-mono">{integration.environment === 'demo' ? 'UK-2022 (Demo)' : '— prüfe configuration.Enterprise.TaxEnvironmentCode'}</span>
+              {taxRateOptions.length > 0
+                ? <>Auswahl gefiltert auf Tax-Environment <span class="font-mono">{taxEnvironmentCode}</span>. Auswahl löst auch den numerischen Rate-Wert auf (für Net-Pricing-Hotels).</>
+                : <>Tax-Codes aus Mews konnten nicht geladen werden — bitte manuell eintragen. Tax-Environment: <span class="font-mono">{taxEnvironmentCode ?? '?'}</span></>}
               {integration.default_tax_rate != null && (
                 <>
                   <br />Aktueller Rate: <span class="font-mono">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span>
-                  {' '}(= {Number(integration.default_tax_rate)}). Net-Pricing-Hotels brauchen diesen Wert für die Rückrechnung.
                 </>
               )}
             </span>
