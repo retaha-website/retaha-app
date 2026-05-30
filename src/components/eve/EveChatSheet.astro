@@ -1,0 +1,311 @@
+---
+// Sprint E4 · Phase 9 — Voll-Screen Chat-Sheet für Eve
+//
+// Verbraucht parent x-data="guestPage" mit erweitertem Eve-State (siehe
+// /g/[token].astro). State-Felder:
+//   eveOpen: boolean
+//   eveMessages: Array<{role, content, streaming?}>
+//   eveTyping: boolean
+//   evePendingAction: {action_type, action_params, summary} | null
+//   eveError: string | null
+//   eveConfirming: boolean  — während POST /api/eve/confirm-action
+// Methods:
+//   eveSend(text), eveConfirm(), eveCancel(), eveClose()
+//
+// Sub-Components werden via Import-only-for-Styles geladen — die eigentlichen
+// Templates sind hier inline weil Alpine bindings nur in einem File schlicht
+// rendern.
+
+import EveTypingIndicator from './EveTypingIndicator.astro';
+import EveMessage from './EveMessage.astro';
+import EveActionConfirmCard from './EveActionConfirmCard.astro';
+import EveSuggestionChips from './EveSuggestionChips.astro';
+import { t, type Lang } from '../../lib/i18n';
+
+interface Props {
+  lang: Lang;
+  eveName: string;
+  /** Pink-Shock Default — Hotelier kann via hotel_settings.accent_color überschreiben. */
+  accentColor?: string;
+  /** Default-Chip-Set. Phase 10 macht das tageszeit-dynamisch. */
+  chips?: Array<{ key: string; text: string }>;
+}
+
+const { lang, eveName, accentColor = '#FF4A82', chips } = Astro.props;
+
+const defaultChips = chips ?? [
+  { key: 'breakfast_when',   text: t('eve.chip_breakfast_when', lang) },
+  { key: 'wifi',             text: t('eve.chip_wifi', lang) },
+  { key: 'recommendations',  text: t('eve.chip_recommendations', lang) },
+  { key: 'checkout',         text: t('eve.chip_checkout', lang) },
+];
+
+const placeholder = t('eve.placeholder', lang).replace('{name}', eveName);
+const typingLabel = t('eve.typing', lang).replace('{name}', eveName);
+const sendLabel = t('eve.send', lang);
+const closeLabel = t('eve.close', lang);
+const confirmLabel = t('eve.confirm_booking', lang);
+const cancelLabel = t('eve.cancel_booking', lang);
+const suggestionsLabel = t('eve.suggestions_label', lang);
+---
+
+<!-- Backdrop -->
+<div
+  class="eve-sheet-backdrop"
+  x-show="eveOpen"
+  x-transition.opacity
+  @click="eveClose()"
+  style="display: none;"
+></div>
+
+<!-- Sheet -->
+<aside
+  class="eve-sheet"
+  x-show="eveOpen"
+  x-transition:enter="eve-sheet-enter"
+  x-transition:enter-start="eve-sheet-enter-start"
+  x-transition:enter-end="eve-sheet-enter-end"
+  x-transition:leave="eve-sheet-leave"
+  x-transition:leave-start="eve-sheet-leave-start"
+  x-transition:leave-end="eve-sheet-leave-end"
+  role="dialog"
+  aria-modal="true"
+  aria-label={`Chat mit ${eveName}`}
+  style="display: none;"
+>
+  <!-- Header -->
+  <header class="eve-sheet-header">
+    <div class="eve-sheet-header-info">
+      <span class="eve-sheet-header-eyebrow">— Concierge —</span>
+      <h2 class="eve-sheet-header-name">{eveName}</h2>
+    </div>
+    <button type="button" class="eve-sheet-close" @click="eveClose()" aria-label={closeLabel}>×</button>
+  </header>
+
+  <!-- Messages -->
+  <div class="eve-sheet-messages" x-ref="eveMessagesEl">
+    <!-- Suggestion-Chips (nur wenn noch keine Messages) -->
+    <template x-if="eveMessages.length === 0 && !eveTyping">
+      <div class="eve-chips">
+        <p class="eve-chips-label">{suggestionsLabel}</p>
+        {defaultChips.map(chip => (
+          <button
+            type="button"
+            class="eve-chip"
+            data-chip-text={chip.text}
+            @click={`eveSend('${chip.text.replace(/'/g, "\\'")}')`}
+          >
+            {chip.text}
+          </button>
+        ))}
+      </div>
+    </template>
+
+    <!-- Messages -->
+    <template x-for="(msg, idx) in eveMessages" :key="idx">
+      <div
+        :class="`eve-message eve-message--${msg.role}${msg.streaming ? ' eve-message--streaming' : ''}`"
+      >
+        <div class="eve-message-bubble" x-text="msg.content"></div>
+      </div>
+    </template>
+
+    <!-- Typing-Indicator -->
+    <div class="eve-message eve-message--assistant" x-show="eveTyping" style="display: none;">
+      <EveTypingIndicator />
+    </div>
+
+    <!-- Confirmation-Card (pending_action) -->
+    <template x-if="evePendingAction">
+      <div class="eve-confirm-card">
+        <h3 class="eve-confirm-title" x-text="evePendingAction.summary?.title || 'Bestätigen?'"></h3>
+
+        <ul class="eve-confirm-list" x-show="evePendingAction.summary?.items?.length > 0">
+          <template x-for="(item, i) in (evePendingAction.summary?.items || [])" :key="i">
+            <li>
+              <span class="item-name" x-text="`${item.quantity > 1 ? item.quantity + '× ' : ''}${item.label}`"></span>
+              <span class="item-price" x-show="item.price_cents != null && item.price_cents > 0" x-text="`€${(item.price_cents / 100).toFixed(2)}`"></span>
+              <span class="item-price" x-show="item.price_cents === 0">inklusive</span>
+            </li>
+          </template>
+        </ul>
+
+        <p class="eve-confirm-when" x-show="evePendingAction.summary?.when" x-text="evePendingAction.summary?.when"></p>
+
+        <p class="eve-confirm-total" x-show="evePendingAction.summary?.total_cents > 0"
+           x-text="`Summe: €${(evePendingAction.summary.total_cents / 100).toFixed(2)}`"></p>
+
+        <p class="eve-confirm-note" x-show="evePendingAction.summary?.note" x-text="evePendingAction.summary?.note"></p>
+
+        <div class="eve-confirm-actions">
+          <button type="button" class="eve-confirm-btn eve-confirm-btn--primary" @click="eveConfirm()" :disabled="eveConfirming">
+            <span x-show="!eveConfirming">{confirmLabel}</span>
+            <span x-show="eveConfirming" style="display:none">…</span>
+          </button>
+          <button type="button" class="eve-confirm-btn eve-confirm-btn--secondary" @click="eveCancel()" :disabled="eveConfirming">
+            {cancelLabel}
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- Error -->
+    <div class="eve-error" x-show="eveError" style="display: none;">
+      <p x-text="eveError"></p>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <form class="eve-sheet-input-row" @submit.prevent="eveSend($refs.eveInput.value); $refs.eveInput.value = ''">
+    <input
+      type="text"
+      class="eve-sheet-input"
+      x-ref="eveInput"
+      placeholder={placeholder}
+      :disabled="eveTyping || eveConfirming"
+      autocomplete="off"
+    />
+    <button
+      type="submit"
+      class="eve-sheet-send"
+      :disabled="eveTyping || eveConfirming"
+      aria-label={sendLabel}
+    >
+      ↑
+    </button>
+  </form>
+</aside>
+
+<style is:global define:vars={{ accent: accentColor }}>
+  .eve-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 90;
+  }
+  .eve-sheet {
+    position: fixed;
+    inset: 0;
+    background: #fafafa;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  @media (min-width: 768px) {
+    .eve-sheet {
+      inset: auto 24px 24px auto;
+      width: 420px;
+      height: min(80vh, 720px);
+      border-radius: 16px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+    }
+  }
+
+  /* Transitions */
+  .eve-sheet-enter { transition: transform 0.3s ease-out, opacity 0.3s ease-out; }
+  .eve-sheet-enter-start { transform: translateY(100%); opacity: 0; }
+  .eve-sheet-enter-end { transform: translateY(0); opacity: 1; }
+  .eve-sheet-leave { transition: transform 0.25s ease-in, opacity 0.25s ease-in; }
+  .eve-sheet-leave-start { transform: translateY(0); opacity: 1; }
+  .eve-sheet-leave-end { transform: translateY(100%); opacity: 0; }
+
+  /* Header */
+  .eve-sheet-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+  }
+  .eve-sheet-header-info { display: flex; flex-direction: column; gap: 2px; }
+  .eve-sheet-header-eyebrow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+  }
+  .eve-sheet-header-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 400;
+    color: #1A1A1A;
+    letter-spacing: -0.01em;
+  }
+  .eve-sheet-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    font-size: 28px;
+    line-height: 1;
+    color: rgba(26, 26, 26, 0.55);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background 0.15s ease;
+  }
+  .eve-sheet-close:hover { background: rgba(26, 26, 26, 0.05); }
+
+  /* Messages-Scroll-Area */
+  .eve-sheet-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    scroll-behavior: smooth;
+  }
+
+  /* Error-Box */
+  .eve-error {
+    margin: 12px 0;
+    padding: 12px 16px;
+    background: #fee;
+    border-left: 3px solid #c00;
+    color: #900;
+    font-size: 13px;
+    border-radius: 4px;
+  }
+
+  /* Input */
+  .eve-sheet-input-row {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+    background: #fff;
+  }
+  .eve-sheet-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 22px;
+    font-size: 15px;
+    color: #1A1A1A;
+    background: #f5f5f5;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .eve-sheet-input:focus {
+    border-color: var(--accent);
+    background: #fff;
+  }
+  .eve-sheet-input:disabled { opacity: 0.5; }
+  .eve-sheet-send {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+  .eve-sheet-send:hover:not(:disabled) { transform: scale(1.05); }
+  .eve-sheet-send:disabled { opacity: 0.4; cursor: wait; }
+</style>

@@ -6,6 +6,8 @@ import WifiSheet from '../../components/sheets/WifiSheet.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
+import EveChatSheet from '../../components/eve/EveChatSheet.astro';
+import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
 import '../../styles/retaha.css';
 import '../../styles/components/buttons.css';
 import '../../styles/components/inputs.css';
@@ -305,8 +307,8 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
             <span class="gate-tile-sub">{t('tile.wifi.sub', lang)}</span>
           </button>
 
-          {f.concierge_chat !== false && (
-            <button class="gate-tile" type="button">
+          {f.concierge_chat !== false && (settings as any).eve_enabled && (
+            <button class="gate-tile" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
               </span>
@@ -437,6 +439,16 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           checkOut={stay.check_out}
         />
       )}
+
+      {(settings as any).eve_enabled && (
+        <>
+          <EveChatSheet
+            lang={lang}
+            eveName={settings.eve_name || 'Eve'}
+          />
+          <EveFloatingBubble />
+        </>
+      )}
     </main>
 
     <script>
@@ -544,6 +556,146 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
         sheetDragOffset: 0,
         sheetIsDragging: false,
         _sheetDragStart: 0,
+
+        // Eve state (Sprint E4 Phase 9)
+        eveOpen: false,
+        eveMessages: [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
+        eveTyping: false,
+        evePendingAction: null as any,
+        eveError: null as string | null,
+        eveConfirming: false,
+        eveSeenBefore: typeof window !== 'undefined' ? !!localStorage.getItem('retaha_eve_seen') : false,
+        _eveLastConversation: '' as string,  // für Audit-Context
+
+        async eveSend(text: string) {
+          const message = (text || '').trim();
+          if (!message || this.eveTyping) return;
+
+          this.eveError = null;
+          this.evePendingAction = null;
+          this.eveMessages.push({ role: 'user', content: message });
+          this.eveTyping = true;
+          this._scrollEveBottom();
+
+          // Mark als seen für Pulse-Disable
+          try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
+          this.eveSeenBefore = true;
+
+          // Assistant-Bubble vorbereiten (streaming)
+          const assistantMsg = { role: 'assistant' as const, content: '', streaming: true };
+
+          try {
+            const res = await fetch('/api/eve/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message }),
+            });
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => '');
+              throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+            }
+
+            this.eveMessages.push(assistantMsg);
+            this.eveTyping = false;
+
+            const reader = res.body!.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const blocks = buffer.split('\n\n');
+              buffer = blocks.pop() ?? '';
+              for (const block of blocks) {
+                const line = block.trim();
+                if (!line.startsWith('data:')) continue;
+                try {
+                  const ev = JSON.parse(line.slice(5).trim());
+                  if (ev.type === 'text_delta') {
+                    assistantMsg.content += ev.text;
+                    this._scrollEveBottom();
+                  } else if (ev.type === 'pending_action') {
+                    this.evePendingAction = ev.action;
+                    this._scrollEveBottom();
+                  } else if (ev.type === 'error') {
+                    this.eveError = ev.message;
+                  } else if (ev.type === 'message_complete') {
+                    // Stream zu Ende — Streaming-Cursor weg
+                    assistantMsg.streaming = false;
+                  } else if (ev.type === 'escalating') {
+                    // Bei Re-Try: neuer assistant-message-stream
+                    assistantMsg.content = '';
+                  }
+                  // router_decision + tool_use_preview ignorieren wir im UI (Backend-Logging reicht)
+                } catch (_) {
+                  // unbekannter chunk, weiter
+                }
+              }
+            }
+            assistantMsg.streaming = false;
+            this._eveLastConversation = this._buildConversationContext();
+          } catch (err) {
+            this.eveTyping = false;
+            const msg = (err as Error).message || 'Unbekannter Fehler';
+            this.eveError = msg;
+            console.error('[eve] chat failed:', err);
+          }
+        },
+
+        async eveConfirm() {
+          if (!this.evePendingAction || this.eveConfirming) return;
+          this.eveConfirming = true;
+          this.eveError = null;
+          const pending = this.evePendingAction;
+
+          try {
+            const res = await fetch('/api/eve/confirm-action', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pending_action: pending,
+                conversation_context: this._eveLastConversation,
+              }),
+            });
+            const body = await res.json();
+            if (body.ok) {
+              this.eveMessages.push({ role: 'assistant', content: 'Erledigt — der Hotelier bekommt deine Anfrage gleich.' });
+              this.evePendingAction = null;
+            } else {
+              this.eveError = body.error || 'Bestätigung fehlgeschlagen.';
+            }
+          } catch (err) {
+            this.eveError = (err as Error).message || 'Bestätigung fehlgeschlagen.';
+          } finally {
+            this.eveConfirming = false;
+            this._scrollEveBottom();
+          }
+        },
+
+        eveCancel() {
+          this.evePendingAction = null;
+          this.eveMessages.push({ role: 'assistant', content: 'Kein Problem, sag Bescheid wenn ich helfen kann.' });
+          this._scrollEveBottom();
+        },
+
+        eveClose() {
+          this.eveOpen = false;
+        },
+
+        _scrollEveBottom() {
+          requestAnimationFrame(() => {
+            const el = this.$refs.eveMessagesEl as HTMLElement | undefined;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        },
+
+        _buildConversationContext(): string {
+          return this.eveMessages.slice(-3).map((m: any) =>
+            `${m.role === 'user' ? 'Gast' : 'Eve'}: ${m.content}`
+          ).join('\n');
+        },
 
         openSheet(id: string) {
           this.activeSheet = id;
