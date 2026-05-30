@@ -68,8 +68,8 @@ if (Astro.request.method === 'POST') {
       wifi_ssid: form.get('wifi_ssid')?.toString().trim() || null,
       wifi_password: form.get('wifi_password')?.toString().trim() || null,
       wifi_speed_mbits: parseInt(form.get('wifi_speed_mbits')?.toString() || '0') || null,
-      concierge_name: form.get('concierge_name')?.toString().trim() || null,
-      concierge_online_until: form.get('concierge_online_until')?.toString() || null,
+      eve_name: form.get('eve_name')?.toString().trim() || null,
+      eve_online_until: form.get('eve_online_until')?.toString() || null,
       hotel_eyebrow_de: form.get('hotel_eyebrow_de')?.toString().trim() || null,
       hotel_eyebrow_en: form.get('hotel_eyebrow_en')?.toString().trim() || null,
       hotel_eyebrow_fr: form.get('hotel_eyebrow_fr')?.toString().trim() || null,
@@ -129,7 +129,7 @@ const { data: settings } = await client
   .select(`
     notification_email,
     wifi_ssid, wifi_password, wifi_speed_mbits,
-    concierge_name, concierge_online_until,
+    eve_name, eve_online_until,
     hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
     welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
     guest_address_form
@@ -139,7 +139,7 @@ const { data: settings } = await client
 
 const s = settings || {};
 
-const conciergeTime = (s as any).concierge_online_until || '22:00';
+const conciergeTime = (s as any).eve_online_until || '22:00';
 const conciergeTimeShort = conciergeTime.substring(0, 5);
 
 // Bevorzugt user.user_metadata.locale (User-Preference), Fallback auf Middleware-resolved Locale, finally 'de'
@@ -423,8 +423,8 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
           <span class="bauhaus-field-eyebrow">— Name —</span>
           <input
             type="text"
-            name="concierge_name"
-            value={(s as any).concierge_name || ''}
+            name="eve_name"
+            value={(s as any).eve_name || ''}
             class="bauhaus-input"
             placeholder="Maria"
           />
@@ -434,7 +434,7 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
           <span class="eyebrow text-anthrazit/55 block mb-1">Online bis</span>
           <input
             type="time"
-            name="concierge_online_until"
+            name="eve_online_until"
             value={conciergeTimeShort}
             class="w-full px-3 py-2 border border-anthrazit/20 text-sm focus:outline-none focus:border-anthrazit"
           />

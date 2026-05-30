@@ -38,8 +38,8 @@ export type StayContext = {
     hotel_eyebrow_en: string | null;
     hotel_eyebrow_fr: string | null;
     hotel_eyebrow_es: string | null;
-    concierge_name: string;
-    concierge_online_until: string | null;
+    eve_name: string;
+    eve_online_until: string | null;
     wifi_ssid: string | null;
     wifi_password: string | null;
     wifi_speed_mbits: number | null;
@@ -102,7 +102,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       features, recommendations,
       welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
       hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
-      concierge_name, concierge_online_until,
+      eve_name, eve_online_until,
       wifi_ssid, wifi_password, wifi_speed_mbits,
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
       breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es,
