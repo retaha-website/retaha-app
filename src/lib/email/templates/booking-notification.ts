@@ -5,6 +5,8 @@ export interface BookingNotificationData {
   hotelName: string;
   hotelLogoUrl?: string | null;
   hotelAccentColor?: string | null;
+  /** First-Name des Hotel-Owners für "Hallo Kristin," — null = neutrale Anrede */
+  recipientFirstName?: string | null;
   guestName: string;
   roomLabel?: string | null;
   bookingType: 'breakfast' | 'service' | 'conference';
@@ -47,6 +49,9 @@ export function bookingNotificationHtml(data: BookingNotificationData): string {
       </td></tr>
       <tr><td style="padding:28px 32px 8px">
         <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:${accent}">— Neue Buchung —</p>
+        ${data.recipientFirstName
+          ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.4;color:#1A1A1A">Hallo ${escapeHtml(data.recipientFirstName)},</p>`
+          : ''}
         <h1 style="margin:0 0 18px;font-size:22px;font-weight:300;line-height:1.3;color:#1A1A1A">
           ${escapeHtml(typeLabel)} von <strong style="font-weight:700">${escapeHtml(data.guestName)}</strong>
         </h1>

@@ -3,6 +3,7 @@
 
 import { createSupabaseServiceRoleInstance } from '../auth';
 import { getEnv } from '../env';
+import { hotelOwnerFirstName } from '../user-profile';
 import { routeEmail } from './router';
 import {
   bookingNotificationHtml,
@@ -94,6 +95,7 @@ export async function sendBookingNotification(ctx: BookingNotificationContext): 
       hotelName: hotel.name ?? 'Hotel',
       hotelLogoUrl: hotel.logo_url ?? null,
       hotelAccentColor: settings?.accent_color ?? null,
+      recipientFirstName: await hotelOwnerFirstName(ctx.hotelId),
       guestName,
       roomLabel,
       bookingType: ctx.bookingType,
