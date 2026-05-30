@@ -9,6 +9,8 @@ import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
 import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
+import { getEveSuggestions } from '../../lib/eve/suggestions';
+import { createSupabaseServiceRoleInstance } from '../../lib/auth';
 import '../../styles/retaha.css';
 import '../../styles/components/buttons.css';
 import '../../styles/components/inputs.css';
@@ -72,6 +74,33 @@ const activeServiceBooking = existingServiceBookings[0] || null;
 
 const langParam = new URL(Astro.request.url).searchParams.get('lang');
 const lang: Lang = normalizeLang(langParam || guest?.language || hotel.default_language);
+
+// Sprint E4 Phase 10 — Tageszeit-Chips (hotel-timezone-aware) + History pre-load
+const hotelTz = (hotel as any).timezone || 'Europe/Berlin';
+let localHour = 9;
+try {
+  localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', { timeZone: hotelTz, hour: 'numeric', hourCycle: 'h23' }).format(new Date()),
+    10,
+  );
+  if (!Number.isFinite(localHour)) localHour = 9;
+} catch { localHour = 9; }
+const eveSuggestions = getEveSuggestions(localHour, lang);
+
+// Pre-load chat_messages für diesen Stay (letzte 20) — Frontend startet mit
+// History statt leerem Sheet. Wenn 0 Messages: Welcome-Trigger im Frontend.
+const sbSr = createSupabaseServiceRoleInstance();
+const { data: initialChatRows } = (settings as any).eve_enabled
+  ? await sbSr
+      .from('chat_messages')
+      .select('role, content, created_at')
+      .eq('stay_id', stay.id)
+      .order('created_at', { ascending: true })
+      .limit(20)
+  : { data: [] };
+const initialEveMessages = (initialChatRows ?? [])
+  .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+  .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content, streaming: false }));
 
 const welcomeMap: Record<Lang, string | null> = {
   de: settings.welcome_message_de,
@@ -321,7 +350,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           </button>
 
           {f.concierge_chat !== false && (settings as any).eve_enabled && (
-            <button class="gate-tile" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}">
+            <button class="gate-tile" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
               </span>
@@ -455,9 +484,11 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
       {(settings as any).eve_enabled && (
         <>
+          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages })};`} />
           <EveChatSheet
             lang={lang}
             eveName={settings.eve_name || 'Eve'}
+            chips={eveSuggestions}
           />
           <EveFloatingBubble />
         </>
@@ -570,15 +601,18 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
         sheetIsDragging: false,
         _sheetDragStart: 0,
 
-        // Eve state (Sprint E4 Phase 9)
+        // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
-        eveMessages: [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
+        eveMessages: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.messages)
+          ? [...(window as any).__EVE_INITIAL__.messages]
+          : [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
         eveTyping: false,
         evePendingAction: null as any,
         eveError: null as string | null,
         eveConfirming: false,
         eveSeenBefore: typeof window !== 'undefined' ? !!localStorage.getItem('retaha_eve_seen') : false,
         _eveLastConversation: '' as string,  // für Audit-Context
+        _eveWelcomeTried: false,  // Phase 10: idempotenter Welcome-Trigger
 
         async eveSend(text: string) {
           const message = (text || '').trim();
@@ -694,6 +728,33 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
         eveClose() {
           this.eveOpen = false;
+        },
+
+        // Phase 10: Welcome-Trigger beim ersten Sheet-Open ohne History.
+        // Idempotent: Server-Side checks chat_messages.count + Client-Side
+        // checks _eveWelcomeTried (prevents Doppel-Calls beim raschen Reopen).
+        async eveMaybeWelcome() {
+          if (this._eveWelcomeTried) return;
+          if (this.eveMessages.length > 0) return;
+          this._eveWelcomeTried = true;
+
+          this.eveTyping = true;
+          try {
+            const res = await fetch('/api/eve/welcome', { method: 'POST' });
+            if (!res.ok) {
+              console.warn('[eve/welcome] HTTP', res.status);
+              return;
+            }
+            const body = await res.json();
+            if (body.ok && body.welcome) {
+              this.eveMessages.push({ role: 'assistant', content: body.welcome, streaming: false });
+              this._scrollEveBottom();
+            }
+          } catch (err) {
+            console.warn('[eve/welcome] failed', err);
+          } finally {
+            this.eveTyping = false;
+          }
         },
 
         _scrollEveBottom() {
