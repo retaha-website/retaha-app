@@ -8,6 +8,7 @@ import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
+import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
 import '../../styles/retaha.css';
 import '../../styles/components/buttons.css';
 import '../../styles/components/inputs.css';
@@ -43,6 +44,18 @@ if (!ctx) {
 }
 
 const { stay, guest, room, hotel, settings } = ctx;
+
+// Sprint E4 Phase 9 Fix — Auto-Pair: wer den access_token in der URL hat,
+// kriegt automatisch eine Stay-Session-Cookie. Konsistent zum Sprint-D-Pair-
+// Pattern (/api/pair?token=...). Eve-Chat (/api/eve/chat) braucht den Cookie.
+const existingSession = await getStaySession(Astro.cookies);
+if (!existingSession || existingSession.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id,
+    hotel_id: hotel.id,
+    check_out_utc: stay.check_out,
+  });
+}
 
 const menuItems = await loadActiveBreakfastItems(hotel.id);
 
