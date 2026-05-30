@@ -594,9 +594,6 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
           this.eveSeenBefore = true;
 
-          // Assistant-Bubble vorbereiten (streaming)
-          const assistantMsg = { role: 'assistant' as const, content: '', streaming: true };
-
           try {
             const res = await fetch('/api/eve/chat', {
               method: 'POST',
@@ -608,7 +605,11 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
               throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
             }
 
-            this.eveMessages.push(assistantMsg);
+            // Assistant-Bubble pushen + Index tracken. WICHTIG: nach push() greifen
+            // wir IMMER via this.eveMessages[msgIdx] zu, damit Alpine den reaktiven
+            // Proxy sieht (nicht die Original-Object-Reference).
+            this.eveMessages.push({ role: 'assistant', content: '', streaming: true });
+            const msgIdx = this.eveMessages.length - 1;
             this.eveTyping = false;
 
             const reader = res.body!.getReader();
@@ -627,7 +628,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
                 try {
                   const ev = JSON.parse(line.slice(5).trim());
                   if (ev.type === 'text_delta') {
-                    assistantMsg.content += ev.text;
+                    this.eveMessages[msgIdx].content += ev.text;
                     this._scrollEveBottom();
                   } else if (ev.type === 'pending_action') {
                     this.evePendingAction = ev.action;
@@ -635,19 +636,17 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
                   } else if (ev.type === 'error') {
                     this.eveError = ev.message;
                   } else if (ev.type === 'message_complete') {
-                    // Stream zu Ende — Streaming-Cursor weg
-                    assistantMsg.streaming = false;
+                    this.eveMessages[msgIdx].streaming = false;
                   } else if (ev.type === 'escalating') {
-                    // Bei Re-Try: neuer assistant-message-stream
-                    assistantMsg.content = '';
+                    this.eveMessages[msgIdx].content = '';
                   }
-                  // router_decision + tool_use_preview ignorieren wir im UI (Backend-Logging reicht)
+                  // router_decision + tool_use_preview ignorieren wir im UI
                 } catch (_) {
                   // unbekannter chunk, weiter
                 }
               }
             }
-            assistantMsg.streaming = false;
+            this.eveMessages[msgIdx].streaming = false;
             this._eveLastConversation = this._buildConversationContext();
           } catch (err) {
             this.eveTyping = false;
