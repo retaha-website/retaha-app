@@ -353,11 +353,13 @@ const pricingMewsLabelClass = productsAvailable
   : 'flex items-start gap-3 opacity-50 cursor-not-allowed';
 
 type ServiceMappingField = { name: string; label: string; current: string | null };
+// Sprint E1 Phase 3 — nur Frühstück-Mapping zeigen. Service + Konferenz
+// werden nicht nach Mews gepushed (Sprint-C-Scope-Korrektur §14):
+// Service ist meist kostenfrei, Konferenz B2B-Vertrieb. Code-Side bleibt
+// (graceful skip wenn service_id_* NULL), UI ist nur klarer.
 const serviceMappingFields: ServiceMappingField[] = integration
   ? [
       { name: 'service_id_breakfast', label: 'Frühstück-Buchungen', current: integration.service_id_breakfast ?? null },
-      { name: 'service_id_service', label: 'Service-Anfragen', current: integration.service_id_service ?? null },
-      { name: 'service_id_conference', label: 'Konferenz-Buchungen', current: integration.service_id_conference ?? null },
     ]
   : [];
 
@@ -481,10 +483,11 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
         <form method="POST" class="space-y-6 max-w-2xl">
           <input type="hidden" name="_action" value="save_config" />
 
-          <!-- Service-Mapping (3 Dropdowns) -->
+          <!-- Service-Mapping (Sprint E1 Phase 3 — nur Frühstück) -->
           <p class="text-xs italic text-anthrazit/55 mb-4 max-w-xl leading-relaxed">
-            Leer lassen wenn ein Buchungstyp <strong>nicht</strong> über Mews abgerechnet werden soll
-            — der Push für diesen Typ wird dann übersprungen, die Buchung bleibt nur in retaha.
+            Charge-to-Room ist aktuell <strong>nur für Frühstück</strong> aktiv.
+            Service-Anfragen und Konferenz-Buchungen bleiben in retaha (Service ist meist
+            kostenfrei, Konferenz läuft über B2B-Vertrieb).
           </p>
           <div class="space-y-5">
             {serviceMappingFields.map(field => (
