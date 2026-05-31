@@ -147,11 +147,36 @@ const hotelTargetUrl = firstStay?.access_token ? buildGuestStayUrl(firstStay.acc
     )}
   </section>
 
-  <!-- PDF Preview Stub -->
+  <!-- Druck-Export (Phase 6) -->
   <section class="qr-section">
-    <div class="qr-stub">
-      <p class="qr-stub-eyebrow">— Phase 6 —</p>
-      <p class="qr-stub-text">PDF-Export für druckbare QR-Bogen (Hotel + alle Zimmer auf einem Sheet) folgt in der nächsten Phase.</p>
+    <h2 class="qr-section-title">Drucken / PDF-Export</h2>
+    <p class="qr-section-desc">
+      Print-CSS-optimierte Druckansicht. Browser-Druck-Dialog → „Als PDF speichern" funktioniert plattformübergreifend
+      ohne zusätzliche Software.
+    </p>
+
+    <div class="print-grid">
+      <a href="/app/qr/print?mode=rooms" target="_blank" rel="noopener" class="print-card">
+        <p class="print-card-eyebrow">— Zimmer-Bogen —</p>
+        <p class="print-card-title">A4 Grid · 3×4 = 12 QRs pro Seite</p>
+        <p class="print-card-desc">
+          Alle Zimmer-QRs zum Ausdrucken und Ausschneiden. Pro Zelle: Hotel-Name, Zimmer-Nummer, QR-Code, room_code.
+          {roomsWithCode.length === 0
+            ? ' (Aktuell 0 rooms → zeigt Hotel-weiten QR als Fallback.)'
+            : ` Aktuell ${roomsWithCode.length} Zimmer.`}
+        </p>
+        <span class="print-card-cta">Öffnen ↗</span>
+      </a>
+
+      <a href="/app/qr/print?mode=tisch" target="_blank" rel="noopener" class="print-card">
+        <p class="print-card-eyebrow">— Tischaufsteller —</p>
+        <p class="print-card-title">A4 Hochformat · Hotel-weit</p>
+        <p class="print-card-desc">
+          Großer Hotel-QR mit Hotel-Name und „Scannen für WLAN, Frühstück, Empfehlungen & mehr".
+          Für Rezeption, Lobby, Frühstücksraum.
+        </p>
+        <span class="print-card-cta">Öffnen ↗</span>
+      </a>
     </div>
   </section>
 
@@ -204,8 +229,13 @@ const hotelTargetUrl = firstStay?.access_token ? buildGuestStayUrl(firstStay.acc
     .qr-room-url { margin-top: 6px; font-size: 10px; color: rgba(26,26,26,.4); word-break: break-all; text-decoration: none; }
     .qr-room-url:hover { color: #FF4A82; }
 
-    .qr-stub { padding: 24px; background: #fff; border: 1px dashed #e0e0e0; text-align: center; }
-    .qr-stub-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #FF4A82; margin: 0 0 6px; }
-    .qr-stub-text { font-size: 13px; color: rgba(26,26,26,.55); margin: 0; }
+    .print-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 768px) { .print-grid { grid-template-columns: 1fr 1fr; } }
+    .print-card { display: block; background: #fff; border: 1px solid #e8e8e8; padding: 20px; text-decoration: none; color: inherit; transition: border-color .15s; }
+    .print-card:hover { border-color: #FF4A82; }
+    .print-card-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 8px; }
+    .print-card-title { font-size: 16px; font-weight: 500; color: #1A1A1A; margin: 0 0 8px; }
+    .print-card-desc { font-size: 13px; color: rgba(26,26,26,.6); margin: 0 0 12px; line-height: 1.5; }
+    .print-card-cta { font-size: 13px; font-weight: 500; color: #FF4A82; }
   </style>
 </AppLayout>
