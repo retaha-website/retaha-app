@@ -17,6 +17,20 @@ const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 // Defensive fallbacks falls Middleware Astro.locals nicht gesetzt hat
 const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
 
+// Sprint i18n Phase 5.8 — Hotel-Sprach-Settings VOR POST-Handler laden
+const { data: hotelPreLang } = await client
+  .from('hotels').select('default_language')
+  .eq('id', hotel.id).maybeSingle();
+const hotelDefaultLang = (hotelPreLang?.default_language as string | undefined) ?? 'de';
+
+const NOW_ISO = () => new Date().toISOString();
+function mergeI18nField(existing: any, value: string): any | null {
+  const merged: Record<string, any> = (existing && typeof existing === 'object') ? { ...existing } : {};
+  if (value) merged[hotelDefaultLang] = { value, source: 'original', updated_at: NOW_ISO() };
+  else delete merged[hotelDefaultLang];
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 let message: { type: 'success' | 'error'; text: string } | null = null;
 
 if (Astro.request.method === 'POST') {
@@ -142,7 +156,16 @@ if (Astro.request.method === 'POST') {
       message = { type: 'error', text: 'Ungültige Anrede.' };
     }
   } else {
-    // Default: Bulk-Update (WLAN + Concierge + Eyebrows + Welcome)
+    // Default: Bulk-Update — Sprint i18n Phase 5.8 auf 1-Feld-UX umgestellt
+    const eyebrowDefault = form.get('hotel_eyebrow_default')?.toString().trim() || '';
+    const welcomeDefault = form.get('welcome_message_default')?.toString().trim() || '';
+
+    // Existing i18n laden damit override-Werte in anderen Sprachen erhalten bleiben
+    const { data: existingI18n } = await client
+      .from('hotel_settings')
+      .select('hotel_eyebrow_i18n, welcome_message_i18n')
+      .eq('hotel_id', hotel.id).maybeSingle();
+
     const updates: Record<string, any> = {
       notification_email: form.get('notification_email')?.toString().trim() || null,
       wifi_ssid: form.get('wifi_ssid')?.toString().trim() || null,
@@ -150,16 +173,15 @@ if (Astro.request.method === 'POST') {
       wifi_speed_mbits: parseInt(form.get('wifi_speed_mbits')?.toString() || '0') || null,
       eve_name: form.get('eve_name')?.toString().trim() || null,
       eve_online_until: form.get('eve_online_until')?.toString() || null,
-      hotel_eyebrow_de: form.get('hotel_eyebrow_de')?.toString().trim() || null,
-      hotel_eyebrow_en: form.get('hotel_eyebrow_en')?.toString().trim() || null,
-      hotel_eyebrow_fr: form.get('hotel_eyebrow_fr')?.toString().trim() || null,
-      hotel_eyebrow_es: form.get('hotel_eyebrow_es')?.toString().trim() || null,
-      welcome_message_de: form.get('welcome_message_de')?.toString().trim() || null,
-      welcome_message_en: form.get('welcome_message_en')?.toString().trim() || null,
-      welcome_message_fr: form.get('welcome_message_fr')?.toString().trim() || null,
-      welcome_message_es: form.get('welcome_message_es')?.toString().trim() || null,
+      hotel_eyebrow_i18n:    mergeI18nField(existingI18n?.hotel_eyebrow_i18n, eyebrowDefault),
+      welcome_message_i18n:  mergeI18nField(existingI18n?.welcome_message_i18n, welcomeDefault),
       updated_at: new Date().toISOString(),
     };
+    // Safety-Net: spiegle Default zur alten _de-Spalte (Phase 10 dropt)
+    if (hotelDefaultLang === 'de') {
+      updates.hotel_eyebrow_de   = eyebrowDefault || null;
+      updates.welcome_message_de = welcomeDefault || null;
+    }
 
     const { data: updatedRows, error } = await client
       .from('hotel_settings')
@@ -212,8 +234,8 @@ const { data: settings } = await client
     notification_email,
     wifi_ssid, wifi_password, wifi_speed_mbits,
     eve_name, eve_online_until,
-    hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
-    welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
+    hotel_eyebrow_de, hotel_eyebrow_i18n,
+    welcome_message_de, welcome_message_i18n,
     guest_address_form
   `)
   .eq('hotel_id', hotel.id)
@@ -230,8 +252,7 @@ const hasGeocode = typeof hr.latitude === 'number' && typeof hr.longitude === 'n
 
 const s = settings || {};
 
-// Sprint i18n Phase 4 — Hotel-Sprach-Settings
-const hotelDefaultLang = (hr.default_language as string | undefined) ?? 'de';
+// Sprint i18n Phase 4 — Hotel-Sprach-Settings (default_language schon oben geladen)
 const hotelEnabledLangs: string[] = Array.isArray(hr.enabled_languages) ? hr.enabled_languages : ['de','en','fr','es'];
 const ALL_LANGUAGES = [
   { code: 'de', label: 'Deutsch'    }, { code: 'en', label: 'English'    },
@@ -750,44 +771,22 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
       <h2 class="settings-section-headline">{t('settings.hotel_eyebrow.label', userLocale)}</h2>
       <p class="settings-section-description">{t('settings.hotel_eyebrow.description', userLocale)}</p>
 
-      <div class="grid grid-cols-2 gap-4">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
-          <input
-            type="text"
-            name="hotel_eyebrow_de"
-            value={(s as any).hotel_eyebrow_de || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <input
-            type="text"
-            name="hotel_eyebrow_en"
-            value={(s as any).hotel_eyebrow_en || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <input
-            type="text"
-            name="hotel_eyebrow_fr"
-            value={(s as any).hotel_eyebrow_fr || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <input
-            type="text"
-            name="hotel_eyebrow_es"
-            value={(s as any).hotel_eyebrow_es || ''}
-            class="bauhaus-input"
-          />
-        </label>
-      </div>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">{
+          (ALL_LANGUAGES.find(l => l.code === hotelDefaultLang)?.label ?? hotelDefaultLang.toUpperCase())
+        }</span>
+        <input
+          type="text"
+          name="hotel_eyebrow_default"
+          value={(s as any).hotel_eyebrow_i18n?.[hotelDefaultLang]?.value ?? (s as any).hotel_eyebrow_de ?? ''}
+          class="bauhaus-input"
+        />
+        <p class="text-xs text-anthrazit/55 mt-1 italic">
+          {hotelEnabledLangs.filter(l => l !== hotelDefaultLang).length > 0
+            ? `Wird automatisch in ${hotelEnabledLangs.filter(l => l !== hotelDefaultLang).map(l => ALL_LANGUAGES.find(al => al.code === l)?.label ?? l).join(', ')} übersetzt (sobald Phase 6 aktiv).`
+            : 'Aktuell nur Standardsprache aktiviert.'}
+        </p>
+      </label>
     </section>
 
     <!-- Welcome (4 Sprachen) -->
@@ -800,44 +799,22 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
       <h2 class="settings-section-headline">{t('settings.welcome.label', userLocale)}</h2>
       <p class="settings-section-description">{t('settings.welcome.description', userLocale)}</p>
 
-      <div class="space-y-3">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
-          <input
-            type="text"
-            name="welcome_message_de"
-            value={(s as any).welcome_message_de || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <input
-            type="text"
-            name="welcome_message_en"
-            value={(s as any).welcome_message_en || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <input
-            type="text"
-            name="welcome_message_fr"
-            value={(s as any).welcome_message_fr || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <input
-            type="text"
-            name="welcome_message_es"
-            value={(s as any).welcome_message_es || ''}
-            class="bauhaus-input"
-          />
-        </label>
-      </div>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">{
+          (ALL_LANGUAGES.find(l => l.code === hotelDefaultLang)?.label ?? hotelDefaultLang.toUpperCase())
+        }</span>
+        <input
+          type="text"
+          name="welcome_message_default"
+          value={(s as any).welcome_message_i18n?.[hotelDefaultLang]?.value ?? (s as any).welcome_message_de ?? ''}
+          class="bauhaus-input"
+        />
+        <p class="text-xs text-anthrazit/55 mt-1 italic">
+          {hotelEnabledLangs.filter(l => l !== hotelDefaultLang).length > 0
+            ? `Wird automatisch in ${hotelEnabledLangs.filter(l => l !== hotelDefaultLang).map(l => ALL_LANGUAGES.find(al => al.code === l)?.label ?? l).join(', ')} übersetzt.`
+            : 'Aktuell nur Standardsprache aktiviert.'}
+        </p>
+      </label>
     </section>
 
     <div class="flex justify-end pt-4">
