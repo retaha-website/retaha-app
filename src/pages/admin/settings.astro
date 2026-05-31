@@ -43,6 +43,52 @@ if (Astro.request.method === 'POST') {
     } else {
       message = { type: 'error', text: 'Ungültige Sprache.' };
     }
+  } else if (action === 'update_address') {
+    // Sprint E2 Phase 3 — Adress-Felder speichern + auto-Geocoding via Nominatim.
+    // Geocoding non-fatal: bei Fehler bleibt lat/lng wie sie sind, Warning an User.
+    const street  = form.get('address_street')?.toString().trim() || null;
+    const zip     = form.get('address_zip')?.toString().trim() || null;
+    const city    = form.get('city')?.toString().trim() || null;
+    const country = form.get('country')?.toString().trim() || null;
+
+    const { geocodeAddress, buildAddressQuery } = await import('../../lib/places/geocoding');
+    const addressQuery = buildAddressQuery({ street, zip, city, country });
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let geocodeWarning: string | null = null;
+
+    if (addressQuery.length >= 5) {
+      const result = await geocodeAddress(addressQuery);
+      if (result) {
+        lat = result.lat;
+        lng = result.lng;
+      } else {
+        geocodeWarning = 'Adresse gespeichert, aber Geo-Koordinaten konnten nicht ermittelt werden. Bitte Adresse prüfen.';
+      }
+    }
+
+    const updates: Record<string, any> = {
+      address_street: street,
+      address_zip: zip,
+      city: city,
+      country: country,
+    };
+    if (lat !== null && lng !== null) {
+      updates.latitude = lat;
+      updates.longitude = lng;
+    }
+
+    const { error } = await client.from('hotels').update(updates).eq('id', hotel.id);
+    if (error) {
+      message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+    } else if (geocodeWarning) {
+      message = { type: 'error', text: geocodeWarning };
+    } else if (lat !== null) {
+      message = { type: 'success', text: `Adresse verifiziert ✓ — 📍 ${lat.toFixed(4)}, ${lng!.toFixed(4)}` };
+    } else {
+      message = { type: 'success', text: 'Adresse gespeichert.' };
+    }
   } else if (action === 'update_address_form') {
     const newForm = form.get('address_form')?.toString();
     if (newForm === 'du' || newForm === 'sie') {
@@ -136,6 +182,15 @@ const { data: settings } = await client
   `)
   .eq('hotel_id', hotel.id)
   .maybeSingle();
+
+// Sprint E2 Phase 3 — Hotel-Adresse + Geocoding-Status
+const { data: hotelRow } = await client
+  .from('hotels')
+  .select('address_street, address_zip, city, country, latitude, longitude')
+  .eq('id', hotel.id)
+  .maybeSingle();
+const hr = (hotelRow ?? {}) as any;
+const hasGeocode = typeof hr.latitude === 'number' && typeof hr.longitude === 'number';
 
 const s = settings || {};
 
@@ -250,6 +305,99 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
       <button type="submit" class="bauhaus-button bauhaus-button--primary">
         {t('settings.guest_address.submit', userLocale)}
       </button>
+    </form>
+  </section>
+
+  <!-- Sprint E2 Phase 3 — Adresse + Geocoding -->
+  <section class="settings-section">
+    <div class="settings-section-marker-bar">
+      <span class="settings-section-marker settings-section-marker--circle"></span>
+      <p class="settings-section-eyebrow">— Standort —</p>
+      <span class="settings-section-line"></span>
+    </div>
+    <h2 class="settings-section-headline">Hotel-Adresse</h2>
+    <p class="text-sm text-anthrazit/55 mb-4 max-w-xl leading-relaxed">
+      Pflichtfeld für das Empfehlungs-Modul (Sprint E2). Aus Adresse und PLZ ermitteln
+      wir per Geocoding die Geo-Koordinaten — Eve nutzt sie um Restaurants, Cafés und
+      Sehenswürdigkeiten in der Nachbarschaft zu finden.
+    </p>
+
+    <form method="POST" class="settings-section-form space-y-4 max-w-2xl">
+      <input type="hidden" name="_action" value="update_address" />
+
+      <div>
+        <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Straße + Hausnummer</label>
+        <input
+          type="text"
+          name="address_street"
+          value={hr.address_street ?? ''}
+          placeholder="z.B. Hardenbergstraße 4"
+          autocomplete="street-address"
+          class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm"
+        />
+      </div>
+
+      <div class="grid grid-cols-[120px_1fr] gap-4">
+        <div>
+          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">PLZ</label>
+          <input
+            type="text"
+            name="address_zip"
+            value={hr.address_zip ?? ''}
+            placeholder="10623"
+            autocomplete="postal-code"
+            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm font-mono"
+          />
+        </div>
+        <div>
+          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Stadt</label>
+          <input
+            type="text"
+            name="city"
+            value={hr.city ?? ''}
+            placeholder="Berlin"
+            autocomplete="address-level2"
+            required
+            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Land</label>
+        <input
+          type="text"
+          name="country"
+          value={hr.country ?? 'DE'}
+          placeholder="DE"
+          autocomplete="country"
+          maxlength="2"
+          required
+          class="w-32 px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm font-mono uppercase"
+        />
+        <p class="text-xs text-anthrazit/55 mt-1 italic">ISO-2-Code, z.B. DE, AT, CH, FR.</p>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button
+          type="submit"
+          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors"
+        >
+          Adresse speichern + verifizieren
+        </button>
+
+        {hasGeocode ? (
+          <span class="text-xs text-green-700 inline-flex items-center gap-1">
+            <span>📍</span>
+            <span class="font-mono">{Number(hr.latitude).toFixed(4)}, {Number(hr.longitude).toFixed(4)}</span>
+            <span>— verifiziert</span>
+          </span>
+        ) : (
+          <span class="text-xs text-anthrazit/55 italic">
+            Geo-Koordinaten noch nicht ermittelt
+          </span>
+        )}
+      </div>
     </form>
   </section>
 
