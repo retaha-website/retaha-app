@@ -1,0 +1,58 @@
+---
+// Sprint E3 Phase 1 — Operations-Dashboard Landing (Stub)
+//
+// Phase 2 baut Stat-Cards (Belegung / Frühstück / Service) + Sektionen
+// (Service-Anfragen pending, Frühstück morgen, Eve-Counter).
+
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const now = new Date();
+const weekdayDate = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+const hour = now.getHours();
+const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+---
+
+<AppLayout title="Übersicht" hotel={hotel} user={{ email: user.email ?? '' }}>
+  <header class="app-page-header">
+    <p class="app-page-eyebrow">— {weekdayDate} —</p>
+    <h1 class="app-page-title">{greeting}, {hotel.name}.</h1>
+  </header>
+
+  <div class="app-stub">
+    <p class="app-stub-eyebrow">— Phase 2 —</p>
+    <p class="app-stub-text">Hier kommen die Stat-Cards (Belegung / Frühstück / Service-Pending) und die operativen Sektionen.</p>
+  </div>
+
+  <style>
+    .app-page-header { margin-bottom: 32px; }
+    .app-page-eyebrow {
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(26, 26, 26, 0.45); margin: 0 0 8px;
+    }
+    .app-page-title {
+      font-size: 28px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.2;
+      margin: 0; color: #1A1A1A;
+    }
+    .app-stub {
+      padding: 32px 24px;
+      background: #fff;
+      border: 1px dashed #e0e0e0;
+      text-align: center;
+    }
+    .app-stub-eyebrow {
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: #FF4A82; margin: 0 0 8px;
+    }
+    .app-stub-text {
+      font-size: 14px; color: rgba(26, 26, 26, 0.55); margin: 0;
+    }
+  </style>
+</AppLayout>

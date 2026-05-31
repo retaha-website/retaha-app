@@ -1,0 +1,37 @@
+---
+// Sprint E3 Phase 1 — QR-Codes (Stub)
+//
+// Phase 5 baut Hotel-weit + Pro-Zimmer-QR-Generierung (qrcode-Lib), Phase 6
+// das PDF-Export-Format für ausdruckbaren Bogen.
+
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getUser, getUserHotels } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+---
+
+<AppLayout title="QR-Codes" hotel={hotel} user={{ email: user.email ?? '' }}>
+  <header class="app-page-header">
+    <p class="app-page-eyebrow">— Operations —</p>
+    <h1 class="app-page-title">QR-Codes.</h1>
+  </header>
+
+  <div class="app-stub">
+    <p class="app-stub-eyebrow">— Phase 5 + 6 —</p>
+    <p class="app-stub-text">QR-Code-Generierung für Hotel-weit + Pro-Zimmer (room_code-Pairing aus Sprint D Phase 3), PDF-Export für Druck-Bogen.</p>
+  </div>
+
+  <style>
+    .app-page-header { margin-bottom: 32px; }
+    .app-page-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26, 26, 26, 0.45); margin: 0 0 8px; }
+    .app-page-title { font-size: 28px; font-weight: 300; letter-spacing: -0.01em; margin: 0; color: #1A1A1A; }
+    .app-stub { padding: 32px 24px; background: #fff; border: 1px dashed #e0e0e0; text-align: center; }
+    .app-stub-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #FF4A82; margin: 0 0 8px; }
+    .app-stub-text { font-size: 14px; color: rgba(26, 26, 26, 0.55); margin: 0; }
+  </style>
+</AppLayout>

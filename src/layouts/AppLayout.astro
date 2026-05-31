@@ -1,0 +1,260 @@
+---
+// Sprint E3 Phase 1 — AppLayout für Operations-Dashboard (/app/*)
+//
+// KAPSELUNGS-DISZIPLIN: dieses Layout importiert KEINE AdminLayout-Internals
+// (NotificationBell, AdminFooter, etc.). Sprint F zieht /app sauber raus
+// nach dashboard.retaha.de — je weniger Cross-Dependencies, desto einfacher.
+//
+// Mobile-first: Top-Bar mit Hotel-Name + Settings-Icon-Link (→ /admin),
+// darunter horizontal scrollbare Tab-Bar. Auf Desktop: Tab-Bar zentriert
+// neben Hotel-Name.
+
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  hotel: { name: string; slug: string; logo_url?: string | null };
+  user: { email: string };
+}
+
+const { title, hotel, user } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+interface NavItem { href: string; label: string; matchPrefix?: boolean }
+const NAV: NavItem[] = [
+  { href: '/app',          label: 'Übersicht' },
+  { href: '/app/bookings', label: 'Buchungen', matchPrefix: true },
+  { href: '/app/service',  label: 'Service' },
+  { href: '/app/qr',       label: 'QR-Codes' },
+];
+
+function isActive(item: NavItem): boolean {
+  if (item.matchPrefix) return currentPath === item.href || currentPath.startsWith(item.href + '/');
+  return currentPath === item.href;
+}
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · retaha operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="app-body">
+    <!-- Top-Bar -->
+    <header class="app-header">
+      <div class="app-header-inner">
+        <a href="/app" class="app-brand" aria-label={`${hotel.name} · Operations`}>
+          {hotel.logo_url ? (
+            <img src={hotel.logo_url} alt={hotel.name} class="app-brand-logo" />
+          ) : (
+            <span class="app-brand-text">{hotel.name}</span>
+          )}
+          <span class="app-brand-eyebrow">operations</span>
+        </a>
+
+        <div class="app-header-right">
+          <a
+            href="/admin"
+            class="app-header-config-link"
+            title="Zur Konfiguration im Backoffice"
+            aria-label="Konfiguration"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span class="app-header-config-label">Konfiguration</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Tab-Nav (horizontal scrollbar auf mobile) -->
+      <nav class="app-nav" aria-label="Operations-Navigation">
+        <div class="app-nav-inner">
+          {NAV.map(item => (
+            <a
+              href={item.href}
+              class={`app-nav-tab${isActive(item) ? ' is-active' : ''}`}
+              aria-current={isActive(item) ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+    </header>
+
+    <!-- Page-Content -->
+    <main class="app-main">
+      <slot />
+    </main>
+
+    <!-- Footer (minimal, kapselt nicht AdminFooter) -->
+    <footer class="app-footer">
+      <span class="app-footer-email">{user.email}</span>
+      <span class="app-footer-sep">·</span>
+      <span class="app-footer-slug">/{hotel.slug}</span>
+    </footer>
+
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error - Alpine types
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+
+    <style is:global>
+      .app-body {
+        min-height: 100vh;
+        background: #fafafa;
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+        color: #1A1A1A;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        -webkit-font-smoothing: antialiased;
+      }
+      [x-cloak] { display: none !important; }
+
+      /* Header */
+      .app-header {
+        background: #fff;
+        border-bottom: 1px solid #e8e8e8;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+      }
+      .app-header-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .app-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        text-decoration: none;
+        color: #1A1A1A;
+        min-width: 0;
+      }
+      .app-brand-logo {
+        height: 24px;
+        width: auto;
+        object-fit: contain;
+      }
+      .app-brand-text {
+        font-size: 17px;
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        line-height: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .app-brand-eyebrow {
+        font-size: 9px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #FF4A82;
+        font-weight: 500;
+        line-height: 1;
+      }
+      .app-header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+      .app-header-config-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        color: rgba(26, 26, 26, 0.65);
+        text-decoration: none;
+        border: 1px solid #e8e8e8;
+        border-radius: 4px;
+        transition: color 0.15s, border-color 0.15s, background 0.15s;
+      }
+      .app-header-config-link:hover {
+        color: #1A1A1A;
+        background: #f5f5f5;
+        border-color: #ccc;
+      }
+      .app-header-config-label {
+        display: none;
+      }
+      @media (min-width: 768px) {
+        .app-header-config-label { display: inline; }
+      }
+
+      /* Tab-Nav */
+      .app-nav {
+        border-top: 1px solid #f0f0f0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .app-nav::-webkit-scrollbar { display: none; }
+      .app-nav-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+        display: flex;
+        gap: 4px;
+      }
+      .app-nav-tab {
+        flex-shrink: 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: rgba(26, 26, 26, 0.55);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        transition: color 0.15s, border-color 0.15s;
+        margin-bottom: -1px;
+        white-space: nowrap;
+      }
+      .app-nav-tab:hover { color: #1A1A1A; }
+      .app-nav-tab.is-active {
+        color: #1A1A1A;
+        border-bottom-color: #FF4A82;
+        font-weight: 500;
+      }
+
+      /* Main */
+      .app-main {
+        flex: 1;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 20px 48px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      @media (min-width: 768px) {
+        .app-main { padding: 32px 20px 64px; }
+      }
+
+      /* Footer */
+      .app-footer {
+        padding: 16px 20px;
+        text-align: center;
+        font-size: 11px;
+        color: rgba(26, 26, 26, 0.35);
+        border-top: 1px solid #f0f0f0;
+        font-family: 'JetBrains Mono', monospace;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+      .app-footer-sep { color: rgba(26, 26, 26, 0.2); }
+    </style>
+  </body>
+</html>
