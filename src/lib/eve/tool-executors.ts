@@ -9,6 +9,7 @@
 
 import { createSupabaseServiceRoleInstance } from '../auth';
 import { isLookupTool, isActionTool } from './tools';
+import { haversineMeters, walkingMinutes } from '../places/distance';
 
 const sb = () => createSupabaseServiceRoleInstance();
 
@@ -136,17 +137,115 @@ async function getBreakfastMenu(ctx: EveExecutionContext) {
   };
 }
 
+// Sprint E2 Phase 9 — getRecommendations liest jetzt place_picks +
+// nearby_cache (statt hotel_settings.recommendations = Action-Cards).
+// Picks-First mit Hotel-Notiz, Auto-Empfehlungen ergänzend mit Dedup.
 async function getRecommendations(ctx: EveExecutionContext, category?: string) {
-  const { data } = await sb()
-    .from('hotel_settings')
-    .select('recommendations')
-    .eq('hotel_id', ctx.hotel_id)
+  const sup = sb();
+  const cat = (category && category !== 'all') ? category : null;
+
+  // 1. Hotel-Coordinates + default-language für hotel_note-Fallback
+  const { data: hotelRow } = await sup
+    .from('hotels')
+    .select('latitude, longitude, default_language')
+    .eq('id', ctx.hotel_id)
     .maybeSingle();
-  let recs = (data?.recommendations as any[]) ?? [];
-  if (category && category !== 'all') {
-    recs = recs.filter(r => (r.category ?? '').toLowerCase() === category.toLowerCase());
+  const hotelLoc = hotelRow?.latitude && hotelRow?.longitude
+    ? { lat: hotelRow.latitude as number, lng: hotelRow.longitude as number }
+    : null;
+
+  // 2. Gast-Sprache (für hotel_note_<lang>) — wenn Stay vorhanden, sonst default
+  let guestLang: 'de' | 'en' | 'fr' | 'es' = 'de';
+  if (ctx.stay_id) {
+    const { data: stayRow } = await sup
+      .from('stays')
+      .select('guests(language)')
+      .eq('id', ctx.stay_id)
+      .maybeSingle();
+    const g = (stayRow?.guests as any)?.language;
+    if (g === 'en' || g === 'fr' || g === 'es' || g === 'de') guestLang = g;
   }
-  return { recommendations: recs };
+
+  // 3. Picks laden
+  let picksQuery = sup
+    .from('hotel_place_picks')
+    .select('place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, cached_data, sort_order')
+    .eq('hotel_id', ctx.hotel_id)
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true });
+  if (cat) picksQuery = picksQuery.eq('category', cat);
+  const { data: picks } = await picksQuery;
+
+  // 4. Nearby-Cache laden
+  let nearbyQuery = sup
+    .from('hotel_place_nearby_cache')
+    .select('category, cached_places')
+    .eq('hotel_id', ctx.hotel_id);
+  if (cat) nearbyQuery = nearbyQuery.eq('category', cat);
+  const { data: nearbyRows } = await nearbyQuery;
+
+  // 5. Dedup + Sort + Slice für Auto
+  const pickPlaceIds = new Set((picks ?? []).map(p => p.place_id));
+  const autoFlat = (nearbyRows ?? [])
+    .flatMap(c => (c.cached_places as any[]).map(p => ({ ...p, category: c.category })))
+    .filter(p => !pickPlaceIds.has(p.placeId))
+    .sort((a, b) => {
+      const r = (b.rating ?? 0) - (a.rating ?? 0);
+      if (r !== 0) return r;
+      return (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+    })
+    .slice(0, 10);
+
+  // 6. Format für LLM (minimal Felder, kein JSON-Pollution)
+  return {
+    picks: (picks ?? []).map(p => formatPickForLLM(p, hotelLoc, guestLang)),
+    auto: autoFlat.map(p => formatAutoForLLM(p, hotelLoc)),
+    hotel_has_location: hotelLoc !== null,
+    guest_language: guestLang,
+  };
+}
+
+function formatPickForLLM(pick: any, hotelLoc: { lat: number; lng: number } | null, lang: 'de' | 'en' | 'fr' | 'es') {
+  const cd = pick.cached_data ?? {};
+  // Sprach-aware Hotel-Notiz mit Fallback auf DE
+  const noteField = `hotel_note${lang === 'de' ? '' : '_' + lang}`;
+  const note = (pick[noteField] || pick.hotel_note || null) as string | null;
+  const loc = cd.location;
+  let walking: number | undefined;
+  if (hotelLoc && loc?.lat && loc?.lng) {
+    walking = walkingMinutes(haversineMeters(hotelLoc, { lat: loc.lat, lng: loc.lng }));
+  }
+  return {
+    name: cd.name,
+    category: pick.category,
+    rating: cd.rating,
+    review_count: cd.user_ratings_total,
+    price_level: cd.price_level,
+    types: cd.types,
+    opening_hours_text: cd.opening_hours?.weekdayDescriptions?.join(' / '),
+    is_open_now: cd.opening_hours?.openNow,
+    address: cd.formatted_address,
+    walking_minutes: walking,
+    hotel_note: note?.trim() || null,
+    is_pick: true,
+  };
+}
+
+function formatAutoForLLM(place: any, hotelLoc: { lat: number; lng: number } | null) {
+  let walking: number | undefined;
+  if (hotelLoc && place.location?.lat && place.location?.lng) {
+    walking = walkingMinutes(haversineMeters(hotelLoc, { lat: place.location.lat, lng: place.location.lng }));
+  }
+  return {
+    name: place.name,
+    category: place.category,
+    rating: place.rating,
+    review_count: place.userRatingCount,
+    types: place.types,
+    address: place.formattedAddress,
+    walking_minutes: walking,
+    is_pick: false,
+  };
 }
 
 async function getActiveBookings(ctx: EveExecutionContext) {

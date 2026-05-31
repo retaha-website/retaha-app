@@ -38,14 +38,36 @@ export const EVE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'get_recommendations',
-    description: 'Liefert vom Hotelier kuratierte Empfehlungen in der Nachbarschaft (Restaurants, Cafés, Bars, Aktivitäten, Sehenswürdigkeiten). Filtere optional nach Kategorie.',
+    description: `Liefert Empfehlungen für den Gast in der Hotel-Nachbarschaft.
+Backend liefert ZWEI Listen:
+- picks: Hotelier-kuratierte Premium-Empfehlungen mit Hotel-Notiz (is_pick=true).
+  Diese sind IMMER priorisiert.
+- auto: Auto-Empfehlungen aus Google Places (top 10 nach Rating sortiert),
+  Dedup gegen Picks bereits erledigt.
+
+Jeder Eintrag hat: name, rating, review_count, price_level, walking_minutes,
+opening_hours_text, is_open_now (bei Picks). Picks zusätzlich: hotel_note.
+
+Best-Practice für deine Antwort:
+- Wenn picks für die gefragte Kategorie da: erwähne diese ZUERST mit der
+  hotel_note (Premium-Differenzierung — das ist warum der Hotelier zahlt)
+- Ergänze mit 1-3 auto-Empfehlungen wenn relevant
+- Bei filter_hint ("romantisch", "günstig", "vegan", "ruhig"): filtere
+  selbst basierend auf rating (>=4.5 für "Premium"), price_level, types,
+  und ggf. hotel_note-Inhalt
+- Erwähne IMMER die walking_minutes wenn vorhanden ("5 Min zu Fuß")
+- Bei leeren Listen: ehrlich sagen + zur Rezeption verweisen`,
     input_schema: {
       type: 'object',
       properties: {
         category: {
           type: 'string',
-          enum: ['restaurant', 'cafe', 'bar', 'activity', 'sightseeing', 'all'],
-          description: 'Welche Art von Empfehlung. "all" wenn unklar oder generelle Anfrage.',
+          enum: ['restaurant', 'cafe', 'bar', 'activity', 'sight', 'all'],
+          description: 'Kategorie. "all" wenn der Gast unklar fragt oder gemischte Empfehlungen will.',
+        },
+        filter_hint: {
+          type: 'string',
+          description: 'Optional: was der Gast sucht (z.B. "romantisch", "günstig", "vegan", "ruhig", "open jetzt"). Du nutzt das beim Filtern + bei der Antwort-Formulierung.',
         },
       },
       required: [],
