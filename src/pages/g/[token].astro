@@ -217,15 +217,52 @@ const now = new Date();
 const dayPartLabel = dayPart(lang, now.getHours());
 const dateLabel = now.toLocaleDateString(localeMap[lang], { weekday: 'long', day: 'numeric', month: 'short' });
 
-const recs = (settings.recommendations as any[]).map(rec => ({
-  id: rec.id,
-  eyebrow: pick(rec, 'eyebrow', lang),
-  title: pick(rec, 'title', lang),
-  sub: pick(rec, 'sub', lang),
-  cta: pick(rec, 'cta', lang),
-  cardClass: rec.card_class || 'rec-white',
-  icon: rec.id === 'garden' ? 'sun' : rec.id === 'conference' ? 'square' : 'triangle',
-}));
+// Sprint E7 Phase 4 — Action-Cards aus relationaler Tabelle laden.
+// Fallback auf alte hotel_settings.recommendations JSONB falls ein Hotel
+// noch nicht migriert wurde — wird in Phase 5 entfernt.
+const { data: actionCardsRows } = await sbSr
+  .from('hotel_action_cards')
+  .select('id, card_type, action_target, title_de, title_en, title_fr, title_es, subtitle_de, subtitle_en, subtitle_fr, subtitle_es, eyebrow_de, eyebrow_en, eyebrow_fr, eyebrow_es, cta_de, cta_en, cta_fr, cta_es, image_url, card_class, sort_order')
+  .eq('hotel_id', hotel.id)
+  .eq('is_published', true)
+  .order('sort_order', { ascending: true });
+
+function defaultIconForType(card_type: string): 'sun' | 'square' | 'triangle' {
+  switch (card_type) {
+    case 'external_link': return 'square';
+    case 'phone': case 'email': case 'info': return 'triangle';
+    default: return 'sun';
+  }
+}
+
+// pick() erwartet `${field}_${lang}`. action_cards-Spalten heißen schon so —
+// also kann ich pick(card, 'title', lang) direkt aufrufen.
+const recs = (actionCardsRows && actionCardsRows.length > 0)
+  ? actionCardsRows.map((card: any) => ({
+      id: card.id,
+      cardType: card.card_type,
+      actionTarget: card.action_target,
+      imageUrl: card.image_url,
+      eyebrow: pick(card, 'eyebrow', lang),
+      title:   pick(card, 'title', lang),
+      sub:     pick(card, 'subtitle', lang),
+      cta:     pick(card, 'cta', lang),
+      cardClass: card.card_class || 'rec-anthrazit',
+      icon: defaultIconForType(card.card_type),
+    }))
+  // Fallback (Phase-5-deprecate): alte JSONB
+  : (settings.recommendations as any[]).map(rec => ({
+      id: rec.id,
+      cardType: 'internal_action' as const,
+      actionTarget: rec.action ?? null,
+      imageUrl: null as string | null,
+      eyebrow: pick(rec, 'eyebrow', lang),
+      title: pick(rec, 'title', lang),
+      sub: pick(rec, 'sub', lang),
+      cta: pick(rec, 'cta', lang),
+      cardClass: rec.card_class || 'rec-white',
+      icon: (rec.id === 'garden' ? 'sun' : rec.id === 'conference' ? 'square' : 'triangle') as 'sun' | 'square' | 'triangle',
+    }));
 
 const weather = {
   temperature: 21,
@@ -343,7 +380,18 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
                  :class="{ dragging: recIsDragging }">
               {recs.map((rec) => (
                 <div class="rec-slide">
-                  <div class={`rec-card ${rec.cardClass}`}>
+                  <div
+                    class={`rec-card ${rec.cardClass}${rec.cardType === 'info' ? ' rec-card--info' : ''}`}
+                    data-card-id={rec.id}
+                    data-card-type={rec.cardType}
+                    data-action-target={rec.actionTarget ?? ''}
+                    @click={rec.cardType === 'info' ? undefined : `handleRecClick($el)`}
+                    role={rec.cardType === 'info' ? undefined : 'button'}
+                    tabindex={rec.cardType === 'info' ? undefined : '0'}
+                  >
+                    {rec.imageUrl ? (
+                      <img class="rec-card-image" src={rec.imageUrl} alt="" loading="lazy" />
+                    ) : (
                     <span class="rec-card-icon">
                       {rec.icon === 'sun' && (
                         <svg viewBox="0 0 100 100" style="overflow:visible">
@@ -368,10 +416,13 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
                         <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor"><polygon points="12,4 20,18 4,18"/></svg>
                       )}
                     </span>
-                    <div class="rec-card-eyebrow">{rec.eyebrow}</div>
+                    )}
+                    {rec.eyebrow && <div class="rec-card-eyebrow">{rec.eyebrow}</div>}
                     <div class="rec-card-title">{rec.title}</div>
-                    <div class="rec-card-sub">{rec.sub}</div>
-                    <button class="rec-card-cta" type="button">{rec.cta}</button>
+                    {rec.sub && <div class="rec-card-sub">{rec.sub}</div>}
+                    {rec.cta && rec.cardType !== 'info' && (
+                      <button class="rec-card-cta" type="button" @click.stop={`handleRecClick($el.closest('.rec-card'))`}>{rec.cta}</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -906,6 +957,59 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           this.activeSheet = id;
           this.sheetDragOffset = 0;
           document.body.style.overflow = 'hidden';
+        },
+
+        // Sprint E7 Phase 4 — Action-Card-Click dispatch (5 Typen)
+        handleRecClick(el: HTMLElement) {
+          if (!el) return;
+          const cardType = el.dataset.cardType;
+          const target = el.dataset.actionTarget || '';
+
+          switch (cardType) {
+            case 'internal_action': {
+              if (!target) return;
+              const sheetId = target.replace(/^open_/, '');
+              if (sheetId === 'eve') {
+                this.eveOpen = true;
+                this.eveSeenBefore = true;
+                try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
+                if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
+                return;
+              }
+              const KNOWN_SHEETS = new Set(['wifi', 'breakfast', 'conference', 'service', 'places']);
+              if (KNOWN_SHEETS.has(sheetId)) {
+                this.openSheet(sheetId);
+              } else {
+                this._showRecToast('Diese Funktion ist bald verfügbar.');
+              }
+              return;
+            }
+            case 'external_link':
+              if (target) window.open(target, '_blank', 'noopener,noreferrer');
+              return;
+            case 'phone':
+              if (target) window.location.href = `tel:${target.replace(/\s+/g, '')}`;
+              return;
+            case 'email':
+              if (target) window.location.href = `mailto:${target}`;
+              return;
+            case 'info':
+            default:
+              return;
+          }
+        },
+
+        _showRecToast(text: string) {
+          let t = document.getElementById('rec-toast');
+          if (!t) {
+            t = document.createElement('div');
+            t.id = 'rec-toast';
+            t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;background:rgba(26,26,26,.92);color:#fff;font-size:14px;font-family:inherit;border-radius:0;z-index:1000;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.2);';
+            document.body.appendChild(t);
+          }
+          t.textContent = text;
+          t.style.opacity = '1';
+          setTimeout(() => { if (t) t.style.opacity = '0'; t.style.transition = 'opacity .4s'; }, 2500);
         },
 
         closeSheet() {
