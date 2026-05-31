@@ -270,7 +270,11 @@ if (savedParam === 'pick_added' && !message) {
         const cd = (pick.cached_data ?? {}) as any;
         const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 200) : null;
         return (
-          <article class="mb-4 border border-stein bg-white" x-data="{ editing: false }">
+          <article
+            class={`mb-4 border bg-white transition-all duration-700`}
+            x-data={`pickCardRefresh('${pick.id}')`}
+            :class="{ 'border-pink-shock shadow-lg': pulse, 'border-stein': !pulse }"
+          >
             <div x-show="!editing" class="p-4 flex gap-4">
               {photoUrl && (
                 <img src={photoUrl} alt={cd.name ?? ''} class="w-24 h-24 object-cover flex-shrink-0" loading="lazy" />
@@ -296,6 +300,14 @@ if (savedParam === 'pick_added' && !message) {
                       </form>
                     )}
                     <button type="button" @click="editing = true" class="text-xs text-anthrazit/55 hover:text-pink-shock px-2">Notiz</button>
+                    <button
+                      type="button"
+                      class="text-xs text-anthrazit/55 hover:text-pink-shock px-1 disabled:opacity-50 disabled:cursor-wait"
+                      :disabled="refreshing"
+                      @click="refresh()"
+                      :title="refreshing ? '...' : 'Daten von Google aktualisieren'"
+                      aria-label="Refresh"
+                    >↻</button>
                     <form method="POST" class="inline" onsubmit="return confirm('Diesen Pick wirklich entfernen?')">
                       <input type="hidden" name="_action" value="pick_delete" />
                       <input type="hidden" name="id" value={pick.id} />
@@ -338,11 +350,23 @@ if (savedParam === 'pick_added' && !message) {
     </section>
 
     <!-- Auto-Suggestions aus nearby_cache -->
-    <section>
-      <h2 class="text-lg font-light mb-3">
-        Mehr in der Nähe
-        {autoSuggestions.length > 0 && <span class="text-anthrazit/40 text-sm">({autoSuggestions.length})</span>}
-      </h2>
+    <section x-data={`placesRefresh('${activeCategory}')`}>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-light">
+          Mehr in der Nähe
+          {autoSuggestions.length > 0 && <span class="text-anthrazit/40 text-sm">({autoSuggestions.length})</span>}
+        </h2>
+        <button
+          type="button"
+          class="text-xs text-anthrazit/55 hover:text-pink-shock border border-stein hover:border-pink-shock px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-wait"
+          :disabled="refreshing"
+          @click="refreshNearby()"
+        >
+          <span x-show="!refreshing">↻ Auto-Empfehlungen aktualisieren</span>
+          <span x-show="refreshing" x-cloak>… aktualisiere</span>
+        </button>
+      </div>
+      <p x-show="refreshMessage" x-cloak class="mb-3 px-3 py-2 text-xs" :class="refreshOk ? 'bg-green-50 text-green-800 border-l-2 border-green-700' : 'bg-red-50 text-red-800 border-l-2 border-red-700'" x-text="refreshMessage"></p>
       {!nearbyCache && (
         <div class="p-4 bg-anthrazit/5 text-sm text-anthrazit/55 italic">
           Auto-Empfehlungen werden noch nicht angezeigt. Der monatliche Refresh-Cron (Phase 6)
@@ -398,6 +422,69 @@ if (savedParam === 'pick_added' && !message) {
             this.suggestions = [];
           } finally {
             this.pending = false;
+          }
+        },
+      }));
+
+      // @ts-expect-error - Alpine global
+      Alpine.data('placesRefresh', (category: string) => ({
+        category,
+        refreshing: false,
+        refreshMessage: '' as string,
+        refreshOk: true,
+
+        async refreshNearby() {
+          this.refreshing = true;
+          this.refreshMessage = '';
+          try {
+            const res = await fetch('/api/admin/places/refresh-nearby', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category: this.category }),
+            });
+            const body = await res.json();
+            if (body.ok) {
+              this.refreshOk = true;
+              this.refreshMessage = `Aktualisiert — ${body.total_places_cached ?? 0} Places für ${this.category} gefunden. (Lade die Seite neu für den Anzeige-Update.)`;
+            } else {
+              this.refreshOk = false;
+              this.refreshMessage = `Fehler: ${body.error ?? 'unbekannt'}`;
+            }
+          } catch (err) {
+            this.refreshOk = false;
+            this.refreshMessage = `Netzwerk-Fehler: ${(err as Error).message}`;
+          } finally {
+            this.refreshing = false;
+          }
+        },
+      }));
+
+      // @ts-expect-error - Alpine global
+      Alpine.data('pickCardRefresh', (pickId: string) => ({
+        pickId,
+        editing: false,
+        refreshing: false,
+        pulse: false,
+
+        async refresh() {
+          this.refreshing = true;
+          try {
+            const res = await fetch('/api/admin/places/refresh-pick', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: this.pickId }),
+            });
+            const body = await res.json();
+            if (body.ok) {
+              this.pulse = true;
+              setTimeout(() => { this.pulse = false; }, 2500);
+            } else {
+              console.warn('[pick refresh]', body.error);
+            }
+          } catch (err) {
+            console.warn('[pick refresh] network', err);
+          } finally {
+            this.refreshing = false;
           }
         },
       }));
