@@ -175,6 +175,8 @@ export async function loadBookingsForHotel(hotelId: string, type?: string): Prom
     .from('bookings')
     .select(`
       id, type, status, details, created_at, updated_at,
+      mews_order_id, mews_push_attempted_at, mews_push_error,
+      mews_cancelled_at, mews_cancel_error,
       stay:stays (
         id, check_in, check_out,
         room:rooms (room_number, room_name),
