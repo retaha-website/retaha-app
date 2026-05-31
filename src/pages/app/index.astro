@@ -1,11 +1,13 @@
 ---
-// Sprint E3 Phase 1 — Operations-Dashboard Landing (Stub)
+// Sprint E3 Phase 2 — Operations-Dashboard Landing
 //
-// Phase 2 baut Stat-Cards (Belegung / Frühstück / Service) + Sektionen
-// (Service-Anfragen pending, Frühstück morgen, Eve-Counter).
+// 3 Stat-Cards (Belegung / Frühstück / Service) + Service-Pending mit
+// Quick-Actions + Frühstück morgen + Eve-Counter heute (vorgezogen aus
+// Phase 7). Plus optional Mews-Push-Trigger bei Service-Confirm
+// (analog Bookings-update-status aus Sprint C).
 
 import AppLayout from '../../layouts/AppLayout.astro';
-import { getUser, getUserHotels } from '../../lib/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -13,6 +15,109 @@ if (!user) return Astro.redirect('/admin/login');
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+// ─── POST: Service-Quick-Action ───────────────────────────────
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString();
+  const bookingId = form.get('booking_id')?.toString();
+
+  if ((action === 'service_confirm' || action === 'service_reject') && bookingId) {
+    const newStatus = action === 'service_confirm' ? 'confirmed' : 'cancelled';
+    const { error } = await client
+      .from('bookings')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', bookingId)
+      .eq('hotel_id', hotel.id);
+
+    if (error) {
+      message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+    } else {
+      message = { type: 'success', text: newStatus === 'confirmed' ? 'Service-Anfrage bestätigt.' : 'Service-Anfrage abgelehnt.' };
+    }
+  }
+}
+
+// ─── Stat-Cards-Queries parallel ──────────────────────────────
+const todayIso = new Date().toISOString().slice(0, 10);
+const tomorrowIso = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+
+const [
+  totalRoomsRes,
+  occupiedNowRes,
+  breakfastTodayRes,
+  breakfastTomorrowRes,
+  servicePendingRes,
+  eveTodayRes,
+] = await Promise.all([
+  client.from('rooms').select('id', { count: 'exact', head: true }).eq('hotel_id', hotel.id),
+  client.from('stays')
+    .select('id', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('is_active', true)
+    .in('state', ['Confirmed', 'Started'])
+    .lte('check_in', new Date().toISOString())
+    .gt('check_out', new Date().toISOString()),
+  client.from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('type', 'breakfast')
+    .filter('details->>date', 'eq', todayIso),
+  client.from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('type', 'breakfast')
+    .filter('details->>date', 'eq', tomorrowIso),
+  client.from('bookings')
+    .select('id, type, details, created_at, stay:stays(id, guests(first_name, last_name), rooms(room_number))')
+    .eq('hotel_id', hotel.id)
+    .eq('type', 'service')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true }),
+  client.from('chat_messages')
+    .select('stay_id', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .gte('created_at', todayIso),
+]);
+
+const totalRooms = totalRoomsRes.count ?? 0;
+const occupiedNow = occupiedNowRes.count ?? 0;
+const breakfastToday = breakfastTodayRes.count ?? 0;
+const breakfastTomorrow = breakfastTomorrowRes.count ?? 0;
+const servicePendingRows = (servicePendingRes.data ?? []) as any[];
+const servicePending = servicePendingRows.length;
+const eveConversationsToday = eveTodayRes.count ?? 0;
+
+// Frühstück morgen — Zeitfenster ermitteln (kleinste + größte time_slot)
+const { data: breakfastTomorrowDetails } = await client
+  .from('bookings')
+  .select('details')
+  .eq('hotel_id', hotel.id)
+  .eq('type', 'breakfast')
+  .filter('details->>date', 'eq', tomorrowIso);
+
+const slots = (breakfastTomorrowDetails ?? [])
+  .map((b: any) => (b.details?.time_slot ?? '').toString())
+  .filter(Boolean)
+  .sort();
+const slotWindow = slots.length > 0 ? `${slots[0]}–${slots[slots.length - 1]}` : null;
+
+// Belegung-Formatter
+function formatOccupancy(occupied: number, total: number): { value: string; sub: string } {
+  if (total > 0) {
+    const pct = Math.round((occupied / total) * 100);
+    return { value: `${occupied}/${total}`, sub: `${pct}% belegt` };
+  }
+  if (occupied > 0) {
+    return { value: `${occupied}`, sub: 'aktive Gäste' };
+  }
+  return { value: '—', sub: 'keine Daten' };
+}
+const occ = formatOccupancy(occupiedNow, totalRooms);
 
 const now = new Date();
 const weekdayDate = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -26,33 +131,237 @@ const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten A
     <h1 class="app-page-title">{greeting}, {hotel.name}.</h1>
   </header>
 
-  <div class="app-stub">
-    <p class="app-stub-eyebrow">— Phase 2 —</p>
-    <p class="app-stub-text">Hier kommen die Stat-Cards (Belegung / Frühstück / Service-Pending) und die operativen Sektionen.</p>
+  {message && (
+    <div class={`app-flash ${message.type === 'success' ? 'app-flash--success' : 'app-flash--error'}`}>
+      {message.text}
+    </div>
+  )}
+
+  <!-- Stat-Cards -->
+  <section class="stat-grid">
+    <div class="stat-card">
+      <p class="stat-card-label">— Belegung jetzt —</p>
+      <p class="stat-card-value">{occ.value}</p>
+      <p class="stat-card-sub">{occ.sub}</p>
+    </div>
+
+    <div class="stat-card">
+      <p class="stat-card-label">— Frühstück heute —</p>
+      <p class="stat-card-value">{breakfastToday}</p>
+      <p class="stat-card-sub">{breakfastToday === 1 ? 'Buchung' : 'Buchungen'}</p>
+    </div>
+
+    <div class={`stat-card${servicePending > 0 ? ' stat-card--warning' : ''}`}>
+      <p class="stat-card-label">— Service offen —</p>
+      <p class="stat-card-value">{servicePending}</p>
+      <p class="stat-card-sub">{servicePending > 0 ? 'wartet auf Bestätigung' : 'alles erledigt ✓'}</p>
+    </div>
+  </section>
+
+  <!-- Service-Anfragen pending -->
+  <section class="app-section">
+    <h2 class="app-section-title">⚠ Service-Anfragen (brauchen Aktion)</h2>
+
+    {servicePending === 0 && (
+      <p class="app-section-empty">Keine offenen Anfragen — alles erledigt ✓</p>
+    )}
+
+    {servicePendingRows.map((b: any) => {
+      const stay = b.stay as any;
+      const guest = stay?.guests as any;
+      const room = stay?.rooms as any;
+      const guestName = [guest?.first_name, guest?.last_name].filter(Boolean).join(' ') || 'Gast';
+      const roomLabel = room?.room_number ?? '—';
+      const d = b.details ?? {};
+      const summary = d.item_name ?? d.service_type ?? 'Service-Anfrage';
+      const when = [d.date, d.time].filter(Boolean).join(' · ');
+
+      return (
+        <article class="service-row">
+          <div class="service-row-body">
+            <p class="service-row-summary">{summary}</p>
+            <p class="service-row-meta">
+              {guestName} · Zimmer {roomLabel}
+              {when && <span> · {when}</span>}
+            </p>
+            {d.details && <p class="service-row-notes">„{d.details}"</p>}
+          </div>
+          <div class="service-row-actions">
+            <form method="POST" class="inline">
+              <input type="hidden" name="_action" value="service_confirm" />
+              <input type="hidden" name="booking_id" value={b.id} />
+              <button type="submit" class="btn-confirm">Bestätigen</button>
+            </form>
+            <form method="POST" class="inline">
+              <input type="hidden" name="_action" value="service_reject" />
+              <input type="hidden" name="booking_id" value={b.id} />
+              <button type="submit" class="btn-reject">Ablehnen</button>
+            </form>
+          </div>
+        </article>
+      );
+    })}
+  </section>
+
+  <!-- Frühstück morgen -->
+  <section class="app-section">
+    <h2 class="app-section-title">Frühstück morgen</h2>
+    {breakfastTomorrow === 0 ? (
+      <p class="app-section-empty">Noch keine Buchungen für morgen.</p>
+    ) : (
+      <p class="app-section-stat">
+        <strong>{breakfastTomorrow}</strong> {breakfastTomorrow === 1 ? 'Buchung' : 'Buchungen'}
+        {slotWindow && <span> · Zeitfenster {slotWindow}</span>}
+        <a href={`/app/bookings?type=breakfast&filter=week`} class="app-section-link">→ Details ansehen</a>
+      </p>
+    )}
+  </section>
+
+  <!-- Eve-Counter -->
+  <section class="app-section">
+    <h2 class="app-section-title">🤖 Eve heute</h2>
+    {eveConversationsToday === 0 ? (
+      <p class="app-section-empty">Noch keine Eve-Gespräche heute.</p>
+    ) : (
+      <p class="app-section-stat">
+        <strong>{eveConversationsToday}</strong> {eveConversationsToday === 1 ? 'Gespräch' : 'Gespräche'} mit Gästen
+      </p>
+    )}
+  </section>
+
+  <!-- Quick-Links -->
+  <div class="app-quick-links">
+    <a href="/app/bookings" class="app-quick-link">→ Alle Buchungen</a>
+    <a href="/app/qr" class="app-quick-link">→ QR-Codes</a>
   </div>
 
   <style>
-    .app-page-header { margin-bottom: 32px; }
+    .app-page-header { margin-bottom: 28px; }
     .app-page-eyebrow {
       font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
       color: rgba(26, 26, 26, 0.45); margin: 0 0 8px;
     }
     .app-page-title {
-      font-size: 28px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.2;
+      font-size: 26px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.2;
       margin: 0; color: #1A1A1A;
     }
-    .app-stub {
-      padding: 32px 24px;
+    @media (min-width: 768px) {
+      .app-page-title { font-size: 32px; }
+    }
+
+    .app-flash {
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      border-left: 3px solid;
+    }
+    .app-flash--success { background: #e8f5ec; border-left-color: #1f7a3a; color: #145c2a; }
+    .app-flash--error { background: #fdeaea; border-left-color: #aa1f1f; color: #7a1515; }
+
+    /* Stat-Cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    @media (min-width: 640px) {
+      .stat-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    }
+    .stat-card {
       background: #fff;
-      border: 1px dashed #e0e0e0;
-      text-align: center;
+      border: 1px solid #e8e8e8;
+      padding: 20px;
+      transition: border-color 0.15s;
     }
-    .app-stub-eyebrow {
+    .stat-card--warning {
+      border-color: #FF4A82;
+      background: rgba(255, 74, 130, 0.04);
+    }
+    .stat-card-label {
       font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-      color: #FF4A82; margin: 0 0 8px;
+      color: rgba(26, 26, 26, 0.5); margin: 0 0 12px;
     }
-    .app-stub-text {
-      font-size: 14px; color: rgba(26, 26, 26, 0.55); margin: 0;
+    .stat-card-value {
+      font-size: 36px; font-weight: 300; line-height: 1;
+      color: #1A1A1A; margin: 0 0 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-card-sub { font-size: 13px; color: rgba(26, 26, 26, 0.55); margin: 0; }
+    .stat-card--warning .stat-card-sub { color: #FF4A82; font-weight: 500; }
+
+    /* Section */
+    .app-section {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .app-section-title {
+      margin: 0 0 16px;
+      font-size: 14px; font-weight: 500;
+      color: #1A1A1A;
+    }
+    .app-section-empty {
+      margin: 0;
+      font-size: 13px; font-style: italic;
+      color: rgba(26, 26, 26, 0.5);
+    }
+    .app-section-stat {
+      margin: 0;
+      font-size: 14px; color: #1A1A1A;
+    }
+    .app-section-stat strong { font-weight: 500; }
+    .app-section-link {
+      margin-left: 12px;
+      font-size: 13px; color: #FF4A82; text-decoration: none;
+    }
+    .app-section-link:hover { text-decoration: underline; }
+
+    /* Service-Row */
+    .service-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      padding: 14px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .service-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .service-row-body { flex: 1; min-width: 0; }
+    .service-row-summary { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: #1A1A1A; }
+    .service-row-meta { margin: 0; font-size: 12px; color: rgba(26, 26, 26, 0.55); }
+    .service-row-notes { margin: 8px 0 0; font-size: 13px; font-style: italic; color: rgba(26, 26, 26, 0.7); }
+    .service-row-actions {
+      display: flex; gap: 6px; flex-shrink: 0;
+    }
+    .inline { display: inline; }
+    .btn-confirm, .btn-reject {
+      padding: 6px 12px; font-size: 12px; font-weight: 500;
+      border: 1px solid; cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .btn-confirm { background: #FF4A82; color: #fff; border-color: #FF4A82; }
+    .btn-confirm:hover { background: #e63d72; border-color: #e63d72; }
+    .btn-reject { background: transparent; color: rgba(26, 26, 26, 0.65); border-color: #ddd; }
+    .btn-reject:hover { background: #f5f5f5; border-color: #999; }
+
+    /* Quick-Links */
+    .app-quick-links {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .app-quick-link {
+      padding: 12px 20px;
+      background: transparent;
+      border: 1px solid #ddd;
+      color: rgba(26, 26, 26, 0.75);
+      font-size: 14px;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .app-quick-link:hover {
+      background: #f5f5f5;
+      border-color: #999;
+      color: #1A1A1A;
     }
   </style>
 </AppLayout>
