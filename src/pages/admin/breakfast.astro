@@ -4,6 +4,7 @@ import BauhausToggle from '../../components/admin/BauhausToggle.astro';
 import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
 import { t } from '../../i18n/helpers';
+import { mergeAndTranslate, asLanguageCode } from '../../lib/i18n/save-hook.ts';
 
 const userLocale = Astro.locals.locale;
 
@@ -69,8 +70,14 @@ if (Astro.request.method === 'POST') {
     breakfast_start_time: form.get('breakfast_start_time')?.toString() || '07:30',
     breakfast_end_time: form.get('breakfast_end_time')?.toString() || '10:30',
     breakfast_slot_minutes: parseInt(form.get('breakfast_slot_minutes')?.toString() || '30') || 30,
-    breakfast_location_i18n: mergeI18n(currentSettings?.breakfast_location_i18n, locationDefault),
-    breakfast_included_i18n: mergeI18n(currentSettings?.breakfast_included_i18n, includedDefault),
+    // Sprint i18n Phase 6 — Auto-Translation via Save-Hook (parallel)
+    ...(await Promise.all([
+      mergeAndTranslate(currentSettings?.breakfast_location_i18n, locationDefault, asLanguageCode(hotelDefaultLang), { logLabel: 'hotel_settings.breakfast_location' }),
+      mergeAndTranslate(currentSettings?.breakfast_included_i18n, includedDefault, asLanguageCode(hotelDefaultLang), { logLabel: 'hotel_settings.breakfast_included' }),
+    ]).then(([locR, incR]) => ({
+      breakfast_location_i18n: Object.keys(locR.i18n).length > 0 ? locR.i18n : null,
+      breakfast_included_i18n: Object.keys(incR.i18n).length > 0 ? incR.i18n : null,
+    }))),
     updated_at: new Date().toISOString(),
   };
   // Safety-Net: spiegle Default zur alten DE-Spalte (Phase 10 dropt)

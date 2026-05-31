@@ -18,6 +18,7 @@ import PlacesSubNav from '../../../components/admin/PlacesSubNav.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../lib/auth';
 import { addPickToHotel } from '../../../lib/places/pick-actions';
 import { buildPhotoUrl, type PickCategory } from '../../../lib/places/google-client';
+import { mergeAndTranslate, asLanguageCode } from '../../../lib/i18n/save-hook.ts';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -75,29 +76,38 @@ if (Astro.request.method === 'POST') {
     if (!id) {
       message = { type: 'error', text: 'Keine ID übergeben.' };
     } else {
-      // Bestehende i18n laden, damit Override-Einträge in anderen Sprachen erhalten bleiben
+      // Bestehende i18n laden — mergeAndTranslate respektiert override-Slots
       const { data: existing } = await client
         .from('hotel_place_picks')
         .select('hotel_note_i18n')
         .eq('id', id).eq('hotel_id', hotel.id).maybeSingle();
-      const i18n: Record<string, any> = (existing?.hotel_note_i18n as any) ?? {};
-      if (note) {
-        i18n[hotelDefaultLang] = { value: note, source: 'original', updated_at: new Date().toISOString() };
-      } else {
-        delete i18n[hotelDefaultLang];
-      }
+
+      // Sprint i18n Phase 6 — Save-Hook mit Auto-Translation
+      const hookResult = await mergeAndTranslate(
+        existing?.hotel_note_i18n as any,
+        note ?? '',
+        asLanguageCode(hotelDefaultLang),
+        { logLabel: `place_picks.${id}.hotel_note` },
+      );
 
       const updates: Record<string, any> = {
-        hotel_note_i18n: Object.keys(i18n).length > 0 ? i18n : null,
+        hotel_note_i18n: Object.keys(hookResult.i18n).length > 0 ? hookResult.i18n : null,
         updated_at: new Date().toISOString(),
       };
-      // Safety-Net: alte DE-Spalte synchron halten (Phase 10 dropt sie)
       if (hotelDefaultLang === 'de') updates.hotel_note = note;
 
       const { error } = await client.from('hotel_place_picks').update(updates)
         .eq('id', id).eq('hotel_id', hotel.id);
-      if (error) message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
-      else message = { type: 'success', text: 'Hotel-Notiz gespeichert. (Übersetzungen folgen sobald Phase 6 aktiv.)' };
+      if (error) {
+        message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+      } else {
+        const langCount = Object.keys(hookResult.i18n).length;
+        message = {
+          type: 'success',
+          text: `Hotel-Notiz gespeichert — ${langCount} Sprachen ($${hookResult.cost.estimatedUSD.toFixed(5)}, ${hookResult.durationMs}ms)` +
+                (hookResult.failures.length ? ` · ${hookResult.failures.length} Übersetzungs-Fehler` : ''),
+        };
+      }
     }
   }
 

@@ -13,6 +13,7 @@
 
 import type { APIRoute } from 'astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../../lib/auth';
+import { mergeAndTranslate, asLanguageCode } from '../../../../lib/i18n/save-hook.ts';
 
 const VALID_TYPES = ['internal_action', 'external_link', 'info', 'phone', 'email'] as const;
 type CardType = typeof VALID_TYPES[number];
@@ -72,7 +73,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const { data: hotelLang } = await sb
     .from('hotels').select('default_language')
     .eq('id', hotel.id).maybeSingle();
-  const defLang = (hotelLang?.default_language as string | undefined) ?? 'de';
+  const defLang = asLanguageCode(hotelLang?.default_language);
 
   const title    = (body.title    ?? body.title_de    ?? '').toString().trim();
   const subtitle = (body.subtitle ?? body.subtitle_de ?? '').toString().trim();
@@ -81,7 +82,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   if (!title) return json({ ok: false, error: 'title required' }, 400);
 
-  // Lese existing i18n damit override-Werte in anderen Sprachen erhalten bleiben
+  // Existing i18n laden (override-Werte erhalten + 'auto'-Re-Translate vermeiden falls Original unverändert)
   let existingI18n: Record<string, any> = {};
   if (body.id) {
     const { data: ex } = await sb
@@ -91,23 +92,24 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     if (ex) existingI18n = ex;
   }
 
-  const NOW = new Date().toISOString();
-  function mergeI18n(existing: any, value: string): any | null {
-    const merged: Record<string, any> = (existing && typeof existing === 'object') ? { ...existing } : {};
-    if (value) merged[defLang] = { value, source: 'original', updated_at: NOW };
-    else delete merged[defLang];
-    return Object.keys(merged).length > 0 ? merged : null;
-  }
+  // Sprint i18n Phase 6 — mergeAndTranslate: Original + Auto-Translation parallel
+  // (synchron im Save weil Astro/Vercel keine post-response Promises supported)
+  const labelBase = `action_cards.${body.id ?? 'new'}`;
+  const [titleR, subtitleR, eyebrowR, ctaR] = await Promise.all([
+    mergeAndTranslate(existingI18n.title_i18n,    title,    defLang, { logLabel: `${labelBase}.title`    }),
+    mergeAndTranslate(existingI18n.subtitle_i18n, subtitle, defLang, { logLabel: `${labelBase}.subtitle` }),
+    mergeAndTranslate(existingI18n.eyebrow_i18n,  eyebrow,  defLang, { logLabel: `${labelBase}.eyebrow`  }),
+    mergeAndTranslate(existingI18n.cta_i18n,      cta,      defLang, { logLabel: `${labelBase}.cta`      }),
+  ]);
 
   const fields: Record<string, any> = {
     hotel_id: hotel.id,
     card_type: body.card_type,
     action_target: target,
-    // NEW: i18n JSONB
-    title_i18n:    mergeI18n(existingI18n.title_i18n, title),
-    subtitle_i18n: mergeI18n(existingI18n.subtitle_i18n, subtitle),
-    eyebrow_i18n:  mergeI18n(existingI18n.eyebrow_i18n, eyebrow),
-    cta_i18n:      mergeI18n(existingI18n.cta_i18n, cta),
+    title_i18n:    Object.keys(titleR.i18n).length    > 0 ? titleR.i18n    : null,
+    subtitle_i18n: Object.keys(subtitleR.i18n).length > 0 ? subtitleR.i18n : null,
+    eyebrow_i18n:  Object.keys(eyebrowR.i18n).length  > 0 ? eyebrowR.i18n  : null,
+    cta_i18n:      Object.keys(ctaR.i18n).length      > 0 ? ctaR.i18n      : null,
     // Safety-Net: alte DE-Spalten synchron halten falls default=DE (Phase 10 dropt)
     title_de:    defLang === 'de' ? title    : undefined,
     subtitle_de: defLang === 'de' ? (subtitle || null) : undefined,
@@ -118,6 +120,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   };
   // undefined-Felder rausstrippen (Postgres würde sonst NULL setzen)
   for (const k of Object.keys(fields)) if (fields[k] === undefined) delete fields[k];
+
+  // Translation-Cost-Summe an Caller (für UI-Feedback in Phase 6+)
+  const totalUSD = titleR.cost.estimatedUSD + subtitleR.cost.estimatedUSD + eyebrowR.cost.estimatedUSD + ctaR.cost.estimatedUSD;
+  const totalFails = [...titleR.failures, ...subtitleR.failures, ...eyebrowR.failures, ...ctaR.failures];
 
   if (body.id) {
     // UPDATE
@@ -130,7 +136,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       .maybeSingle();
     if (error) return json({ ok: false, error: error.message }, 500);
     if (!data) return json({ ok: false, error: 'Not found or forbidden' }, 404);
-    return json({ ok: true, id: data.id, isNew: false });
+    return json({ ok: true, id: data.id, isNew: false, translation: { cost_usd: totalUSD, failures: totalFails.length } });
   }
 
   // INSERT — sort_order = max + 1
@@ -149,5 +155,5 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     .select('id')
     .single();
   if (error) return json({ ok: false, error: error.message }, 500);
-  return json({ ok: true, id: data.id, isNew: true });
+  return json({ ok: true, id: data.id, isNew: true, translation: { cost_usd: totalUSD, failures: totalFails.length } });
 };

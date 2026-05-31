@@ -5,6 +5,7 @@ import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/
 import { t } from '../../i18n/helpers';
 import { SUPPORTED_ADMIN_LOCALES, LOCALE_LABELS, LOCALE_CODES, DEFAULT_ADDRESS_FORM } from '../../i18n/constants';
 import type { AdminLocale, AddressForm } from '../../i18n/types';
+import { mergeAndTranslate, asLanguageCode } from '../../lib/i18n/save-hook.ts';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -173,8 +174,14 @@ if (Astro.request.method === 'POST') {
       wifi_speed_mbits: parseInt(form.get('wifi_speed_mbits')?.toString() || '0') || null,
       eve_name: form.get('eve_name')?.toString().trim() || null,
       eve_online_until: form.get('eve_online_until')?.toString() || null,
-      hotel_eyebrow_i18n:    mergeI18nField(existingI18n?.hotel_eyebrow_i18n, eyebrowDefault),
-      welcome_message_i18n:  mergeI18nField(existingI18n?.welcome_message_i18n, welcomeDefault),
+      // Sprint i18n Phase 6 — Save-Hook mit Auto-Translation
+      ...(await Promise.all([
+        mergeAndTranslate(existingI18n?.hotel_eyebrow_i18n,   eyebrowDefault, asLanguageCode(hotelDefaultLang), { logLabel: 'hotel_settings.hotel_eyebrow' }),
+        mergeAndTranslate(existingI18n?.welcome_message_i18n, welcomeDefault, asLanguageCode(hotelDefaultLang), { logLabel: 'hotel_settings.welcome_message' }),
+      ]).then(([ebR, wmR]) => ({
+        hotel_eyebrow_i18n:   Object.keys(ebR.i18n).length > 0 ? ebR.i18n : null,
+        welcome_message_i18n: Object.keys(wmR.i18n).length > 0 ? wmR.i18n : null,
+      }))),
       updated_at: new Date().toISOString(),
     };
     // Safety-Net: spiegle Default zur alten _de-Spalte (Phase 10 dropt)
