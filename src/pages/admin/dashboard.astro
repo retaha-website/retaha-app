@@ -18,7 +18,7 @@ if (!hotel) return Astro.redirect('/onboarding/locale');
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 const { data: settings } = await client
   .from('hotel_settings')
-  .select('features, recommendations')
+  .select('features')
   .eq('hotel_id', hotel.id)
   .maybeSingle();
 
@@ -26,7 +26,13 @@ const featuresActive = settings?.features
   ? Object.values(settings.features).filter(v => v === true).length
   : 0;
 const featuresTotal = settings?.features ? Object.keys(settings.features).length : 0;
-const recCount = settings?.recommendations?.length ?? 0;
+
+// Sprint E7 Phase 5 — Action-Card-Count aus hotel_action_cards (war vorher
+// hotel_settings.recommendations.length, JSONB ist deprecated).
+const { count: recCount } = await client
+  .from('hotel_action_cards')
+  .select('*', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id);
 
 const { count: stayCount } = await client
   .from('stays')
@@ -47,9 +53,9 @@ const { count: stayCount } = await client
   </div>
 
   <div class="grid grid-cols-3 gap-4 mb-10">
-    <a href="/admin/recommendations" class="bg-white border border-stein p-6 hover:border-pink-shock transition group">
-      <p class="eyebrow text-anthrazit/55 mb-3">Empfehlungs-Karten</p>
-      <p class="text-3xl font-light mb-1">{recCount}</p>
+    <a href="/admin/action-cards" class="bg-white border border-stein p-6 hover:border-pink-shock transition group">
+      <p class="eyebrow text-anthrazit/55 mb-3">Hero-Karten</p>
+      <p class="text-3xl font-light mb-1">{recCount ?? 0}</p>
       <p class="text-xs text-anthrazit/40 group-hover:text-pink-shock transition">bearbeiten →</p>
     </a>
     <a href="/admin/features" class="bg-white border border-stein p-6 hover:border-pink-shock transition group">

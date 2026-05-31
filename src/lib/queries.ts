@@ -29,7 +29,8 @@ export type StayContext = {
   };
   settings: {
     features: Record<string, boolean>;
-    recommendations: any[];
+    /** @deprecated Sprint E7: ersetzt durch hotel_action_cards. Spalte existiert noch als Safety-Net bis Sprint G. */
+    recommendations?: any[];
     welcome_message_de: string;
     welcome_message_en: string;
     welcome_message_fr: string | null;
@@ -99,7 +100,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
   const { data: settings, error: setErr } = await supabase
     .from('hotel_settings')
     .select(`
-      features, recommendations,
+      features,
       welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
       hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
       eve_name, eve_online_until, eve_enabled,

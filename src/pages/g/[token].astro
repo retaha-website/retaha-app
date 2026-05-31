@@ -217,9 +217,11 @@ const now = new Date();
 const dayPartLabel = dayPart(lang, now.getHours());
 const dateLabel = now.toLocaleDateString(localeMap[lang], { weekday: 'long', day: 'numeric', month: 'short' });
 
-// Sprint E7 Phase 4 — Action-Cards aus relationaler Tabelle laden.
-// Fallback auf alte hotel_settings.recommendations JSONB falls ein Hotel
-// noch nicht migriert wurde — wird in Phase 5 entfernt.
+// Sprint E7 Phase 4/5 — Action-Cards aus relationaler Tabelle.
+// Verifikation Phase 5: alle Hotels mit JSONB-Cards haben action_cards
+// → JSONB-Fallback entfernt. Die Spalte hotel_settings.recommendations
+// existiert noch (deprecated), wird in Sprint G nach Production-Verifikation
+// gedroppt.
 const { data: actionCardsRows } = await sbSr
   .from('hotel_action_cards')
   .select('id, card_type, action_target, title_de, title_en, title_fr, title_es, subtitle_de, subtitle_en, subtitle_fr, subtitle_es, eyebrow_de, eyebrow_en, eyebrow_fr, eyebrow_es, cta_de, cta_en, cta_fr, cta_es, image_url, card_class, sort_order')
@@ -235,34 +237,18 @@ function defaultIconForType(card_type: string): 'sun' | 'square' | 'triangle' {
   }
 }
 
-// pick() erwartet `${field}_${lang}`. action_cards-Spalten heißen schon so —
-// also kann ich pick(card, 'title', lang) direkt aufrufen.
-const recs = (actionCardsRows && actionCardsRows.length > 0)
-  ? actionCardsRows.map((card: any) => ({
-      id: card.id,
-      cardType: card.card_type,
-      actionTarget: card.action_target,
-      imageUrl: card.image_url,
-      eyebrow: pick(card, 'eyebrow', lang),
-      title:   pick(card, 'title', lang),
-      sub:     pick(card, 'subtitle', lang),
-      cta:     pick(card, 'cta', lang),
-      cardClass: card.card_class || 'rec-anthrazit',
-      icon: defaultIconForType(card.card_type),
-    }))
-  // Fallback (Phase-5-deprecate): alte JSONB
-  : (settings.recommendations as any[]).map(rec => ({
-      id: rec.id,
-      cardType: 'internal_action' as const,
-      actionTarget: rec.action ?? null,
-      imageUrl: null as string | null,
-      eyebrow: pick(rec, 'eyebrow', lang),
-      title: pick(rec, 'title', lang),
-      sub: pick(rec, 'sub', lang),
-      cta: pick(rec, 'cta', lang),
-      cardClass: rec.card_class || 'rec-white',
-      icon: (rec.id === 'garden' ? 'sun' : rec.id === 'conference' ? 'square' : 'triangle') as 'sun' | 'square' | 'triangle',
-    }));
+const recs = (actionCardsRows ?? []).map((card: any) => ({
+  id: card.id,
+  cardType: card.card_type,
+  actionTarget: card.action_target,
+  imageUrl: card.image_url,
+  eyebrow: pick(card, 'eyebrow', lang),
+  title:   pick(card, 'title', lang),
+  sub:     pick(card, 'subtitle', lang),
+  cta:     pick(card, 'cta', lang),
+  cardClass: card.card_class || 'rec-anthrazit',
+  icon: defaultIconForType(card.card_type),
+}));
 
 const weather = {
   temperature: 21,
