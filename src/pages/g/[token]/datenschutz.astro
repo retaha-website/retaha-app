@@ -39,6 +39,21 @@ const backHref = `/g/${token}`;
     <style>
       @import '../../../styles/global.css';
       @import '../../../styles/components/legal.css';
+
+      #dsgvo-tools { margin: 20px 0 8px; display: flex; flex-direction: column; gap: 8px; }
+      .dsgvo-action-btn {
+        display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+        padding: 14px 18px; border: 1px solid #1A1A1A; background: #fff; color: #1A1A1A;
+        font-family: inherit; cursor: pointer; transition: background 0.15s, color 0.15s;
+        text-align: left;
+      }
+      .dsgvo-action-btn:hover { background: #1A1A1A; color: #fff; }
+      .dsgvo-action-btn:disabled { opacity: 0.5; cursor: wait; }
+      .dsgvo-action-label { font-size: 14px; font-weight: 500; }
+      .dsgvo-action-hint { font-size: 12px; opacity: 0.7; }
+      .dsgvo-status { font-size: 13px; padding: 8px 12px; margin: 0; }
+      .dsgvo-status.ok { background: #e8f5ec; color: #145c2a; border-left: 3px solid #1f7a3a; }
+      .dsgvo-status.err { background: #fdeaea; color: #7a1515; border-left: 3px solid #aa1f1f; }
     </style>
   </head>
   <body class="font-sans antialiased text-anthrazit bg-white min-h-screen">
@@ -162,9 +177,16 @@ const backHref = `/g/${token}`;
           unverzüglich an das Hotel weiter.
         </p>
         <p>
-          Für die wichtigsten Wünsche stellen wir Self-Service-Funktionen bereit (in Kürze direkt in der App
-          verfügbar): Datenexport als JSON und Löschung deiner App-Daten.
+          Für die wichtigsten Wünsche stellen wir Self-Service-Funktionen bereit — direkt hier in der App:
         </p>
+
+        <div id="dsgvo-tools">
+          <button type="button" id="export-btn" class="dsgvo-action-btn">
+            <span class="dsgvo-action-label">↓ Meine Daten herunterladen</span>
+            <span class="dsgvo-action-hint">App-Daten als JSON. Stay-Stammdaten direkt beim Hotel anfordern.</span>
+          </button>
+          <p id="export-status" class="dsgvo-status" hidden></p>
+        </div>
 
         <h2>9. Beschwerderecht</h2>
         <p>
@@ -193,5 +215,52 @@ const backHref = `/g/${token}`;
         </p>
       </div>
     </main>
+
+    <script is:inline>
+      (function () {
+        const btn = document.getElementById('export-btn');
+        const status = document.getElementById('export-status');
+        if (!btn || !status) return;
+
+        function setStatus(text, kind) {
+          status.textContent = text;
+          status.hidden = false;
+          status.className = 'dsgvo-status ' + (kind === 'ok' ? 'ok' : 'err');
+        }
+
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          status.hidden = true;
+          try {
+            const res = await fetch('/api/g/data-export', { method: 'GET', credentials: 'include' });
+            if (res.status === 429) {
+              const data = await res.json().catch(() => ({}));
+              setStatus(data.message || 'Bitte warte einen Moment zwischen Exporten.', 'err');
+              return;
+            }
+            if (!res.ok) {
+              setStatus('Export fehlgeschlagen (HTTP ' + res.status + '). Bitte später erneut versuchen.', 'err');
+              return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const cd = res.headers.get('content-disposition') || '';
+            const m = cd.match(/filename="([^"]+)"/);
+            a.download = m ? m[1] : 'retaha-data.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setStatus('Download gestartet. Falls nichts passiert, prüfe deine Browser-Downloads.', 'ok');
+          } catch (err) {
+            setStatus('Netzwerk-Fehler: ' + (err.message || 'unbekannt'), 'err');
+          } finally {
+            setTimeout(() => { btn.disabled = false; }, 1500);
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
