@@ -68,10 +68,49 @@ OFFEN:
 ☐ /admin/recommendations → Redirect funktioniert
 ```
 
-## Sprint i18n-Expansion (kommt als nächstes)
+## Sprint i18n-Expansion
 
 ```
-☐ wird beim Bau definiert
+HOTELIER-FLOW (Backoffice):
+☐ /admin/settings → Sprach-Section sichtbar
+  ☐ Default-Sprache umschalten (DE → EN testen)
+  ☐ enabled_languages auf z.B. ['en','fr','it','ar'] setzen (max-4-Hint greift bei 5+)
+  ☐ Default-Sprache automatisch zu enabled hinzugefügt
+  ☐ ★-Marker auf Default + Disabled-Checkboxes wenn 4 gewählt
+☐ /admin/action-cards → Neue Card in Default-Sprache anlegen
+  ☐ Nur 1 Feld pro Text (kein 4-Sprach-Tab mehr)
+  ☐ Save → 1-7s Wartezeit → "Übersetzungen in 10 Sprachen ✓" (UI-Polish: Status-Badge in Phase 6+)
+  ☐ Cost im Server-Response (translation.cost_usd)
+☐ /admin/places → Hotel-Notiz in Default-Sprache pflegen → success-Message mit Cost + Time
+☐ /admin/eve/knowledge → FAQ erstellen → Sprache-Hinweis-Banner zeigt Default-Sprache
+☐ /admin/breakfast + /admin/conference + /admin/menu + /admin/service
+  ☐ DeepL-Button ist weg (war "Aus DE übersetzen")
+  ☐ /admin/breakfast: 1-Feld-UX greift, location + included
+  ☐ conference/service/menu: JSONB-Item-Templates noch mit 4-Sprach-Inputs (Backlog)
+
+GAST-FLOW (/g/[token]):
+☐ Sprach-Selector zeigt enabled_languages des Hotels (4 Buttons)
+☐ Buttons in Native-Labels (Deutsch/English/Français/Español)
+☐ Klick auf andere Sprache → URL ?lang= + sendBeacon persistiert in guests.language
+☐ Nächster Besuch derselben URL → gewählte Sprache erinnert
+☐ Browser-Locale-Test: Browser auf FR → erster Besuch lädt FR (wenn enabled)
+☐ Card-Texte erscheinen in gewählter Sprache (pickI18n greift)
+☐ Welcome-Message + Hotel-Eyebrow folgen Sprach-Wahl
+☐ Eve fragen in EN/FR/IT/AR → Eve antwortet in JEDER Sprache, auch UI-disabled
+☐ AR-Test: <html dir="rtl"> wird gesetzt (Layout-Probleme = UX-Sprint-Backlog)
+
+DB-VERIFY (per SQL):
+☐ Action-Card editieren → title_i18n hat 10 Keys (1 original + 9 auto)
+☐ Override-Test: 1 Sprache manuell auf source='override' → Card editieren →
+  override-Sprache bleibt unangetastet, andere werden re-übersetzt
+☐ hotel_settings.welcome_message_i18n + hotel_eyebrow_i18n korrekt nach Save
+☐ hotel_place_picks.hotel_note_i18n nach Save
+☐ eve_knowledge.question_i18n + answer_i18n nach FAQ-Edit
+
+COST-MONITORING:
+☐ Hotel-Setup einmalig (Welcome + Eyebrow + 3 Cards): ~$0.01-0.02
+☐ Pro Card-Edit (4 Felder × 9 Sprachen): ~$0.005
+☐ UI-Strings Build-Script: $0.05 einmalig (idempotent — keine Re-Costs)
 ```
 
 ## Sprint Legal/DSGVO
@@ -116,8 +155,18 @@ OFFEN:
 ☐ Schema-Migration sauber durchgelaufen?
 ☐ HTTP-Referrer-Restriction Google Cloud
 ☐ Mews-Room-Bug verifizieren (oder als Workaround bestätigen)
-☐ DROP COLUMN hotel_settings.recommendations
+☐ DROP COLUMN hotel_settings.recommendations (E7-Backlog)
 ☐ Region-Move Supabase eu-west-2 → eu-central-1 (falls strikt nötig)
+
+i18n-Cleanup (Sprint i18n hat alle alten Spalten als Safety-Net behalten):
+☐ DROP COLUMN hotel_place_picks.{hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es}
+☐ DROP COLUMN hotel_action_cards.{title_de, title_en, title_fr, title_es, subtitle_*, eyebrow_*, cta_*}
+☐ DROP COLUMN breakfast_items.{name_*, description_*}
+☐ DROP COLUMN hotel_settings.{welcome_message_*, hotel_eyebrow_*, breakfast_location_*, breakfast_included_*}
+☐ DROP COLUMN eve_knowledge.{question, answer, language_code}
+☐ DROP TABLE eve_knowledge_translations (obsolete — i18n IST der Cache)
+☐ JSONB-Item-Cleanup: name_de/etc. aus conference_rooms + service_items entfernen (nach Item-Template-Refactor)
+☐ DEEPL_API_KEY aus Vercel-ENV entfernen
 ```
 
 ---
@@ -132,9 +181,11 @@ Komplett-getestete Sprints:
 
 Code-verifizierte Sprints (UX-Test offen):
   🔵 E7 (Action-Card-Editor)        — automatische Tests 24/24, UX-Walkthrough offen
+  🔵 i18n-Expansion                 — automatische Tests 60+/60+, Multi-Sprach-Test 5/5,
+                                      UX-Walkthrough mit Kristin offen
 
 Wartende Sprints:
-  ⏳ i18n, Legal, Funktional, Wallet, UI/UX, Themes, Monorepo, Production
+  ⏳ Legal, Funktional, Wallet, UI/UX, Themes, Monorepo, Production
 ```
 
 ---
