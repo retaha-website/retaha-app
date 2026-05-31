@@ -83,7 +83,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       id, check_in, check_out, is_active,
       guest:guests(id, first_name, last_name, language, visit_count),
       room:rooms(id, room_number, room_name),
-      hotel:hotels(id, slug, name, city, default_language, logo_url)
+      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_url)
     `)
     .eq('access_token', token)
     .eq('is_active', true)
@@ -101,8 +101,8 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
     .from('hotel_settings')
     .select(`
       features,
-      welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es,
-      hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es,
+      welcome_message_de, welcome_message_en, welcome_message_fr, welcome_message_es, welcome_message_i18n,
+      hotel_eyebrow_de, hotel_eyebrow_en, hotel_eyebrow_fr, hotel_eyebrow_es, hotel_eyebrow_i18n,
       eve_name, eve_online_until, eve_enabled,
       wifi_ssid, wifi_password, wifi_speed_mbits,
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,

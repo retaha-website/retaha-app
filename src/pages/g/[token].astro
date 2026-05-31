@@ -1,6 +1,6 @@
 ---
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '../../lib/queries';
-import { normalizeLang, t, dayPart, pick, type Lang } from '../../lib/i18n';
+import { normalizeLang, t, dayPart, type Lang } from '../../lib/i18n';
 import WeatherIcon from '../../components/WeatherIcon.astro';
 import WifiSheet from '../../components/sheets/WifiSheet.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
@@ -75,8 +75,32 @@ const activeConferenceBooking = existingConferenceBookings[0] || null;
 const existingServiceBookings = await loadBookingsForStay(stay.id, 'service');
 const activeServiceBooking = existingServiceBookings[0] || null;
 
+// Sprint i18n Phase 7 — Sprach-Resolution erweitert um Browser-Locale + enabled_languages
+// Hierarchie: ?lang= URL > guest.language > Accept-Language (gegen enabled) > hotel.default_language > 'de'
 const langParam = new URL(Astro.request.url).searchParams.get('lang');
-const lang: Lang = normalizeLang(langParam || guest?.language || hotel.default_language);
+const acceptLangHeader = Astro.request.headers.get('accept-language') ?? '';
+const hotelEnabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
+  ? (hotel as any).enabled_languages : ['de','en','fr','es'];
+
+function pickBrowserLang(acceptHeader: string, enabled: string[]): string | null {
+  // "de-DE,de;q=0.9,en;q=0.8" → ['de-DE','de','en']
+  const tags = acceptHeader.split(',').map(s => s.split(';')[0].trim().toLowerCase()).filter(Boolean);
+  for (const tag of tags) {
+    const stripped = tag.slice(0, 2);
+    if (enabled.includes(stripped)) return stripped;
+  }
+  return null;
+}
+
+const browserLang = pickBrowserLang(acceptLangHeader, hotelEnabledLangs);
+const resolvedRaw = langParam || guest?.language || browserLang || hotel.default_language;
+const lang: Lang = normalizeLang(resolvedRaw);
+const hotelDefaultLang: Lang = normalizeLang(hotel.default_language);
+
+import { pickI18n as pickI18nHelper } from '../../lib/i18n/picker.ts';
+import { LANGUAGE_LABELS as LANG_LABELS_FULL, isRTL as isRTLHelper } from '../../lib/i18n/types.ts';
+const isRTL = isRTLHelper(lang as any);
+const htmlDir = isRTL ? 'rtl' : 'ltr';
 
 // Sprint E4 Phase 10 — Tageszeit-Chips (hotel-timezone-aware) + History pre-load
 const hotelTz = (hotel as any).timezone || 'Europe/Berlin';
@@ -154,21 +178,11 @@ for (const p of placesPicks) {
   };
 }
 
-const welcomeMap: Record<Lang, string | null> = {
-  de: settings.welcome_message_de,
-  en: settings.welcome_message_en,
-  fr: settings.welcome_message_fr,
-  es: settings.welcome_message_es,
-};
-const welcomeMsg = welcomeMap[lang] || settings.welcome_message_de;
-
-const eyebrowMap: Record<Lang, string | null> = {
-  de: settings.hotel_eyebrow_de,
-  en: settings.hotel_eyebrow_en,
-  fr: settings.hotel_eyebrow_fr,
-  es: settings.hotel_eyebrow_es,
-};
-const hotelEyebrow = eyebrowMap[lang] || settings.hotel_eyebrow_de || (hotel.city || '');
+// Sprint i18n Phase 7 — pickI18n statt Hand-Mapping (mit Safety-Fallback auf alte _de-Spalte)
+const welcomeMsg = pickI18nHelper((settings as any).welcome_message_i18n, hotelDefaultLang as any, lang as any)
+  || settings.welcome_message_de;
+const hotelEyebrow = pickI18nHelper((settings as any).hotel_eyebrow_i18n, hotelDefaultLang as any, lang as any)
+  || settings.hotel_eyebrow_de || (hotel.city || '');
 
 const greetingLabel = t('hero.greeting', lang);
 const greetingFallback = t('hero.greetingFallback', lang);
@@ -224,7 +238,7 @@ const dateLabel = now.toLocaleDateString(localeMap[lang], { weekday: 'long', day
 // gedroppt.
 const { data: actionCardsRows } = await sbSr
   .from('hotel_action_cards')
-  .select('id, card_type, action_target, title_de, title_en, title_fr, title_es, subtitle_de, subtitle_en, subtitle_fr, subtitle_es, eyebrow_de, eyebrow_en, eyebrow_fr, eyebrow_es, cta_de, cta_en, cta_fr, cta_es, image_url, card_class, sort_order')
+  .select('id, card_type, action_target, title_de, title_i18n, subtitle_de, subtitle_i18n, eyebrow_de, eyebrow_i18n, cta_de, cta_i18n, image_url, card_class, sort_order')
   .eq('hotel_id', hotel.id)
   .eq('is_published', true)
   .order('sort_order', { ascending: true });
@@ -242,10 +256,11 @@ const recs = (actionCardsRows ?? []).map((card: any) => ({
   cardType: card.card_type,
   actionTarget: card.action_target,
   imageUrl: card.image_url,
-  eyebrow: pick(card, 'eyebrow', lang),
-  title:   pick(card, 'title', lang),
-  sub:     pick(card, 'subtitle', lang),
-  cta:     pick(card, 'cta', lang),
+  // Sprint i18n Phase 7 — pickI18n mit Safety-Fallback auf alte _de-Spalten
+  eyebrow: pickI18nHelper(card.eyebrow_i18n,  hotelDefaultLang as any, lang as any) || card.eyebrow_de || '',
+  title:   pickI18nHelper(card.title_i18n,    hotelDefaultLang as any, lang as any) || card.title_de    || '',
+  sub:     pickI18nHelper(card.subtitle_i18n, hotelDefaultLang as any, lang as any) || card.subtitle_de || '',
+  cta:     pickI18nHelper(card.cta_i18n,      hotelDefaultLang as any, lang as any) || card.cta_de      || '',
   cardClass: card.card_class || 'rec-anthrazit',
   icon: defaultIconForType(card.card_type),
 }));
@@ -280,7 +295,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 ---
 
 <!DOCTYPE html>
-<html lang={lang}>
+<html lang={lang} dir={htmlDir}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -306,11 +321,15 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
               </span>
               <span>{hotelEyebrow}</span>
             </div>
-            <div class="lang-switcher">
-              <a href={switchUrl('de')} class={`lang-btn ${lang === 'de' ? 'active' : ''}`}>DE</a>
-              <a href={switchUrl('en')} class={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</a>
-              <a href={switchUrl('fr')} class={`lang-btn ${lang === 'fr' ? 'active' : ''}`}>FR</a>
-              <a href={switchUrl('es')} class={`lang-btn ${lang === 'es' ? 'active' : ''}`}>ES</a>
+            <div class="lang-switcher" data-stay-token={token}>
+              {hotelEnabledLangs.map(l => (
+                <a
+                  href={switchUrl(l)}
+                  class={`lang-btn ${lang === l ? 'active' : ''}`}
+                  data-lang={l}
+                  title={LANG_LABELS_FULL[l as keyof typeof LANG_LABELS_FULL] ?? l}
+                >{l.toUpperCase()}</a>
+              ))}
             </div>
           </div>
 
@@ -1553,6 +1572,25 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
       }));
 
       Alpine.start();
+    </script>
+
+    <!-- Sprint i18n Phase 7 — Sprach-Wechsel-Persistenz via sendBeacon -->
+    <script is:inline>
+      document.querySelectorAll('.lang-switcher .lang-btn').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          const lang = btn.dataset.lang;
+          const switcher = btn.closest('.lang-switcher');
+          const token = switcher && switcher.dataset.stayToken;
+          if (!lang || !token) return;
+          // sendBeacon damit Persistenz vor Navigation garantiert flusht
+          try {
+            const payload = JSON.stringify({ token, lang });
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon('/api/g/set-language', blob);
+          } catch (_) { /* non-fatal */ }
+          // Navigation läuft normal weiter (href greift)
+        });
+      });
     </script>
   </body>
 </html>
