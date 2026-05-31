@@ -7,7 +7,8 @@
 // (analog Bookings-update-status aus Sprint C).
 
 import AppLayout from '../../layouts/AppLayout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '../../lib/auth';
+import { getOnboardingChecklist, maybeMarkCompleted } from '../../lib/onboarding/checklist';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -123,6 +124,13 @@ const now = new Date();
 const weekdayDate = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 const hour = now.getHours();
 const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+
+// Sprint Functional Modul B Phase 6 — Onboarding-Checkliste
+const adminSb = createSupabaseServiceRoleInstance();
+const checklist = await getOnboardingChecklist(adminSb, hotel.id);
+// Auto-mark completed wenn alle required-Steps fertig (idempotent)
+await maybeMarkCompleted(adminSb, hotel.id, checklist);
+const showChecklist = !checklist.completed_at;
 ---
 
 <AppLayout title="Übersicht" hotel={hotel} user={{ email: user.email ?? '' }}>
@@ -135,6 +143,30 @@ const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten A
     <div class={`app-flash ${message.type === 'success' ? 'app-flash--success' : 'app-flash--error'}`}>
       {message.text}
     </div>
+  )}
+
+  {showChecklist && (
+    <section class="onboarding-widget">
+      <div class="onboarding-head">
+        <p class="onboarding-eyebrow">— Setup-Checkliste —</p>
+        <h2 class="onboarding-title">{checklist.doneCount}/{checklist.totalCount} abgeschlossen</h2>
+        <p class="onboarding-sub">Ein paar Schritte noch — dann ist dein Hotel pilot-bereit.</p>
+        <div class="onboarding-progress">
+          <div class="onboarding-progress-bar" style={`width: ${Math.round((checklist.doneCount / checklist.totalCount) * 100)}%`}></div>
+        </div>
+      </div>
+      <ul class="onboarding-items">
+        {checklist.items.map(it => (
+          <li class={`onboarding-item${it.done ? ' is-done' : ''}${it.required ? '' : ' is-optional'}`}>
+            <span class="onboarding-item-check">{it.done ? '✓' : '○'}</span>
+            <div class="onboarding-item-body">
+              <a href={it.href} class="onboarding-item-link">{it.label}{!it.required && <span class="onboarding-item-optional"> (optional)</span>}</a>
+              <p class="onboarding-item-desc">{it.description}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   )}
 
   <!-- Stat-Cards -->
@@ -374,5 +406,25 @@ const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten A
       border-color: #999;
       color: #1A1A1A;
     }
+
+    /* Sprint Functional Modul B Phase 6 — Onboarding-Checkliste */
+    .onboarding-widget { background: rgba(255,74,130,.04); border: 1px solid #FF4A82; padding: 18px 20px; margin-bottom: 24px; }
+    .onboarding-head { margin-bottom: 14px; }
+    .onboarding-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: #FF4A82; margin: 0 0 6px; }
+    .onboarding-title { margin: 0 0 4px; font-size: 18px; font-weight: 500; color: #1A1A1A; }
+    .onboarding-sub { margin: 0 0 10px; font-size: 13px; color: rgba(26,26,26,.6); }
+    .onboarding-progress { width: 100%; height: 4px; background: rgba(26,26,26,.06); overflow: hidden; }
+    .onboarding-progress-bar { height: 100%; background: #FF4A82; transition: width 0.3s ease; }
+    .onboarding-items { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr; gap: 6px; }
+    @media (min-width: 768px) { .onboarding-items { grid-template-columns: repeat(2, 1fr); } }
+    .onboarding-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid rgba(26,26,26,.06); }
+    .onboarding-item-check { font-size: 14px; color: rgba(26,26,26,.4); width: 18px; flex-shrink: 0; line-height: 1.3; }
+    .onboarding-item.is-done .onboarding-item-check { color: #1f7a3a; font-weight: 600; }
+    .onboarding-item-body { min-width: 0; flex: 1; }
+    .onboarding-item-link { font-size: 13px; font-weight: 500; color: #1A1A1A; text-decoration: none; }
+    .onboarding-item-link:hover { color: #FF4A82; }
+    .onboarding-item.is-done .onboarding-item-link { color: rgba(26,26,26,.5); text-decoration: line-through; }
+    .onboarding-item-optional { font-weight: 400; color: rgba(26,26,26,.4); font-size: 11px; }
+    .onboarding-item-desc { font-size: 11px; color: rgba(26,26,26,.5); margin: 1px 0 0; }
   </style>
 </AppLayout>
