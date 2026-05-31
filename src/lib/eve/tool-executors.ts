@@ -154,8 +154,9 @@ async function getRecommendations(ctx: EveExecutionContext, category?: string) {
     ? { lat: hotelRow.latitude as number, lng: hotelRow.longitude as number }
     : null;
 
-  // 2. Gast-Sprache (für hotel_note_<lang>) — wenn Stay vorhanden, sonst default
-  let guestLang: 'de' | 'en' | 'fr' | 'es' = 'de';
+  // 2. Gast-Sprache — Sprint i18n Phase 8: alle 10 Sprachen, nicht mehr nur 4
+  const VALID_LANGS = ['de','en','fr','es','it','pt','nl','ru','ar','zh'];
+  let guestLang: string = (hotelRow?.default_language as string) || 'de';
   if (ctx.stay_id) {
     const { data: stayRow } = await sup
       .from('stays')
@@ -163,13 +164,14 @@ async function getRecommendations(ctx: EveExecutionContext, category?: string) {
       .eq('id', ctx.stay_id)
       .maybeSingle();
     const g = (stayRow?.guests as any)?.language;
-    if (g === 'en' || g === 'fr' || g === 'es' || g === 'de') guestLang = g;
+    if (g && VALID_LANGS.includes(g)) guestLang = g;
   }
+  const hotelDefaultLang = (hotelRow?.default_language as string) || 'de';
 
-  // 3. Picks laden
+  // 3. Picks laden (i18n + Safety-Net Spalten)
   let picksQuery = sup
     .from('hotel_place_picks')
-    .select('place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, cached_data, sort_order')
+    .select('place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, hotel_note_i18n, cached_data, sort_order')
     .eq('hotel_id', ctx.hotel_id)
     .eq('is_published', true)
     .order('sort_order', { ascending: true });
@@ -198,18 +200,24 @@ async function getRecommendations(ctx: EveExecutionContext, category?: string) {
 
   // 6. Format für LLM (minimal Felder, kein JSON-Pollution)
   return {
-    picks: (picks ?? []).map(p => formatPickForLLM(p, hotelLoc, guestLang)),
+    picks: (picks ?? []).map(p => formatPickForLLM(p, hotelLoc, guestLang, hotelDefaultLang)),
     auto: autoFlat.map(p => formatAutoForLLM(p, hotelLoc)),
     hotel_has_location: hotelLoc !== null,
     guest_language: guestLang,
   };
 }
 
-function formatPickForLLM(pick: any, hotelLoc: { lat: number; lng: number } | null, lang: 'de' | 'en' | 'fr' | 'es') {
+function formatPickForLLM(pick: any, hotelLoc: { lat: number; lng: number } | null, lang: string, hotelDefault: string) {
   const cd = pick.cached_data ?? {};
-  // Sprach-aware Hotel-Notiz mit Fallback auf DE
-  const noteField = `hotel_note${lang === 'de' ? '' : '_' + lang}`;
-  const note = (pick[noteField] || pick.hotel_note || null) as string | null;
+  // Sprint i18n Phase 8 — pickI18n aus i18n-JSONB, Safety-Net auf alte _de-Spalte
+  const i18n = pick.hotel_note_i18n as Record<string, { value: string }> | null;
+  const noteFromI18n = i18n?.[lang]?.value || i18n?.[hotelDefault]?.value || i18n?.de?.value || null;
+  const noteFromOldCol = lang === 'de' ? pick.hotel_note
+    : lang === 'en' ? (pick.hotel_note_en ?? pick.hotel_note)
+    : lang === 'fr' ? (pick.hotel_note_fr ?? pick.hotel_note)
+    : lang === 'es' ? (pick.hotel_note_es ?? pick.hotel_note)
+    : pick.hotel_note;
+  const note = (noteFromI18n || noteFromOldCol || null) as string | null;
   const loc = cd.location;
   let walking: number | undefined;
   if (hotelLoc && loc?.lat && loc?.lng) {

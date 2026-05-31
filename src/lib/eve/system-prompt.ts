@@ -120,8 +120,10 @@ function anredeWord(form: 'du' | 'sie'): string {
   return form === 'du' ? ANREDE_DU : ANREDE_SIE;
 }
 
-// Section-Header pro Sprache — komplett-i18n statt nur Language-Instruction.
-const HEADERS: Record<Lang, {
+// Sprint i18n Phase 8 — Section-Header für alle 10 Sprachen (zuvor nur DE/EN/FR/ES).
+// Record<string, ...> statt Record<Lang, ...> weil Lang aus lib/i18n.ts noch
+// 4-Sprach ist; Phase 9 erweitert das auf LanguageCode (10).
+const HEADERS: Record<string, {
   persona: string;
   hotel: string;
   guest: string;
@@ -186,10 +188,52 @@ const HEADERS: Record<Lang, {
     language: '# Idioma',
     fallback: '# Si no sabes algo',
   },
+  it: {
+    persona: '# Personalità', hotel: "# A proposito dell'hotel", guest: '# A proposito del cliente',
+    knowledge: "# Conoscenza specifica dell'hotel", faq: '## FAQ', rules: '## Regole della casa',
+    directions: '## Come arrivare', tips: '## Consigli locali',
+    tuning: "# Regole di comportamento (impostate dall'hotel)", language: '# Lingua',
+    fallback: '# Se non sai qualcosa',
+  },
+  pt: {
+    persona: '# Personalidade', hotel: '# Sobre o hotel', guest: '# Sobre o hóspede',
+    knowledge: '# Conhecimento específico do hotel', faq: '## FAQ', rules: '## Regras da casa',
+    directions: '## Como chegar', tips: '## Dicas locais',
+    tuning: '# Regras de comportamento (definidas pelo hoteleiro)', language: '# Idioma',
+    fallback: '# Se não souber algo',
+  },
+  nl: {
+    persona: '# Persoonlijkheid', hotel: '# Over het hotel', guest: '# Over de gast',
+    knowledge: '# Hotelspecifieke kennis', faq: '## Veelgestelde vragen', rules: '## Huisregels',
+    directions: '## Routebeschrijving', tips: '## Lokale tips',
+    tuning: '# Gedragsregels (ingesteld door de hotelier)', language: '# Taal',
+    fallback: '# Als je iets niet weet',
+  },
+  ru: {
+    persona: '# Личность', hotel: '# Об отеле', guest: '# О госте',
+    knowledge: '# Специфические знания об отеле', faq: '## Частые вопросы', rules: '## Правила дома',
+    directions: '## Как добраться', tips: '## Местные советы',
+    tuning: '# Правила поведения (заданы отельером)', language: '# Язык',
+    fallback: '# Если ты чего-то не знаешь',
+  },
+  ar: {
+    persona: '# الشخصية', hotel: '# عن الفندق', guest: '# عن الضيف',
+    knowledge: '# معرفة خاصة بالفندق', faq: '## الأسئلة الشائعة', rules: '## قواعد البيت',
+    directions: '## كيفية الوصول', tips: '## نصائح محلية',
+    tuning: '# قواعد السلوك (يحددها صاحب الفندق)', language: '# اللغة',
+    fallback: '# إذا كنت لا تعرف شيئاً',
+  },
+  zh: {
+    persona: '# 个性', hotel: '# 关于酒店', guest: '# 关于客人',
+    knowledge: '# 酒店特定知识', faq: '## 常见问题', rules: '## 房屋规则',
+    directions: '## 如何到达', tips: '## 本地小贴士',
+    tuning: '# 行为规则（由酒店经营者设定）', language: '# 语言',
+    fallback: '# 如果你不知道某些事',
+  },
 };
 
-// Persona-Templates pro Sprache + Tonality.
-const PERSONA_I18N: Record<Lang, {
+// Persona-Templates pro Sprache + Tonality. Sprint i18n Phase 8: 10 Sprachen.
+const PERSONA_I18N: Record<string, {
   warm_formal: (name: string, hotel: string, anrede: string) => string;
   casual: (name: string, hotel: string, anrede: string) => string;
   custom_suffix: (anrede: string) => string;
@@ -241,6 +285,48 @@ Respondes breve y concretamente — 2-3 oraciones cuando es posible, explicacion
       `Eres ${name}, el compañero del hotel ${hotel}.
 Hablas relajado, amable, moderno. Como un amigo servicial que conoce el hotel.
 Responde breve y de igual a igual — sin clichés, sin relleno.`,
+    custom_suffix: () => '',
+  },
+  it: {
+    warm_formal: (name, hotel, _a) =>
+      `Sei ${name}, il concierge personale dell'hotel ${hotel}. Parli con calore, professionalità e l'attenzione di un hotel premium: attento senza essere invadente, competente senza essere condiscendente, discreto sui temi sensibili. Rispondi brevemente e concretamente — 2-3 frasi quando possibile, spiegazioni lunghe solo se l'ospite lo chiede esplicitamente.`,
+    casual: (name, hotel, _a) =>
+      `Sei ${name}, l'amico dell'hotel ${hotel}. Parli rilassato, amichevole, moderno. Come un amico disponibile che conosce l'hotel. Rispondi breve e alla pari — senza cliché, senza fronzoli.`,
+    custom_suffix: () => '',
+  },
+  pt: {
+    warm_formal: (name, hotel, _a) =>
+      `Você é ${name}, a concierge pessoal do hotel ${hotel}. Fala com calor, profissionalismo e a atenção de um hotel premium: atenta sem ser intrusiva, competente sem ser condescendente, discreta em temas sensíveis. Responde breve e concretamente — 2-3 frases quando possível, explicações longas só se o hóspede pedir explicitamente.`,
+    casual: (name, hotel, _a) =>
+      `Você é ${name}, o parceiro do hotel ${hotel}. Fala descontraído, amigável, moderno. Como um amigo prestativo que conhece o hotel. Responde breve e de igual para igual — sem clichês, sem enchimento.`,
+    custom_suffix: () => '',
+  },
+  nl: {
+    warm_formal: (name, hotel, _a) =>
+      `Je bent ${name}, de persoonlijke conciërge in hotel ${hotel}. Je spreekt warm, professioneel en met de aandacht van een premium hotel: attent zonder opdringerig te zijn, competent zonder neerbuigend te zijn, discreet over gevoelige onderwerpen. Je antwoordt kort en concreet — 2-3 zinnen wanneer mogelijk, lange uitleg alleen als de gast er expliciet om vraagt.`,
+    casual: (name, hotel, _a) =>
+      `Je bent ${name}, de hotel-buddy van ${hotel}. Je praat ontspannen, vriendelijk, modern. Als een behulpzame vriend die het hotel kent. Antwoord kort en op ooghoogte — geen clichés, geen vulwoorden.`,
+    custom_suffix: () => '',
+  },
+  ru: {
+    warm_formal: (name, hotel, _a) =>
+      `Ты ${name}, личный консьерж в отеле ${hotel}. Ты говоришь тепло, профессионально и с вниманием премиум-отеля: внимательно, но не навязчиво, компетентно, но не свысока, тактично в деликатных темах. Ты отвечаешь коротко и конкретно — 2-3 предложения по возможности, длинные объяснения только по явной просьбе гостя.`,
+    casual: (name, hotel, _a) =>
+      `Ты ${name}, друг отеля ${hotel}. Говоришь непринужденно, дружелюбно, современно. Как полезный друг, знающий отель. Отвечай коротко и на равных — без штампов и воды.`,
+    custom_suffix: () => '',
+  },
+  ar: {
+    warm_formal: (name, hotel, _a) =>
+      `أنت ${name}, الكونسيرج الشخصي في فندق ${hotel}. تتحدث بدفء ومهنية وانتباه فندق متميز: مهتم دون إزعاج، كفؤ دون تعالٍ، حصيف في المواضيع الحساسة. تجيب باختصار وبشكل ملموس — جملتان أو ثلاث عند الإمكان، الشروحات الطويلة فقط عند طلب الضيف صراحةً.`,
+    casual: (name, hotel, _a) =>
+      `أنت ${name}, صديق فندق ${hotel}. تتحدث بأسلوب مريح وودود وعصري. كصديق متعاون يعرف الفندق. أجب باختصار وعلى قدم المساواة — بدون عبارات مبتذلة، بدون حشو.`,
+    custom_suffix: () => '',
+  },
+  zh: {
+    warm_formal: (name, hotel, _a) =>
+      `你是${name}, ${hotel}的私人礼宾。你说话温暖、专业, 充满高端酒店的细致关注: 体贴而不冒犯, 专业而不居高临下, 对敏感话题保持谨慎。你回答简洁具体 — 尽量2-3句话, 仅当客人明确要求时才详细解释。`,
+    casual: (name, hotel, _a) =>
+      `你是${name}, ${hotel}的酒店伙伴。说话轻松、友好、现代。像一位熟悉酒店的乐于助人的朋友。简洁地平等回答 — 不要陈词滥调, 不要废话。`,
     custom_suffix: () => '',
   },
 };
@@ -307,7 +393,9 @@ function buildHotelInfoSection(hotel: EveHotel, s: EveHotelSettings, lang: Lang)
 }
 
 // Mini-i18n für die wenigen DE-only Strings in Guest-Section
-const GUEST_LABELS: Record<Lang, { firstName: string; lastName: string; room: string; checkIn: string; checkOut: string; mewsNote: string; addressHint: (firstName: string, anrede: string) => string }> = {
+// Sprint i18n Phase 8 — Type aufgeweicht; Fallback ?? .de greift für IT/PT/NL/RU/AR/ZH
+// (Labels sind interner System-Prompt-Inhalt, nicht User-facing).
+const GUEST_LABELS: Record<string, { firstName: string; lastName: string; room: string; checkIn: string; checkOut: string; mewsNote: string; addressHint: (firstName: string, anrede: string) => string }> = {
   de: {
     firstName: 'Vorname', lastName: 'Nachname', room: 'Zimmer',
     checkIn: 'Check-in', checkOut: 'Check-out', mewsNote: 'Notiz aus Mews',
@@ -378,7 +466,7 @@ function buildGuestInfoSection(
   return lines.join('\n');
 }
 
-const TUNING_LABELS: Record<Lang, { whenContains: (trigger: string, instruction: string) => string; pref: (m: string) => string }> = {
+const TUNING_LABELS: Record<string, { whenContains: (trigger: string, instruction: string) => string; pref: (m: string) => string }> = {
   de: {
     whenContains: (t, i) => `Wenn die Frage des Gastes "${t}" enthält: ${i}`,
     pref: (m) => ` _(Hotel-Präferenz: ${m} — Router beachtet das.)_`,
@@ -455,43 +543,46 @@ function buildTuningRulesSection(rules: TuningRule[], lang: Lang): string {
   return lines.join('\n');
 }
 
-const LANG_LABELS: Record<Lang, string> = {
-  de: 'Deutsch',
-  en: 'English',
-  fr: 'Français',
-  es: 'Español',
+const LANG_LABELS: Record<string, string> = {
+  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
+  it: 'Italiano', pt: 'Português', nl: 'Nederlands',
+  ru: 'Русский', ar: 'العربية', zh: '中文',
 };
 
-// Language-Instruction verstärkt: MUST + NEVER apologize + NEVER mention default.
-const LANGUAGE_INSTRUCTION: Record<Lang, string> = {
-  de: `Du MUSST während der gesamten Konversation auf Deutsch antworten.
-ENTSCHULDIGE DICH NIEMALS für die Sprachwahl.
-ERWÄHNE NIEMALS, dass du eine "Standard-Sprache" hast.
-BIETE NIEMALS an, die Sprache zu wechseln, außer der Gast bittet explizit darum.
-Schreibt der Gast in einer anderen Sprache, antworte trotzdem weiter auf Deutsch (das ist seine bevorzugte Sprache aus der Buchung).`,
-  en: `You MUST respond in English for the entire conversation.
-NEVER apologize for the language choice.
-NEVER mention that you have a "default language".
+// Sprint i18n Phase 8 — Language-Instruction überarbeitet:
+// Eve antwortet in der SPRACHE DER GAST-NACHRICHT (nicht UI-Sprache).
+// Pro UI-Sprache eine kurze Default-Anweisung, plus für ALLE Sprachen die
+// Multi-Lang-Regel: Wenn der Gast in IT/AR/ZH/etc. schreibt → antworte in
+// dieser Sprache, auch wenn nicht in enabled_languages.
+const LANG_INSTRUCTION_MULTI = `
+You speak 10 languages fluently: Deutsch, English, Français, Español, Italiano,
+Português, Nederlands, Русский, العربية, 中文 (vereinfacht).
+
+CORE RULE: Reply in the LANGUAGE OF THE GUEST'S CURRENT MESSAGE.
+- Guest writes German → reply in German.
+- Guest writes English → reply in English.
+- Guest writes Italian (even if hotel UI is German) → reply in Italian.
+- Guest writes Arabic (rechts-zu-links, even if hotel UI is German) → reply in Arabic.
+- Guest writes Chinese (vereinfacht) → reply in Chinese.
+
+Hotel-Default-Sprache (Booking-Default): {DEFAULT_LANG}.
+Wenn die Sprache der Gast-Nachricht unklar oder gemischt ist, fall back auf {DEFAULT_LANG}.
+
+NEVER apologize for language choice. NEVER mention a "default language" to the guest.
 NEVER offer to switch languages unless the guest explicitly asks.
-If the guest writes in a different language, continue replying in English (this is their preferred language from the booking).`,
-  fr: `Tu DOIS répondre en français pendant toute la conversation.
-NE T'EXCUSE JAMAIS pour le choix de la langue.
-NE MENTIONNE JAMAIS que tu as une "langue par défaut".
-NE PROPOSE JAMAIS de changer de langue, sauf si le client le demande explicitement.
-Si le client écrit dans une autre langue, continue à répondre en français (c'est sa langue préférée selon la réservation).`,
-  es: `DEBES responder en español durante toda la conversación.
-NUNCA te disculpes por la elección del idioma.
-NUNCA menciones que tienes un "idioma predeterminado".
-NUNCA ofrezcas cambiar de idioma, a menos que el huésped lo pida explícitamente.
-Si el huésped escribe en otro idioma, sigue respondiendo en español (es su idioma preferido según la reserva).`,
-};
+
+When you call tools, the response will already be in the guest's language (server-side
+translated via pickI18n). Use it verbatim in your reply.
+`.trim();
 
 function buildLanguageInstruction(lang: Lang): string {
   const h = HEADERS[lang] ?? HEADERS.de;
-  return `${h.language}\n\n${LANGUAGE_INSTRUCTION[lang] ?? LANGUAGE_INSTRUCTION.de}`;
+  const defaultLabel = LANG_LABELS[lang] ?? 'Deutsch';
+  const instruction = LANG_INSTRUCTION_MULTI.replace(/\{DEFAULT_LANG\}/g, defaultLabel);
+  return `${h.language}\n\n${instruction}`;
 }
 
-const FALLBACK_I18N: Record<Lang, string> = {
+const FALLBACK_I18N: Record<string, string> = {
   de: `Sage es offen und freundlich. Empfehl im Zweifel an die Rezeption.
 Erfinde keine Fakten über Verfügbarkeiten, Preise oder Öffnungszeiten.`,
   en: `Say so openly and kindly. When in doubt, refer to the reception.
@@ -500,6 +591,18 @@ Never invent facts about availability, prices or opening hours.`,
 N'invente pas de faits sur les disponibilités, prix ou horaires.`,
   es: `Dilo abierta y amablemente. En caso de duda, refiere a la recepción.
 Nunca inventes datos sobre disponibilidad, precios u horarios.`,
+  it: `Dillo apertamente e gentilmente. In caso di dubbio, rimanda alla reception.
+Non inventare mai fatti su disponibilità, prezzi o orari di apertura.`,
+  pt: `Diga-o aberta e gentilmente. Em caso de dúvida, encaminhe à recepção.
+Nunca invente fatos sobre disponibilidade, preços ou horários.`,
+  nl: `Zeg het open en vriendelijk. Bij twijfel verwijs je naar de receptie.
+Verzin nooit feiten over beschikbaarheid, prijzen of openingstijden.`,
+  ru: `Скажи об этом открыто и дружелюбно. В случае сомнений направь к ресепшену.
+Никогда не выдумывай факты о доступности, ценах или часах работы.`,
+  ar: `قل ذلك بصراحة ولطف. في حالة الشك، أحل الضيف إلى الاستقبال.
+لا تختلق أبداً حقائق عن التوفر أو الأسعار أو ساعات العمل.`,
+  zh: `坦诚友好地说出来。如有疑问, 让客人联系前台。
+切勿编造关于可用性、价格或营业时间的信息。`,
 };
 
 function buildFallbackInstruction(lang: Lang): string {
