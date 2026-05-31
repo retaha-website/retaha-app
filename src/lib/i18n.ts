@@ -1,10 +1,14 @@
-export type Lang = 'de' | 'en' | 'fr' | 'es';
-export const SUPPORTED_LANGS: Lang[] = ['de', 'en', 'fr', 'es'];
+// Sprint i18n-Expansion Phase 9 — Lang erweitert auf alle 10 Sprachen.
+// Re-export aus dem zentralen Type-System (src/lib/i18n/types.ts) damit
+// Lang und LanguageCode dasselbe sind und bestehende Caller weiter funktionieren.
+import { LANGUAGES as ALL_LANGS, type LanguageCode, normalizeLanguage } from './i18n/types.ts';
+import { UI_STRINGS_EXTRA } from './i18n.extra-langs.ts';
+
+export type Lang = LanguageCode;
+export const SUPPORTED_LANGS: Lang[] = [...ALL_LANGS];
 
 export function normalizeLang(input: string | undefined | null): Lang {
-  if (!input) return 'de';
-  const l = input.toLowerCase().slice(0, 2);
-  return (SUPPORTED_LANGS.includes(l as Lang) ? l : 'de') as Lang;
+  return normalizeLanguage(input);
 }
 
 export function pick<T extends Record<string, any>>(obj: T, field: string, lang: Lang): string {
@@ -195,8 +199,14 @@ export const UI_STRINGS = {
 
 export type UIKey = keyof typeof UI_STRINGS['de'];
 
+// Sprint i18n Phase 9 — t() liest aus UI_STRINGS (DE/EN/FR/ES) +
+// UI_STRINGS_EXTRA (IT/PT/NL/RU/AR/ZH). Fallback-Kette: lang → DE → key.
 export function t(key: UIKey, lang: Lang): string {
-  return (UI_STRINGS[lang]?.[key] || UI_STRINGS.de[key] || key) as string;
+  const fromCore = (UI_STRINGS as any)[lang]?.[key];
+  if (fromCore) return fromCore as string;
+  const fromExtra = (UI_STRINGS_EXTRA as any)[lang]?.[key];
+  if (fromExtra) return fromExtra as string;
+  return ((UI_STRINGS as any).de[key] || key) as string;
 }
 
 export function dayPart(lang: Lang, hour: number): string {
