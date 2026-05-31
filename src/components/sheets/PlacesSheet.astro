@@ -1,0 +1,462 @@
+---
+// Sprint E2 · Phase 7 — Gast-Frontend Empfehlungs-Sheet
+//
+// Tab-Switcher (5 Kategorien) + Picks-Section (immer zuerst) + Auto-Empfehlungs-
+// Section (dedup, top 10 mit Show-more).
+//
+// Pattern: Sheet.astro wrapper, openSheet('places') / closeSheet() von guestPage.
+// Tab-State + show-more via Alpine x-data="placesSheet()".
+// Data kommt aus /g/[token].astro frontmatter (kein client-side fetch).
+
+import Sheet from '../Sheet.astro';
+import { t, type Lang, pick as pickI18n } from '../../lib/i18n';
+import { buildPhotoUrl, type PickCategory } from '../../lib/places/google-client';
+import { haversineMeters, walkingMinutes } from '../../lib/places/distance';
+
+interface PickRow {
+  id: string;
+  place_id: string;
+  category: string;
+  hotel_note?: string | null;
+  hotel_note_en?: string | null;
+  hotel_note_fr?: string | null;
+  hotel_note_es?: string | null;
+  cached_data: any;
+  photo_references?: string[] | null;
+}
+
+interface NearbyPlace {
+  placeId: string;
+  name: string;
+  formattedAddress?: string;
+  rating?: number;
+  userRatingCount?: number;
+  photoNames?: string[];
+  location?: { lat: number; lng: number };
+  types?: string[];
+}
+
+interface NearbyRow {
+  category: string;
+  cached_places: NearbyPlace[];
+}
+
+interface Props {
+  lang: Lang;
+  hotelLat: number | null;
+  hotelLng: number | null;
+  picks: PickRow[];
+  nearby: NearbyRow[];
+}
+
+const { lang, hotelLat, hotelLng, picks, nearby } = Astro.props;
+
+const TABS: PickCategory[] = ['restaurant', 'cafe', 'bar', 'activity', 'sight'];
+
+// Group picks + nearby per category, compute dedup + walking-minutes here
+// (server-side — Alpine bekommt fertig sortierte Listen).
+interface CategoryData {
+  picks: Array<{
+    id: string;
+    place_id: string;
+    name: string;
+    rating?: number;
+    userRatingCount?: number;
+    priceLevel?: string;
+    address?: string;
+    photoUrl?: string;
+    hotelNote?: string;
+    walkingMin?: number;
+  }>;
+  auto: Array<{
+    place_id: string;
+    name: string;
+    rating?: number;
+    userRatingCount?: number;
+    address?: string;
+    photoUrl?: string;
+    walkingMin?: number;
+  }>;
+}
+
+function noteForLang(p: PickRow): string | undefined {
+  const field = lang === 'de' ? p.hotel_note
+    : lang === 'en' ? (p.hotel_note_en ?? p.hotel_note)
+    : lang === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
+    : lang === 'es' ? (p.hotel_note_es ?? p.hotel_note)
+    : p.hotel_note;
+  return field?.trim() || undefined;
+}
+
+const dataByCategory: Record<string, CategoryData> = {};
+for (const cat of TABS) {
+  const categoryPicks = picks
+    .filter(p => p.category === cat)
+    .map(p => {
+      const cd = p.cached_data ?? {};
+      const photo = p.photo_references?.[0] ? buildPhotoUrl(p.photo_references[0], 800) : undefined;
+      const loc = cd.location;
+      let walking: number | undefined;
+      if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng) {
+        walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
+      }
+      return {
+        id: p.id,
+        place_id: p.place_id,
+        name: cd.name ?? '(no name)',
+        rating: cd.rating,
+        userRatingCount: cd.user_ratings_total,
+        priceLevel: cd.price_level,
+        address: cd.formatted_address,
+        photoUrl: photo,
+        hotelNote: noteForLang(p),
+        walkingMin: walking,
+      };
+    });
+
+  const pickPlaceIds = new Set(categoryPicks.map(p => p.place_id));
+  const cacheRow = nearby.find(n => n.category === cat);
+  const autoPlaces = (cacheRow?.cached_places ?? [])
+    .filter(p => !pickPlaceIds.has(p.placeId))
+    .sort((a, b) => {
+      // rating DESC, dann userRatingCount DESC
+      const rDiff = (b.rating ?? 0) - (a.rating ?? 0);
+      if (rDiff !== 0) return rDiff;
+      return (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+    })
+    .map(p => {
+      const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
+      let walking: number | undefined;
+      if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng) {
+        walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
+      }
+      return {
+        place_id: p.placeId,
+        name: p.name,
+        rating: p.rating,
+        userRatingCount: p.userRatingCount,
+        address: p.formattedAddress,
+        photoUrl: photo,
+        walkingMin: walking,
+      };
+    });
+
+  dataByCategory[cat] = { picks: categoryPicks, auto: autoPlaces };
+}
+
+// Initial-Tab: erster Tab mit Picks, sonst restaurant
+const initialTab: PickCategory = TABS.find(c => dataByCategory[c].picks.length > 0) ?? 'restaurant';
+
+function priceSymbol(level: string | undefined): string {
+  switch (level) {
+    case 'PRICE_LEVEL_FREE':         return '';
+    case 'PRICE_LEVEL_INEXPENSIVE':  return '€';
+    case 'PRICE_LEVEL_MODERATE':     return '€€';
+    case 'PRICE_LEVEL_EXPENSIVE':    return '€€€';
+    case 'PRICE_LEVEL_VERY_EXPENSIVE':return '€€€€';
+    default: return '';
+  }
+}
+---
+
+<Sheet
+  id="places"
+  eyebrow={t('places.subtitle', lang)}
+  title={t('places.title', lang)}
+  titleAccent=""
+>
+  <div x-data={`placesSheet('${initialTab}')`}>
+    <!-- Tab-Switcher -->
+    <nav class="places-tabs" role="tablist" aria-label="Place-Kategorien">
+      {TABS.map(cat => (
+        <button
+          type="button"
+          class="places-tab"
+          :class={`{ 'is-active': activeTab === '${cat}' }`}
+          @click={`activeTab = '${cat}'; showAllAuto = false`}
+        >
+          {t(`places.tab.${cat}` as any, lang)}
+          {dataByCategory[cat].picks.length > 0 && (
+            <span class="places-tab-counter">{dataByCategory[cat].picks.length}</span>
+          )}
+        </button>
+      ))}
+    </nav>
+
+    <!-- Pro Kategorie ein Block, x-show toggle -->
+    {TABS.map(cat => {
+      const data = dataByCategory[cat];
+      const visibleAutoCount = 10;
+      return (
+        <div x-show={`activeTab === '${cat}'`} class="places-tab-panel">
+          <!-- Picks-Section IMMER zuerst -->
+          <section class="places-section">
+            <h3 class="places-section-eyebrow">{t('places.our_favorites', lang)}</h3>
+
+            {data.picks.length === 0 && (
+              <p class="places-empty">{t('places.no_picks', lang)}</p>
+            )}
+
+            {data.picks.map(p => (
+              <article class="place-card">
+                {p.photoUrl && (
+                  <div class="place-card-photo">
+                    <img src={p.photoUrl} alt={p.name} loading="lazy" />
+                  </div>
+                )}
+                <div class="place-card-body">
+                  <h4 class="place-card-name">{p.name}</h4>
+                  <div class="place-card-meta">
+                    {p.rating != null && (
+                      <span class="place-rating">⭐ {p.rating} <span class="place-reviews">({p.userRatingCount ?? 0})</span></span>
+                    )}
+                    {p.priceLevel && (
+                      <span class="place-price">· {priceSymbol(p.priceLevel)}</span>
+                    )}
+                    {p.walkingMin != null && (
+                      <span class="place-distance">· {t('places.distance_minutes', lang).replace('{n}', String(p.walkingMin))}</span>
+                    )}
+                  </div>
+                  {p.hotelNote && (
+                    <p class="place-card-note">„{p.hotelNote}"</p>
+                  )}
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <!-- Auto-Empfehlungs-Section -->
+          <section class="places-section">
+            <h3 class="places-section-eyebrow">{t('places.more_nearby', lang)}</h3>
+
+            {data.auto.length === 0 && (
+              <p class="places-empty">{t('places.no_nearby', lang)}</p>
+            )}
+
+            <ul class="place-list">
+              {data.auto.slice(0, visibleAutoCount).map(a => (
+                <li class="place-list-item">
+                  {a.photoUrl ? (
+                    <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
+                  ) : (
+                    <div class="place-list-photo place-list-photo--placeholder"></div>
+                  )}
+                  <div class="place-list-body">
+                    <p class="place-list-name">{a.name}</p>
+                    <p class="place-list-meta">
+                      {a.rating != null && <span>⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
+                      {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
+                    </p>
+                  </div>
+                </li>
+              ))}
+
+              <template x-if={`showAllAuto`}>
+                <span>
+                  {data.auto.slice(visibleAutoCount).map(a => (
+                    <li class="place-list-item">
+                      {a.photoUrl ? (
+                        <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
+                      ) : (
+                        <div class="place-list-photo place-list-photo--placeholder"></div>
+                      )}
+                      <div class="place-list-body">
+                        <p class="place-list-name">{a.name}</p>
+                        <p class="place-list-meta">
+                          {a.rating != null && <span>⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
+                          {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </span>
+              </template>
+            </ul>
+
+            {data.auto.length > visibleAutoCount && (
+              <button
+                type="button"
+                class="places-show-more"
+                x-show="!showAllAuto"
+                @click="showAllAuto = true"
+              >
+                {t('places.show_more', lang)} ({data.auto.length - visibleAutoCount})
+              </button>
+            )}
+          </section>
+        </div>
+      );
+    })}
+  </div>
+
+  <script is:inline>
+    document.addEventListener('alpine:init', () => {
+      // @ts-expect-error - Alpine global
+      Alpine.data('placesSheet', (initialTab) => ({
+        activeTab: initialTab,
+        showAllAuto: false,
+      }));
+    });
+  </script>
+</Sheet>
+
+<style is:global>
+  /* Tab-Switcher */
+  .places-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    padding-bottom: 1px;
+    border-bottom: 1px solid #e8e8e8;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .places-tabs::-webkit-scrollbar { display: none; }
+  .places-tab {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    font-size: 13px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(26, 26, 26, 0.55);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+  .places-tab:hover { color: #1A1A1A; }
+  .places-tab.is-active {
+    color: #1A1A1A;
+    border-bottom-color: #FF4A82;
+    font-weight: 500;
+  }
+  .places-tab-counter {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 11px;
+    color: rgba(26, 26, 26, 0.4);
+  }
+
+  /* Sections */
+  .places-section { margin-bottom: 32px; }
+  .places-section-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: rgba(26, 26, 26, 0.45);
+    margin: 0 0 16px;
+    text-align: center;
+  }
+  .places-empty {
+    font-size: 13px;
+    color: rgba(26, 26, 26, 0.5);
+    font-style: italic;
+    padding: 20px 0;
+    text-align: center;
+  }
+
+  /* Pick-Card (large) */
+  .place-card {
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    overflow: hidden;
+  }
+  .place-card-photo {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #f5f5f5;
+    overflow: hidden;
+  }
+  .place-card-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .place-card-body { padding: 16px; }
+  .place-card-name {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 500;
+    color: #1A1A1A;
+  }
+  .place-card-meta {
+    font-size: 13px;
+    color: rgba(26, 26, 26, 0.55);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .place-card-note {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    background: rgba(255, 74, 130, 0.06);
+    border-left: 3px solid #FF4A82;
+    font-size: 14px;
+    font-style: italic;
+    color: rgba(26, 26, 26, 0.8);
+  }
+
+  /* List-Item (small) */
+  .place-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .place-list-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .place-list-item:last-child { border-bottom: none; }
+  .place-list-photo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f5f5f5;
+  }
+  .place-list-photo--placeholder { background: #eee; }
+  .place-list-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .place-list-name {
+    margin: 0;
+    font-size: 14px;
+    color: #1A1A1A;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .place-list-meta {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: rgba(26, 26, 26, 0.55);
+  }
+  .place-rating { color: #1A1A1A; }
+  .place-reviews { color: rgba(26, 26, 26, 0.4); font-size: 11px; }
+
+  .places-show-more {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 18px;
+    background: transparent;
+    border: 1px solid #ddd;
+    color: rgba(26, 26, 26, 0.7);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .places-show-more:hover {
+    background: #f5f5f5;
+    border-color: #999;
+  }
+</style>

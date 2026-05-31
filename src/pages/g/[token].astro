@@ -8,6 +8,7 @@ import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
+import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
 import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
 import { getEveSuggestions } from '../../lib/eve/suggestions';
 import { createSupabaseServiceRoleInstance } from '../../lib/auth';
@@ -101,6 +102,24 @@ const { data: initialChatRows } = (settings as any).eve_enabled
 const initialEveMessages = (initialChatRows ?? [])
   .filter((m: any) => m.role === 'user' || m.role === 'assistant')
   .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content, streaming: false }));
+
+// Sprint E2 Phase 7 — Places-Sheet-Daten: Picks + Nearby-Cache + hotel lat/lng
+const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = await Promise.all([
+  sbSr.from('hotels').select('latitude, longitude').eq('id', hotel.id).maybeSingle(),
+  sbSr.from('hotel_place_picks')
+    .select('id, place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, cached_data, photo_references, sort_order')
+    .eq('hotel_id', hotel.id)
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false }),
+  sbSr.from('hotel_place_nearby_cache')
+    .select('category, cached_places')
+    .eq('hotel_id', hotel.id),
+]);
+const placesHotelLat = (hotelGeoRow?.latitude as number | null) ?? null;
+const placesHotelLng = (hotelGeoRow?.longitude as number | null) ?? null;
+const placesPicks = (placePicksRows ?? []) as any[];
+const placesNearby = (nearbyRows ?? []) as any[];
 
 const welcomeMap: Record<Lang, string | null> = {
   de: settings.welcome_message_de,
@@ -391,7 +410,7 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           )}
 
           {f.berlin_tips !== false && (
-            <button class="gate-tile" type="button">
+            <button class="gate-tile" type="button" @click="openSheet('places')">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
               </span>
@@ -465,6 +484,16 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           conciergeName={settings.eve_name || 'das Team'}
           checkIn={stay.check_in}
           checkOut={stay.check_out}
+        />
+      )}
+
+      {f.berlin_tips !== false && (
+        <PlacesSheet
+          lang={lang}
+          hotelLat={placesHotelLat}
+          hotelLng={placesHotelLng}
+          picks={placesPicks}
+          nearby={placesNearby}
         />
       )}
 
