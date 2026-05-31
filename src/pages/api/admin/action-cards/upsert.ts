@@ -60,38 +60,64 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (!body.card_type || !VALID_TYPES.includes(body.card_type)) {
     return json({ ok: false, error: 'Invalid card_type' }, 400);
   }
-  if (!body.title_de || typeof body.title_de !== 'string' || !body.title_de.trim()) {
-    return json({ ok: false, error: 'title_de required' }, 400);
-  }
   const target = (body.action_target ?? '').toString().trim() || null;
   const targetErr = validateTarget(body.card_type, target);
   if (targetErr) return json({ ok: false, error: targetErr }, 400);
 
   const sb = createSupabaseServerInstance(cookies, request);
 
+  // Sprint i18n Phase 5 — 1-Feld-UX: Hotelier sendet je Feld nur 1 Wert
+  // in seiner Default-Sprache. Wir schreiben in {field}_i18n[default] +
+  // mirror auf alte _de-Spalte (Safety bis Phase 10).
+  const { data: hotelLang } = await sb
+    .from('hotels').select('default_language')
+    .eq('id', hotel.id).maybeSingle();
+  const defLang = (hotelLang?.default_language as string | undefined) ?? 'de';
+
+  const title    = (body.title    ?? body.title_de    ?? '').toString().trim();
+  const subtitle = (body.subtitle ?? body.subtitle_de ?? '').toString().trim();
+  const eyebrow  = (body.eyebrow  ?? body.eyebrow_de  ?? '').toString().trim();
+  const cta      = (body.cta      ?? body.cta_de      ?? '').toString().trim();
+
+  if (!title) return json({ ok: false, error: 'title required' }, 400);
+
+  // Lese existing i18n damit override-Werte in anderen Sprachen erhalten bleiben
+  let existingI18n: Record<string, any> = {};
+  if (body.id) {
+    const { data: ex } = await sb
+      .from('hotel_action_cards')
+      .select('title_i18n, subtitle_i18n, eyebrow_i18n, cta_i18n')
+      .eq('id', body.id).eq('hotel_id', hotel.id).maybeSingle();
+    if (ex) existingI18n = ex;
+  }
+
+  const NOW = new Date().toISOString();
+  function mergeI18n(existing: any, value: string): any | null {
+    const merged: Record<string, any> = (existing && typeof existing === 'object') ? { ...existing } : {};
+    if (value) merged[defLang] = { value, source: 'original', updated_at: NOW };
+    else delete merged[defLang];
+    return Object.keys(merged).length > 0 ? merged : null;
+  }
+
   const fields: Record<string, any> = {
     hotel_id: hotel.id,
     card_type: body.card_type,
     action_target: target,
-    title_de: body.title_de.trim(),
-    title_en: body.title_en?.trim() || null,
-    title_fr: body.title_fr?.trim() || null,
-    title_es: body.title_es?.trim() || null,
-    subtitle_de: body.subtitle_de?.trim() || null,
-    subtitle_en: body.subtitle_en?.trim() || null,
-    subtitle_fr: body.subtitle_fr?.trim() || null,
-    subtitle_es: body.subtitle_es?.trim() || null,
-    eyebrow_de: body.eyebrow_de?.trim() || null,
-    eyebrow_en: body.eyebrow_en?.trim() || null,
-    eyebrow_fr: body.eyebrow_fr?.trim() || null,
-    eyebrow_es: body.eyebrow_es?.trim() || null,
-    cta_de: body.cta_de?.trim() || null,
-    cta_en: body.cta_en?.trim() || null,
-    cta_fr: body.cta_fr?.trim() || null,
-    cta_es: body.cta_es?.trim() || null,
+    // NEW: i18n JSONB
+    title_i18n:    mergeI18n(existingI18n.title_i18n, title),
+    subtitle_i18n: mergeI18n(existingI18n.subtitle_i18n, subtitle),
+    eyebrow_i18n:  mergeI18n(existingI18n.eyebrow_i18n, eyebrow),
+    cta_i18n:      mergeI18n(existingI18n.cta_i18n, cta),
+    // Safety-Net: alte DE-Spalten synchron halten falls default=DE (Phase 10 dropt)
+    title_de:    defLang === 'de' ? title    : undefined,
+    subtitle_de: defLang === 'de' ? (subtitle || null) : undefined,
+    eyebrow_de:  defLang === 'de' ? (eyebrow  || null) : undefined,
+    cta_de:      defLang === 'de' ? (cta      || null) : undefined,
     card_class: (body.card_class ?? 'rec-anthrazit').toString(),
     is_published: body.is_published !== false,
   };
+  // undefined-Felder rausstrippen (Postgres würde sonst NULL setzen)
+  for (const k of Object.keys(fields)) if (fields[k] === undefined) delete fields[k];
 
   if (body.id) {
     // UPDATE

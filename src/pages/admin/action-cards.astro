@@ -26,6 +26,21 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
+// Sprint i18n Phase 5 — Hotel-Sprach-Settings für 1-Feld-UX
+const { data: hotelLangRow } = await client
+  .from('hotels').select('default_language, enabled_languages')
+  .eq('id', hotel.id).maybeSingle();
+const hotelDefaultLang = (hotelLangRow?.default_language as string | undefined) ?? 'de';
+const hotelEnabledLangs: string[] = Array.isArray(hotelLangRow?.enabled_languages)
+  ? hotelLangRow.enabled_languages : ['de','en','fr','es'];
+const LANG_LABELS: Record<string, string> = {
+  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
+  it: 'Italiano', pt: 'Português', nl: 'Nederlands',
+  ru: 'Русский', ar: 'العربية', zh: '中文',
+};
+const otherEnabled = hotelEnabledLangs.filter(l => l !== hotelDefaultLang);
+const otherEnabledLabel = otherEnabled.map(l => LANG_LABELS[l] || l).join(', ');
+
 const { data: cards } = await client
   .from('hotel_action_cards')
   .select('*')
@@ -34,6 +49,12 @@ const { data: cards } = await client
 
 const cardList = (cards ?? []) as any[];
 const overFive = cardList.length > 5;
+
+// pickI18n-Helper inline (Hotelier-Default für Listen/Preview)
+function pickI18n(value: any, lang: string, fallbackLang: string = 'de'): string {
+  if (!value || typeof value !== 'object') return '';
+  return value[lang]?.value || value[fallbackLang]?.value || value['de']?.value || '';
+}
 
 const INTERNAL_ACTIONS = [
   { value: 'open_breakfast',  label: 'Frühstück' },
@@ -64,6 +85,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
   <div
     x-data={`actionCardsEditor(${JSON.stringify({
       hotelId: hotel.id,
+      defaultLang: hotelDefaultLang,
       cards: cardList,
       internalActions: INTERNAL_ACTIONS,
       cardClasses: CARD_CLASSES,
@@ -110,8 +132,10 @@ const CARD_TYPE_LABELS: Record<string, string> = {
                 {!c.is_published && <span class="ac-badge ac-badge--draft">Entwurf</span>}
                 {c.action_target && <span class="ac-badge ac-badge--target">{c.action_target}</span>}
               </div>
-              <p class="ac-row-title">{c.title_de}</p>
-              {c.subtitle_de && <p class="ac-row-sub">{c.subtitle_de}</p>}
+              <p class="ac-row-title">{pickI18n(c.title_i18n, hotelDefaultLang) || c.title_de}</p>
+              {(pickI18n(c.subtitle_i18n, hotelDefaultLang) || c.subtitle_de) && (
+                <p class="ac-row-sub">{pickI18n(c.subtitle_i18n, hotelDefaultLang) || c.subtitle_de}</p>
+              )}
             </div>
             <div class="ac-row-actions">
               <button type="button" @click={`moveCard('${c.id}','up')`} disabled={idx === 0} class="ac-icon-btn" title="Nach oben">↑</button>
@@ -127,22 +151,30 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     <!-- ─── Live-Preview ─────────────────────────────────────────── -->
     <section class="ac-preview-section">
       <h2 class="ac-section-title">Live-Vorschau im Gast-Bereich</h2>
-      <p class="ac-section-sub">Genauso sehen die Karten oben im /g-Frontend aus (DE-Sprache, in echter Größe).</p>
+      <p class="ac-section-sub">
+        Vorschau in {LANG_LABELS[hotelDefaultLang]}. Gäste sehen automatische Übersetzungen in {otherEnabledLabel || 'ihrer Sprache'}.
+      </p>
 
       {cardList.length === 0 ? (
         <p class="ac-preview-empty">Keine Karten zum Vorschauen.</p>
       ) : (
         <div class="ac-preview-stage">
           <div class="ac-preview-scroller">
-            {cardList.map(c => (
-              <div class={`ac-preview-card rec-card ${c.card_class}`}>
-                {c.image_url && <img src={c.image_url} alt="" class="ac-preview-card-img" />}
-                {c.eyebrow_de && <div class="rec-card-eyebrow">{c.eyebrow_de}</div>}
-                <div class="rec-card-title">{c.title_de}</div>
-                {c.subtitle_de && <div class="rec-card-sub">{c.subtitle_de}</div>}
-                {c.cta_de && <button class="rec-card-cta" type="button" disabled>{c.cta_de}</button>}
-              </div>
-            ))}
+            {cardList.map(c => {
+              const t = pickI18n(c.title_i18n, hotelDefaultLang) || c.title_de;
+              const s = pickI18n(c.subtitle_i18n, hotelDefaultLang) || c.subtitle_de;
+              const e = pickI18n(c.eyebrow_i18n, hotelDefaultLang) || c.eyebrow_de;
+              const cta = pickI18n(c.cta_i18n, hotelDefaultLang) || c.cta_de;
+              return (
+                <div class={`ac-preview-card rec-card ${c.card_class}`}>
+                  {c.image_url && <img src={c.image_url} alt="" class="ac-preview-card-img" />}
+                  {e && <div class="rec-card-eyebrow">{e}</div>}
+                  <div class="rec-card-title">{t}</div>
+                  {s && <div class="rec-card-sub">{s}</div>}
+                  {cta && <button class="rec-card-cta" type="button" disabled>{cta}</button>}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -193,45 +225,30 @@ const CARD_TYPE_LABELS: Record<string, string> = {
             <input type="email" x-model="editor.action_target" placeholder="rezeption@gate-garden.de" class="ac-input" />
           </div>
 
-          <!-- Sprach-Tabs -->
-          <div class="ac-lang-tabs">
-            <template x-for="lang in ['de','en','fr','es']" :key="lang">
-              <button
-                type="button"
-                @click="activeLang = lang"
-                :class="{ 'is-active': activeLang === lang, 'has-content': hasContent(lang) }"
-                class="ac-lang-tab"
-              >
-                <span x-text="lang.toUpperCase()"></span>
-                <span x-show="hasContent(lang)" class="ac-lang-dot">•</span>
-              </button>
-            </template>
+          <!-- Sprint i18n Phase 5 — 1-Feld-UX statt 4 Sprach-Tabs -->
+          <div class="ac-i18n-hint">
+            <strong>Eingabe in {LANG_LABELS[hotelDefaultLang]}</strong> · Wird {otherEnabled.length > 0
+              ? `automatisch in ${otherEnabledLabel} übersetzt`
+              : 'aktuell nicht übersetzt (keine weiteren Gast-Sprachen aktiviert)'
+            } <span class="ac-optional">(Phase 6 verdrahtet den Translation-Hook)</span>
           </div>
 
-          <!-- Texte pro Sprache -->
-          <template x-for="lang in ['de','en','fr','es']" :key="lang">
-            <div x-show="activeLang === lang" class="ac-lang-fields">
-              <label class="ac-field">
-                <span class="ac-field-label">
-                  Titel <span x-show="lang === 'de'" class="ac-required">*</span>
-                  <span x-show="lang !== 'de'" class="ac-optional">(optional)</span>
-                </span>
-                <input type="text" x-model="editor[`title_${lang}`]" :required="lang === 'de'" maxlength="60" class="ac-input" />
-              </label>
-              <label class="ac-field">
-                <span class="ac-field-label">Eyebrow <span class="ac-optional">(z.B. „Morgen Mittag")</span></span>
-                <input type="text" x-model="editor[`eyebrow_${lang}`]" maxlength="40" class="ac-input" />
-              </label>
-              <label class="ac-field">
-                <span class="ac-field-label">Untertitel <span class="ac-optional">(2–3 Sätze)</span></span>
-                <textarea x-model="editor[`subtitle_${lang}`]" rows="2" maxlength="200" class="ac-input"></textarea>
-              </label>
-              <label class="ac-field">
-                <span class="ac-field-label">Button-Text (CTA)</span>
-                <input type="text" x-model="editor[`cta_${lang}`]" maxlength="30" class="ac-input" placeholder="z.B. Tisch reservieren" />
-              </label>
-            </div>
-          </template>
+          <label class="ac-field">
+            <span class="ac-field-label">Titel <span class="ac-required">*</span></span>
+            <input type="text" x-model="editor.title" required maxlength="60" class="ac-input" />
+          </label>
+          <label class="ac-field">
+            <span class="ac-field-label">Eyebrow <span class="ac-optional">(z.B. „Morgen Mittag")</span></span>
+            <input type="text" x-model="editor.eyebrow" maxlength="40" class="ac-input" />
+          </label>
+          <label class="ac-field">
+            <span class="ac-field-label">Untertitel <span class="ac-optional">(2–3 Sätze)</span></span>
+            <textarea x-model="editor.subtitle" rows="2" maxlength="200" class="ac-input"></textarea>
+          </label>
+          <label class="ac-field">
+            <span class="ac-field-label">Button-Text (CTA)</span>
+            <input type="text" x-model="editor.cta" maxlength="30" class="ac-input" placeholder="z.B. Tisch reservieren" />
+          </label>
 
           <!-- Bild -->
           <div class="ac-field">
@@ -286,15 +303,13 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     import Alpine from 'alpinejs';
     import { resizeImage } from '../../lib/storage/client-resize';
 
+    // Sprint i18n Phase 5 — Editor-State auf 1-Feld-UX (Default-Sprache)
     function emptyEditor() {
       return {
         id: null,
         card_type: 'internal_action',
         action_target: '',
-        title_de: '', title_en: '', title_fr: '', title_es: '',
-        subtitle_de: '', subtitle_en: '', subtitle_fr: '', subtitle_es: '',
-        eyebrow_de: '', eyebrow_en: '', eyebrow_fr: '', eyebrow_es: '',
-        cta_de: '', cta_en: '', cta_fr: '', cta_es: '',
+        title: '', subtitle: '', eyebrow: '', cta: '',
         image_url: null,
         imageFile: null,
         imagePreview: null,
@@ -303,8 +318,14 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       };
     }
 
+    function pickI18nClient(value: any, lang: string): string {
+      if (!value || typeof value !== 'object') return '';
+      return value[lang]?.value || value['de']?.value || '';
+    }
+
     Alpine.data('actionCardsEditor', (initial: any) => ({
       hotelId: initial.hotelId,
+      defaultLang: initial.defaultLang as string,
       cards: initial.cards,
       internalActions: initial.internalActions,
       cardClasses: initial.cardClasses,
@@ -313,19 +334,12 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       editorOpen: false,
       editorMode: 'new' as 'new' | 'edit',
       editor: emptyEditor(),
-      activeLang: 'de' as 'de' | 'en' | 'fr' | 'es',
       isSaving: false,
       saveError: '' as string,
       toast: null as null | { type: 'success' | 'error'; text: string },
 
-      hasContent(lang: string) {
-        const e: any = this.editor;
-        return !!(e[`title_${lang}`] || e[`subtitle_${lang}`] || e[`eyebrow_${lang}`] || e[`cta_${lang}`]);
-      },
-
       openNew() {
         this.editor = emptyEditor();
-        this.activeLang = 'de';
         this.editorMode = 'new';
         this.saveError = '';
         this.editorOpen = true;
@@ -335,11 +349,18 @@ const CARD_TYPE_LABELS: Record<string, string> = {
         const c = this.cards.find((x: any) => x.id === id);
         if (!c) return;
         const e = emptyEditor();
-        Object.assign(e, c);
-        e.imageFile = null;
-        e.imagePreview = null;
+        // i18n-First mit Fallback auf alte _de-Spalten (Safety bis Phase 10)
+        e.id = c.id;
+        e.card_type = c.card_type;
+        e.action_target = c.action_target ?? '';
+        e.title    = pickI18nClient(c.title_i18n,    this.defaultLang) || c.title_de    || '';
+        e.subtitle = pickI18nClient(c.subtitle_i18n, this.defaultLang) || c.subtitle_de || '';
+        e.eyebrow  = pickI18nClient(c.eyebrow_i18n,  this.defaultLang) || c.eyebrow_de  || '';
+        e.cta      = pickI18nClient(c.cta_i18n,      this.defaultLang) || c.cta_de      || '';
+        e.image_url = c.image_url ?? null;
+        e.card_class = c.card_class ?? 'rec-anthrazit';
+        e.is_published = c.is_published !== false;
         this.editor = e;
-        this.activeLang = 'de';
         this.editorMode = 'edit';
         this.saveError = '';
         this.editorOpen = true;
@@ -374,26 +395,26 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       },
 
       async saveEditor() {
-        if (!this.editor.title_de?.trim()) {
-          this.saveError = 'Titel auf Deutsch ist Pflicht.';
-          this.activeLang = 'de';
+        if (!this.editor.title?.trim()) {
+          this.saveError = 'Titel ist Pflicht.';
           return;
         }
         this.isSaving = true;
         this.saveError = '';
         try {
+          // 1-Feld-UX: schickt nur plain Werte. Endpoint mappt sie auf
+          // {field}_i18n[default_lang] + spiegelt zur alten DE-Spalte.
           const payload: any = {
             id: this.editor.id || undefined,
             card_type: this.editor.card_type,
             action_target: this.editor.action_target,
             card_class: this.editor.card_class,
             is_published: this.editor.is_published,
+            title:    this.editor.title,
+            subtitle: this.editor.subtitle,
+            eyebrow:  this.editor.eyebrow,
+            cta:      this.editor.cta,
           };
-          for (const lang of ['de','en','fr','es']) {
-            for (const f of ['title','subtitle','eyebrow','cta']) {
-              payload[`${f}_${lang}`] = (this.editor as any)[`${f}_${lang}`];
-            }
-          }
           const res = await fetch('/api/admin/action-cards/upsert', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -526,6 +547,8 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     textarea.ac-input { resize: vertical; }
 
     /* Lang-Tabs */
+    .ac-i18n-hint { padding: 10px 12px; background: rgba(255,74,130,.06); border-left: 3px solid #FF4A82; font-size: 12px; color: rgba(26,26,26,.75); margin-bottom: 16px; }
+    .ac-i18n-hint strong { color: #1A1A1A; font-weight: 500; }
     .ac-lang-tabs { display: flex; gap: 2px; border-bottom: 1px solid #eee; margin: 8px 0 16px; }
     .ac-lang-tab { padding: 8px 14px; background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12px; font-weight: 500; cursor: pointer; color: rgba(26,26,26,.5); display: flex; align-items: center; gap: 4px; }
     .ac-lang-tab.is-active { color: #1A1A1A; border-bottom-color: #FF4A82; }

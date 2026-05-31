@@ -16,15 +16,41 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
+// Sprint i18n Phase 5 — Hotel-Sprach-Settings für 1-Feld-UX
+const { data: hotelLangRow } = await client
+  .from('hotels').select('default_language, enabled_languages')
+  .eq('id', hotel.id).maybeSingle();
+const hotelDefaultLang = (hotelLangRow?.default_language as string | undefined) ?? 'de';
+const hotelEnabledLangs: string[] = Array.isArray(hotelLangRow?.enabled_languages)
+  ? hotelLangRow.enabled_languages : ['de','en','fr','es'];
+const LANG_LABELS_LOC: Record<string, string> = {
+  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
+  it: 'Italiano', pt: 'Português', nl: 'Nederlands',
+  ru: 'Русский', ar: 'العربية', zh: '中文',
+};
+const otherEnabledLabel = hotelEnabledLangs.filter(l => l !== hotelDefaultLang)
+  .map(l => LANG_LABELS_LOC[l] || l).join(', ');
+
+function pickI18n(value: any, lang: string, fallback: string = ''): string {
+  if (!value || typeof value !== 'object') return fallback;
+  return value[lang]?.value || value[hotelDefaultLang]?.value || value['de']?.value || fallback;
+}
+function mergeI18n(existing: any, value: string): any | null {
+  const merged: Record<string, any> = (existing && typeof existing === 'object') ? { ...existing } : {};
+  if (value) merged[hotelDefaultLang] = { value, source: 'original', updated_at: new Date().toISOString() };
+  else delete merged[hotelDefaultLang];
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 let message: { type: 'success' | 'error'; text: string } | null = null;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
 
-  // Read current settings to update features JSONB
+  // Read current settings (features + existing i18n damit override-Werte erhalten bleiben)
   const { data: currentSettings } = await client
     .from('hotel_settings')
-    .select('features')
+    .select('features, breakfast_location_i18n, breakfast_included_i18n')
     .eq('hotel_id', hotel.id)
     .maybeSingle();
 
@@ -34,21 +60,24 @@ if (Astro.request.method === 'POST') {
   const reservationOn = allReservationValues.includes('on');
   const newFeatures = { ...currentFeatures, breakfast_reservation: reservationOn };
 
+  // Sprint i18n Phase 5 — 1-Feld-UX: Hotelier sendet je Feld nur Default-Wert
+  const locationDefault = form.get('breakfast_location_default')?.toString().trim() || '';
+  const includedDefault = form.get('breakfast_included_default')?.toString().trim() || '';
+
   const updates: Record<string, any> = {
     features: newFeatures,
     breakfast_start_time: form.get('breakfast_start_time')?.toString() || '07:30',
     breakfast_end_time: form.get('breakfast_end_time')?.toString() || '10:30',
     breakfast_slot_minutes: parseInt(form.get('breakfast_slot_minutes')?.toString() || '30') || 30,
-    breakfast_location_de: form.get('breakfast_location_de')?.toString().trim() || null,
-    breakfast_location_en: form.get('breakfast_location_en')?.toString().trim() || null,
-    breakfast_location_fr: form.get('breakfast_location_fr')?.toString().trim() || null,
-    breakfast_location_es: form.get('breakfast_location_es')?.toString().trim() || null,
-    breakfast_included_de: form.get('breakfast_included_de')?.toString().trim() || null,
-    breakfast_included_en: form.get('breakfast_included_en')?.toString().trim() || null,
-    breakfast_included_fr: form.get('breakfast_included_fr')?.toString().trim() || null,
-    breakfast_included_es: form.get('breakfast_included_es')?.toString().trim() || null,
+    breakfast_location_i18n: mergeI18n(currentSettings?.breakfast_location_i18n, locationDefault),
+    breakfast_included_i18n: mergeI18n(currentSettings?.breakfast_included_i18n, includedDefault),
     updated_at: new Date().toISOString(),
   };
+  // Safety-Net: spiegle Default zur alten DE-Spalte (Phase 10 dropt)
+  if (hotelDefaultLang === 'de') {
+    updates.breakfast_location_de = locationDefault || null;
+    updates.breakfast_included_de = includedDefault || null;
+  }
 
   const { data: updatedRows, error } = await client
     .from('hotel_settings')
@@ -70,8 +99,8 @@ const { data: settings } = await client
   .select(`
     features,
     breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
-    breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es,
-    breakfast_included_de, breakfast_included_en, breakfast_included_fr, breakfast_included_es
+    breakfast_location_de, breakfast_location_i18n,
+    breakfast_included_de, breakfast_included_i18n
   `)
   .eq('hotel_id', hotel.id)
   .maybeSingle();
@@ -198,120 +227,52 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
       </p>
     </section>
 
-    <!-- Ort (4 Sprachen) -->
-    <section class="bg-white border border-anthrazit/[0.12] p-8" data-translate-section="location">
-      <div class="mb-6 flex justify-between items-start gap-4">
-        <div>
-          <p class="eyebrow text-pink-shock mb-1">— Ort —</p>
-          <h2 class="text-xl font-medium">Wo wird gefrühstückt?</h2>
-          <p class="text-xs text-anthrazit/55 mt-1">Z.B. "im Wintergarten" — wird zusammen mit der Begrüßung gezeigt.</p>
-        </div>
-        <button type="button" data-translate="location"
-          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
-          <span>Aus DE übersetzen</span>
-        </button>
+    <!-- Sprint i18n Phase 5 — 1-Feld-UX (statt 4 Sprach-Tabs + DeepL-Button) -->
+    <section class="bg-white border border-anthrazit/[0.12] p-8">
+      <div class="mb-6">
+        <p class="eyebrow text-pink-shock mb-1">— Ort —</p>
+        <h2 class="text-xl font-medium">Wo wird gefrühstückt?</h2>
+        <p class="text-xs text-anthrazit/55 mt-1">Z.B. „im Wintergarten" — wird zusammen mit der Begrüßung gezeigt.</p>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
-          <input
-            type="text"
-            name="breakfast_location_de"
-            data-field="location_de"
-            value={(s as any).breakfast_location_de || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <input
-            type="text"
-            name="breakfast_location_en"
-            data-field="location_en"
-            value={(s as any).breakfast_location_en || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <input
-            type="text"
-            name="breakfast_location_fr"
-            data-field="location_fr"
-            value={(s as any).breakfast_location_fr || ''}
-            class="bauhaus-input"
-          />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <input
-            type="text"
-            name="breakfast_location_es"
-            data-field="location_es"
-            value={(s as any).breakfast_location_es || ''}
-            class="bauhaus-input"
-          />
-        </label>
-      </div>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">{LANG_LABELS_LOC[hotelDefaultLang]}</span>
+        <input
+          type="text"
+          name="breakfast_location_default"
+          value={pickI18n((s as any).breakfast_location_i18n, hotelDefaultLang, (s as any).breakfast_location_de ?? '')}
+          class="bauhaus-input"
+        />
+        <p class="text-xs text-anthrazit/55 mt-1 italic">
+          {otherEnabledLabel
+            ? `Wird automatisch in ${otherEnabledLabel} übersetzt (Phase 6 verdrahtet den Hook).`
+            : 'Aktuell nur Standardsprache aktiviert.'}
+        </p>
+      </label>
     </section>
 
-    <!-- Was inkludiert (4 Sprachen) -->
-    <section class="bg-white border border-anthrazit/[0.12] p-8" data-translate-section="included">
-      <div class="mb-6 flex justify-between items-start gap-4">
-        <div>
-          <p class="eyebrow text-pink-shock mb-1">— Was inkludiert ist —</p>
-          <h2 class="text-xl font-medium">Was bekommen deine Gäste?</h2>
-          <p class="text-xs text-anthrazit/55 mt-1 max-w-lg">
-            Z.B. "Frische Backwaren, regionaler Honig, Bio-Eier, …" — wird im Info-Mode prominent gezeigt.
-          </p>
-        </div>
-        <button type="button" data-translate="included"
-          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
-          <span>Aus DE übersetzen</span>
-        </button>
+    <section class="bg-white border border-anthrazit/[0.12] p-8">
+      <div class="mb-6">
+        <p class="eyebrow text-pink-shock mb-1">— Was inkludiert ist —</p>
+        <h2 class="text-xl font-medium">Was bekommen deine Gäste?</h2>
+        <p class="text-xs text-anthrazit/55 mt-1 max-w-lg">
+          Z.B. „Frische Backwaren, regionaler Honig, Bio-Eier, …" — wird im Info-Mode prominent gezeigt.
+        </p>
       </div>
 
-      <div class="space-y-3">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
-          <textarea
-            name="breakfast_included_de"
-            data-field="included_de"
-            rows="2"
-            class="bauhaus-textarea"
-          >{(s as any).breakfast_included_de || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <textarea
-            name="breakfast_included_en"
-            data-field="included_en"
-            rows="2"
-            class="bauhaus-textarea"
-          >{(s as any).breakfast_included_en || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <textarea
-            name="breakfast_included_fr"
-            data-field="included_fr"
-            rows="2"
-            class="bauhaus-textarea"
-          >{(s as any).breakfast_included_fr || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <textarea
-            name="breakfast_included_es"
-            data-field="included_es"
-            rows="2"
-            class="bauhaus-textarea"
-          >{(s as any).breakfast_included_es || ''}</textarea>
-        </label>
-      </div>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">{LANG_LABELS_LOC[hotelDefaultLang]}</span>
+        <textarea
+          name="breakfast_included_default"
+          rows="3"
+          class="bauhaus-textarea"
+        >{pickI18n((s as any).breakfast_included_i18n, hotelDefaultLang, (s as any).breakfast_included_de ?? '')}</textarea>
+        <p class="text-xs text-anthrazit/55 mt-1 italic">
+          {otherEnabledLabel
+            ? `Wird automatisch in ${otherEnabledLabel} übersetzt.`
+            : 'Aktuell nur Standardsprache aktiviert.'}
+        </p>
+      </label>
     </section>
 
     <div class="flex justify-end pt-4">
@@ -325,67 +286,6 @@ const endTime = ((s as any).breakfast_end_time || '10:30').substring(0, 5);
 
   </form>
 
-  <script>
-    // DeepL-Translate-Buttons
-    document.querySelectorAll('[data-translate]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const target = e.currentTarget as HTMLButtonElement;
-        const section = target.dataset.translate; // 'location' or 'included'
-        const sectionEl = target.closest('[data-translate-section]') as HTMLElement;
-        if (!sectionEl) return;
-
-        const deInput = sectionEl.querySelector(`[data-field="${section}_de"]`) as HTMLInputElement | HTMLTextAreaElement;
-        if (!deInput || !deInput.value.trim()) {
-          alert('Bitte zuerst den deutschen Text eingeben.');
-          return;
-        }
-
-        const originalText = target.innerHTML;
-        target.disabled = true;
-        target.innerHTML = '<span>Übersetze...</span>';
-
-        try {
-          const resp = await fetch('/api/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              source: 'de',
-              targets: ['en', 'fr', 'es'],
-              fields: {
-                [`${section}_de`]: deInput.value,
-              },
-            }),
-          });
-
-          const data = await resp.json();
-
-          if (!data.ok) {
-            alert('Übersetzung fehlgeschlagen: ' + (data.error || 'unbekannt'));
-            return;
-          }
-
-          ['en', 'fr', 'es'].forEach(target => {
-            const trans = data.result[target];
-            if (!trans) return;
-            const value = trans[section]; // 'location' or 'included' key in response
-            if (value !== undefined) {
-              const input = sectionEl.querySelector(`[data-field="${section}_${target}"]`) as HTMLInputElement | HTMLTextAreaElement;
-              if (input) input.value = value;
-            }
-          });
-
-          const msg = document.createElement('div');
-          msg.className = 'fixed top-4 right-4 bg-green-700 text-white px-4 py-3 text-sm shadow-lg z-50';
-          msg.textContent = 'Übersetzt — vergiss nicht zu speichern.';
-          document.body.appendChild(msg);
-          setTimeout(() => msg.remove(), 4000);
-        } catch (err: any) {
-          alert('Fehler: ' + (err.message || 'unbekannt'));
-        } finally {
-          target.disabled = false;
-          target.innerHTML = originalText;
-        }
-      });
-    });
-  </script>
+  <!-- Sprint i18n Phase 5: DeepL-Translate-Script entfernt.
+       Auto-Translation läuft jetzt im Save-Hook (Phase 6, async). -->
 </AdminLayout>

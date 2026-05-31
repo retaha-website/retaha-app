@@ -217,11 +217,7 @@ if (url.searchParams.get('created') === '1' && !message) {
           <h2 class="text-lg font-medium">Name</h2>
           <p class="text-xs text-anthrazit/55 mt-1">In allen 4 Sprachen. Pflichtfeld: Deutsch.</p>
         </div>
-        <button type="button" data-translate="name"
-          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
-          <span>Aus DE übersetzen</span>
-        </button>
+{/* Sprint i18n Phase 5: DeepL-Button entfernt — Auto-Translation in Phase 6 */}
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -276,11 +272,7 @@ if (url.searchParams.get('created') === '1' && !message) {
           <h2 class="text-lg font-medium">Beschreibung</h2>
           <p class="text-xs text-anthrazit/55 mt-1">Optional. Z.B. "Hausgemacht mit Roggen-Sauerteig"</p>
         </div>
-        <button type="button" data-translate="description"
-          class="bauhaus-button bauhaus-button--primary bauhaus-button--small self-start">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1 a7 7 0 0 1 7 7 h-1 a6 6 0 0 0 -12 0 H1 a7 7 0 0 1 7 -7 z M14 8 a6 6 0 0 1 -12 0 a6 6 0 0 1 1 -1 l-2 -1 a7 7 0 0 0 13 2 z"/></svg>
-          <span>Aus DE übersetzen</span>
-        </button>
+{/* Sprint i18n Phase 5: DeepL-Button entfernt — Auto-Translation in Phase 6 */}
       </div>
 
       <div class="space-y-3">
@@ -413,66 +405,6 @@ if (url.searchParams.get('created') === '1' && !message) {
 
   </form>
 
-  <script is:inline>
-    document.querySelectorAll('[data-translate]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const target = e.currentTarget;
-        const section = target.dataset.translate;
-        const sectionEl = target.closest('[data-translate-section]');
-        if (!sectionEl) return;
-
-        const deInput = sectionEl.querySelector(`[data-field="${section}_de"]`);
-        if (!deInput || !deInput.value.trim()) {
-          alert('Bitte zuerst den deutschen Text eingeben.');
-          return;
-        }
-
-        const originalText = target.innerHTML;
-        target.disabled = true;
-        target.innerHTML = '<span>Übersetze...</span>';
-
-        try {
-          const resp = await fetch('/api/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              source: 'de',
-              targets: ['en', 'fr', 'es'],
-              fields: {
-                [`${section}_de`]: deInput.value,
-              },
-            }),
-          });
-
-          const data = await resp.json();
-
-          if (!data.ok) {
-            alert('Übersetzung fehlgeschlagen: ' + (data.error || 'unbekannt'));
-            return;
-          }
-
-          ['en', 'fr', 'es'].forEach(t => {
-            const trans = data.result[t];
-            if (!trans) return;
-            const value = trans[section];
-            if (value !== undefined) {
-              const input = sectionEl.querySelector(`[data-field="${section}_${t}"]`);
-              if (input) input.value = value;
-            }
-          });
-
-          const msg = document.createElement('div');
-          msg.className = 'fixed top-4 right-4 bg-green-700 text-white px-4 py-3 text-sm shadow-lg z-50';
-          msg.textContent = 'Übersetzt — vergiss nicht zu speichern.';
-          document.body.appendChild(msg);
-          setTimeout(() => msg.remove(), 4000);
-        } catch (err) {
-          alert('Fehler: ' + (err.message || 'unbekannt'));
-        } finally {
-          target.disabled = false;
-          target.innerHTML = originalText;
-        }
-      });
-    });
-  </script>
+  <!-- Sprint i18n Phase 5: DeepL-Translate-Script entfernt.
+       Auto-Translation in Phase 6 via async Save-Hook (Haiku). -->
 </AdminLayout>

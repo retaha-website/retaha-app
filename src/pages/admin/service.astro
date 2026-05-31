@@ -170,10 +170,6 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
           <div class="flex justify-between items-start mb-3">
             <span class="bg-anthrazit/[0.04] text-anthrazit/70 text-xs px-2 py-1 font-mono-display">Item ${idx + 1}</span>
             <div class="flex gap-2 items-center">
-              <button type="button" data-action="translate" data-idx="${idx}"
-                class="bauhaus-button bauhaus-button--primary bauhaus-button--small">
-                DE → andere Sprachen
-              </button>
               <button type="button" data-action="delete" data-idx="${idx}"
                 class="bauhaus-button bauhaus-button--ghost">
                 Entfernen
@@ -253,51 +249,8 @@ const endTime = ((settings as any)?.service_end_time || '22:00').substring(0, 5)
         });
       });
 
-      container.querySelectorAll('[data-action="translate"]').forEach(btn => {
-        btn.addEventListener('click', async e => {
-          const idx = parseInt(e.currentTarget.dataset.idx);
-          const item = items[idx];
-          if (!item.name_de) {
-            alert('Bitte zuerst DE-Name eingeben.');
-            return;
-          }
-          const btnEl = e.currentTarget;
-          btnEl.disabled = true;
-          btnEl.textContent = 'Übersetze...';
-
-          try {
-            const resp = await fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                source: 'de',
-                targets: ['en', 'fr', 'es'],
-                fields: {
-                  name_de: item.name_de,
-                  description_de: item.description_de || '',
-                },
-              }),
-            });
-            const data = await resp.json();
-            if (data.ok) {
-              ['en', 'fr', 'es'].forEach(t => {
-                if (data.result[t]) {
-                  items[idx][`name_${t}`] = data.result[t].name || items[idx][`name_${t}`] || '';
-                  items[idx][`description_${t}`] = data.result[t].description || items[idx][`description_${t}`] || '';
-                }
-              });
-              render();
-            } else {
-              alert('Übersetzung fehlgeschlagen: ' + (data.error || 'unbekannt'));
-            }
-          } catch (err) {
-            alert('Fehler: ' + (err.message || 'unbekannt'));
-          } finally {
-            btnEl.disabled = false;
-            btnEl.textContent = 'DE → andere Sprachen';
-          }
-        });
-      });
+      // Sprint i18n Phase 5: Translate-Button-Handler entfernt.
+      // Auto-Translation kommt in Phase 6 via async Save-Hook (Haiku).
 
       document.getElementById('items-json-input').value = JSON.stringify(items);
     }
