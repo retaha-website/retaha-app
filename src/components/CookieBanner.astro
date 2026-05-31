@@ -20,7 +20,10 @@ interface Props {
   stayToken?: string;
   privacyHref?: string;
 }
-const { stayToken, privacyHref = '/g/datenschutz' } = Astro.props;
+const { stayToken, privacyHref } = Astro.props;
+// Phase 3 — wenn Token vorhanden, nested-Route für Hotel-Name-Auflösung;
+// sonst Standalone-Page mit generischem Text
+const resolvedPrivacyHref = privacyHref ?? (stayToken ? `/g/${stayToken}/datenschutz` : '/g/datenschutz');
 const POLICY_VERSION = '2026-06-01';
 ---
 
@@ -28,7 +31,7 @@ const POLICY_VERSION = '2026-06-01';
   id="cookie-banner"
   data-policy-version={POLICY_VERSION}
   data-stay-token={stayToken ?? ''}
-  data-privacy-href={privacyHref}
+  data-privacy-href={resolvedPrivacyHref}
   hidden
 >
   <div class="cb-inner">
@@ -38,7 +41,7 @@ const POLICY_VERSION = '2026-06-01';
         Diese App nutzt <strong>technisch notwendige Cookies</strong> für deine Sitzung.
         Funktionale Speicherung (z.B. ob du <em>Eve</em> schon gesehen hast) verbessert dein Erlebnis.
         <strong>Wir tracken dich nicht.</strong>
-        <a href={privacyHref} class="cb-link">Datenschutz</a>
+        <a href={resolvedPrivacyHref} class="cb-link">Datenschutz</a>
       </p>
     </div>
 
