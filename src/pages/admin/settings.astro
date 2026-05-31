@@ -85,7 +85,12 @@ if (Astro.request.method === 'POST') {
     } else if (geocodeWarning) {
       message = { type: 'error', text: geocodeWarning };
     } else if (lat !== null) {
-      message = { type: 'success', text: `Adresse verifiziert ✓ — 📍 ${lat.toFixed(4)}, ${lng!.toFixed(4)}` };
+      message = { type: 'success', text: `Adresse verifiziert ✓ — 📍 ${lat.toFixed(4)}, ${lng!.toFixed(4)} — Auto-Empfehlungen werden im Hintergrund aufgebaut.` };
+      // Sprint E2 Phase 6 — Non-blocking Nearby-Cache-Build (fire-and-forget).
+      // User sieht den Success-Message sofort, Cache läuft async (~5-10s).
+      import('../../lib/places/nearby-actions').then(({ buildNearbyCache }) =>
+        buildNearbyCache(hotel.id, lat!, lng!)
+      ).catch(err => console.warn('[settings] nearby-cache build failed:', (err as Error).message));
     } else {
       message = { type: 'success', text: 'Adresse gespeichert.' };
     }
