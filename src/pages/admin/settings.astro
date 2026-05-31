@@ -94,6 +94,35 @@ if (Astro.request.method === 'POST') {
     } else {
       message = { type: 'success', text: 'Adresse gespeichert.' };
     }
+  } else if (action === 'update_languages') {
+    // Sprint i18n Phase 4 — Hotelier-Sprach-Settings (hotels-Table)
+    const VALID = ['de','en','fr','es','it','pt','nl','ru','ar','zh'];
+    const newDefault = form.get('default_language')?.toString().trim() || '';
+    const enabledRaw = form.getAll('enabled_languages').map(v => v.toString().trim()).filter(Boolean);
+
+    // Server-side Validation (Constraints fangen das auch ab, aber bessere Fehler-Texte hier)
+    if (!VALID.includes(newDefault)) {
+      message = { type: 'error', text: 'Ungültige Standardsprache.' };
+    } else if (enabledRaw.length === 0) {
+      message = { type: 'error', text: 'Mindestens eine Sprache muss aktiviert sein.' };
+    } else if (enabledRaw.length > 4) {
+      message = { type: 'error', text: 'Maximal 4 Sprachen für den Gast-Selector (Mobile-UX).' };
+    } else if (enabledRaw.some(l => !VALID.includes(l))) {
+      message = { type: 'error', text: 'Eine der gewählten Sprachen ist ungültig.' };
+    } else {
+      // Default automatisch zu enabled hinzufügen falls nicht drin (Briefing-Hinweis 3)
+      const enabled = enabledRaw.includes(newDefault) ? enabledRaw : [newDefault, ...enabledRaw].slice(0, 4);
+
+      const { error } = await client
+        .from('hotels')
+        .update({ default_language: newDefault, enabled_languages: enabled })
+        .eq('id', hotel.id);
+      if (error) {
+        message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      } else {
+        return Astro.redirect('/admin/settings?saved=languages');
+      }
+    }
   } else if (action === 'update_address_form') {
     const newForm = form.get('address_form')?.toString();
     if (newForm === 'du' || newForm === 'sie') {
@@ -172,6 +201,8 @@ if (savedParam === 'logo' && !message) {
   message = { type: 'success', text: t('settings.language.saved', userLocale) };
 } else if (savedParam === 'address' && !message) {
   message = { type: 'success', text: t('settings.guest_address.saved', userLocale) };
+} else if (savedParam === 'languages' && !message) {
+  message = { type: 'success', text: 'Sprach-Einstellungen gespeichert.' };
 }
 
 // Load current settings (inkl. neuem guest_address_form)
@@ -191,13 +222,24 @@ const { data: settings } = await client
 // Sprint E2 Phase 3 — Hotel-Adresse + Geocoding-Status
 const { data: hotelRow } = await client
   .from('hotels')
-  .select('address_street, address_zip, city, country, latitude, longitude')
+  .select('address_street, address_zip, city, country, latitude, longitude, default_language, enabled_languages')
   .eq('id', hotel.id)
   .maybeSingle();
 const hr = (hotelRow ?? {}) as any;
 const hasGeocode = typeof hr.latitude === 'number' && typeof hr.longitude === 'number';
 
 const s = settings || {};
+
+// Sprint i18n Phase 4 — Hotel-Sprach-Settings
+const hotelDefaultLang = (hr.default_language as string | undefined) ?? 'de';
+const hotelEnabledLangs: string[] = Array.isArray(hr.enabled_languages) ? hr.enabled_languages : ['de','en','fr','es'];
+const ALL_LANGUAGES = [
+  { code: 'de', label: 'Deutsch'    }, { code: 'en', label: 'English'    },
+  { code: 'fr', label: 'Français'   }, { code: 'es', label: 'Español'    },
+  { code: 'it', label: 'Italiano'   }, { code: 'pt', label: 'Português'  },
+  { code: 'nl', label: 'Nederlands' }, { code: 'ru', label: 'Русский'     },
+  { code: 'ar', label: 'العربية'      }, { code: 'zh', label: '中文'        },
+];
 
 const conciergeTime = (s as any).eve_online_until || '22:00';
 const conciergeTimeShort = conciergeTime.substring(0, 5);
@@ -278,6 +320,109 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
 
       <button type="submit" class="bauhaus-button bauhaus-button--primary">
         {t('settings.language.submit', userLocale)}
+      </button>
+    </form>
+  </section>
+
+  <!-- Sprint i18n Phase 4 — Hotel-Sprachen (Hotelier-Default + Gast-enabled) -->
+  <section
+    class="settings-section"
+    x-data={`{
+      defaultLang: '${hotelDefaultLang}',
+      enabled: ${JSON.stringify(hotelEnabledLangs)},
+      toggle(code) {
+        if (this.enabled.includes(code)) {
+          if (code === this.defaultLang) return; // Default kann nicht entfernt werden
+          this.enabled = this.enabled.filter(l => l !== code);
+        } else {
+          if (this.enabled.length >= 4) return; // Hard-Stop
+          this.enabled = [...this.enabled, code];
+        }
+      },
+      setDefault(code) {
+        this.defaultLang = code;
+        if (!this.enabled.includes(code)) {
+          if (this.enabled.length >= 4) this.enabled = [code, ...this.enabled.slice(0, 3)];
+          else this.enabled = [...this.enabled, code];
+        }
+      },
+      get atLimit() { return this.enabled.length >= 4; },
+      get defaultChanged() { return this.defaultLang !== '${hotelDefaultLang}'; }
+    }`}
+  >
+    <div class="settings-section-marker-bar">
+      <span class="settings-section-marker settings-section-marker--triangle"></span>
+      <p class="settings-section-eyebrow">— Sprachen —</p>
+      <span class="settings-section-line"></span>
+    </div>
+    <h2 class="settings-section-headline">
+      In welchen Sprachen<span class="text-pink-shock">?</span>
+    </h2>
+
+    <form method="POST" class="settings-section-form space-y-6 max-w-2xl">
+      <input type="hidden" name="_action" value="update_languages" />
+
+      <div>
+        <label class="block text-sm font-medium mb-2">Deine Standardsprache</label>
+        <p class="text-xs text-anthrazit/55 mb-3">
+          Du pflegst alle Inhalte (Karten, Tipps, FAQ) in dieser Sprache. Wir übersetzen
+          automatisch in die anderen 9 Sprachen via KI.
+        </p>
+        <select
+          name="default_language"
+          x-model="defaultLang"
+          @change="setDefault($event.target.value)"
+          class="w-full max-w-xs px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none bg-white text-sm"
+        >
+          {ALL_LANGUAGES.map(l => <option value={l.code}>{l.label}</option>)}
+        </select>
+        <p x-show="defaultChanged" x-cloak class="mt-2 text-xs text-amber-700">
+          ⚠ Wechsel der Standardsprache: bestehende Inhalte werden bei nächstem Save re-übersetzt.
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-2">
+          Sprachen für deine Gäste <span class="text-anthrazit/45 font-normal">(max 4)</span>
+        </label>
+        <p class="text-xs text-anthrazit/55 mb-3">
+          Diese Sprachen sieht der Gast im Sprach-Selector des Gast-Frontends.
+          <strong>Auto-Übersetzungen funktionieren für alle 10</strong> — du kannst also
+          jederzeit eine Sprache aktivieren, sobald Bedarf entsteht.
+        </p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          {ALL_LANGUAGES.map(l => (
+            <label
+              class="flex items-center gap-2 px-3 py-2 border cursor-pointer text-sm"
+              :class={`enabled.includes('${l.code}') ? 'border-pink-shock bg-pink-shock/5' : 'border-stein hover:border-anthrazit/40'`}
+              :style={`!enabled.includes('${l.code}') && atLimit ? 'opacity: 0.4; cursor: not-allowed' : ''`}
+            >
+              <input
+                type="checkbox"
+                name="enabled_languages"
+                value={l.code}
+                :checked={`enabled.includes('${l.code}')`}
+                @change={`toggle('${l.code}')`}
+                :disabled={`!enabled.includes('${l.code}') && atLimit`}
+                class="accent-pink-shock"
+              />
+              <span>{l.label}</span>
+              <span x-show={`defaultLang === '${l.code}'`} x-cloak class="text-pink-shock text-xs ml-auto">★</span>
+            </label>
+          ))}
+        </div>
+
+        <p class="mt-2 text-xs text-anthrazit/55">
+          ★ Standardsprache ist immer aktiviert · <span x-text="enabled.length"></span>/4 ausgewählt
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        class="px-6 py-2 bg-anthrazit text-white text-sm hover:bg-pink-shock transition"
+      >
+        Speichern
       </button>
     </form>
   </section>
