@@ -116,7 +116,85 @@ COST-MONITORING:
 ## Sprint Legal/DSGVO
 
 ```
-☐ wird beim Bau definiert
+COOKIE-BANNER:
+☐ Demo-Stay /g/[token]: Banner erscheint beim ersten Besuch (Bauhaus-Style,
+   floating bottom, nicht-blockierend)
+☐ Banner-Text ehrlich ("Wir tracken dich nicht.")
+☐ "Alle akzeptieren" → consent_log-Eintrag (consent_type='all',
+   ip_hash 64 hex, policy_version='2026-06-01')
+☐ "Nur notwendige" → consent_type='rejected'
+☐ "Einstellungen ▾" → 3 Toggles (Notwendig locked, Funktional, Analyse)
+☐ "Auswahl speichern" → granularer consent_type basierend auf Checkboxes
+☐ Re-Visit derselben URL: Banner kommt NICHT wieder (localStorage-Flag greift)
+
+RECHTSTEXTE-ERREICHBARKEIT (5 Pages):
+☐ /g/[token]/datenschutz → Hotel-Name dynamisch in Section 1
+☐ /g/[token]/impressum
+☐ /admin/datenschutz → retaha als Verantwortlicher (B2B-Klarstellung)
+☐ /admin/agb → 10 §, Pricing-Platzhalter visuell hervorgehoben
+☐ /admin/impressum → identisch zu Gast-Impressum
+☐ Cross-Links überall (Footer-Pattern)
+☐ Footer in /g/[token]: "Datenschutz · Impressum" Links
+☐ Footer in /admin (AdminFooter): "Datenschutz · AGB · Impressum" Links
+
+DATEN-EXPORT (Art. 15):
+☐ Button "↓ Meine Daten herunterladen" in /g/[token]/datenschutz Section 8
+☐ Klick → JSON-Download mit Filename retaha-data-{prefix}-{date}.json
+☐ JSON enthält: subject + data {stay, guest, conversations, bookings,
+   eve_actions, consents} + note (Mews-Ehrlichkeit)
+☐ raw_mews_data nur whitelisted (Notes/TimeUnitCount/Currency/TotalAmount)
+☐ data_export_log-Eintrag mit ip_hash + bytes_exported
+☐ Rate-Limit: 2. Export innerhalb 5min → 429 mit deutscher Message
+
+DATEN-LÖSCH SELF-SERVICE (Art. 17):
+☐ "🗑 Eve-Chats löschen" Button
+☐ "🗑 Alle App-Daten löschen" Button
+☐ Confirm-Modal öffnet bei Klick mit scope-spezifischem Text
+☐ Submit-Button disabled bis "LÖSCHEN" exakt getippt (uppercase, mono-font)
+☐ Backdrop-Click cancelt
+☐ Submit → chat_messages weg (für scope=conversations)
+☐ Submit scope=app_data → chat + bookings + alte consents weg
+☐ deletion_log mit subject_type='guest_request', triggered_by='gast',
+   status='completed', actual-Counts
+☐ Aktueller Consent (<7 Tage) bleibt erhalten
+☐ Session-Invalidierung (Stay-Cookie weg)
+☐ Redirect zu /g/datenschutz-geloescht (Erfolgs-Page)
+☐ Rate-Limit: 2. Lösch innerhalb 10min → 429
+
+AUTO-DELETE CRON:
+☐ AUTO_DELETE_ENABLED='true' in Vercel-ENV gesetzt (vorher: Skip)
+☐ CRON_SECRET-Header korrekt
+☐ Cron 02:00 UTC läuft in Vercel
+☐ Manueller Trigger: Stay mit check_out=-31d + state=Confirmed → App-Daten weg
+☐ deletion_log mit subject_type='auto_checkout', triggered_by='cron'
+☐ Stays MIT state='Started' werden NICHT angefasst (Sicherheits-Filter)
+☐ stay-Eintrag UNVERÄNDERT nach Cron (Mews-Realität verifiziert)
+☐ try/catch isoliert: ein crashender Stay killt nicht den ganzen Run
+
+INTERNE DOKUMENTE (docs/legal/):
+☐ README.md mit Übersicht + nächste Schritte
+☐ verarbeitungsverzeichnis.md mit 2 Tätigkeiten (Gast + Hotelier)
+☐ dsfa-skelett.md mit 6 Risiko-Indikatoren + 5 strukturellen Abschnitten
+☐ alle Cross-Links zu App-Code funktionieren
+
+ANWALTS-REVIEW (parallel zum Big-Test-Day):
+☐ /g/[token]/datenschutz vom Anwalt geprüft
+☐ /g/[token]/impressum vom Anwalt geprüft
+☐ /admin/datenschutz vom Anwalt geprüft
+☐ /admin/agb vom Anwalt geprüft (besonders Pricing-Platzhalter finalisiert)
+☐ /admin/impressum vom Anwalt geprüft
+☐ docs/legal/verarbeitungsverzeichnis.md vom Anwalt validiert
+☐ docs/legal/dsfa-skelett.md vom Anwalt befüllt oder als "nicht erforderlich" begründet
+
+AVV-CHECKLISTE (für Taha manuell):
+☐ Anthropic (Console → Settings → DPA)
+☐ Google Cloud (Console → DPA akzeptieren)
+☐ Supabase (Dashboard → Legal → DPA)
+☐ Resend (Account → DPA)
+☐ Vercel (Settings → DPA)
+☐ Stripe (Dashboard → DPA)
+☐ Mews (Geschäftspartner-Vertrag prüfen)
+☐ AVV-Vorlage Hotel ↔ retaha (Anwalt erstellt)
 ```
 
 ## Sprint Funktionale Module
@@ -183,9 +261,11 @@ Code-verifizierte Sprints (UX-Test offen):
   🔵 E7 (Action-Card-Editor)        — automatische Tests 24/24, UX-Walkthrough offen
   🔵 i18n-Expansion                 — automatische Tests 60+/60+, Multi-Sprach-Test 5/5,
                                       UX-Walkthrough mit Kristin offen
+  🔵 Legal/DSGVO                    — automatische Tests 41+/41+, Anwalts-Review parallel
+                                      zum Big-Test-Day, AVV-Abschlüsse durch Taha
 
 Wartende Sprints:
-  ⏳ Legal, Funktional, Wallet, UI/UX, Themes, Monorepo, Production
+  ⏳ Funktional, Wallet, UI/UX, Themes, Monorepo, Production
 ```
 
 ---
