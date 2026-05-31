@@ -9,7 +9,7 @@
 // Data kommt aus /g/[token].astro frontmatter (kein client-side fetch).
 
 import Sheet from '../Sheet.astro';
-import { t, type Lang, pick as pickI18n } from '../../lib/i18n';
+import { t, type Lang } from '../../lib/i18n';
 import { buildPhotoUrl, type PickCategory } from '../../lib/places/google-client';
 import { haversineMeters, walkingMinutes } from '../../lib/places/distance';
 
@@ -198,7 +198,7 @@ function priceSymbol(level: string | undefined): string {
             )}
 
             {data.picks.map(p => (
-              <article class="place-card">
+              <article class="place-card" role="button" tabindex="0" @click={`openPlaceDetail('${p.place_id}')`} @keydown.enter={`openPlaceDetail('${p.place_id}')`}>
                 {p.photoUrl && (
                   <div class="place-card-photo">
                     <img src={p.photoUrl} alt={p.name} loading="lazy" />
@@ -235,7 +235,7 @@ function priceSymbol(level: string | undefined): string {
 
             <ul class="place-list">
               {data.auto.slice(0, visibleAutoCount).map(a => (
-                <li class="place-list-item">
+                <li class="place-list-item" role="button" tabindex="0" @click={`openPlaceDetail('${a.place_id}')`} @keydown.enter={`openPlaceDetail('${a.place_id}')`}>
                   {a.photoUrl ? (
                     <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
                   ) : (
@@ -254,7 +254,7 @@ function priceSymbol(level: string | undefined): string {
               <template x-if={`showAllAuto`}>
                 <span>
                   {data.auto.slice(visibleAutoCount).map(a => (
-                    <li class="place-list-item">
+                    <li class="place-list-item" role="button" tabindex="0" @click={`openPlaceDetail('${a.place_id}')`} @keydown.enter={`openPlaceDetail('${a.place_id}')`}>
                       {a.photoUrl ? (
                         <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
                       ) : (

@@ -9,6 +9,8 @@ import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
 import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
+import PlaceDetailSheet from '../../components/sheets/PlaceDetailSheet.astro';
+import { buildPhotoUrl } from '../../lib/places/google-client';
 import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
 import { getEveSuggestions } from '../../lib/eve/suggestions';
 import { createSupabaseServiceRoleInstance } from '../../lib/auth';
@@ -120,6 +122,37 @@ const placesHotelLat = (hotelGeoRow?.latitude as number | null) ?? null;
 const placesHotelLng = (hotelGeoRow?.longitude as number | null) ?? null;
 const placesPicks = (placePicksRows ?? []) as any[];
 const placesNearby = (nearbyRows ?? []) as any[];
+
+// Sprint E2 Phase 8 — Pre-render Pick-Detail-Daten als window-Global damit
+// PlaceDetailSheet sie sofort hat (kein fetch). Auto-Places werden on-demand
+// via /api/places/details geholt — die haben hier KEINE Daten.
+const PRICE_SYMBOLS: Record<string, string> = {
+  PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+  PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+};
+const placeDetailCache: Record<string, any> = {};
+for (const p of placesPicks) {
+  const cd = p.cached_data ?? {};
+  const note = lang === 'de' ? p.hotel_note
+    : lang === 'en' ? (p.hotel_note_en ?? p.hotel_note)
+    : lang === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
+    : (p.hotel_note_es ?? p.hotel_note);
+  placeDetailCache[p.place_id] = {
+    name: cd.name,
+    rating: cd.rating,
+    userRatingCount: cd.user_ratings_total,
+    priceSymbol: PRICE_SYMBOLS[cd.price_level] ?? '',
+    hotelNote: note?.trim() || null,
+    formattedAddress: cd.formatted_address,
+    phone: cd.international_phone_number,
+    website: cd.website_uri,
+    googleMapsUri: cd.google_maps_uri,
+    openNow: cd.opening_hours?.openNow ?? null,
+    weekdayDescriptions: cd.opening_hours?.weekdayDescriptions ?? [],
+    reviews: (cd.reviews ?? []).slice(0, 3),
+    photoUrls: (p.photo_references ?? []).slice(0, 8).map((n: string) => buildPhotoUrl(n, 1200)),
+  };
+}
 
 const welcomeMap: Record<Lang, string | null> = {
   de: settings.welcome_message_de,
@@ -488,13 +521,17 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
       )}
 
       {f.berlin_tips !== false && (
-        <PlacesSheet
-          lang={lang}
-          hotelLat={placesHotelLat}
-          hotelLng={placesHotelLng}
-          picks={placesPicks}
-          nearby={placesNearby}
-        />
+        <>
+          <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang })};`} />
+          <PlacesSheet
+            lang={lang}
+            hotelLat={placesHotelLat}
+            hotelLng={placesHotelLng}
+            picks={placesPicks}
+            nearby={placesNearby}
+          />
+          <PlaceDetailSheet />
+        </>
       )}
 
       {f.service_requests !== false && settings.service_items && settings.service_items.length > 0 && (
@@ -643,6 +680,67 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
         _eveLastConversation: '' as string,  // für Audit-Context
         _eveWelcomeTried: false,  // Phase 10: idempotenter Welcome-Trigger
         _eveLang: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.lang) || 'de',
+
+        // Sprint E2 Phase 8 — Place-Detail-Sheet (layered über PlacesSheet)
+        activeDetailPlaceId: null as string | null,
+        activeDetailData: null as any,
+        detailLoading: false,
+        detailError: null as string | null,
+
+        async openPlaceDetail(placeId: string) {
+          this.activeDetailError = null;
+          this.detailError = null;
+          this.activeDetailPlaceId = placeId;
+
+          // 1. Cache-Lookup (Picks haben pre-loaded data im window-Global)
+          const cache = (typeof window !== 'undefined' && (window as any).__PLACE_DETAILS__?.cache) || {};
+          if (cache[placeId]) {
+            this.activeDetailData = cache[placeId];
+            this.detailLoading = false;
+            return;
+          }
+
+          // 2. Auto-Place → on-demand fetch
+          this.activeDetailData = null;
+          this.detailLoading = true;
+          try {
+            const lang = (typeof window !== 'undefined' && (window as any).__PLACE_DETAILS__?.lang) || 'de';
+            const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}&lang=${lang}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const body = await res.json();
+            if (!body.ok) throw new Error(body.error || 'Unknown error');
+            const d = body.details as any;
+            const PRICE_SYMBOLS: Record<string, string> = {
+              PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+              PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+            };
+            this.activeDetailData = {
+              name: d.name,
+              rating: d.rating,
+              userRatingCount: d.userRatingCount,
+              priceSymbol: PRICE_SYMBOLS[d.priceLevel ?? ''] ?? '',
+              hotelNote: null,  // Auto-Places haben keine Hotel-Notiz
+              formattedAddress: d.formattedAddress,
+              phone: d.internationalPhoneNumber,
+              website: d.websiteUri,
+              googleMapsUri: d.googleMapsUri,
+              openNow: d.openingHours?.openNow ?? null,
+              weekdayDescriptions: d.openingHours?.weekdayDescriptions ?? [],
+              reviews: d.reviews ?? [],
+              photoUrls: d.photoUrls ?? [],
+            };
+          } catch (err) {
+            this.detailError = `Details konnten nicht geladen werden: ${(err as Error).message}`;
+          } finally {
+            this.detailLoading = false;
+          }
+        },
+
+        closePlaceDetail() {
+          this.activeDetailPlaceId = null;
+          this.activeDetailData = null;
+          this.detailError = null;
+        },
 
         async eveSend(text: string) {
           const message = (text || '').trim();
