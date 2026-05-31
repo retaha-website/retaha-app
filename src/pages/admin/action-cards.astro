@@ -1,0 +1,548 @@
+---
+// Sprint E7 Phase 3 — Action-Card-Editor (Backoffice)
+//
+// Ersetzt /admin/recommendations (alter JSONB-Editor). Hotelier verwaltet
+// die Hero-Swipe-Cards mit:
+//   - 5 Card-Typen (internal_action / external_link / info / phone / email)
+//   - 4 Sprachen (title/subtitle/eyebrow/cta je DE/EN/FR/ES)
+//   - Bild-Upload via Phase-2-Storage-Lib (client-side resize → API)
+//   - Sortierung ↑↓ (Drag&Drop = Backlog)
+//   - Live-Preview im retaha-Bauhaus-Stil
+//
+// CSS-Klassen aus src/styles/retaha.css: rec-anthrazit / rec-pink / rec-white
+// (rec-burgundy aus Briefing existiert NICHT im CSS → nicht angeboten).
+//
+// Alpine.js für Editor-State + typ-abhängige Felder + Bild-Preview.
+
+import AdminLayout from '../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+const { data: cards } = await client
+  .from('hotel_action_cards')
+  .select('*')
+  .eq('hotel_id', hotel.id)
+  .order('sort_order', { ascending: true });
+
+const cardList = (cards ?? []) as any[];
+const overFive = cardList.length > 5;
+
+const INTERNAL_ACTIONS = [
+  { value: 'open_breakfast',  label: 'Frühstück' },
+  { value: 'open_service',    label: 'Service-Anfrage' },
+  { value: 'open_eve',        label: 'Eve KI-Concierge' },
+  { value: 'open_places',     label: 'Empfehlungen' },
+  { value: 'open_wifi',       label: 'WLAN' },
+  { value: 'open_conference', label: 'Konferenz' },
+  { value: 'open_wallet',     label: 'Wallet (bald verfügbar)' },
+];
+
+const CARD_CLASSES = [
+  { value: 'rec-anthrazit', label: 'Anthrazit · dunkel' },
+  { value: 'rec-pink',      label: 'Pink-Shock · Statement' },
+  { value: 'rec-white',     label: 'Weiß · Brutalist' },
+];
+
+const CARD_TYPE_LABELS: Record<string, string> = {
+  internal_action: 'Interne Action',
+  external_link:   'Externer Link',
+  info:            'Info-Card (kein Click)',
+  phone:           'Telefon-Link',
+  email:           'Email-Link',
+};
+---
+
+<AdminLayout title="Action-Cards" hotel={hotel} user={user} activeTab="recommendations">
+  <div
+    x-data={`actionCardsEditor(${JSON.stringify({
+      hotelId: hotel.id,
+      cards: cardList,
+      internalActions: INTERNAL_ACTIONS,
+      cardClasses: CARD_CLASSES,
+      typeLabels: CARD_TYPE_LABELS,
+    })})`}
+    class="ac-root"
+  >
+    <header class="ac-header">
+      <p class="ac-eyebrow">— 08 · Hero-Karten —</p>
+      <h1 class="ac-title">Die Karten oben im Gast-Bereich.</h1>
+      <p class="ac-sub">Swipebar, sortierbar, mehrsprachig. Empfehlung: 3–5 Karten — mehr macht das Swipen mühsam.</p>
+    </header>
+
+    {overFive && (
+      <div class="ac-hint-banner">
+        <strong>{cardList.length} Karten aktiv.</strong> Empfehlung sind 3–5 — Gäste swipen sonst zu lange. (Kein Limit, nur ein Hinweis.)
+      </div>
+    )}
+
+    <div class="ac-actions-row">
+      <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">+ Neue Karte</button>
+      <span class="ac-counter">{cardList.length} {cardList.length === 1 ? 'Karte' : 'Karten'}</span>
+    </div>
+
+    <!-- ─── Liste ─────────────────────────────────────────────────── -->
+    {cardList.length === 0 ? (
+      <div class="ac-empty">
+        <p class="ac-empty-text">Noch keine Karten. Lege deine erste an — z.B. „Frühstück reservieren" als interne Action.</p>
+      </div>
+    ) : (
+      <div class="ac-list">
+        {cardList.map((c, idx) => (
+          <article class="ac-row" data-card-id={c.id}>
+            <div class="ac-row-thumb">
+              {c.image_url ? (
+                <img src={c.image_url} alt="" loading="lazy" />
+              ) : (
+                <div class="ac-row-thumb-placeholder" data-class={c.card_class}>—</div>
+              )}
+            </div>
+            <div class="ac-row-meta">
+              <div class="ac-row-badges">
+                <span class="ac-badge">{CARD_TYPE_LABELS[c.card_type] ?? c.card_type}</span>
+                {!c.is_published && <span class="ac-badge ac-badge--draft">Entwurf</span>}
+                {c.action_target && <span class="ac-badge ac-badge--target">{c.action_target}</span>}
+              </div>
+              <p class="ac-row-title">{c.title_de}</p>
+              {c.subtitle_de && <p class="ac-row-sub">{c.subtitle_de}</p>}
+            </div>
+            <div class="ac-row-actions">
+              <button type="button" @click={`moveCard('${c.id}','up')`} disabled={idx === 0} class="ac-icon-btn" title="Nach oben">↑</button>
+              <button type="button" @click={`moveCard('${c.id}','down')`} disabled={idx === cardList.length - 1} class="ac-icon-btn" title="Nach unten">↓</button>
+              <button type="button" @click={`openEdit('${c.id}')`} class="ac-icon-btn" title="Bearbeiten">✎</button>
+              <button type="button" @click={`deleteCard('${c.id}')`} class="ac-icon-btn ac-icon-btn--danger" title="Löschen">×</button>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+
+    <!-- ─── Live-Preview ─────────────────────────────────────────── -->
+    <section class="ac-preview-section">
+      <h2 class="ac-section-title">Live-Vorschau im Gast-Bereich</h2>
+      <p class="ac-section-sub">Genauso sehen die Karten oben im /g-Frontend aus (DE-Sprache, in echter Größe).</p>
+
+      {cardList.length === 0 ? (
+        <p class="ac-preview-empty">Keine Karten zum Vorschauen.</p>
+      ) : (
+        <div class="ac-preview-stage">
+          <div class="ac-preview-scroller">
+            {cardList.map(c => (
+              <div class={`ac-preview-card rec-card ${c.card_class}`}>
+                {c.image_url && <img src={c.image_url} alt="" class="ac-preview-card-img" />}
+                {c.eyebrow_de && <div class="rec-card-eyebrow">{c.eyebrow_de}</div>}
+                <div class="rec-card-title">{c.title_de}</div>
+                {c.subtitle_de && <div class="rec-card-sub">{c.subtitle_de}</div>}
+                {c.cta_de && <button class="rec-card-cta" type="button" disabled>{c.cta_de}</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+
+    <!-- ─── Editor-Modal ─────────────────────────────────────────── -->
+    <div x-show="editorOpen" x-cloak class="ac-modal-backdrop" @click.self="closeEditor()">
+      <div class="ac-modal" @click.stop>
+        <header class="ac-modal-head">
+          <h3 x-text="editorMode === 'new' ? 'Neue Karte' : 'Karte bearbeiten'"></h3>
+          <button type="button" @click="closeEditor()" class="ac-modal-close">×</button>
+        </header>
+
+        <div class="ac-modal-body">
+          <!-- Typ -->
+          <label class="ac-field">
+            <span class="ac-field-label">Karten-Typ</span>
+            <select x-model="editor.card_type" @change="onTypeChange()" class="ac-input">
+              <option value="internal_action">Interne Action</option>
+              <option value="external_link">Externer Link</option>
+              <option value="info">Info-Card (kein Click)</option>
+              <option value="phone">Telefon-Link</option>
+              <option value="email">Email-Link</option>
+            </select>
+          </label>
+
+          <!-- Ziel (typ-abhängig) -->
+          <div x-show="editor.card_type === 'internal_action'" class="ac-field">
+            <span class="ac-field-label">Welches Sheet öffnen?</span>
+            <select x-model="editor.action_target" class="ac-input">
+              <option value="">— wählen —</option>
+              {INTERNAL_ACTIONS.map(a => <option value={a.value}>{a.label}</option>)}
+            </select>
+          </div>
+
+          <div x-show="editor.card_type === 'external_link'" class="ac-field">
+            <span class="ac-field-label">URL (https://…)</span>
+            <input type="url" x-model="editor.action_target" placeholder="https://booking.gate-garden.de" class="ac-input" />
+          </div>
+
+          <div x-show="editor.card_type === 'phone'" class="ac-field">
+            <span class="ac-field-label">Telefonnummer</span>
+            <input type="tel" x-model="editor.action_target" placeholder="+49 30 12345678" class="ac-input" />
+          </div>
+
+          <div x-show="editor.card_type === 'email'" class="ac-field">
+            <span class="ac-field-label">Email-Adresse</span>
+            <input type="email" x-model="editor.action_target" placeholder="rezeption@gate-garden.de" class="ac-input" />
+          </div>
+
+          <!-- Sprach-Tabs -->
+          <div class="ac-lang-tabs">
+            <template x-for="lang in ['de','en','fr','es']" :key="lang">
+              <button
+                type="button"
+                @click="activeLang = lang"
+                :class="{ 'is-active': activeLang === lang, 'has-content': hasContent(lang) }"
+                class="ac-lang-tab"
+              >
+                <span x-text="lang.toUpperCase()"></span>
+                <span x-show="hasContent(lang)" class="ac-lang-dot">•</span>
+              </button>
+            </template>
+          </div>
+
+          <!-- Texte pro Sprache -->
+          <template x-for="lang in ['de','en','fr','es']" :key="lang">
+            <div x-show="activeLang === lang" class="ac-lang-fields">
+              <label class="ac-field">
+                <span class="ac-field-label">
+                  Titel <span x-show="lang === 'de'" class="ac-required">*</span>
+                  <span x-show="lang !== 'de'" class="ac-optional">(optional)</span>
+                </span>
+                <input type="text" x-model="editor[`title_${lang}`]" :required="lang === 'de'" maxlength="60" class="ac-input" />
+              </label>
+              <label class="ac-field">
+                <span class="ac-field-label">Eyebrow <span class="ac-optional">(z.B. „Morgen Mittag")</span></span>
+                <input type="text" x-model="editor[`eyebrow_${lang}`]" maxlength="40" class="ac-input" />
+              </label>
+              <label class="ac-field">
+                <span class="ac-field-label">Untertitel <span class="ac-optional">(2–3 Sätze)</span></span>
+                <textarea x-model="editor[`subtitle_${lang}`]" rows="2" maxlength="200" class="ac-input"></textarea>
+              </label>
+              <label class="ac-field">
+                <span class="ac-field-label">Button-Text (CTA)</span>
+                <input type="text" x-model="editor[`cta_${lang}`]" maxlength="30" class="ac-input" placeholder="z.B. Tisch reservieren" />
+              </label>
+            </div>
+          </template>
+
+          <!-- Bild -->
+          <div class="ac-field">
+            <span class="ac-field-label">Bild <span class="ac-optional">(max 2 MB, JPEG/PNG/WebP, wird auf 1200px verkleinert)</span></span>
+            <div class="ac-image-row">
+              <div class="ac-image-preview">
+                <template x-if="editor.imagePreview || editor.image_url">
+                  <img :src="editor.imagePreview || editor.image_url" alt="" />
+                </template>
+                <template x-if="!editor.imagePreview && !editor.image_url">
+                  <span class="ac-image-placeholder">kein Bild</span>
+                </template>
+              </div>
+              <div class="ac-image-actions">
+                <input type="file" accept="image/jpeg,image/png,image/webp" @change="onFileChange($event)" class="ac-input ac-input--file" />
+                <button type="button" x-show="editor.imagePreview || editor.image_url" @click="clearImage()" class="ac-btn ac-btn--ghost">Bild entfernen</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Style + Published -->
+          <div class="ac-field-row">
+            <label class="ac-field">
+              <span class="ac-field-label">Karten-Stil</span>
+              <select x-model="editor.card_class" class="ac-input">
+                {CARD_CLASSES.map(c => <option value={c.value}>{c.label}</option>)}
+              </select>
+            </label>
+            <label class="ac-field ac-field--checkbox">
+              <input type="checkbox" x-model="editor.is_published" />
+              <span>Veröffentlicht (im Gast-Frontend sichtbar)</span>
+            </label>
+          </div>
+        </div>
+
+        <footer class="ac-modal-foot">
+          <span x-show="saveError" x-text="saveError" class="ac-error"></span>
+          <button type="button" @click="closeEditor()" class="ac-btn ac-btn--ghost">Abbrechen</button>
+          <button type="button" @click="saveEditor()" :disabled="isSaving" class="ac-btn ac-btn--primary">
+            <span x-show="!isSaving">Speichern</span>
+            <span x-show="isSaving">Speichere…</span>
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div x-show="toast" x-cloak class="ac-toast" :class="`ac-toast--${toast?.type}`" x-text="toast?.text"></div>
+  </div>
+
+  <script>
+    import Alpine from 'alpinejs';
+    import { resizeImage } from '../../lib/storage/client-resize';
+
+    function emptyEditor() {
+      return {
+        id: null,
+        card_type: 'internal_action',
+        action_target: '',
+        title_de: '', title_en: '', title_fr: '', title_es: '',
+        subtitle_de: '', subtitle_en: '', subtitle_fr: '', subtitle_es: '',
+        eyebrow_de: '', eyebrow_en: '', eyebrow_fr: '', eyebrow_es: '',
+        cta_de: '', cta_en: '', cta_fr: '', cta_es: '',
+        image_url: null,
+        imageFile: null,
+        imagePreview: null,
+        card_class: 'rec-anthrazit',
+        is_published: true,
+      };
+    }
+
+    Alpine.data('actionCardsEditor', (initial: any) => ({
+      hotelId: initial.hotelId,
+      cards: initial.cards,
+      internalActions: initial.internalActions,
+      cardClasses: initial.cardClasses,
+      typeLabels: initial.typeLabels,
+
+      editorOpen: false,
+      editorMode: 'new' as 'new' | 'edit',
+      editor: emptyEditor(),
+      activeLang: 'de' as 'de' | 'en' | 'fr' | 'es',
+      isSaving: false,
+      saveError: '' as string,
+      toast: null as null | { type: 'success' | 'error'; text: string },
+
+      hasContent(lang: string) {
+        const e: any = this.editor;
+        return !!(e[`title_${lang}`] || e[`subtitle_${lang}`] || e[`eyebrow_${lang}`] || e[`cta_${lang}`]);
+      },
+
+      openNew() {
+        this.editor = emptyEditor();
+        this.activeLang = 'de';
+        this.editorMode = 'new';
+        this.saveError = '';
+        this.editorOpen = true;
+      },
+
+      openEdit(id: string) {
+        const c = this.cards.find((x: any) => x.id === id);
+        if (!c) return;
+        const e = emptyEditor();
+        Object.assign(e, c);
+        e.imageFile = null;
+        e.imagePreview = null;
+        this.editor = e;
+        this.activeLang = 'de';
+        this.editorMode = 'edit';
+        this.saveError = '';
+        this.editorOpen = true;
+      },
+
+      closeEditor() {
+        this.editorOpen = false;
+      },
+
+      onTypeChange() {
+        // Bei Typ-Wechsel das action_target neutralisieren wenn unpassend
+        if (this.editor.card_type === 'info') this.editor.action_target = '';
+      },
+
+      async onFileChange(ev: Event) {
+        const input = ev.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          this.showToast('Datei zu groß (max 2 MB)', 'error');
+          input.value = '';
+          return;
+        }
+        this.editor.imageFile = await resizeImage(file, 1200);
+        this.editor.imagePreview = URL.createObjectURL(this.editor.imageFile);
+      },
+
+      clearImage() {
+        this.editor.imageFile = null;
+        this.editor.imagePreview = null;
+        this.editor.image_url = null;
+      },
+
+      async saveEditor() {
+        if (!this.editor.title_de?.trim()) {
+          this.saveError = 'Titel auf Deutsch ist Pflicht.';
+          this.activeLang = 'de';
+          return;
+        }
+        this.isSaving = true;
+        this.saveError = '';
+        try {
+          const payload: any = {
+            id: this.editor.id || undefined,
+            card_type: this.editor.card_type,
+            action_target: this.editor.action_target,
+            card_class: this.editor.card_class,
+            is_published: this.editor.is_published,
+          };
+          for (const lang of ['de','en','fr','es']) {
+            for (const f of ['title','subtitle','eyebrow','cta']) {
+              payload[`${f}_${lang}`] = (this.editor as any)[`${f}_${lang}`];
+            }
+          }
+          const res = await fetch('/api/admin/action-cards/upsert', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!data.ok) { this.saveError = data.error || 'Speichern fehlgeschlagen.'; return; }
+
+          // Bild-Upload falls neue Datei
+          if (this.editor.imageFile) {
+            const fd = new FormData();
+            fd.append('card_id', data.id);
+            fd.append('image', this.editor.imageFile);
+            const upRes = await fetch('/api/admin/action-cards/upload-image', { method: 'POST', body: fd });
+            const upData = await upRes.json();
+            if (!upData.ok) { this.saveError = `Bild-Upload: ${upData.error}`; return; }
+          }
+          this.showToast('Gespeichert.', 'success');
+          this.editorOpen = false;
+          setTimeout(() => window.location.reload(), 600);
+        } catch (err: any) {
+          this.saveError = `Netzwerk-Fehler: ${err.message ?? err}`;
+        } finally {
+          this.isSaving = false;
+        }
+      },
+
+      async moveCard(id: string, direction: 'up' | 'down') {
+        const res = await fetch('/api/admin/action-cards/sort', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, direction }),
+        });
+        const data = await res.json();
+        if (!data.ok) { this.showToast(data.error || 'Sortieren fehlgeschlagen', 'error'); return; }
+        if (!data.noop) window.location.reload();
+      },
+
+      async deleteCard(id: string) {
+        if (!confirm('Diese Karte wirklich löschen?')) return;
+        const res = await fetch('/api/admin/action-cards/delete', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        const data = await res.json();
+        if (!data.ok) { this.showToast(data.error || 'Löschen fehlgeschlagen', 'error'); return; }
+        this.showToast('Gelöscht.', 'success');
+        setTimeout(() => window.location.reload(), 400);
+      },
+
+      showToast(text: string, type: 'success' | 'error') {
+        this.toast = { type, text };
+        setTimeout(() => { this.toast = null; }, 3000);
+      },
+    }));
+  </script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    .ac-root { padding: 0 24px 60px; max-width: 1200px; margin: 0 auto; }
+    .ac-header { margin: 20px 0 24px; }
+    .ac-eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); }
+    .ac-title { margin: 0 0 8px; font-size: 28px; font-weight: 300; letter-spacing: -0.01em; color: #1A1A1A; }
+    .ac-sub { margin: 0; font-size: 14px; color: rgba(26,26,26,.6); }
+
+    .ac-hint-banner { margin-bottom: 16px; padding: 12px 16px; background: #fff8e1; border: 1px solid #f5d77a; color: #8a5800; font-size: 13px; }
+
+    .ac-actions-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .ac-counter { font-size: 12px; color: rgba(26,26,26,.5); }
+
+    .ac-empty { padding: 60px 24px; text-align: center; background: #fff; border: 1px dashed #ddd; }
+    .ac-empty-text { margin: 0; font-size: 14px; color: rgba(26,26,26,.55); font-style: italic; }
+
+    .ac-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
+    .ac-row { display: grid; grid-template-columns: 80px 1fr auto; gap: 16px; padding: 12px; background: #fff; border: 1px solid #e8e8e8; align-items: center; }
+    .ac-row-thumb { width: 80px; height: 80px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .ac-row-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .ac-row-thumb-placeholder { color: rgba(26,26,26,.3); font-size: 24px; }
+    .ac-row-meta { min-width: 0; }
+    .ac-row-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+    .ac-badge { font-size: 10px; padding: 2px 8px; background: rgba(26,26,26,.06); color: rgba(26,26,26,.7); letter-spacing: 0.04em; }
+    .ac-badge--draft { background: #fff8e1; color: #8a5800; }
+    .ac-badge--target { background: rgba(255,74,130,.08); color: #FF4A82; font-family: 'JetBrains Mono', monospace; }
+    .ac-row-title { margin: 4px 0 2px; font-size: 15px; font-weight: 500; color: #1A1A1A; }
+    .ac-row-sub { margin: 0; font-size: 12px; color: rgba(26,26,26,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60ch; }
+    .ac-row-actions { display: flex; gap: 4px; }
+
+    .ac-section-title { margin: 0 0 6px; font-size: 16px; font-weight: 500; color: #1A1A1A; }
+    .ac-section-sub { margin: 0 0 16px; font-size: 13px; color: rgba(26,26,26,.55); }
+
+    .ac-preview-section { margin-top: 32px; }
+    .ac-preview-empty { font-size: 13px; color: rgba(26,26,26,.5); font-style: italic; }
+    .ac-preview-stage { background: #FAF8F5; padding: 20px; border: 1px solid #e8e8e8; overflow: hidden; }
+    .ac-preview-scroller { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+    .ac-preview-card { flex: 0 0 280px; min-height: 220px; }
+    .ac-preview-card-img { width: calc(100% + 52px); margin: -28px -26px 8px; height: 120px; object-fit: cover; }
+
+    /* Buttons */
+    .ac-btn { padding: 8px 16px; font-size: 13px; font-weight: 500; border: 1px solid; cursor: pointer; background: transparent; color: #1A1A1A; }
+    .ac-btn:disabled { opacity: 0.5; cursor: wait; }
+    .ac-btn--primary { background: #FF4A82; color: #fff; border-color: #FF4A82; }
+    .ac-btn--primary:hover:not(:disabled) { background: #e63d72; }
+    .ac-btn--ghost { border-color: #ddd; }
+    .ac-btn--ghost:hover { background: #f5f5f5; }
+
+    .ac-icon-btn { width: 32px; height: 32px; padding: 0; background: transparent; border: 1px solid #e0e0e0; cursor: pointer; font-size: 14px; line-height: 1; }
+    .ac-icon-btn:hover:not(:disabled) { background: #f5f5f5; border-color: #1A1A1A; }
+    .ac-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .ac-icon-btn--danger:hover { background: #fdeaea; border-color: #aa1f1f; color: #aa1f1f; }
+
+    /* Modal */
+    .ac-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding: 24px; z-index: 100; overflow-y: auto; }
+    .ac-modal { background: #fff; width: 100%; max-width: 640px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+    .ac-modal-head { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+    .ac-modal-head h3 { margin: 0; font-size: 18px; font-weight: 500; }
+    .ac-modal-close { background: transparent; border: none; font-size: 24px; cursor: pointer; line-height: 1; color: rgba(26,26,26,.5); }
+    .ac-modal-close:hover { color: #1A1A1A; }
+    .ac-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .ac-modal-foot { padding: 12px 20px; border-top: 1px solid #eee; display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+    .ac-error { flex: 1; font-size: 12px; color: #aa1f1f; }
+
+    /* Fields */
+    .ac-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .ac-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .ac-field--checkbox { flex-direction: row; align-items: center; gap: 8px; }
+    .ac-field-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(26,26,26,.6); }
+    .ac-required { color: #FF4A82; }
+    .ac-optional { font-size: 10px; color: rgba(26,26,26,.45); text-transform: none; letter-spacing: normal; }
+    .ac-input { padding: 8px 10px; border: 1px solid #ddd; font-size: 14px; font-family: inherit; color: #1A1A1A; background: #fff; width: 100%; }
+    .ac-input:focus { outline: none; border-color: #FF4A82; }
+    .ac-input--file { padding: 4px; }
+    textarea.ac-input { resize: vertical; }
+
+    /* Lang-Tabs */
+    .ac-lang-tabs { display: flex; gap: 2px; border-bottom: 1px solid #eee; margin: 8px 0 16px; }
+    .ac-lang-tab { padding: 8px 14px; background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12px; font-weight: 500; cursor: pointer; color: rgba(26,26,26,.5); display: flex; align-items: center; gap: 4px; }
+    .ac-lang-tab.is-active { color: #1A1A1A; border-bottom-color: #FF4A82; }
+    .ac-lang-tab.has-content { color: #1A1A1A; }
+    .ac-lang-dot { color: #2a8a44; font-size: 16px; line-height: 0.5; }
+    .ac-lang-fields { display: flex; flex-direction: column; }
+
+    /* Bild */
+    .ac-image-row { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: start; }
+    .ac-image-preview { width: 120px; height: 120px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .ac-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .ac-image-placeholder { font-size: 12px; color: rgba(26,26,26,.4); font-style: italic; }
+    .ac-image-actions { display: flex; flex-direction: column; gap: 8px; }
+
+    /* Toast */
+    .ac-toast { position: fixed; top: 20px; right: 20px; padding: 12px 16px; color: #fff; font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+    .ac-toast--success { background: #1f7a3a; }
+    .ac-toast--error { background: #aa1f1f; }
+  </style>
+</AdminLayout>
