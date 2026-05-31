@@ -1,0 +1,61 @@
+---
+// Sprint E2 · Phase 4 — Sub-Navigation für /admin/places/*
+//
+// Pattern analog EveSubNav (Sprint E4). Aktuell nur "Picks" — später
+// "Analytics" (welche Picks werden geklickt) als Backlog-Sub-Page.
+
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+
+const tabs = [
+  { href: '/admin/places',           label: 'Picks',          slug: 'picks' },
+  // Backlog: { href: '/admin/places/analytics', label: 'Analytics', slug: 'analytics' },
+];
+---
+
+<nav class="places-subnav" aria-label="Places Sub-Navigation">
+  <div class="places-subnav-inner">
+    {tabs.map(tab => (
+      <a
+        href={tab.href}
+        class={`places-subnav-tab${currentPath === tab.href ? ' is-active' : ''}`}
+        aria-current={currentPath === tab.href ? 'page' : undefined}
+      >
+        {tab.label}
+      </a>
+    ))}
+  </div>
+</nav>
+
+<style>
+  .places-subnav {
+    border-bottom: 1px solid #e8e8e8;
+    margin-bottom: 32px;
+  }
+  .places-subnav-inner {
+    display: flex;
+    gap: 0;
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+  .places-subnav-tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: rgba(26, 26, 26, 0.55);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    margin-bottom: -1px;
+  }
+  .places-subnav-tab:hover { color: #1A1A1A; }
+  .places-subnav-tab.is-active {
+    color: #1A1A1A;
+    border-bottom-color: #FF4A82;
+    font-weight: 500;
+  }
+</style>
