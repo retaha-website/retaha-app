@@ -16,6 +16,7 @@ import { createSupabaseServiceRoleInstance, getUserHotels } from '../../../../..
 import { requirePermission } from '../../../../../lib/auth/require-permission';
 import { validateVariables } from '../../../../../lib/marketing/variables';
 import { sanitizeMarketingHtml } from '../../../../../lib/marketing/html-sanitize';
+import { mergeAndTranslateMarketing, asLanguageCode } from '../../../../../lib/marketing/translate-with-vars';
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -71,20 +72,29 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   // HTML sanitizen
   const sanitizedBody = sanitizeMarketingHtml(bodyHtml);
 
-  const hotelDefault = (hotel as any).default_language || 'de';
-  const now = new Date().toISOString();
-  const i18nWrap = (value: string) => ({
-    [hotelDefault]: { value, source: 'original', updated_at: now },
-  });
+  const hotelDefault = asLanguageCode((hotel as any).default_language);
+
+  // Auto-Translation für title, body, cta_label (Variable-protected)
+  // Sync parallel (Vercel-Edge kann keine Promises nach return — Pattern wie
+  // i18n-Sprint Phase 6). Hotelier wartet 3-7s auf Save.
+  const ctaLabel = body.cta_label_default?.toString().trim() || '';
+  const [titleResult, bodyResult, ctaResult] = await Promise.all([
+    mergeAndTranslateMarketing(null, title, hotelDefault, { logLabel: 'marketing_templates.title' }),
+    mergeAndTranslateMarketing(null, sanitizedBody, hotelDefault, { logLabel: 'marketing_templates.body' }),
+    ctaLabel
+      ? mergeAndTranslateMarketing(null, ctaLabel, hotelDefault, { logLabel: 'marketing_templates.cta' })
+      : Promise.resolve(null),
+  ]);
+
+  const totalUSD = titleResult.cost.estimatedUSD + bodyResult.cost.estimatedUSD + (ctaResult?.cost.estimatedUSD ?? 0);
+  console.info(`[marketing/templates/create] auto-translate cost: $${totalUSD.toFixed(5)}`);
 
   const insert: Record<string, any> = {
     hotel_id: hotel.id,
     name,
-    title_i18n: i18nWrap(title),
-    body_i18n: i18nWrap(sanitizedBody),
-    cta_label_i18n: body.cta_label_default
-      ? i18nWrap(body.cta_label_default.toString().trim())
-      : null,
+    title_i18n: titleResult.i18n,
+    body_i18n: bodyResult.i18n,
+    cta_label_i18n: ctaResult ? ctaResult.i18n : null,
     cta_url: body.cta_url?.toString().trim() || null,
     hero_image_url: body.hero_image_url?.toString().trim() || null,
     category,

@@ -12,6 +12,7 @@ import { createSupabaseServiceRoleInstance, getUserHotels } from '../../../../..
 import { requirePermission } from '../../../../../lib/auth/require-permission';
 import { validateVariables } from '../../../../../lib/marketing/variables';
 import { sanitizeMarketingHtml } from '../../../../../lib/marketing/html-sanitize';
+import { mergeAndTranslateMarketing, asLanguageCode } from '../../../../../lib/marketing/translate-with-vars';
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -68,24 +69,26 @@ export const PUT: APIRoute = async ({ cookies, request, params }) => {
   }
 
   const sanitizedBody = sanitizeMarketingHtml(bodyHtml);
-  const hotelDefault = (hotel as any).default_language || 'de';
-  const now = new Date().toISOString();
+  const hotelDefault = asLanguageCode((hotel as any).default_language);
 
-  // Merge: bestehende Übersetzungen behalten, Default-Sprache überschreiben
-  // (Phase 11 wird die anderen Sprachen via Auto-Translate aktualisieren)
-  function mergeField(existingI18n: any, newValue: string) {
-    const merged = { ...(existingI18n ?? {}) };
-    merged[hotelDefault] = { value: newValue, source: 'original', updated_at: now };
-    return merged;
-  }
+  // Auto-Translate: behält override-Slots, re-translated alle auto/missing
+  const ctaLabel = body.cta_label_default?.toString().trim() || '';
+  const [titleResult, bodyResult, ctaResult] = await Promise.all([
+    mergeAndTranslateMarketing(existing.title_i18n, title, hotelDefault, { logLabel: `marketing_templates.title:${templateId.slice(0,8)}` }),
+    mergeAndTranslateMarketing(existing.body_i18n,  sanitizedBody, hotelDefault, { logLabel: `marketing_templates.body:${templateId.slice(0,8)}` }),
+    ctaLabel
+      ? mergeAndTranslateMarketing(existing.cta_label_i18n, ctaLabel, hotelDefault, { logLabel: `marketing_templates.cta:${templateId.slice(0,8)}` })
+      : Promise.resolve(null),
+  ]);
+
+  const totalUSD = titleResult.cost.estimatedUSD + bodyResult.cost.estimatedUSD + (ctaResult?.cost.estimatedUSD ?? 0);
+  console.info(`[marketing/templates PUT ${templateId.slice(0,8)}] auto-translate cost: $${totalUSD.toFixed(5)}`);
 
   const update: Record<string, any> = {
     name,
-    title_i18n: mergeField(existing.title_i18n, title),
-    body_i18n:  mergeField(existing.body_i18n, sanitizedBody),
-    cta_label_i18n: body.cta_label_default
-      ? mergeField(existing.cta_label_i18n, body.cta_label_default.toString().trim())
-      : null,
+    title_i18n: titleResult.i18n,
+    body_i18n:  bodyResult.i18n,
+    cta_label_i18n: ctaResult ? ctaResult.i18n : null,
     cta_url: body.cta_url?.toString().trim() || null,
     hero_image_url: body.hero_image_url?.toString().trim() || null,
     category,

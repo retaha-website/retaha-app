@@ -315,6 +315,74 @@ export function signSaveLink(input: PassObjectInput, origins: string[] = ['https
   return { ok: true, url: `${SAVE_LINK_BASE}/${signed}`, status: 'ok' };
 }
 
+// ─── Pass-Notification (Phase 10: Marketing-Push via Google Wallet) ───────
+
+export interface PassMessageInput {
+  walletPassUuid: string;
+  hotelId: string;
+  header: string;            // Notification-Titel (kurz, max ~50 Zeichen)
+  body: string;              // Notification-Body
+  messageId?: string;        // optional: UUID für Dedup (Re-Send → kein Doppel-Push)
+}
+
+export interface PassMessageResult {
+  ok: boolean;
+  objectId: string;
+  status: 'sent' | 'not_configured' | 'auth_failed' | 'http_error' | 'object_not_found';
+  httpStatus?: number;
+  message?: string;
+}
+
+/**
+ * Schickt eine Notification an einen einzelnen Pass-Object.
+ *
+ * Google-API: POST /loyaltyObject/{objectId}/addMessage
+ * messageType=TEXT_AND_NOTIFY triggert eine Push-Notification auf dem Gerät;
+ * messageType=TEXT zeigt sie nur im Pass-Detail.
+ *
+ * Bei 404: Pass-Object existiert nicht mehr (User hat ihn entfernt oder Pass
+ * wurde nie angelegt). Caller sollte den Pass in der DB als state='opted_out'
+ * markieren — passiert aber separat im Send-Loop um Race-Conditions zu vermeiden.
+ */
+export async function addMessageToPass(input: PassMessageInput): Promise<PassMessageResult> {
+  const cfg = getWalletConfig();
+  const objectId = cfg ? buildPassObjectId(cfg.issuerId, input.walletPassUuid) : `unknown.pass_${input.walletPassUuid}`;
+  if (!cfg) return { ok: false, objectId, status: 'not_configured' };
+
+  const token = await getAccessToken(cfg);
+  if (!token) return { ok: false, objectId, status: 'auth_failed' };
+
+  const body = {
+    message: {
+      id: input.messageId,                // optional dedup key
+      header: input.header.slice(0, 60),  // Google empfiehlt kurz
+      body: input.body.slice(0, 1024),    // hard limit
+      messageType: 'TEXT_AND_NOTIFY',
+    },
+  };
+
+  try {
+    const res = await fetch(
+      `${WALLET_API_BASE}/loyaltyObject/${encodeURIComponent(objectId)}/addMessage`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    if (res.status === 404) {
+      return { ok: false, objectId, status: 'object_not_found', httpStatus: 404 };
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, objectId, status: 'http_error', httpStatus: res.status, message: text.slice(0, 500) };
+    }
+    return { ok: true, objectId, status: 'sent', httpStatus: res.status };
+  } catch (err) {
+    return { ok: false, objectId, status: 'http_error', message: (err as Error).message };
+  }
+}
+
 // ─── Convenience: für Tests ────────────────────────────────────────────────
 
 /**
