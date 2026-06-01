@@ -11,6 +11,7 @@ import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
 import CookieBanner from '../../components/CookieBanner.astro';
 import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
 import PlaceDetailSheet from '../../components/sheets/PlaceDetailSheet.astro';
+import PostStaySheet from '../../components/sheets/PostStaySheet.astro';
 import { buildPhotoUrl } from '../../lib/places/google-client';
 import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
 import { getEveSuggestions } from '../../lib/eve/suggestions';
@@ -121,14 +122,21 @@ const sbSr = createSupabaseServiceRoleInstance();
 const { data: initialChatRows } = (settings as any).eve_enabled
   ? await sbSr
       .from('chat_messages')
-      .select('role, content, created_at')
+      .select('id, role, content, created_at, eve_message_feedback(rating)')
       .eq('stay_id', stay.id)
       .order('created_at', { ascending: true })
       .limit(20)
   : { data: [] };
+// Sprint Functional Modul C Phase 7 — id + feedback-Rating für Daumen-UI mitladen
 const initialEveMessages = (initialChatRows ?? [])
   .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-  .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content, streaming: false }));
+  .map((m: any) => ({
+    id: m.id,
+    role: m.role as 'user' | 'assistant',
+    content: m.content,
+    streaming: false,
+    feedback: m.eve_message_feedback?.[0]?.rating ?? null,
+  }));
 
 // Sprint E2 Phase 7 — Places-Sheet-Daten: Picks + Nearby-Cache + hotel lat/lng
 const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = await Promise.all([
@@ -293,6 +301,22 @@ const breakfastIncludedMap: Record<Lang, string | null> = {
 const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_included_de || '';
 
 const reservationEnabled = settings.features?.breakfast_reservation !== false;
+
+// Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
+// Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
+// Cooldown (24h via localStorage) entscheidet danach Client-seitig, ob das
+// Sheet wirklich aufpoppt — Render-Aufwand sparen wir trotzdem schon hier.
+const stayEnded = Date.parse(stay.check_out) < Date.now();
+let hasStayFeedback = false;
+if (stayEnded) {
+  const { data: existingFb } = await sbSr
+    .from('stay_feedback')
+    .select('id')
+    .eq('stay_id', stay.id)
+    .maybeSingle();
+  hasStayFeedback = !!existingFb;
+}
+const showPostStay = stayEnded && !hasStayFeedback;
 ---
 
 <!DOCTYPE html>
@@ -621,6 +645,10 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           <EveFloatingBubble />
         </>
       )}
+
+      {showPostStay && (
+        <PostStaySheet lang={lang} stayId={stay.id} hotelName={hotel.name} />
+      )}
     </main>
 
     {/* Sprint Legal Phase 2 — Cookie-Banner (zeigt sich nur beim ersten Besuch) */}
@@ -631,6 +659,12 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
       // @ts-expect-error - Alpine types
       Alpine.data('guestPage', () => ({
+        init() {
+          // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet ggf. anzeigen
+          if (typeof (this as any)._initPostStay === 'function') {
+            (this as any)._initPostStay();
+          }
+        },
         recSlideIndex: 0,
         recDragOffset: 0,
         recIsDragging: false,
@@ -965,6 +999,90 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
           return this.eveMessages.slice(-3).map((m: any) =>
             `${m.role === 'user' ? 'Gast' : 'Eve'}: ${m.content}`
           ).join('\n');
+        },
+
+        // Sprint Functional Modul C Phase 8 — Post-Stay-Rating-State
+        postStayOpen: false,
+        postStayRating: 0,
+        postStayHover: 0,
+        postStayComment: '',
+        postStaySubmitting: false,
+        postStayDone: false,
+        postStayError: '' as string,
+
+        // Wird bei init() vom Alpine-Component aufgerufen (s. registerguestPageInit).
+        _initPostStay() {
+          const cfg = (window as any).__RETAHA_POSTSTAY__;
+          if (!cfg || !cfg.shouldAutoOpen) return;
+          // Sanfter Auto-Open: 1.6s damit Gast die Seite zuerst sieht.
+          setTimeout(() => { this.postStayOpen = true; }, 1600);
+        },
+
+        postStayDismiss() {
+          this.postStayOpen = false;
+          const cfg = (window as any).__RETAHA_POSTSTAY__;
+          if (!cfg) return;
+          try {
+            localStorage.setItem('retaha_poststay_dismissed_' + cfg.stayId, String(Date.now()));
+          } catch (_) { /* localStorage blocked — egal */ }
+        },
+
+        async postStaySubmit() {
+          if (!this.postStayRating || this.postStaySubmitting) return;
+          this.postStaySubmitting = true;
+          this.postStayError = '';
+          try {
+            const res = await fetch('/api/g/stay-feedback', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rating: this.postStayRating,
+                comment: this.postStayComment.trim() || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              this.postStayError = data.error || 'unknown';
+              return;
+            }
+            this.postStayDone = true;
+            // Cleanup Cooldown — Gast hat ja bewertet, soll nie wieder gefragt werden
+            const cfg = (window as any).__RETAHA_POSTSTAY__;
+            if (cfg) {
+              try { localStorage.removeItem('retaha_poststay_dismissed_' + cfg.stayId); } catch(_){}
+            }
+          } catch (err) {
+            this.postStayError = (err as Error).message || 'network';
+          } finally {
+            this.postStaySubmitting = false;
+          }
+        },
+
+        // Sprint Functional Modul C Phase 7 — Eve-Feedback (Daumen)
+        async sendEveFeedback(messageId: string, rating: 1 | -1) {
+          if (!messageId) return;
+          const idx = this.eveMessages.findIndex((m: any) => m.id === messageId);
+          if (idx < 0) return;
+          // Optimistic Update
+          const prev = this.eveMessages[idx].feedback;
+          (this.eveMessages[idx] as any).feedback = rating;
+          try {
+            const res = await fetch('/api/g/eve-feedback', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message_id: messageId, rating }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              (this.eveMessages[idx] as any).feedback = prev;
+              this._showRecToast('Feedback fehlgeschlagen.');
+              return;
+            }
+            this._showRecToast(rating === 1 ? 'Danke!' : 'Danke für dein Feedback.');
+          } catch (_) {
+            (this.eveMessages[idx] as any).feedback = prev;
+            this._showRecToast('Netzwerk-Fehler.');
+          }
         },
 
         openSheet(id: string) {

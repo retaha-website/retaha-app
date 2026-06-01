@@ -109,6 +109,29 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
         :class="`eve-message eve-message--${msg.role}${msg.streaming ? ' eve-message--streaming' : ''}`"
       >
         <div class="eve-message-bubble" x-text="msg.content"></div>
+        <!-- Sprint Functional Modul C Phase 7 — Feedback-Daumen für assistant-Messages -->
+        <div
+          class="eve-message-feedback"
+          x-show="msg.role === 'assistant' && msg.id && !msg.streaming"
+          x-cloak
+        >
+          <button
+            type="button"
+            class="eve-fb-btn"
+            :class="{ 'is-active': msg.feedback === 1 }"
+            @click="sendEveFeedback(msg.id, 1)"
+            aria-label="Hilfreich"
+            title="Hilfreich"
+          >👍</button>
+          <button
+            type="button"
+            class="eve-fb-btn"
+            :class="{ 'is-active': msg.feedback === -1 }"
+            @click="sendEveFeedback(msg.id, -1)"
+            aria-label="Nicht hilfreich"
+            title="Nicht hilfreich"
+          >👎</button>
+        </div>
       </div>
     </template>
 
