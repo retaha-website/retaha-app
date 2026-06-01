@@ -1,6 +1,9 @@
 import type { APIRoute } from 'astro';
 import { createServerClient } from '../../../lib/supabase';
 import { sendBookingNotification } from '../../../lib/email/send-booking-notification';
+import { sendHotelierPush } from '../../../lib/push/send';
+import { createSupabaseServiceRoleInstance } from '../../../lib/auth';
+import { hasPermission, type Role } from '../../../lib/auth/permissions';
 
 interface CreateBookingPayload {
   access_token: string;
@@ -75,6 +78,53 @@ export const POST: APIRoute = async ({ request }) => {
     bookingType: payload.type,
     details: payload.details,
   });
+
+  // Sprint Functional Modul D · Phase 10 — Hotelier-Push bei Service-Anfragen
+  // (andere Booking-Typen kommen über Email; Push nur für sofort-handelnde Items).
+  if (payload.type === 'service') {
+    try {
+      const admin = createSupabaseServiceRoleInstance();
+      const { data: members } = await admin
+        .from('hotel_users')
+        .select('user_id, role')
+        .eq('hotel_id', stay.hotel_id)
+        .not('accepted_at', 'is', null);
+
+      const eligibleUserIds = (members ?? [])
+        .filter(m => hasPermission(m.role as Role, 'operations.read'))
+        .map(m => m.user_id);
+
+      if (eligibleUserIds.length > 0) {
+        // Room/Item-Label für aussagekräftige Notification
+        const { data: stayRow } = await admin
+          .from('stays')
+          .select('rooms(room_number, room_name), guests(first_name, last_name)')
+          .eq('id', stay.id)
+          .maybeSingle();
+        const room: any = (stayRow as any)?.rooms;
+        const roomLabel = room
+          ? [room.room_number, room.room_name].filter(Boolean).join(' · ')
+          : null;
+        const itemName = (payload.details as any)?.item_name || 'Service-Anfrage';
+        const body = roomLabel
+          ? `${roomLabel}: ${itemName}`
+          : itemName;
+
+        await sendHotelierPush({
+          hotelId: stay.hotel_id,
+          userIds: eligibleUserIds,
+          payload: {
+            title: 'Neue Service-Anfrage',
+            body,
+            url: `/admin/service?booking=${booking.id}`,
+            tag: `booking-${booking.id}`,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('[push] service-trigger failed (non-fatal):', err);
+    }
+  }
 
   return new Response(JSON.stringify({ ok: true, booking }), {
     status: 200, headers: { 'Content-Type': 'application/json' },

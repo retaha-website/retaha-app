@@ -6,6 +6,8 @@ import { t } from '../../i18n/helpers';
 import { SUPPORTED_ADMIN_LOCALES, LOCALE_LABELS, LOCALE_CODES, DEFAULT_ADDRESS_FORM } from '../../i18n/constants';
 import type { AdminLocale, AddressForm } from '../../i18n/types';
 import { mergeAndTranslate, asLanguageCode } from '../../lib/i18n/save-hook.ts';
+import { getVapidPublicKey } from '../../lib/push/config';
+const vapidPublicKey = getVapidPublicKey();
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -834,4 +836,192 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
     </div>
 
   </form>
+
+  {/* Sprint Functional Modul D · Phase 10 — Web-Push (Hotelier) */}
+  <section class="settings-section" x-data="pushSettings()" x-init="init()">
+    <div class="settings-section-marker-bar">
+      <span class="settings-section-marker settings-section-marker--circle"></span>
+      <p class="settings-section-eyebrow">— Push-Benachrichtigungen —</p>
+      <span class="settings-section-line"></span>
+    </div>
+    <h2 class="settings-section-headline">Direkt im Browser benachrichtigen</h2>
+    <p class="settings-section-description">
+      Push schickt eine sofortige Benachrichtigung an deinen Browser, sobald ein Gast eine Service-Anfrage stellt — auch wenn diese retaha-Seite gerade nicht offen ist. Aktiviere Push pro Gerät auf dem du es brauchst (Laptop, Tablet, Smartphone).
+    </p>
+
+    <div class="rounded border border-anthrazit/10 bg-anthrazit/[0.02] p-4">
+      <template x-if="!supported">
+        <p class="text-sm text-anthrazit/70 italic">
+          Dieser Browser unterstützt keine Web-Push-Benachrichtigungen.<br>
+          <span class="text-xs">Auf iPhone: zuerst die Seite zum Homescreen hinzufügen, dann erneut öffnen.</span>
+        </p>
+      </template>
+
+      <template x-if="supported && status === 'denied'">
+        <p class="text-sm text-red-700">
+          Push wurde vom Browser blockiert. Erlaube Benachrichtigungen in den Browser-Einstellungen und lade die Seite neu.
+        </p>
+      </template>
+
+      <template x-if="supported && status !== 'denied'">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="inline-block w-2 h-2 rounded-full" :class="subscribed ? 'bg-green-600' : 'bg-anthrazit/30'"></span>
+              <span class="text-sm" x-text="subscribed ? 'Push auf diesem Gerät aktiv.' : 'Auf diesem Gerät noch nicht aktiviert.'"></span>
+            </div>
+            <button
+              type="button"
+              class="bauhaus-button"
+              :class="subscribed ? 'bauhaus-button--ghost' : 'bauhaus-button--primary'"
+              @click="subscribed ? unsubscribe() : subscribe()"
+              :disabled="busy"
+              x-text="busy ? '…' : (subscribed ? 'Deaktivieren' : 'Push aktivieren')"
+            ></button>
+          </div>
+          <template x-if="message">
+            <p class="text-xs" :class="messageType === 'error' ? 'text-red-700' : 'text-anthrazit/60'" x-text="message"></p>
+          </template>
+          <p class="text-xs text-anthrazit/55 italic">
+            iPhone: Web-Push funktioniert nur, wenn diese Seite über "Zum Home-Bildschirm" als App installiert ist und von dort geöffnet wurde.
+          </p>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <script is:inline define:vars={{ VAPID_PUBLIC_KEY: vapidPublicKey }}>
+    // Sprint Functional Modul D · Phase 10 — Push-Subscribe Client-Logik
+    window.__RETAHA_PUSH__ = { vapidPublicKey: VAPID_PUBLIC_KEY };
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+      return out;
+    }
+    window.__retahaPushHelpers = { urlBase64ToUint8Array };
+  </script>
+
+  <script>
+    // @ts-expect-error - Alpine global
+    document.addEventListener('alpine:init', () => {
+      // @ts-expect-error
+      window.Alpine.data('pushSettings', () => ({
+        supported: false,
+        status: 'default' as NotificationPermission,
+        subscribed: false,
+        busy: false,
+        message: '' as string,
+        messageType: 'info' as 'info' | 'error',
+
+        async init() {
+          this.supported = typeof window !== 'undefined'
+            && 'serviceWorker' in navigator
+            && 'PushManager' in window
+            && 'Notification' in window;
+          if (!this.supported) return;
+          this.status = Notification.permission;
+
+          try {
+            const reg = await navigator.serviceWorker.register('/sw.js');
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+              // Server-Side cross-check (vielleicht hat User Sub aus anderem Tab gelöscht)
+              const res = await fetch('/api/admin/push/status?endpoint=' + encodeURIComponent(sub.endpoint));
+              const body = await res.json();
+              this.subscribed = !!body.subscribed;
+            } else {
+              this.subscribed = false;
+            }
+          } catch (err) {
+            console.warn('[push] init failed:', err);
+            this.message = 'Service-Worker konnte nicht geladen werden.';
+            this.messageType = 'error';
+          }
+        },
+
+        async subscribe() {
+          if (this.busy) return;
+          this.busy = true;
+          this.message = '';
+          try {
+            const perm = await Notification.requestPermission();
+            this.status = perm;
+            if (perm !== 'granted') {
+              this.message = 'Browser-Berechtigung verweigert.';
+              this.messageType = 'error';
+              return;
+            }
+            const reg = await navigator.serviceWorker.ready;
+            const cfg = (window as any).__RETAHA_PUSH__;
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: (window as any).__retahaPushHelpers.urlBase64ToUint8Array(cfg.vapidPublicKey),
+            });
+            const json = sub.toJSON() as any;
+            const res = await fetch('/api/admin/push/subscribe', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                endpoint: json.endpoint,
+                keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+              }),
+            });
+            const body = await res.json();
+            if (!body.ok) {
+              // Bei Server-Reject: Browser-Sub wieder canceln damit Status konsistent bleibt
+              try { await sub.unsubscribe(); } catch (_) {}
+              this.message = body.error === 'too_many_subscriptions'
+                ? `Maximal ${body.limit} Geräte. Auf einem anderen Gerät deaktivieren oder älteste löschen lassen.`
+                : 'Speichern fehlgeschlagen: ' + (body.error || 'unbekannt');
+              this.messageType = 'error';
+              return;
+            }
+            this.subscribed = true;
+            this.message = 'Push aktiviert. Du bekommst ab jetzt Service-Anfragen sofort.';
+            this.messageType = 'info';
+          } catch (err: any) {
+            console.error('[push] subscribe failed:', err);
+            this.message = 'Subscribe fehlgeschlagen: ' + (err.message || 'unbekannt');
+            this.messageType = 'error';
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async unsubscribe() {
+          if (this.busy) return;
+          this.busy = true;
+          this.message = '';
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+              const endpoint = sub.endpoint;
+              await sub.unsubscribe();
+              await fetch('/api/admin/push/unsubscribe', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ endpoint }),
+              });
+            }
+            this.subscribed = false;
+            this.message = 'Push auf diesem Gerät deaktiviert.';
+            this.messageType = 'info';
+          } catch (err: any) {
+            console.error('[push] unsubscribe failed:', err);
+            this.message = 'Deaktivieren fehlgeschlagen: ' + (err.message || 'unbekannt');
+            this.messageType = 'error';
+          } finally {
+            this.busy = false;
+          }
+        },
+      }));
+    });
+  </script>
 </AdminLayout>
