@@ -149,10 +149,51 @@ export const POST: APIRoute = async ({ request }) => {
   const now = new Date().toISOString();
   let update: Record<string, any> = {};
 
+  // ── Phase 13: Open-Tracking-Attribution ──────────────────────────────
+  // Open/update-Events = User hat den Pass im Wallet geöffnet. Wir kennen
+  // nicht WELCHE Message er gesehen hat (Google liefert keine message_id im
+  // Webhook), also attributen wir an die letzte gesendete Campaign-Message
+  // innerhalb 7 Tage. Conditional UPDATE (opened_at IS NULL) verhindert
+  // Doppel-Counts bei mehreren Webhook-Hits.
+  //
+  // Best-Effort: bei DB-Fehlern weiterlaufen.
+  async function attributeOpen(walletPassId: string): Promise<void> {
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const { data: latestSend } = await sb
+        .from('marketing_sends')
+        .select('id, campaign_id')
+        .eq('wallet_pass_id', walletPassId)
+        .is('opened_at', null)
+        .not('sent_at', 'is', null)
+        .gte('sent_at', sevenDaysAgo)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!latestSend) return;
+
+      // Compare-and-Set: nur Sieger inkrementiert den Counter
+      const { data: claimed, error: claimErr } = await sb
+        .from('marketing_sends')
+        .update({ opened_at: new Date().toISOString() })
+        .eq('id', latestSend.id)
+        .is('opened_at', null)
+        .select('id, campaign_id')
+        .maybeSingle();
+      if (claimErr || !claimed) return;
+
+      const { error: rpcErr } = await sb.rpc('mc_inc_open', { p_campaign_id: claimed.campaign_id });
+      if (rpcErr) console.warn('[wallet/webhook] mc_inc_open failed:', rpcErr.message);
+    } catch (err) {
+      console.warn('[wallet/webhook] attributeOpen uncaught:', (err as Error).message);
+    }
+  }
+
   switch (event.eventType) {
     case 'save':
       // User hat den Pass ins Wallet gespeichert — last_pass_open_at = NOW
       update = { last_pass_open_at: now };
+      await attributeOpen(pass.id);
       break;
     case 'del':
       // User hat den Pass aus dem Wallet entfernt → Opt-Out
@@ -167,6 +208,7 @@ export const POST: APIRoute = async ({ request }) => {
     case 'update':
       // Object wurde aktualisiert — könnte ein User-Open sein
       update = { last_pass_open_at: now };
+      await attributeOpen(pass.id);
       break;
     default:
       return json({ ok: true, status: 'event_ignored', eventType: event.eventType });

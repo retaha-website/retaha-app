@@ -225,30 +225,70 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
     }
 
     // ── 6. Eligible: Send (sequenziell wegen Google-Rate-Limits) ──────────
+    // Phase 13: insert-first-then-wrap-then-send Pattern damit die CTA-URL
+    // mit echter send_id getrackt werden kann. Schritte pro Pass:
+    //   1. marketing_sends UPSERT (sent_at=null) → erhalten wir send_id
+    //   2. CTA-URL wrappen mit send_id
+    //   3. addMessageToPass mit gewrappter URL im body
+    //   4. marketing_sends UPDATE (sent_at=NOW or failed_reason)
     let sentCount = 0;
     let failedCount = 0;
     const siteOrigin = getEnv('PUBLIC_SITE_URL') || 'https://demo.retaha.de';
+    const campaignCtaUrl = (campaign as any).cta_url as string | null;
 
     for (const pass of eligible) {
       try {
         // Sprache wählen: pass language (falls bekannt) > hotel-default
         const passLang = asLanguageCode(passLangs.get(pass.guest_email) || hotelDefault);
 
+        // Step 1: send-Row vorab anlegen (oder updaten wenn schon da)
+        const { data: sendRow, error: insErr } = await sb
+          .from('marketing_sends')
+          .upsert({
+            campaign_id: campaign.id,
+            wallet_pass_id: pass.id,
+            sent_at: null,
+            delivered: null,
+            lang_used: passLang.slice(0, 2),
+            failed_reason: null,
+          }, { onConflict: 'campaign_id,wallet_pass_id' })
+          .select('id')
+          .single();
+        if (insErr || !sendRow) {
+          failedCount++;
+          console.warn(`[campaign-send] sends-row insert failed for pass ${pass.id.slice(0, 8)}:`, insErr?.message);
+          continue;
+        }
+        const sendId = sendRow.id;
+
+        // Step 2: CTA-URL wrappen wenn vorhanden
+        const wrappedCta = campaignCtaUrl
+          ? `${siteOrigin.replace(/\/$/, '')}/m/${sendId}?to=${encodeURIComponent(campaignCtaUrl)}`
+          : null;
+
+        // Step 3: Content rendern
         const titleRaw = pickI18n(campaign.title_i18n as any, hotelDefault, passLang);
         const bodyHtml = pickI18n(campaign.body_i18n as any, hotelDefault, passLang);
+        const ctaLabelRaw = pickI18n((campaign as any).cta_label_i18n, hotelDefault, passLang);
         const bodyPlain = htmlToPlain(bodyHtml);
 
-        // Variable-Context + Footer mit Opt-Out
         const ctx = buildVarContext(pass, hotelName, passLang);
         const optOutUrl = await buildOptOutUrl(pass.id, siteOrigin) || '';
         const renderedTitle = renderVariables(titleRaw, ctx);
         const renderedBody  = renderVariables(bodyPlain, ctx, { unsubscribe_link: optOutUrl });
+        const renderedCtaLabel = renderVariables(ctaLabelRaw || '', ctx);
 
-        // Footer für Compliance (immer, wenn URL verfügbar)
-        const finalBody = optOutUrl
-          ? `${renderedBody}\n\n— Abmelden: ${optOutUrl}`
-          : renderedBody;
+        // Step 3b: finalBody zusammensetzen — Body + optional CTA + optional Footer
+        const parts: string[] = [renderedBody];
+        if (wrappedCta) {
+          parts.push(renderedCtaLabel ? `${renderedCtaLabel}: ${wrappedCta}` : wrappedCta);
+        }
+        if (optOutUrl) {
+          parts.push(`— Abmelden: ${optOutUrl}`);
+        }
+        const finalBody = parts.filter(Boolean).join('\n\n');
 
+        // Step 4: Send an Google Wallet
         const sendResult = await addMessageToPass({
           walletPassUuid: pass.id,
           hotelId: pass.hotel_id ?? campaign.hotel_id,
@@ -257,18 +297,16 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
           messageId: `campaign-${campaign.id}-${pass.id}`,
         });
 
+        // Step 5: marketing_sends UPDATE mit Endergebnis
         if (sendResult.ok) {
           sentCount++;
-          await sb.from('marketing_sends').upsert({
-            campaign_id: campaign.id,
-            wallet_pass_id: pass.id,
+          await sb.from('marketing_sends').update({
             sent_at: new Date().toISOString(),
-            delivered: null,  // Webhook bestätigt später (Phase 13)
-            lang_used: passLang.slice(0, 2),
-          }, { onConflict: 'campaign_id,wallet_pass_id' });
+            delivered: null,  // Webhook setzt later
+            failed_reason: null,
+          }).eq('id', sendId);
         } else {
           failedCount++;
-          // Wenn object_not_found: Pass markieren damit er nicht ewig retries kriegt
           if (sendResult.status === 'object_not_found') {
             await sb.from('wallet_passes').update({
               state: 'opted_out',
@@ -276,14 +314,11 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
               opted_out_reason: 'object_404_in_google_wallet',
             }).eq('id', pass.id);
           }
-          await sb.from('marketing_sends').upsert({
-            campaign_id: campaign.id,
-            wallet_pass_id: pass.id,
+          await sb.from('marketing_sends').update({
             sent_at: null,
             delivered: false,
             failed_reason: sendResult.status + (sendResult.message ? `: ${sendResult.message.slice(0, 200)}` : ''),
-            lang_used: passLang.slice(0, 2),
-          }, { onConflict: 'campaign_id,wallet_pass_id' });
+          }).eq('id', sendId);
         }
       } catch (err) {
         failedCount++;
