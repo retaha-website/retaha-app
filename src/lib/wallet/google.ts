@@ -62,6 +62,12 @@ export interface PassClassInput {
   logoUrl: string | null;
   heroImageUrl: string | null;
   defaultLang: string;          // ISO 2-letter, z.B. "de"
+  /**
+   * 'DRAFT': Developer-only, sofort nutzbar mit Issuer-Account zum Test
+   * 'UNDER_REVIEW': Production-Submission, Google reviewed manuell (~2-5 Tage)
+   * Default: 'DRAFT' (safer).
+   */
+  reviewStatus?: 'DRAFT' | 'UNDER_REVIEW';
 }
 
 export interface PassClassResult {
@@ -110,7 +116,7 @@ export async function createPassClass(input: PassClassInput): Promise<PassClassR
   const body = {
     id: classId,
     issuerName: input.hotelName,
-    reviewStatus: 'UNDER_REVIEW',
+    reviewStatus: input.reviewStatus ?? 'DRAFT',
     programName: input.hotelName,
     programLogo: input.logoUrl ? {
       sourceUri: { uri: input.logoUrl },

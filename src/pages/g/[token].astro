@@ -12,6 +12,8 @@ import CookieBanner from '../../components/CookieBanner.astro';
 import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
 import PlaceDetailSheet from '../../components/sheets/PlaceDetailSheet.astro';
 import PostStaySheet from '../../components/sheets/PostStaySheet.astro';
+import WalletAddSheet from '../../components/sheets/WalletAddSheet.astro';
+import { isWalletConfigured } from '../../lib/wallet/config';
 import { buildPhotoUrl } from '../../lib/places/google-client';
 import { setStaySessionCookie, getStaySession } from '../../lib/auth/stay-session';
 import { getEveSuggestions } from '../../lib/eve/suggestions';
@@ -306,6 +308,10 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
 // Cooldown (24h via localStorage) entscheidet danach Client-seitig, ob das
 // Sheet wirklich aufpoppt — Render-Aufwand sparen wir trotzdem schon hier.
+// Sprint Wallet Phase 5 — Add-to-Wallet nur anzeigen wenn Wallet konfiguriert
+// UND der Gast eine Email hat (Pass braucht guest_email).
+const walletAvailable = isWalletConfigured() && !!guest?.email;
+
 const stayEnded = Date.parse(stay.check_out) < Date.now();
 let hasStayFeedback = false;
 if (stayEnded) {
@@ -380,6 +386,15 @@ const showPostStay = stayEnded && !hasStayFeedback;
               <div class="value">{stayRange}</div>
             </div>
           </div>
+
+          {walletAvailable && (
+            <button type="button" class="gate-hero-wallet-btn" @click="walletOpen = true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                <path d="M21 7H3c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm0 8H3V9h18v6zm-9-5h2v3h-2v-3z"/>
+              </svg>
+              <span>Zur Google Wallet hinzufügen</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -648,6 +663,10 @@ const showPostStay = stayEnded && !hasStayFeedback;
 
       {showPostStay && (
         <PostStaySheet lang={lang} stayId={stay.id} hotelName={hotel.name} />
+      )}
+
+      {walletAvailable && (
+        <WalletAddSheet lang={lang} hotelName={hotel.name} />
       )}
     </main>
 
@@ -999,6 +1018,46 @@ const showPostStay = stayEnded && !hasStayFeedback;
           return this.eveMessages.slice(-3).map((m: any) =>
             `${m.role === 'user' ? 'Gast' : 'Eve'}: ${m.content}`
           ).join('\n');
+        },
+
+        // Sprint Wallet · Phase 5 — Add-to-Google-Wallet State
+        walletOpen: false,
+        walletConsent: false,
+        walletSubmitting: false,
+        walletDone: false,
+        walletError: '' as string,
+        walletThanksMessage: '' as string,
+
+        async walletSubmit() {
+          if (this.walletSubmitting) return;
+          this.walletSubmitting = true;
+          this.walletError = '';
+          try {
+            const res = await fetch('/api/g/wallet/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ marketing_consent: this.walletConsent }),
+            });
+            const data = await res.json();
+            if (!data.ok || !data.save_link_url) {
+              this.walletError = data.error === 'wallet_not_configured'
+                ? 'Wallet ist auf diesem System noch nicht aktiviert.'
+                : (data.error || 'Unbekannter Fehler.');
+              return;
+            }
+            // Erfolg: Save-Link in selbem Tab öffnen (Google Wallet entscheidet
+            // basierend auf Plattform: Android-App, Web-Wallet, Fallback)
+            this.walletDone = true;
+            this.walletThanksMessage = data.pass_state?.is_returning
+              ? `Willkommen zurück! Dein ${data.pass_state.visit_count}. Besuch.`
+              : 'Pass wird gleich geöffnet …';
+            // Kurzer Delay damit Thanks-View sichtbar wird, dann redirect
+            setTimeout(() => { window.location.href = data.save_link_url; }, 500);
+          } catch (err) {
+            this.walletError = (err as Error).message || 'Netzwerk-Fehler.';
+          } finally {
+            this.walletSubmitting = false;
+          }
         },
 
         // Sprint Functional Modul C Phase 8 — Post-Stay-Rating-State
