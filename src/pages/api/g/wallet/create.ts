@@ -96,6 +96,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   let visitCount: number;
   let firstVisitAt: Date;
   let isReturning = false;
+  let consentWasGranted = false;  // wird für marketing_consents-Audit gebraucht
 
   if (existing) {
     walletPassId = existing.id;
@@ -118,6 +119,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       updatePayload.marketing_consent_given_at = now.toISOString();
       updatePayload.marketing_consent_ip_hash = ipHash;
       updatePayload.marketing_consent_policy_version = MARKETING_CONSENT_POLICY_VERSION;
+      consentWasGranted = true;
     }
     await sb.from('wallet_passes').update(updatePayload).eq('id', walletPassId);
   } else {
@@ -146,6 +148,23 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     walletPassId = inserted.id;
     visitCount = 1;
     firstVisitAt = now;
+    if (marketingConsent) consentWasGranted = true;
+  }
+
+  // Audit-Eintrag wenn Consent in diesem Call gegeben wurde
+  // (Pattern wie marketing_consents/Sprint Wallet Phase 7)
+  if (consentWasGranted) {
+    const ipHashAudit = hashClientIp(clientIp(request));
+    const ua = request.headers.get('user-agent')?.slice(0, 500) || null;
+    const { error: auditErr } = await sb.from('marketing_consents').insert({
+      wallet_pass_id: walletPassId,
+      action: 'granted',
+      source: 'wallet_add',
+      ip_hash: ipHashAudit,
+      user_agent: ua,
+      policy_version: MARKETING_CONSENT_POLICY_VERSION,
+    });
+    if (auditErr) console.warn('[wallet/create] marketing_consents audit failed (non-fatal):', auditErr.message);
   }
 
   // Hotel-Name für Pass-Body
