@@ -27,6 +27,7 @@ import {
   type PassObjectInput,
 } from '../../../../lib/wallet/google';
 import { isWalletConfigured, getWalletConfig, buildPassObjectId } from '../../../../lib/wallet/config';
+import { triggerDripsForEvent } from '../../../../lib/marketing/drips';
 
 const MARKETING_CONSENT_POLICY_VERSION = '2026-06-01';
 
@@ -215,6 +216,21 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const saveLink = signSaveLink(passObjectInput, [origin]);
   if (!saveLink.ok || !saveLink.url) {
     return json({ ok: false, error: 'save_link_failed', google: googleResult }, 500);
+  }
+
+  // Sprint Wallet Phase 12 — Inline-Drip-Triggers
+  // Best-Effort: triggerDripsForEvent fängt alle Fehler intern, kein await-Fehler
+  // kann hier propagieren. Drip-Enqueue darf nie den Wallet-Create-Flow scheitern.
+  if (isReturning) {
+    // Wiederkehrer: visit_count wurde erhöht → milestone-Check
+    await triggerDripsForEvent(stay.hotel_id, walletPassId, 'visit_count_milestone', { newVisitCount: visitCount });
+  } else {
+    // Neuer Pass: wallet_add UND first_visit feuern (in MVP äquivalent, da
+    // visit_count beim Insert immer 1 ist). Sobald Modul E Wiederkehr-Erkennung
+    // bringt, kann first_visit auch bei bestehenden Pässen NICHT mehr feuern —
+    // dann ist der Unterschied bedeutsam.
+    await triggerDripsForEvent(stay.hotel_id, walletPassId, 'wallet_add');
+    await triggerDripsForEvent(stay.hotel_id, walletPassId, 'first_visit');
   }
 
   return json({
