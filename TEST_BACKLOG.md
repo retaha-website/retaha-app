@@ -341,6 +341,187 @@ Hotel-Rating (5★ Post-Stay):
 
 ---
 
+## Sprint Wallet — 5 Module · Google-Wallet · Marketing · Stay-Pushes · Wiederkehrer
+
+> Sprint commits: `2319d39` (Foundation) → `8f14602` (Modul E). 83/83 automatisierte Tests grün,
+> 8 Migrations appliziert, Browser-/Push-/Approval-Tests stehen für Big-Test-Day aus.
+
+### Modul A — Google-Wallet-Pass-Issuance
+
+```
+☐ npm run wallet:create-class durchlaeuft (Production-Logo statt Specht)
+☐ Pass-Class Approval bei Google (~2-5 Tage Wartezeit nach Submission UNDER_REVIEW)
+☐ Gast oeffnet /g/[token] → sieht "Zur Google Wallet hinzufuegen"-Button im Hero
+☐ Click → Consent-Modal mit 3 Bullets → Marketing-Consent-Checkbox sichtbar
+☐ "Add to Wallet" → Save-Link oeffnet → Pass landet im Google Wallet des Test-Accounts
+☐ Pass-Open im Wallet → Webhook fires save → last_pass_open_at gesetzt + welcome ggf.
+☐ Pass-Detail im Wallet zeigt korrektes Branding (Logo + Brand-Color + Hero)
+☐ Pass-Remove im Wallet → Webhook 'del' → state=opted_out, opted_out_reason=wallet_removed
+☐ wallet_passes-Eintrag UNIQUE pro (hotel_id, guest_email) — Re-Add updatet
+```
+
+### Modul B — Marketing-Consent + DSGVO-Layer
+
+```
+☐ Wallet-Add ohne Consent → marketing_consent_given=false, kein Audit-Eintrag
+☐ Wallet-Add mit Consent → marketing_consent_given=true + marketing_consents-Audit
+   action=granted source=wallet_add ip_hash gesalzt
+☐ Marketing-Push mit Opt-Out-Link wird gesendet
+☐ Click auf Opt-Out-Link in Push → /wallet/opt-out?token=... rendert Confirmation
+☐ Bestaetigen → wallet_passes.state=opted_out + audit-row revoked
+☐ Re-Click auf gleichen Link → "Bereits abgemeldet" View
+☐ Marketing-Push nach Opt-Out → canSendPush(marketing)=false → skip
+☐ Service-Push nach Opt-Out → canSendPush(service)=true → WIRD gesendet
+   (Vertragserfuellung DSGVO Art. 6 Abs. 1 lit. b)
+☐ Tampered Opt-Out-Token → 401 invalid_or_expired_token
+```
+
+### Modul C — Mini-Mailchimp · 5 Bereiche
+
+```
+Templates (Phase 9 + 11):
+☐ Template erstellen mit TipTap-Editor (Bold/Italic/H2/Lists/Link)
+☐ Variable-Insert-Dropdown zeigt alle 6 erlaubten Vars + Beispielwerte
+☐ {{guest_email}} → 400 invalid_variables.unknown
+☐ {{unsubscribe_link}} → 400 invalid_variables.forbidden
+☐ Save triggert Auto-Translation in alle hotel.enabled_languages (3-7s sync)
+☐ Konsoleconsole.info zeigt Cost in USD ($0.001-0.01 pro Save)
+☐ Variable-Schutz: {{first_name}} ueberlebt Translation in EN/FR/ES/etc.
+☐ Edit eines uebersetzten Templates: override-Slots bleiben unangetastet
+
+Campaigns (Phase 10):
+☐ Campaign aus Template kopieren → title/body/cta vorausgefuellt
+☐ Ad-hoc Campaign mit eigenem Inhalt
+☐ Target-Filter: Sprache + min_visit_count
+☐ "Nur Wiederkehrer"-Preset-Chip toggled min_visits 0↔2
+☐ Send-Now (status=draft) → atomic-Lock + Send → status=sent
+☐ Doppel-Send-Versuch → 409 "campaign_not_sendable"
+☐ Schedule for Future → status=scheduled
+☐ Cancel scheduled Campaign → status=cancelled
+☐ canSendPush-Filter wirkt: opted_out Paesse werden geskippt
+☐ Skip-Reasons in marketing_campaigns.skip_reasons aggregated
+☐ Recipient-Mass-Send: 50+ Empfaenger sequenziell (Google-Rate-Limit)
+
+Drips (Phase 12):
+☐ Drip mit 3 Steps + verschiedenen Templates + delay_days
+☐ Drag-Drop Step-Reorder via SortableJS (Desktop)
+☐ Touch-Drag auf Mobile (forceFallback)
+☐ Trigger wallet_add: bei jedem neuen Pass → enqueue
+☐ Trigger first_visit + wallet_add gleichzeitig: Idempotenz via UNIQUE(drip_id, pass_id)
+☐ Trigger visit_count_milestone (5,10,25): feuert bei Match
+☐ Trigger seasonal (24.12): Cron findet matching drips → enqueue
+☐ Trigger anniversary: Cron findet pass.first_visit_at MM-DD=heute → enqueue
+☐ Step-Sender: faellige Steps werden sequenziell gesendet
+☐ Step-completed → next Step bei delay_days erreicht
+☐ Letzter Step gesendet → completed_at gesetzt
+
+Tracking (Phase 13):
+☐ Click auf /m/{send_id}?to=https://... → 302 + clicked_at + click_count++
+☐ Click 2x: clicked_at unveraendert (first-click-only)
+☐ /m/{send_id}?to=http://... → 400 Bad Request (Open-Redirect-Schutz)
+☐ Pass-Open via Google Wallet → Webhook → opened_at + open_count++
+☐ Open 2x → opened_at unveraendert
+☐ Send aelter als 7 Tage → KEINE Attribution
+
+Dashboard (Phase 14):
+☐ /admin/marketing 4 KPI-Cards laden mit korrekten Counts
+☐ Chart.js Time-Series rendert mit 3 Linien (Sends/Opens/Clicks)
+☐ Top-3 Campaigns sortiert nach click_rate
+☐ Quick-Actions navigate korrekt
+☐ Campaign-Editor 3-Spalten-Layout, Live-Preview aktualisiert sich
+☐ Mobile (<720px) klappt KPIs auf 2x2
+```
+
+### Modul D — Stay-Pushes (9 Trigger)
+
+```
+☐ Default-Templates fuer Gate Garden vorhanden (9 Trigger)
+☐ Edit eines Templates: Auto-Translation laeuft, Override behalten
+☐ Variable-Validation pro Trigger-Typ (z.B. {{guest_count}} nicht in welcome erlaubt)
+☐ Active-Toggle deaktiviert Push fuer einen Trigger ohne Loeschung
+☐ Live-Preview im Wallet-Mockup zeigt Variable-Substitution mit Demo-Daten
+
+Event-Trigger:
+☐ Service-Anfrage erstellt → status=pending (kein Push)
+☐ Hotelier confirmed Service → "service_confirmed"-Push beim Gast
+☐ Hotelier cancelled Service → "service_declined"-Push
+☐ Restaurant-Booking → "restaurant_reservation"-Push mit guest_count/date/time
+☐ Spa-Booking → "spa_reservation"-Push
+☐ Late-Checkout confirmed → "late_checkout_approved"-Push mit checkout_time
+☐ Housekeeping confirmed → "housekeeping_done"-Push
+☐ Hotelier triggert "Zimmer bereit"-Button manuell → "room_ready"-Push
+☐ Idempotenz: zweimaliger gleicher Trigger → 1 Send-Row
+
+Cron (checkout_reminder):
+☐ Cron findet stays mit check_out in [+50min, +70min]-Window
+☐ STAY_PUSH_ENABLED=false → Cron skipped sauber
+☐ Push wird 1h vor Check-out zugestellt
+☐ Doppel-Run-Verhinderung: kein Doppel-Send bei zwei Cron-Ticks innerhalb 20min-Overlap
+
+DSGVO-Verhalten:
+☐ Stay-Push respektiert NICHT marketing-opted_out (Vertragserfuellung)
+☐ Stay-Push wird trotzdem blockiert bei state=expired
+☐ {{unsubscribe_link}} in Stay-Push-Body → 400 forbidden
+```
+
+### Modul E — Wiederkehrer-Mechanismus
+
+```
+Mews-Sync-Pfad:
+☐ Bestehender Gast (Pass im System) reserviert neu → Mews-Sync inserted Stay
+☐ linkReturningGuests matched via Email → visit_count++ + last_visit_at
+☐ stay.wallet_pass_id verknuepft
+☐ Google Wallet Pass-Object updated (zeigt neuen visit_count im Pass-Detail)
+☐ welcome-Push triggert (best-effort)
+☐ Idempotenz: Re-Sync derselben Stays trigger nicht erneut
+
+Deep-Link-Pfad (/g/wallet-open):
+☐ Gast oeffnet Pass im Wallet, klickt App-Link
+☐ /g/wallet-open?pass=<token> verifiziert Token (30d TTL)
+☐ Bei aktivem Stay: linkStayToPass + welcome-Trigger + 302 zu /g/{access_token}
+☐ Ohne aktiven Stay: HTML-Fallback mit Hotel-Marketing-Hint
+☐ Token tampered → 401 invalid
+
+Webhook-Pfad (first-open):
+☐ Gast oeffnet Pass zum 1. Mal → Webhook 'save' + last_pass_open_at war NULL
+☐ attemptWelcomeOnFirstOpen findet aktiven Stay → linkStayToPass + welcome
+☐ Beim 2. Open: last_pass_open_at gesetzt → kein erneuter welcome
+☐ Drei-Pfad-Idempotenz: alle 3 Pfade duerfen gleichzeitig feuern, nur 1 welcome-Send
+
+Hotelier-UI:
+☐ /admin/dashboard zeigt "Wiederkehrer · 7 Tage" KPI-Card (Burgundy-Border)
+☐ /admin/checkins zeigt Pill "★ 3. Besuch" bei visit_count 2-4
+☐ /admin/checkins zeigt Pill "★ Stammgast · 5. Besuch" bei visit_count ≥ 5
+☐ /admin/marketing/campaigns/new Preset-Chip "Nur Wiederkehrer" toggled min_visits 0↔2
+
+Eve-Awareness:
+☐ Gast mit visit_count=3 fragt Eve → System-Prompt enthaelt "★ Dies ist sein 3. Aufenthalt"
+☐ Eve antwortet entsprechend warm ("Willkommen zurueck, schoen dass du wieder hier bist")
+☐ Sprach-Variation: EN → "your 3rd stay", FR → "3e séjour", ES → "3ª estancia"
+☐ visit_count ≥ 5 → "★ Stammgast — bereits Nx hier"
+☐ visit_count = 1 oder NULL → kein extra Hint (Standard-Persona)
+```
+
+### Pre-Production-Tasks (alle 5 Module)
+
+```
+☐ Google Pass-Class von DRAFT auf UNDER_REVIEW submitten → Google-Approval abwarten
+☐ Production-Logo fuer Gate Garden (statt Specht-Placeholder)
+☐ hotels.brand_color setzen (aktuell NULL, fallback #1A1A1A)
+☐ hotels.hero_image_url setzen (1860x600, aktuell NULL)
+☐ Vercel-ENVs setzen: GOOGLE_WALLET_ISSUER_ID + SERVICE_ACCOUNT_EMAIL + _KEY (base64)
+☐ Vercel-ENV STAY_SESSION_SECRET ≥ 32 chars
+☐ Webhook-URL https://demo.retaha.de/api/webhooks/google-wallet in Pay Business Console registrieren
+☐ PUBLIC_SITE_URL auf demo.retaha.de setzen (sonst /m/-CTA-URLs kaputt)
+☐ MARKETING_ENABLED=true in Production (Marketing-Scheduler + Drip-Cron)
+☐ STAY_PUSH_ENABLED=true in Production (Stay-Push-Scheduler-Cron)
+☐ Anwalt: DSFA-Erweiterung um Wallet-Verarbeitung (CRM-Marketing-Channel)
+☐ AVV mit Google fuer Wallet separat von Places
+☐ Marketing-Compliance-Texte (Werbe-Einwilligung, Opt-Out-Bestaetigung)
+```
+
+---
+
 ## Status-Übersicht
 
 ```
@@ -357,9 +538,11 @@ Code-verifizierte Sprints (UX-Test offen):
                                       zum Big-Test-Day, AVV-Abschlüsse durch Taha
   🔵 Functional (5 Module)          — Schema-Smoketest grün, Browser-/Push-/Sentry-Tests
                                       stehen aus für Big-Test-Day
+  🔵 Wallet (5 Module, 17 Phasen)   — 83/83 automatisierte Tests grün, Browser-/Google-
+                                      Approval-Tests stehen aus, DSGVO-Anwaltsreview parallel
 
 Wartende Sprints:
-  ⏳ Wallet, UI/UX, Themes, Monorepo, Production
+  ⏳ UI/UX, Themes, Monorepo, Production
 ```
 
 ---
