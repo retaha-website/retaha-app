@@ -30,9 +30,10 @@ const sevenDaysOut = new Date(todayUtc.getTime() + horizonDays * 86_400_000);
 const { data: stays } = await supabase
   .from('stays')
   .select(`
-    id, check_in, check_out, state, room_id,
+    id, check_in, check_out, state, room_id, wallet_pass_id,
     rooms(room_number, room_name, room_code),
-    guests(first_name, last_name)
+    guests(first_name, last_name),
+    wallet_passes:wallet_pass_id(visit_count)
   `)
   .eq('hotel_id', hotel.id)
   .eq('is_active', true)
@@ -53,6 +54,8 @@ interface PreparedStay {
   isToday: boolean;
   pairUrl: string | null;
   qrDataUrl: string | null;
+  /** Sprint Wallet Modul E: visit_count des verknüpften Wallet-Passes (1 = Erstbesuch). */
+  visitCount: number;
 }
 
 const prepared: PreparedStay[] = [];
@@ -77,6 +80,9 @@ for (const s of stays ?? []) {
     });
   }
 
+  const wp = (s as any).wallet_passes;
+  const wpRow = Array.isArray(wp) ? wp[0] : wp;
+  const visitCount = wpRow?.visit_count ?? 0;
   prepared.push({
     id: s.id,
     guestName: [g?.first_name, g?.last_name].filter(Boolean).join(' ').trim() || 'Gast',
@@ -88,6 +94,7 @@ for (const s of stays ?? []) {
     isToday,
     pairUrl,
     qrDataUrl,
+    visitCount,
   });
 }
 
@@ -134,7 +141,15 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
               <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-1">
                 {p.checkInLabel}{p.isToday ? ' · heute' : ''}
               </p>
-              <p class="text-lg font-medium text-anthrazit truncate">{p.guestName}</p>
+              <p class="text-lg font-medium text-anthrazit truncate">
+                {p.guestName}
+                {p.visitCount >= 5 && (
+                  <span class="ml-2 inline-flex items-center gap-1 text-xs font-medium" style="background: #8C2128; color: #fff; padding: 2px 8px; letter-spacing: 0.05em;">★ Stammgast · {p.visitCount}. Besuch</span>
+                )}
+                {p.visitCount >= 2 && p.visitCount < 5 && (
+                  <span class="ml-2 inline-flex items-center gap-1 text-xs font-medium" style="background: #FF4A82; color: #fff; padding: 2px 8px; letter-spacing: 0.05em;">★ {p.visitCount}. Besuch</span>
+                )}
+              </p>
               <p class="text-sm text-anthrazit/55 mt-0.5">
                 Zimmer {p.roomLabel}
                 {p.roomCode && (

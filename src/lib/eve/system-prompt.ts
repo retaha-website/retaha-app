@@ -75,12 +75,21 @@ export interface EveKnowledgeItem {
   answer: string;
 }
 
+/** Sprint Wallet Modul E — Wiederkehrer-Awareness. NULL = unbekannt
+ *  (z.B. Gast hat noch keinen Wallet-Pass). Wenn vorhanden: visit_count > 1
+ *  signalisiert Wiederkehrer. */
+export interface EveWalletStatus {
+  visit_count: number;
+  first_visit_at: string | null;
+}
+
 export interface EveContext {
   hotel: EveHotel;
   hotelSettings: EveHotelSettings;
   stay?: EveStay | null;
   guest?: EveGuest | null;
   room?: EveRoom | null;
+  walletStatus?: EveWalletStatus | null;
   knowledge: EveKnowledgeItem[];
   language: Lang;
 }
@@ -93,7 +102,7 @@ export function buildSystemPrompt(ctx: EveContext): string {
   const sections: string[] = [
     buildPersonaSection(ctx.hotelSettings, ctx.hotel, ctx.language),
     buildHotelInfoSection(ctx.hotel, ctx.hotelSettings, ctx.language),
-    buildGuestInfoSection(ctx.stay ?? null, ctx.guest ?? null, ctx.room ?? null, ctx.hotelSettings.guest_address_form, ctx.language),
+    buildGuestInfoSection(ctx.stay ?? null, ctx.guest ?? null, ctx.room ?? null, ctx.walletStatus ?? null, ctx.hotelSettings.guest_address_form, ctx.language),
     buildKnowledgeSection(ctx.knowledge, ctx.language),
     buildTuningRulesSection(ctx.hotelSettings.eve_tuning_rules ?? [], ctx.language),
     buildLanguageInstruction(ctx.language),
@@ -422,6 +431,7 @@ function buildGuestInfoSection(
   stay: EveStay | null,
   guest: EveGuest | null,
   room: EveRoom | null,
+  walletStatus: EveWalletStatus | null,
   addressForm: 'du' | 'sie',
   lang: Lang,
 ): string {
@@ -455,6 +465,25 @@ function buildGuestInfoSection(
     if (typeof mewsNotes === 'string' && mewsNotes.trim().length > 0) {
       lines.push(`${g.mewsNote}: ${mewsNotes.trim()}`);
     }
+  }
+
+  // Sprint Wallet Modul E — Wiederkehrer-Hint für Eve
+  if (walletStatus && walletStatus.visit_count > 1) {
+    const visitNum = walletStatus.visit_count;
+    const isRegular = visitNum >= 5;
+    const RETURN_LABELS: Record<string, { regular: string; returning: (n: number) => string }> = {
+      de: { regular: `Stammgast — bereits ${visitNum}× hier. Begrüße ihn besonders warm.`,
+            returning: (n) => `Dies ist sein/ihr ${n}. Aufenthalt bei uns. Begrüße entsprechend warm — du erkennst Wiederkehrer.` },
+      en: { regular: `Regular guest — visited ${visitNum} times. Welcome them especially warmly.`,
+            returning: (n) => `This is their ${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'} stay with us. Welcome them warmly — you recognize returning guests.` },
+      fr: { regular: `Client régulier — déjà ${visitNum} séjours. Accueillez-le particulièrement chaleureusement.`,
+            returning: (n) => `C'est son ${n}${n === 1 ? 'er' : 'e'} séjour chez nous. Accueillez-le chaleureusement — vous reconnaissez les clients fidèles.` },
+      es: { regular: `Huésped habitual — ${visitNum} estancias. Dale una bienvenida especialmente cálida.`,
+            returning: (n) => `Esta es su ${n}ª estancia con nosotros. Dale una bienvenida cálida — reconoces a los clientes que vuelven.` },
+    };
+    const labels = RETURN_LABELS[lang] ?? RETURN_LABELS.de;
+    lines.push('');
+    lines.push(isRegular ? `★ ${labels.regular}` : `★ ${labels.returning(visitNum)}`);
   }
 
   if (firstName) {

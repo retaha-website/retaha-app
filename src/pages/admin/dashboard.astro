@@ -39,6 +39,19 @@ const { count: stayCount } = await client
   .select('*', { count: 'exact', head: true })
   .eq('hotel_id', hotel.id)
   .eq('is_active', true);
+
+// Sprint Wallet Modul E — Wiederkehrer diese Woche
+const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+const { data: returningRows } = await client
+  .from('stays')
+  .select('id, wallet_pass_id, wallet_passes:wallet_pass_id!inner(visit_count)')
+  .eq('hotel_id', hotel.id)
+  .gte('check_in', sevenDaysAgo)
+  .not('wallet_pass_id', 'is', null);
+const returningCount = (returningRows ?? []).filter((r: any) => {
+  const wp = Array.isArray(r.wallet_passes) ? r.wallet_passes[0] : r.wallet_passes;
+  return wp && wp.visit_count > 1;
+}).length;
 ---
 
 <AdminLayout title="Übersicht" hotel={hotel} user={user} activeTab="overview">
@@ -52,7 +65,7 @@ const { count: stayCount } = await client
     />
   </div>
 
-  <div class="grid grid-cols-3 gap-4 mb-10">
+  <div class="grid grid-cols-4 gap-4 mb-10">
     <a href="/admin/action-cards" class="bg-white border border-stein p-6 hover:border-pink-shock transition group">
       <p class="eyebrow text-anthrazit/55 mb-3">Hero-Karten</p>
       <p class="text-3xl font-light mb-1">{recCount ?? 0}</p>
@@ -67,6 +80,11 @@ const { count: stayCount } = await client
       <p class="eyebrow text-anthrazit/55 mb-3">Aktive Gäste</p>
       <p class="text-3xl font-light mb-1">{stayCount ?? 0}</p>
       <p class="text-xs text-anthrazit/40 group-hover:text-pink-shock transition">Buchungen →</p>
+    </a>
+    <a href="/admin/checkins" class="bg-white border border-stein p-6 hover:border-pink-shock transition group" style="border-left: 3px solid #8C2128;">
+      <p class="eyebrow text-anthrazit/55 mb-3">Wiederkehrer · 7 Tage</p>
+      <p class="text-3xl font-light mb-1">{returningCount}</p>
+      <p class="text-xs text-anthrazit/40 group-hover:text-pink-shock transition">★ Wallet-Match</p>
     </a>
   </div>
 

@@ -145,12 +145,13 @@ export async function sendStayPush(
     const room = Array.isArray((stay as any).rooms) ? (stay as any).rooms[0] : (stay as any).rooms;
     const roomNumber = room?.room_number ?? null;
 
-    // 2. Wallet-Pass via (hotel_id, guest_email) finden
+    // 2. Wallet-Pass via (hotel_id, guest_email) finden — case-insensitive
+    //    (Pass kann mit verschiedener Casing als guest.email gespeichert sein)
     const { data: pass } = await sb
       .from('wallet_passes')
       .select('id, hotel_id, state, marketing_consent_given, guest_first_name, guest_last_name, visit_count, first_visit_at, last_visit_at, google_object_id')
       .eq('hotel_id', stay.hotel_id)
-      .eq('guest_email', guest.email)
+      .ilike('guest_email', guest.email)
       .maybeSingle();
     if (!pass) {
       return { ...baseResult, ok: false, status: 'skipped_no_pass', message: 'no_wallet_pass_for_guest' };

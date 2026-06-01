@@ -287,7 +287,7 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requ
       .select('category, question, answer')
       .eq('hotel_id', hotelId).eq('language_code', 'de').eq('is_published', true),
     sb.from('stays')
-      .select('id, check_in, check_out, raw_mews_data, guests(first_name, last_name, language), rooms(room_number, room_name)')
+      .select('id, check_in, check_out, raw_mews_data, wallet_pass_id, guests(first_name, last_name, language), rooms(room_number, room_name), wallet_passes:wallet_pass_id(visit_count, first_visit_at)')
       .eq('id', stayId).maybeSingle(),
   ]);
 
@@ -305,6 +305,14 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requ
     ? (knowledgeRes.data ?? []) as any
     : await getTranslatedKnowledge(hotelId, lang as 'en' | 'fr' | 'es');
 
+  // Sprint Wallet Modul E — Wiederkehrer-Status aus joined wallet_pass
+  const wp = (stayRes.data as any)?.wallet_passes;
+  const wpRow = Array.isArray(wp) ? wp[0] : wp;
+  const walletStatus = wpRow ? {
+    visit_count: wpRow.visit_count ?? 1,
+    first_visit_at: wpRow.first_visit_at ?? null,
+  } : null;
+
   return {
     hotel: hotelRes.data,
     hotelSettings: settingsRes.data,
@@ -316,6 +324,7 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requ
     } : null,
     guest,
     room: (stayRes.data?.rooms as any) ?? null,
+    walletStatus,
     knowledge,
     language: lang,
   };

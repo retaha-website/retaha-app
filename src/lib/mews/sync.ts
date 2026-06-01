@@ -493,12 +493,25 @@ async function syncStaysFromReservations(
   }
 
   let processed = 0;
+  const insertedStays: Array<{ id: string; hotel_id: string; guest_id: string | null }> = [];
 
   // 3. INSERT (Batches)
   for (const batch of chunk(newRows, INSERT_BATCH)) {
-    const { data, error } = await supabase.from('stays').insert(batch).select('id');
+    const { data, error } = await supabase.from('stays').insert(batch).select('id, hotel_id, guest_id');
     if (error) throw new Error(`stays insert failed: ${error.message}`);
     processed += data?.length ?? 0;
+    insertedStays.push(...(data ?? []) as any);
+  }
+
+  // 3.5. Sprint Wallet Modul E — Email-Match + Wiederkehrer-Linking +
+  // welcome-Trigger. Best-Effort: pro Stay isoliert, killt nicht den Sync-Run.
+  if (insertedStays.length > 0) {
+    try {
+      const { linkReturningGuests } = await import('../wallet/returning-guest');
+      await linkReturningGuests(insertedStays);
+    } catch (err) {
+      console.warn('[mews-sync] returning-guest-linking failed (non-fatal):', (err as Error).message);
+    }
   }
 
   // 4. UPDATE (einzeln — access_token bleibt unangetastet)

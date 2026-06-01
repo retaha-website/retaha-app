@@ -189,9 +189,31 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
+  // Sprint Wallet Modul E — first-open welcome-Trigger.
+  // last_pass_open_at war NULL → erste Öffnung → ggf. welcome senden.
+  // Pass-Lookup hat last_pass_open_at noch nicht im SELECT — wir holen das nach.
+  async function attemptWelcomeOnFirstOpen(walletPassId: string): Promise<void> {
+    try {
+      const { data: passDetails } = await sb
+        .from('wallet_passes').select('last_pass_open_at').eq('id', walletPassId).maybeSingle();
+      if (passDetails?.last_pass_open_at) return;  // war schon offen — nicht first-open
+
+      const { findActiveStayForPass, linkStayToPass } = await import('../../../lib/wallet/returning-guest');
+      const { sendStayPush } = await import('../../../lib/wallet/stay-push');
+      const activeStay = await findActiveStayForPass(walletPassId);
+      if (!activeStay) return;
+      await linkStayToPass(activeStay.id, walletPassId);
+      await sendStayPush(activeStay.id, 'welcome');  // Idempotenz aus Modul D
+    } catch (err) {
+      console.warn('[wallet/webhook] welcome-on-first-open failed:', (err as Error).message);
+    }
+  }
+
   switch (event.eventType) {
     case 'save':
       // User hat den Pass ins Wallet gespeichert — last_pass_open_at = NOW
+      // Welcome-Trigger BEVOR last_pass_open_at gesetzt wird (sonst zählt's nicht als first)
+      await attemptWelcomeOnFirstOpen(pass.id);
       update = { last_pass_open_at: now };
       await attributeOpen(pass.id);
       break;
