@@ -1,0 +1,104 @@
+---
+// Sprint Wallet · Phase 14 — Drip-Sequenz-Liste
+
+import AdminLayout from '../../../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../../lib/auth';
+import { getUserRole } from '../../../../lib/auth/require-permission';
+import { hasPermission } from '../../../../lib/auth/permissions';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'content.read')) return new Response('Forbidden', { status: 403 });
+const canWrite = hasPermission(myRole, 'content.write');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: drips } = await client
+  .from('marketing_drips')
+  .select(`
+    id, name, trigger_type, trigger_config, is_active, created_at,
+    steps:marketing_drip_steps(count),
+    state:marketing_drip_state(count)
+  `)
+  .eq('hotel_id', hotel.id)
+  .order('created_at', { ascending: false });
+
+const TRIGGER_LABELS: Record<string, string> = {
+  wallet_add: 'Wallet hinzugefügt',
+  first_visit: 'Erster Besuch',
+  checkout: 'Check-out',
+  anniversary: 'Jahrestag',
+  visit_count_milestone: 'Besuchs-Meilenstein',
+  seasonal: 'Saisonal',
+};
+---
+
+<AdminLayout title="Marketing · Drips" hotel={hotel} user={user}>
+  <div class="dl-page">
+    <header class="dl-header">
+      <p class="dl-eyebrow">— Marketing · Drip-Sequenzen —</p>
+      <h1 class="dl-title">Automatisch versandt nach Trigger<span class="dot">.</span></h1>
+      <p class="dl-sub">Drips senden Templates automatisch wenn ein Trigger feuert. Marketing-Pushes respektieren Opt-Out, Pässe ohne Google-Sync werden geskippt.</p>
+    </header>
+
+    <div class="dl-bar">
+      {canWrite && <a href="/admin/marketing/drips/new" class="dl-btn-primary">+ Neue Drip-Sequenz</a>}
+    </div>
+
+    {!drips || drips.length === 0 ? (
+      <div class="dl-empty">
+        <p>Noch keine Drip-Sequenzen.</p>
+        {canWrite && <a href="/admin/marketing/drips/new" class="dl-btn-primary">+ Erste Sequenz anlegen</a>}
+      </div>
+    ) : (
+      <div class="dl-grid">
+        {drips.map((d: any) => {
+          const stepsCount = Array.isArray(d.steps) ? (d.steps[0]?.count ?? 0) : 0;
+          const stateCount = Array.isArray(d.state) ? (d.state[0]?.count ?? 0) : 0;
+          return (
+            <a href={`/admin/marketing/drips/${d.id}`} class={`dl-card${d.is_active ? '' : ' dl-card--inactive'}`}>
+              <div class="dl-card-head">
+                <span class={`dl-active-pill${d.is_active ? ' is-on' : ''}`}>{d.is_active ? 'aktiv' : 'inaktiv'}</span>
+                <span class="dl-trigger">{TRIGGER_LABELS[d.trigger_type] ?? d.trigger_type}</span>
+              </div>
+              <h3 class="dl-card-name">{d.name}</h3>
+              <div class="dl-card-meta">
+                <span><strong>{stepsCount}</strong> {stepsCount === 1 ? 'Step' : 'Steps'}</span>
+                <span>·</span>
+                <span><strong>{stateCount}</strong> Pässe enqueuet</span>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  <style>
+    .dl-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .dl-header { margin: 20px 0 24px; }
+    .dl-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 6px; }
+    .dl-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
+    .dot { color: #FF4A82; }
+    .dl-sub { margin: 0; font-size: 14px; color: rgba(26,26,26,.6); max-width: 720px; line-height: 1.5; }
+    .dl-bar { display: flex; justify-content: flex-end; margin: 16px 0; }
+    .dl-btn-primary { padding: 10px 18px; background: #1A1A1A; color: #fff; text-decoration: none; font-size: 13px; font-weight: 500; }
+    .dl-btn-primary:hover { background: #8C2128; }
+    .dl-empty { padding: 60px 24px; background: #fff; border: 1px dashed #ddd; text-align: center; color: rgba(26,26,26,.55); }
+    .dl-empty p { margin: 0 0 20px; font-style: italic; }
+    .dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .dl-card { display: block; background: #fff; border: 1px solid #e8e8e8; padding: 18px; text-decoration: none; color: inherit; transition: border-color .15s; }
+    .dl-card:hover { border-color: #1A1A1A; }
+    .dl-card--inactive { opacity: .65; }
+    .dl-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .dl-active-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; background: #f4f4f4; color: rgba(26,26,26,.5); }
+    .dl-active-pill.is-on { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .dl-trigger { font-size: 11px; color: rgba(26,26,26,.5); }
+    .dl-card-name { font-size: 16px; font-weight: 500; margin: 0 0 10px; color: #1A1A1A; }
+    .dl-card-meta { display: flex; gap: 6px; font-size: 12px; color: rgba(26,26,26,.6); }
+    .dl-card-meta strong { color: #1A1A1A; font-weight: 500; }
+  </style>
+</AdminLayout>

@@ -1,0 +1,229 @@
+---
+// Sprint Wallet · Phase 14 — Campaign-Detail mit Stats
+
+import AdminLayout from '../../../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../../lib/auth';
+import { getUserRole } from '../../../../lib/auth/require-permission';
+import { hasPermission } from '../../../../lib/auth/permissions';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'content.read')) return new Response('Forbidden', { status: 403 });
+const canWrite = hasPermission(myRole, 'content.write');
+
+const campaignId = Astro.params.id;
+if (!campaignId) return Astro.redirect('/admin/marketing/campaigns');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: campaign } = await client
+  .from('marketing_campaigns')
+  .select('*')
+  .eq('id', campaignId)
+  .maybeSingle();
+if (!campaign || campaign.hotel_id !== hotel.id) return Astro.redirect('/admin/marketing/campaigns');
+
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+function pickI18n(jsonb: any): string {
+  if (!jsonb) return '—';
+  return jsonb[hotelDefaultLang]?.value ?? Object.values(jsonb)[0]?.value ?? '—';
+}
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function pct(n: number, total: number): string {
+  if (!total) return '—';
+  return ((n / total) * 100).toFixed(1) + '%';
+}
+
+const recipients = campaign.recipients_count ?? 0;
+const opens = campaign.open_count ?? 0;
+const clicks = campaign.click_count ?? 0;
+const skipped = campaign.skipped_count ?? 0;
+const skipReasons = (campaign.skip_reasons || {}) as Record<string, number>;
+const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + (b as number), 0);
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Entwurf', scheduled: 'Geplant', sending: 'Versand läuft', sent: 'Gesendet', cancelled: 'Abgebrochen', failed: 'Fehler',
+};
+const SKIP_REASON_LABELS: Record<string, string> = {
+  marketing_opted_out:         'Marketing abbestellt',
+  marketing_consent_missing:   'Kein Marketing-Consent',
+  pass_expired:                'Pass abgelaufen',
+  pass_not_synced_to_google:   'Pass noch nicht in Google',
+  filter_excluded:             'Vom Filter ausgeschlossen',
+  service_push_contract_fulfillment: 'Service-Push',
+  marketing_consent_given:     'Marketing-Consent vorhanden',
+};
+---
+
+<AdminLayout title={`Kampagne · ${campaign.name}`} hotel={hotel} user={user}>
+  <div class="cd-page">
+    <div class="cd-breadcrumb">
+      <a href="/admin/marketing/campaigns">← Alle Kampagnen</a>
+    </div>
+
+    <header class="cd-header">
+      <div class="cd-head-info">
+        <p class="cd-eyebrow">— Kampagne —</p>
+        <h1 class="cd-title">{campaign.name}<span class="dot">.</span></h1>
+        <p class="cd-subtitle">{pickI18n(campaign.title_i18n)}</p>
+      </div>
+      <div class="cd-head-meta">
+        <span class={`cd-status cd-status--${campaign.status}`}>{STATUS_LABELS[campaign.status] ?? campaign.status}</span>
+        <div class="cd-meta-row">
+          <span class="cd-meta-label">{campaign.status === 'sent' ? 'Gesendet:' : campaign.status === 'scheduled' ? 'Geplant:' : 'Erstellt:'}</span>
+          <span class="cd-meta-val">{fmtDate(campaign.sent_at || campaign.scheduled_at || campaign.created_at)}</span>
+        </div>
+      </div>
+    </header>
+
+    {(canWrite && (campaign.status === 'draft' || campaign.status === 'scheduled')) && (
+      <div class="cd-action-bar" x-data="{ submitting: false }">
+        {campaign.status === 'draft' && (
+          <button
+            class="cd-btn-primary"
+            type="button"
+            :disabled="submitting"
+            @click={`submitting = true; fetch('/api/admin/marketing/campaigns/${campaign.id}/send-now', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert('Fehler: ' + (d.error || 'unbekannt')); submitting = false; } })`}
+            x-text="submitting ? 'Wird gesendet …' : 'Jetzt versenden'"
+          ></button>
+        )}
+        {campaign.status === 'scheduled' && (
+          <button
+            class="cd-btn-ghost"
+            type="button"
+            :disabled="submitting"
+            @click={`if (!confirm('Wirklich abbrechen?')) return; submitting = true; fetch('/api/admin/marketing/campaigns/${campaign.id}/schedule', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert('Fehler: ' + (d.error || 'unbekannt')); submitting = false; } })`}
+          >Versand abbrechen</button>
+        )}
+      </div>
+    )}
+
+    {campaign.send_error && (
+      <div class="cd-error">
+        <strong>Send-Fehler:</strong> {campaign.send_error}
+      </div>
+    )}
+
+    <!-- Stats Cards -->
+    <section class="cd-stats">
+      <div class="cd-stat">
+        <div class="cd-stat-label">Recipients</div>
+        <div class="cd-stat-value">{recipients}</div>
+        <div class="cd-stat-sub">erfolgreich versendet</div>
+      </div>
+      <div class="cd-stat">
+        <div class="cd-stat-label">Opens</div>
+        <div class="cd-stat-value">{opens}</div>
+        <div class="cd-stat-sub">{pct(opens, recipients)} Rate</div>
+      </div>
+      <div class="cd-stat">
+        <div class="cd-stat-label">Clicks</div>
+        <div class="cd-stat-value">{clicks}</div>
+        <div class="cd-stat-sub">{pct(clicks, recipients)} Rate</div>
+      </div>
+      <div class="cd-stat">
+        <div class="cd-stat-label">Skipped</div>
+        <div class="cd-stat-value">{skipped}</div>
+        <div class="cd-stat-sub">nicht eligible</div>
+      </div>
+    </section>
+
+    {totalSkipped > 0 && (
+      <section class="cd-skip-breakdown">
+        <p class="cd-section-eyebrow">— Skip-Breakdown —</p>
+        <h2 class="cd-section-title">Wer wurde übersprungen, warum</h2>
+        <div class="cd-skip-bars">
+          {Object.entries(skipReasons).map(([reason, count]) => {
+            const w = Math.round(((count as number) / totalSkipped) * 100);
+            return (
+              <div class="cd-skip-row">
+                <span class="cd-skip-label">{SKIP_REASON_LABELS[reason] ?? reason}</span>
+                <span class="cd-skip-track"><span class="cd-skip-fill" style={`width: ${w}%`}></span></span>
+                <span class="cd-skip-count">{count} · {w}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    )}
+
+    <section class="cd-content-preview">
+      <p class="cd-section-eyebrow">— Inhalt —</p>
+      <h2 class="cd-section-title">Was wurde gesendet</h2>
+      <div class="cd-preview-block">
+        <div class="cd-preview-title">{pickI18n(campaign.title_i18n)}</div>
+        <div class="cd-preview-body" set:html={pickI18n(campaign.body_i18n)} />
+        {campaign.cta_url && (
+          <div class="cd-preview-cta">
+            <strong>{pickI18n(campaign.cta_label_i18n) || 'Link'}:</strong> {campaign.cta_url}
+          </div>
+        )}
+      </div>
+    </section>
+  </div>
+
+  <style>
+    .cd-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .cd-breadcrumb { margin: 16px 0 8px; }
+    .cd-breadcrumb a { font-size: 13px; color: rgba(26,26,26,.55); text-decoration: none; }
+    .cd-breadcrumb a:hover { color: #FF4A82; }
+
+    .cd-header { display: flex; justify-content: space-between; gap: 24px; margin: 20px 0 24px; flex-wrap: wrap; align-items: flex-start; }
+    .cd-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 6px; }
+    .cd-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
+    .dot { color: #FF4A82; }
+    .cd-subtitle { font-size: 14px; color: rgba(26,26,26,.65); margin: 0; max-width: 700px; }
+    .cd-head-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .cd-status { font-size: 11px; padding: 4px 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .cd-status--draft     { background: #f4f4f4; color: rgba(26,26,26,.7); }
+    .cd-status--scheduled { background: #fff8e1; color: #6b4f00; border: 1px solid #f5d77a; }
+    .cd-status--sending   { background: #e3f2fd; color: #0d47a1; }
+    .cd-status--sent      { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .cd-status--cancelled { background: #f4f4f4; color: rgba(26,26,26,.45); }
+    .cd-status--failed    { background: #fdeaea; color: #7a1515; border: 1px solid #f3b8b8; }
+    .cd-meta-row { font-size: 12px; color: rgba(26,26,26,.6); display: flex; gap: 6px; }
+    .cd-meta-label { color: rgba(26,26,26,.5); }
+
+    .cd-action-bar { display: flex; gap: 12px; margin: 12px 0 24px; }
+    .cd-btn-primary { padding: 12px 24px; background: #1A1A1A; color: #fff; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }
+    .cd-btn-primary:hover:not(:disabled) { background: #8C2128; }
+    .cd-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .cd-btn-ghost { padding: 12px 24px; background: transparent; color: rgba(26,26,26,.6); border: 1px solid #e8e8e8; cursor: pointer; font-size: 14px; }
+    .cd-btn-ghost:hover { color: #1A1A1A; border-color: #1A1A1A; }
+
+    .cd-error { padding: 12px 16px; background: rgba(220,53,69,.08); color: #7a1515; border-left: 3px solid #B00020; margin-bottom: 24px; font-size: 13px; }
+
+    .cd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .cd-stats { grid-template-columns: repeat(2, 1fr); } }
+    .cd-stat { background: #fff; border: 1px solid #e8e8e8; padding: 16px; }
+    .cd-stat-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(26,26,26,.55); }
+    .cd-stat-value { font-size: 28px; font-weight: 300; margin: 6px 0 2px; color: #1A1A1A; line-height: 1; }
+    .cd-stat-sub { font-size: 11px; color: rgba(26,26,26,.5); }
+
+    .cd-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 4px; }
+    .cd-section-title { font-size: 18px; font-weight: 300; margin: 0 0 16px; }
+
+    .cd-skip-breakdown { background: #fff; border: 1px solid #e8e8e8; padding: 20px; margin-bottom: 32px; }
+    .cd-skip-bars { display: flex; flex-direction: column; gap: 8px; }
+    .cd-skip-row { display: grid; grid-template-columns: 200px 1fr 120px; gap: 12px; align-items: center; font-size: 13px; }
+    @media (max-width: 600px) { .cd-skip-row { grid-template-columns: 1fr; gap: 4px; } }
+    .cd-skip-label { color: #1A1A1A; }
+    .cd-skip-track { height: 8px; background: #f1f1f1; position: relative; overflow: hidden; }
+    .cd-skip-fill { position: absolute; inset: 0 auto 0 0; background: #8C2128; }
+    .cd-skip-count { font-size: 12px; color: rgba(26,26,26,.6); text-align: right; font-variant-numeric: tabular-nums; }
+
+    .cd-content-preview { background: #fff; border: 1px solid #e8e8e8; padding: 24px; }
+    .cd-preview-block { padding: 16px; background: #FAFAFA; border-left: 3px solid #1A1A1A; }
+    .cd-preview-title { font-size: 16px; font-weight: 500; margin-bottom: 8px; }
+    .cd-preview-body { font-size: 14px; line-height: 1.6; color: rgba(26,26,26,.85); }
+    .cd-preview-body :global(p) { margin: 0 0 8px; }
+    .cd-preview-body :global(a) { color: #FF4A82; }
+    .cd-preview-cta { margin-top: 12px; padding: 8px 12px; background: rgba(255,74,130,.06); border-left: 2px solid #FF4A82; font-size: 13px; word-break: break-all; }
+  </style>
+</AdminLayout>
