@@ -4,6 +4,7 @@ import { sendBookingNotification } from '../../../lib/email/send-booking-notific
 import { sendHotelierPush } from '../../../lib/push/send';
 import { createSupabaseServiceRoleInstance } from '../../../lib/auth';
 import { hasPermission, type Role } from '../../../lib/auth/permissions';
+import { sendStayPush, type StayPushTrigger } from '../../../lib/wallet/stay-push';
 
 interface CreateBookingPayload {
   access_token: string;
@@ -27,7 +28,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  if (!['breakfast', 'conference', 'service'].includes(payload.type)) {
+  if (!['breakfast', 'conference', 'service', 'restaurant', 'spa', 'late_checkout', 'housekeeping'].includes(payload.type)) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid type' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
@@ -124,6 +125,19 @@ export const POST: APIRoute = async ({ request }) => {
     } catch (err) {
       console.warn('[push] service-trigger failed (non-fatal):', err);
     }
+  }
+
+  // Sprint Wallet Modul D — Stay-Push für create-Trigger (restaurant/spa).
+  // service-Bookings landen mit status='pending' → kein Push hier; service_confirmed
+  // feuert erst beim Status-Update auf 'confirmed' (update-status.ts).
+  // Best-Effort: sendStayPush fängt alle Fehler intern.
+  const STAY_PUSH_CREATE_MAP: Record<string, StayPushTrigger | undefined> = {
+    restaurant: 'restaurant_reservation',
+    spa:        'spa_reservation',
+  };
+  const stayPushTrigger = STAY_PUSH_CREATE_MAP[payload.type];
+  if (stayPushTrigger) {
+    await sendStayPush(stay.id, stayPushTrigger, { bookingId: booking.id, bookingDetails: payload.details });
   }
 
   return new Response(JSON.stringify({ ok: true, booking }), {

@@ -16,7 +16,7 @@ export type VariableContext = {
   first_visit_date: string;
 };
 
-/** Variablen die der Hotelier verwenden darf */
+/** Variablen die der Hotelier in Marketing-Templates verwenden darf */
 export const HOTELIER_ALLOWED_VARIABLES = [
   'first_name',
   'last_name',
@@ -24,6 +24,17 @@ export const HOTELIER_ALLOWED_VARIABLES = [
   'visit_count',
   'last_visit_date',
   'first_visit_date',
+] as const;
+
+/** Sprint Wallet Modul D — zusätzliche Variablen für Stay-Push-Templates.
+ *  Werden mit Stay/Booking-Context beim Send befüllt. */
+export const STAY_PUSH_ALLOWED_VARIABLES = [
+  ...HOTELIER_ALLOWED_VARIABLES,
+  'checkout_time',   // stays.check_out HH:MM
+  'room_number',     // rooms.room_number
+  'guest_count',     // bookings.details.guests / .people
+  'date',            // bookings.details.date
+  'time',            // bookings.details.time
 ] as const;
 
 /** Variablen die NUR der Server beim Send einsetzt (Footer/Compliance) */

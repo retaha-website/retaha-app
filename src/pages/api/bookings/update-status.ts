@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '../../../lib/auth';
 import { pushBookingToMews, PushSkipped, cancelBookingInMews, CancelSkipped } from '../../../lib/mews/orders';
+import { sendStayPush, type StayPushTrigger } from '../../../lib/wallet/stay-push';
 
 const VALID_STATUSES = ['pending', 'confirmed', 'cancelled'];
 
@@ -82,6 +83,25 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   let cancelOutcome: { ok: true; orderId: string } | { ok: false; reason: string; error: string } | null = null;
   if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
     cancelOutcome = await tryCancelBookingInMews(payload.booking_id);
+  }
+
+  // Sprint Wallet Modul D — Stay-Push beim Status-Übergang
+  // service_confirmed / late_checkout_approved / housekeeping_done bei
+  // pending→confirmed (bzw. completed). service_declined bei →cancelled.
+  // Best-Effort: sendStayPush fängt alle Fehler intern.
+  const booking = updated[0];
+  if (booking?.stay_id) {
+    let trigger: StayPushTrigger | null = null;
+    if (oldStatus !== 'confirmed' && newStatus === 'confirmed') {
+      if (booking.type === 'service')        trigger = 'service_confirmed';
+      else if (booking.type === 'late_checkout') trigger = 'late_checkout_approved';
+      else if (booking.type === 'housekeeping')  trigger = 'housekeeping_done';
+    } else if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
+      if (booking.type === 'service') trigger = 'service_declined';
+    }
+    if (trigger) {
+      await sendStayPush(booking.stay_id, trigger, { bookingId: booking.id, bookingDetails: booking.details ?? {} });
+    }
   }
 
   return new Response(JSON.stringify({

@@ -1,0 +1,99 @@
+---
+// Sprint Wallet · Modul D — Stay-Push-Templates Übersicht
+
+import AdminLayout from '../../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../../lib/auth';
+import { getUserRole } from '../../../lib/auth/require-permission';
+import { hasPermission } from '../../../lib/auth/permissions';
+import {
+  STAY_PUSH_TRIGGER_LABELS,
+  STAY_PUSH_TRIGGER_DESCRIPTIONS,
+  STAY_PUSH_TRIGGER_ORDER,
+} from '../../../lib/marketing/stay-push-variables';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'content.read')) return new Response('Forbidden', { status: 403 });
+const canWrite = hasPermission(myRole, 'content.write');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: templates } = await client
+  .from('stay_push_templates')
+  .select('trigger_type, title_i18n, is_active, updated_at')
+  .eq('hotel_id', hotel.id);
+
+const tplByTrigger = new Map((templates ?? []).map((t: any) => [t.trigger_type, t]));
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+function pickI18n(jsonb: any): string {
+  if (!jsonb) return '';
+  return jsonb[hotelDefaultLang]?.value ?? Object.values(jsonb)[0]?.value ?? '';
+}
+---
+
+<AdminLayout title="Stay-Pushes" hotel={hotel} user={user}>
+  <div class="sp-page">
+    <header class="sp-header">
+      <p class="sp-eyebrow">— Wallet · Stay-Pushes —</p>
+      <h1 class="sp-title">Push-Nachrichten während des Aufenthalts<span class="dot">.</span></h1>
+      <p class="sp-sub">
+        Service-Pushes (z.B. Bestätigung einer Service-Anfrage) sind <strong>Vertragserfüllung</strong>
+        und gehen unabhängig vom Marketing-Opt-Out raus. Sie folgen automatisch auf Booking-Events
+        oder einen Cron — du kannst pro Trigger den Text editieren oder den Push deaktivieren.
+      </p>
+    </header>
+
+    <div class="sp-list">
+      {STAY_PUSH_TRIGGER_ORDER.map((trigger) => {
+        const t = tplByTrigger.get(trigger) as any;
+        const preview = pickI18n(t?.title_i18n);
+        const active = t?.is_active !== false;  // wenn kein Template: default aktiv (Edit legt es an)
+        return (
+          <a href={`/admin/stay-pushes/${trigger}`} class={`sp-card${active ? '' : ' sp-card--off'}`}>
+            <div class="sp-card-head">
+              <span class={`sp-pill${active ? ' is-on' : ''}`}>{active ? 'aktiv' : 'inaktiv'}</span>
+              <span class="sp-card-trigger">{STAY_PUSH_TRIGGER_LABELS[trigger]}</span>
+            </div>
+            <p class="sp-card-preview">{preview || <em>(noch nicht konfiguriert)</em>}</p>
+            <p class="sp-card-sub">{STAY_PUSH_TRIGGER_DESCRIPTIONS[trigger]}</p>
+          </a>
+        );
+      })}
+    </div>
+
+    <div class="sp-footnote">
+      <strong>DSGVO-Hinweis:</strong> Stay-Pushes gelten als Vertragserfüllung (DSGVO Art. 6 Abs. 1 lit. b).
+      Sie ignorieren Marketing-Opt-Out, werden aber blockiert wenn der Pass <code>state='expired'</code> oder
+      noch nicht in Google synchronisiert ist.
+    </div>
+  </div>
+
+  <style>
+    .sp-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .sp-header { margin: 20px 0 28px; }
+    .sp-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 6px; }
+    .sp-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
+    .dot { color: #FF4A82; }
+    .sp-sub { margin: 0; font-size: 14px; color: rgba(26,26,26,.6); max-width: 720px; line-height: 1.5; }
+    .sp-sub strong { color: #1A1A1A; }
+
+    .sp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    .sp-card { display: block; background: #fff; border: 1px solid #e8e8e8; padding: 18px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+    .sp-card:hover { border-color: #1A1A1A; transform: translateY(-1px); }
+    .sp-card--off { opacity: .55; }
+    .sp-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .sp-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; background: #f4f4f4; color: rgba(26,26,26,.5); }
+    .sp-pill.is-on { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .sp-card-trigger { font-size: 12px; font-weight: 500; color: #1A1A1A; letter-spacing: 0.02em; }
+    .sp-card-preview { font-size: 14px; color: #1A1A1A; margin: 6px 0; line-height: 1.4; }
+    .sp-card-preview em { color: rgba(26,26,26,.4); font-style: italic; }
+    .sp-card-sub { font-size: 11px; color: rgba(26,26,26,.55); margin: 0; line-height: 1.45; }
+
+    .sp-footnote { margin-top: 32px; padding: 14px 18px; background: #FAFAFA; border-left: 3px solid #8C2128; font-size: 13px; line-height: 1.5; color: rgba(26,26,26,.7); }
+    .sp-footnote strong { color: #8C2128; }
+    .sp-footnote code { background: #fff; padding: 1px 5px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #1A1A1A; }
+  </style>
+</AdminLayout>
