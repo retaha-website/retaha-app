@@ -249,6 +249,98 @@ i18n-Cleanup (Sprint i18n hat alle alten Spalten als Safety-Net behalten):
 
 ---
 
+## Sprint Functional — 5 Module · Multi-User, Onboarding, Feedback, Push, Sentry
+
+> Sprint commits: `fe3dcaa` → `f63f744`. Schema-Smoketest aller 5 Module grün, Browser-Tests stehen aus.
+
+### Modul A — Multi-User · Team-Verwaltung & Rollen
+
+```
+☐ Owner-Pfad: /admin/team rendert mit eigenem Account als "Owner"
+☐ Owner lädt Manager ein → Magic-Link-Mail kommt an
+☐ Eingeladener User akzeptiert → erscheint mit korrektem Rollen-Badge
+☐ Manager kann /admin/operations sehen (operations.read greift)
+☐ Manager kann /admin/team NICHT sehen (team.read auf owner-only)
+☐ Manager kann KEINE Pricing-Settings (settings.write ohne pricing.write)
+☐ Owner ändert Manager → Staff via Rollen-Dropdown (team.change_role)
+☐ Self-Demote: Owner kann sich selbst NICHT degradieren (Schutz greift)
+☐ Owner entfernt Staff → User aus hotel_users gelöscht (kein orphan-state)
+☐ Logout + Login funktioniert für jedes Rollenniveau
+```
+
+### Modul B — Onboarding-Wizard & Dashboard-Checkliste
+
+```
+☐ Demo-Hotel-Login: KEINE Checkliste sichtbar (completed_at gesetzt)
+☐ Neues Hotel via /onboarding/locale → Sprache + Adresse + Concierge-Name
+☐ Wizard: Logo-Upload optional (skip möglich)
+☐ Wizard: Welcome-Message Live-Übersetzung wenn enabled_languages > 1
+☐ Wizard "Mews später" überspringt sauber, kein Connector-Verbose
+☐ Nach Wizard-Finish: Dashboard zeigt Checkliste mit 3-4 grünen ✓
+☐ Knowledge anlegen → Checkliste-Item flippt automatisch (Read-Time-Check)
+☐ Action-Card anlegen → Checkliste-Item flippt automatisch
+☐ Alle Items grün → Banner "Onboarding abgeschlossen" + completed_at gesetzt
+☐ Beim nächsten Login: Checkliste bleibt versteckt (kein Re-Trigger)
+```
+
+### Modul C — Gast-Feedback (Eve + Hotel-Rating)
+
+```
+Eve-Feedback (👍/👎):
+☐ /g/[token] Eve-Chat öffnen → assistant-Message zeigt 👍/👎 Buttons
+☐ 👍 klicken → optimistic update, Button bleibt aktiv (rosa Hintergrund)
+☐ 👎 klicken auf gleicher Message → wechselt Vote (UNIQUE-Upsert)
+☐ Hotelier /admin/eve/feedback: Default-Filter zeigt 👎-Votes
+☐ Vorherige Gast-Frage erscheint als Kontext über Eve-Antwort
+☐ Filter-Tab "👍 Hilfreich" wechselt korrekt
+☐ Permission: Staff-Login → 403 auf /admin/eve/feedback (content.read fehlt)
+
+Hotel-Rating (5★ Post-Stay):
+☐ Stay mit check_out in der Vergangenheit + kein bisheriges Feedback
+☐ /g/[token] öffnen → nach 1.6s erscheint Post-Stay-Sheet
+☐ "Später" klicken → Sheet schließt, localStorage-Cooldown gesetzt
+☐ Page-Reload innerhalb 24h: Sheet poppt NICHT mehr auf
+☐ 4 Sterne + Kommentar "Frühstück lecker" → "Bewertung senden"
+☐ Sheet wechselt zu Thanks-View, Cooldown-Eintrag gelöscht
+☐ Hotelier /admin/feedback: Avg + Distribution-Bar mit neuer 4★-Zeile
+☐ Filter "Positiv (4-5★)" zeigt die Bewertung
+☐ Filter "Kritisch (1-2★)" zeigt sie nicht
+☐ Re-Submit derselben Bewertung mit anderer Sterne-Zahl → Update (UNIQUE)
+```
+
+### Modul D — Web-Push für Hotelier
+
+```
+☐ /admin/settings → Section "Push-Benachrichtigungen" sichtbar
+☐ Status-Dot grau, Button "Push aktivieren"
+☐ Click → Browser-Permission-Prompt → akzeptieren
+☐ Status-Dot wird grün, Button wechselt zu "Deaktivieren"
+☐ public/sw.js wird vom Browser registriert (DevTools › Application › Service Workers)
+☐ Inkognito-Tab: /g/[token] → Service-Anfrage stellen
+☐ Push-Notification erscheint im Hotelier-Tab + System-Notif-Center
+☐ Push-Click: öffnet/fokussiert Tab auf /admin/service?booking=...
+☐ "Deaktivieren" → Sub aus push_subscriptions gelöscht (RLS-Delete)
+☐ Rate-Limit: 6. Subscribe → 429-Response mit "too_many_subscriptions"
+☐ iPhone-Test (PWA installiert): Push funktioniert nach Home-Screen-Add
+☐ iPhone-Test (normaler Safari-Tab): UI zeigt korrekten Hinweis
+```
+
+### Modul E — Sentry (nach DSN-Setup in Vercel-ENV)
+
+```
+☐ Sentry-Projekt auf sentry.io anlegen → Region Frankfurt (DSGVO)
+☐ DSN in Vercel-ENV setzen → Production-Deploy
+☐ Eingeloggt: GET https://demo.retaha.de/api/admin/sentry-test
+☐ Sentry-Dashboard zeigt Error mit Stack-Trace + Source-Maps (falls AUTH_TOKEN)
+☐ DSGVO-Check: Event-Detail zeigt KEINE Cookies / Authorization-Header
+☐ DSGVO-Check: Event-Detail zeigt KEINE User-Email/Username
+☐ DSGVO-Check: query_string zeigt "[redacted]" statt access_token
+☐ Sentry-Test-Endpoint nach Verifikation löschen
+☐ Künstlicher Frontend-Error (z.B. via DevTools `throw new Error()`) → landet auch in Sentry
+```
+
+---
+
 ## Status-Übersicht
 
 ```
@@ -263,9 +355,11 @@ Code-verifizierte Sprints (UX-Test offen):
                                       UX-Walkthrough mit Kristin offen
   🔵 Legal/DSGVO                    — automatische Tests 41+/41+, Anwalts-Review parallel
                                       zum Big-Test-Day, AVV-Abschlüsse durch Taha
+  🔵 Functional (5 Module)          — Schema-Smoketest grün, Browser-/Push-/Sentry-Tests
+                                      stehen aus für Big-Test-Day
 
 Wartende Sprints:
-  ⏳ Funktional, Wallet, UI/UX, Themes, Monorepo, Production
+  ⏳ Wallet, UI/UX, Themes, Monorepo, Production
 ```
 
 ---
