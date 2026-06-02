@@ -1,0 +1,182 @@
+---
+// Sprint Wallet · Phase 14 — Drip-Detail mit Per-Step-Stats und Edit-Button
+
+import AdminLayout from '../../../../components/AdminLayout.astro';
+import DripEditor from '../../../../components/admin/DripEditor.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { getUserRole } from '@retaha/auth';
+import { hasPermission } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'content.read')) return new Response('Forbidden', { status: 403 });
+const canWrite = hasPermission(myRole, 'content.write');
+
+const dripId = Astro.params.id;
+if (!dripId) return Astro.redirect('/admin/marketing/drips');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: drip } = await client
+  .from('marketing_drips')
+  .select('*')
+  .eq('id', dripId)
+  .maybeSingle();
+if (!drip || drip.hotel_id !== hotel.id) return Astro.redirect('/admin/marketing/drips');
+
+const { data: steps } = await client
+  .from('marketing_drip_steps')
+  .select('id, template_id, delay_days, step_order, templates:template_id(name)')
+  .eq('drip_id', dripId)
+  .order('step_order');
+
+const { data: templates } = await client
+  .from('marketing_templates')
+  .select('id, name')
+  .eq('hotel_id', hotel.id)
+  .eq('is_archived', false)
+  .order('name');
+
+// Per-Step Stats: zähle drip_state-Rows pro last_step_sent
+const { data: stateRows } = await client
+  .from('marketing_drip_state')
+  .select('last_step_sent, completed_at')
+  .eq('drip_id', dripId);
+
+const stepCounts = new Map<number, { active: number; completed: number }>();
+let totalActive = 0;
+let totalCompleted = 0;
+for (const r of (stateRows ?? [])) {
+  const stepNum = r.last_step_sent ?? 0;
+  const slot = stepCounts.get(stepNum) ?? { active: 0, completed: 0 };
+  if (r.completed_at) {
+    slot.completed++;
+    totalCompleted++;
+  } else {
+    slot.active++;
+    totalActive++;
+  }
+  stepCounts.set(stepNum, slot);
+}
+
+const TRIGGER_LABELS: Record<string, string> = {
+  wallet_add: 'Wallet hinzugefügt', first_visit: 'Erster Besuch', checkout: 'Check-out',
+  anniversary: 'Jahrestag', visit_count_milestone: 'Besuchs-Meilenstein', seasonal: 'Saisonal',
+};
+
+const url = new URL(Astro.request.url);
+const editMode = url.searchParams.get('edit') === '1';
+const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id, delay_days: s.delay_days }));
+---
+
+<AdminLayout title={`Drip · ${drip.name}`} hotel={hotel} user={user}>
+  <div class="dd-page">
+    <div class="dd-breadcrumb"><a href="/admin/marketing/drips">← Alle Drip-Sequenzen</a></div>
+
+    {editMode && canWrite ? (
+      <>
+        <header class="dd-header">
+          <p class="dd-eyebrow">— Drip bearbeiten —</p>
+          <h1 class="dd-title">{drip.name}<span class="dot">.</span></h1>
+        </header>
+        <DripEditor
+          drip={{ id: drip.id, name: drip.name, trigger_type: drip.trigger_type, trigger_config: drip.trigger_config, is_active: drip.is_active }}
+          initialSteps={initialSteps}
+          templates={templates ?? []}
+        />
+      </>
+    ) : (
+      <>
+        <header class="dd-header">
+          <div class="dd-head-info">
+            <p class="dd-eyebrow">— Drip-Sequenz —</p>
+            <h1 class="dd-title">{drip.name}<span class="dot">.</span></h1>
+            <p class="dd-subtitle">Trigger: <strong>{TRIGGER_LABELS[drip.trigger_type] ?? drip.trigger_type}</strong></p>
+          </div>
+          <div class="dd-head-meta">
+            <span class={`dd-active-pill${drip.is_active ? ' is-on' : ''}`}>{drip.is_active ? 'aktiv' : 'inaktiv'}</span>
+            {canWrite && <a href={`?edit=1`} class="dd-btn-edit">Bearbeiten</a>}
+          </div>
+        </header>
+
+        <section class="dd-stats">
+          <div class="dd-stat"><div class="dd-stat-label">Steps</div><div class="dd-stat-value">{steps?.length ?? 0}</div></div>
+          <div class="dd-stat"><div class="dd-stat-label">Aktive Pässe</div><div class="dd-stat-value">{totalActive}</div><div class="dd-stat-sub">noch in Sequenz</div></div>
+          <div class="dd-stat"><div class="dd-stat-label">Abgeschlossen</div><div class="dd-stat-value">{totalCompleted}</div><div class="dd-stat-sub">Sequenz beendet</div></div>
+        </section>
+
+        <section class="dd-steps">
+          <p class="dd-section-eyebrow">— Sequenz —</p>
+          <h2 class="dd-section-title">{steps?.length ?? 0} {steps?.length === 1 ? 'Step' : 'Steps'}</h2>
+          {!steps || steps.length === 0 ? (
+            <div class="dd-empty"><p>Keine Steps angelegt. <a href="?edit=1">Bearbeiten</a> um welche hinzuzufügen.</p></div>
+          ) : (
+            <ol class="dd-step-list">
+              {steps.map((s: any) => {
+                const c = stepCounts.get(s.step_order) ?? { active: 0, completed: 0 };
+                const tplName = (Array.isArray(s.templates) ? s.templates[0]?.name : s.templates?.name) || '(Template gelöscht)';
+                return (
+                  <li class="dd-step">
+                    <span class="dd-step-num">{s.step_order}</span>
+                    <div class="dd-step-info">
+                      <div class="dd-step-tpl">{tplName}</div>
+                      <div class="dd-step-meta">{s.delay_days === 0 ? 'sofort' : `${s.delay_days} Tage nach Trigger`}</div>
+                    </div>
+                    <div class="dd-step-stats">
+                      <div><strong>{c.active}</strong> warten</div>
+                      <div class="dd-step-stats-sub"><strong>{c.completed}</strong> abgeschlossen hier</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      </>
+    )}
+  </div>
+
+  <style>
+    .dd-page { max-width: 900px; margin: 0 auto; padding: 0 24px 60px; }
+    .dd-breadcrumb { margin: 16px 0 8px; }
+    .dd-breadcrumb a { font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); text-decoration: none; }
+    .dd-breadcrumb a:hover { color: var(--theme-accent); }
+
+    .dd-header { display: flex; justify-content: space-between; gap: 24px; margin: 20px 0 24px; align-items: flex-start; flex-wrap: wrap; }
+    .dd-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 6px; }
+    .dd-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
+    .dot { color: var(--theme-accent); }
+    .dd-subtitle { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .65, transparent); }
+    .dd-subtitle strong { color: var(--theme-text-primary); font-weight: 500; }
+    .dd-head-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .dd-active-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; background: var(--theme-bg-tertiary); color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); }
+    .dd-active-pill.is-on { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .dd-btn-edit { padding: 8px 16px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); text-decoration: none; font-size: 12px; }
+    .dd-btn-edit:hover { background: var(--theme-burgund); }
+
+    .dd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+    @media (max-width: 600px) { .dd-stats { grid-template-columns: 1fr; } }
+    .dd-stat { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 16px; }
+    .dd-stat-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
+    .dd-stat-value { font-size: 28px; font-weight: 300; margin: 6px 0 2px; }
+    .dd-stat-sub { font-size: 11px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); }
+
+    .dd-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 4px; }
+    .dd-section-title { font-size: 18px; font-weight: 300; margin: 0 0 16px; }
+
+    .dd-steps { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 20px; }
+    .dd-step-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .dd-step { display: grid; grid-template-columns: 32px 1fr 160px; gap: 16px; align-items: center; padding: 12px; background: var(--theme-bg-secondary); border-left: 3px solid var(--theme-text-primary); }
+    .dd-step-num { width: 28px; height: 28px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+    .dd-step-tpl { font-size: 14px; font-weight: 500; }
+    .dd-step-meta { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); margin-top: 2px; }
+    .dd-step-stats { font-size: 12px; text-align: right; color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); }
+    .dd-step-stats strong { color: var(--theme-text-primary); font-weight: 500; }
+    .dd-step-stats-sub { font-size: 11px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-top: 2px; }
+    .dd-empty { padding: 24px; background: var(--theme-bg-secondary); border: 1px dashed var(--theme-border-strong); text-align: center; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; }
+    .dd-empty a { color: var(--theme-accent); }
+  </style>
+</AdminLayout>

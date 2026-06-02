@@ -1,0 +1,356 @@
+---
+// Sprint Wallet · Phase 14 — Drip-Editor mit SortableJS-Step-Builder
+//
+// Sections:
+//   1. Drip-Settings: Name, Trigger-Typ, Trigger-Config (kontextbezogen), Active-Toggle
+//   2. Step-Builder: Drag-Drop-Reorder, Template-Picker pro Step, delay_days
+//
+// SortableJS via npm (auch Mobile-Touch-Support).
+
+interface Tpl { id: string; name: string; }
+interface InitialStep { template_id: string; delay_days: number; }
+interface Props {
+  drip?: {
+    id: string;
+    name: string;
+    trigger_type: string;
+    trigger_config: any;
+    is_active: boolean;
+  } | null;
+  initialSteps?: InitialStep[];
+  templates: Tpl[];
+}
+const p = Astro.props as Props;
+const isEdit = !!p.drip;
+
+const TRIGGERS = [
+  { value: 'wallet_add',            label: 'Wallet hinzugefügt' },
+  { value: 'first_visit',           label: 'Erster Besuch' },
+  { value: 'checkout',              label: 'Check-out' },
+  { value: 'anniversary',           label: 'Jahrestag' },
+  { value: 'visit_count_milestone', label: 'Besuchs-Meilenstein' },
+  { value: 'seasonal',              label: 'Saisonal' },
+];
+---
+
+<div class="de-wrap" x-data="dripEditor()" x-init="init()">
+
+  <!-- ── Section 1: Settings ─────────────────────────────────────── -->
+  <section class="de-section">
+    <h3 class="de-section-title">Einstellungen</h3>
+
+    <label class="de-field">
+      <span class="de-label">Name</span>
+      <input type="text" x-model="form.name" placeholder="z.B. Willkommens-Sequenz" class="de-input" />
+    </label>
+
+    <div class="de-row">
+      <label class="de-field de-flex-1">
+        <span class="de-label">Trigger</span>
+        <select x-model="form.trigger_type" class="de-input">
+          {TRIGGERS.map(t => <option value={t.value}>{t.label}</option>)}
+        </select>
+      </label>
+      <label class="de-field de-flex-fixed">
+        <span class="de-label">Aktiv</span>
+        <div class="de-toggle">
+          <input type="checkbox" x-model="form.is_active" id="de-active-toggle" />
+          <label for="de-active-toggle"></label>
+        </div>
+      </label>
+    </div>
+
+    <!-- Trigger-Config: kontextbezogen -->
+    <div x-show="form.trigger_type === 'visit_count_milestone'" x-cloak class="de-cfg-block">
+      <span class="de-label">Meilensteine (Komma-getrennt, z.B. 5, 10, 25)</span>
+      <input type="text" x-model="form.milestones_input" placeholder="5, 10, 25" class="de-input" />
+      <p class="de-hint">Drip feuert bei diesen Besuchs-Zahlen (UNIQUE-PK: pro Pass nur erster Match).</p>
+    </div>
+
+    <div x-show="form.trigger_type === 'seasonal'" x-cloak class="de-cfg-block">
+      <span class="de-label">Saisonales Datum</span>
+      <div class="de-row">
+        <label class="de-flex-1">
+          <span class="de-label-small">Monat</span>
+          <select x-model.number="form.seasonal_month" class="de-input">
+            <option value="1">Januar</option><option value="2">Februar</option>
+            <option value="3">März</option><option value="4">April</option>
+            <option value="5">Mai</option><option value="6">Juni</option>
+            <option value="7">Juli</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">Oktober</option>
+            <option value="11">November</option><option value="12">Dezember</option>
+          </select>
+        </label>
+        <label class="de-flex-1">
+          <span class="de-label-small">Tag</span>
+          <input type="number" min="1" max="31" x-model.number="form.seasonal_day" class="de-input" />
+        </label>
+      </div>
+      <p class="de-hint">Feuert einmal jährlich an diesem Datum für alle aktiven Pässe.</p>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Step-Builder ──────────────────────────────────── -->
+  <section class="de-section">
+    <div class="de-step-head">
+      <h3 class="de-section-title">Steps</h3>
+      <button type="button" class="de-btn-add" @click="addStep()">+ Step hinzufügen</button>
+    </div>
+    <p class="de-hint">Reihenfolge per Drag-Drop am Griff ⋮⋮. <code>delay_days</code> ist absolut vom Trigger-Zeitpunkt — Step 1 mit 0 sendet sofort, Step 2 mit 3 sendet 3 Tage nach Trigger.</p>
+
+    <ul id="de-steps-list" class="de-steps-list">
+      <template x-for="(step, idx) in form.steps" :key="step._key">
+        <li class="de-step-card" :data-key="step._key">
+          <span class="de-step-grip" aria-label="Verschieben">⋮⋮</span>
+          <span class="de-step-num" x-text="(idx + 1)"></span>
+          <div class="de-step-body">
+            <label class="de-step-row">
+              <span class="de-label-small">Template</span>
+              <select x-model="step.template_id" class="de-input">
+                <option value="">— wählen —</option>
+                {p.templates.map(t => <option value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+            <label class="de-step-row">
+              <span class="de-label-small">Verzögerung (Tage ab Trigger)</span>
+              <input type="number" min="0" x-model.number="step.delay_days" class="de-input de-input-narrow" />
+            </label>
+          </div>
+          <button type="button" class="de-step-remove" @click="removeStep(idx)" aria-label="Entfernen">×</button>
+        </li>
+      </template>
+    </ul>
+
+    <template x-if="form.steps.length === 0">
+      <div class="de-empty">
+        <p>Noch keine Steps. Füge mindestens einen Step hinzu.</p>
+      </div>
+    </template>
+  </section>
+
+  <template x-if="errorMsg">
+    <div class="de-error" x-text="errorMsg"></div>
+  </template>
+
+  <div class="de-actions">
+    <a href="/admin/marketing/drips" class="de-btn-ghost">Abbrechen</a>
+    <button type="button" class="de-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? 'Wird gespeichert …' : (isEditMode ? 'Änderungen speichern' : 'Drip anlegen')"></button>
+  </div>
+</div>
+
+<script is:inline define:vars={{
+  IS_EDIT: isEdit,
+  DRIP: p.drip ?? null,
+  INITIAL_STEPS: p.initialSteps ?? [],
+}}>
+  window.__RETAHA_DE__ = { IS_EDIT, DRIP, INITIAL_STEPS };
+</script>
+
+<script>
+  import Sortable from 'sortablejs';
+
+  document.addEventListener('alpine:init', () => {
+    // @ts-expect-error - Alpine global
+    window.Alpine.data('dripEditor', () => ({
+      cfg: (window as any).__RETAHA_DE__,
+      submitting: false,
+      errorMsg: '' as string,
+      _nextKey: 1,
+      form: {
+        name: '',
+        trigger_type: 'wallet_add',
+        is_active: false,
+        milestones_input: '5, 10, 25',
+        seasonal_month: 12,
+        seasonal_day: 24,
+        steps: [] as Array<{ _key: number; template_id: string; delay_days: number }>,
+      },
+
+      get isEditMode() { return this.cfg.IS_EDIT; },
+
+      init() {
+        if (this.cfg.IS_EDIT && this.cfg.DRIP) {
+          const d = this.cfg.DRIP;
+          this.form.name = d.name;
+          this.form.trigger_type = d.trigger_type;
+          this.form.is_active = d.is_active;
+          if (d.trigger_type === 'visit_count_milestone' && Array.isArray(d.trigger_config?.milestones)) {
+            this.form.milestones_input = d.trigger_config.milestones.join(', ');
+          }
+          if (d.trigger_type === 'seasonal' && d.trigger_config) {
+            this.form.seasonal_month = d.trigger_config.month ?? 12;
+            this.form.seasonal_day = d.trigger_config.day ?? 24;
+          }
+        }
+        for (const s of this.cfg.INITIAL_STEPS) {
+          this.form.steps.push({ _key: this._nextKey++, template_id: s.template_id, delay_days: s.delay_days });
+        }
+        // SortableJS auf der Liste anbringen — kurz delayen damit Alpine rendert
+        setTimeout(() => this._initSortable(), 0);
+      },
+
+      _initSortable() {
+        const list = document.getElementById('de-steps-list');
+        if (!list) return;
+        Sortable.create(list, {
+          handle: '.de-step-grip',
+          animation: 150,
+          forceFallback: true,  // Touch-Support
+          fallbackTolerance: 5,
+          onEnd: (evt: any) => {
+            const oldI = evt.oldIndex; const newI = evt.newIndex;
+            if (oldI === newI || oldI == null || newI == null) return;
+            const moved = this.form.steps.splice(oldI, 1)[0];
+            this.form.steps.splice(newI, 0, moved);
+            // Force Alpine re-render via reassign
+            this.form.steps = [...this.form.steps];
+          },
+        });
+      },
+
+      addStep() {
+        this.form.steps.push({ _key: this._nextKey++, template_id: '', delay_days: 0 });
+      },
+
+      removeStep(idx: number) {
+        this.form.steps.splice(idx, 1);
+      },
+
+      _buildTriggerConfig(): any {
+        if (this.form.trigger_type === 'visit_count_milestone') {
+          const milestones = this.form.milestones_input.split(',')
+            .map(s => parseInt(s.trim(), 10))
+            .filter(n => Number.isFinite(n) && n > 0);
+          return { milestones };
+        }
+        if (this.form.trigger_type === 'seasonal') {
+          return { month: this.form.seasonal_month, day: this.form.seasonal_day };
+        }
+        return null;
+      },
+
+      async save() {
+        if (this.submitting) return;
+        this.errorMsg = '';
+
+        if (!this.form.name?.trim()) { this.errorMsg = 'Bitte gib einen Namen an.'; return; }
+        if (this.form.steps.length === 0) { this.errorMsg = 'Mindestens ein Step erforderlich.'; return; }
+        for (const s of this.form.steps) {
+          if (!s.template_id) { this.errorMsg = 'Jeder Step braucht eine Vorlage.'; return; }
+        }
+
+        const triggerConfig = this._buildTriggerConfig();
+        if (this.form.trigger_type === 'visit_count_milestone' && (!triggerConfig.milestones || triggerConfig.milestones.length === 0)) {
+          this.errorMsg = 'Mindestens 1 Meilenstein nötig (z.B. "5, 10, 25").';
+          return;
+        }
+
+        const stepsPayload = this.form.steps.map(s => ({ template_id: s.template_id, delay_days: s.delay_days }));
+
+        this.submitting = true;
+        try {
+          if (this.cfg.IS_EDIT) {
+            // Update Drip + Steps separat
+            const r1 = await fetch(`/api/admin/marketing/drips/${this.cfg.DRIP.id}`, {
+              method: 'PUT', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: this.form.name.trim(),
+                trigger_config: triggerConfig,
+                is_active: this.form.is_active,
+              }),
+            });
+            const d1 = await r1.json();
+            if (!d1.ok) { this.errorMsg = d1.error || 'Update fehlgeschlagen.'; return; }
+            const r2 = await fetch(`/api/admin/marketing/drips/${this.cfg.DRIP.id}/steps`, {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ steps: stepsPayload }),
+            });
+            const d2 = await r2.json();
+            if (!d2.ok) { this.errorMsg = d2.error || 'Steps-Update fehlgeschlagen.'; return; }
+            window.location.href = `/admin/marketing/drips/${this.cfg.DRIP.id}`;
+          } else {
+            const res = await fetch('/api/admin/marketing/drips/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: this.form.name.trim(),
+                trigger_type: this.form.trigger_type,
+                trigger_config: triggerConfig,
+                is_active: this.form.is_active,
+                steps: stepsPayload,
+              }),
+            });
+            const data = await res.json();
+            if (!data.ok) { this.errorMsg = data.error || 'Speichern fehlgeschlagen.'; return; }
+            window.location.href = `/admin/marketing/drips/${data.id}`;
+          }
+        } catch (err: any) {
+          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+        } finally {
+          this.submitting = false;
+        }
+      },
+    }));
+  });
+</script>
+
+<style>
+  .de-wrap { display: flex; flex-direction: column; gap: 20px; max-width: 800px; }
+  .de-section { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 20px; }
+  .de-section-title { font-size: 13px; font-weight: 500; margin: 0 0 12px; color: var(--theme-text-primary); }
+  .de-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin-bottom: 6px; }
+  .de-label-small { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-bottom: 4px; }
+  .de-hint { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; margin: 6px 0; }
+  .de-hint code { background: var(--theme-bg-tertiary); padding: 1px 4px; font-family: var(--theme-font-mono); font-size: 11px; color: var(--theme-accent); }
+  .de-field { display: block; margin-bottom: 12px; }
+  .de-row { display: flex; gap: 12px; align-items: end; }
+  .de-flex-1 { flex: 1; }
+  .de-flex-fixed { flex: 0 0 80px; }
+  .de-input {
+    width: 100%; box-sizing: border-box; padding: 9px 11px;
+    font-family: inherit; font-size: 14px;
+    border: 1px solid var(--theme-border); background: var(--theme-bg-primary); color: var(--theme-text-primary);
+  }
+  .de-input:focus { outline: none; border-color: var(--theme-text-primary); }
+  .de-input-narrow { width: 100px; }
+  .de-cfg-block { background: #fff8e1; padding: 12px; border-left: 3px solid #f5d77a; margin-top: 8px; }
+
+  /* Toggle-Switch */
+  .de-toggle { position: relative; width: 44px; height: 24px; }
+  .de-toggle input { opacity: 0; width: 0; height: 0; }
+  .de-toggle label { position: absolute; cursor: pointer; inset: 0; background: var(--theme-border); transition: background .15s; }
+  .de-toggle label::before { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; background: var(--theme-bg-primary); transition: transform .15s; }
+  .de-toggle input:checked + label { background: var(--theme-accent); }
+  .de-toggle input:checked + label::before { transform: translateX(20px); }
+
+  .de-step-head { display: flex; justify-content: space-between; align-items: center; }
+  .de-btn-add { padding: 6px 14px; background: transparent; border: 1px dashed var(--theme-text-primary); font-size: 12px; cursor: pointer; }
+  .de-btn-add:hover { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
+
+  .de-steps-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  .de-step-card { display: grid; grid-template-columns: 24px 24px 1fr 32px; gap: 10px; align-items: center; padding: 12px; background: var(--theme-bg-primary); border: 1px solid var(--theme-border); transition: border-color .12s; }
+  .de-step-card:hover { border-color: var(--theme-text-primary); }
+  .de-step-grip { cursor: grab; color: color-mix(in srgb, var(--theme-text-primary) .3, transparent); font-size: 18px; user-select: none; text-align: center; }
+  .de-step-grip:active { cursor: grabbing; }
+  .de-step-num { width: 24px; height: 24px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .de-step-body { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+  .de-step-row { display: block; }
+  .de-step-remove { width: 28px; height: 28px; background: transparent; border: 1px solid var(--theme-border); color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-size: 16px; cursor: pointer; }
+  .de-step-remove:hover { background: #fdeaea; color: #B00020; border-color: #B00020; }
+  .sortable-ghost { opacity: 0.3; background: rgba(var(--theme-accent-rgb), 0.06) !important; }
+  .sortable-chosen { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+
+  .de-empty { padding: 24px; background: var(--theme-bg-secondary); border: 1px dashed var(--theme-border-strong); text-align: center; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; }
+  .de-empty p { margin: 0; }
+
+  .de-error { padding: 12px; background: rgba(220,53,69,.08); color: #B00020; font-size: 13px; border-left: 3px solid #B00020; }
+
+  .de-actions { display: flex; gap: 12px; justify-content: flex-end; }
+  .de-btn-ghost { padding: 12px 20px; background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); border: 1px solid var(--theme-border); text-decoration: none; font-size: 14px; }
+  .de-btn-ghost:hover { color: var(--theme-text-primary); border-color: var(--theme-text-primary); }
+  .de-btn-primary { padding: 12px 24px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .de-btn-primary:hover:not(:disabled) { background: var(--theme-burgund); }
+  .de-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+</style>

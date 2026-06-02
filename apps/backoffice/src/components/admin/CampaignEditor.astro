@@ -1,0 +1,471 @@
+---
+// Sprint Wallet · Phase 14 — Campaign-Editor (3-Spalten + Live-Preview)
+//
+// Layout:
+//   Spalte 1 (Settings): Name, Template-Picker, Target-Filter, Scheduling
+//   Spalte 2 (Editor):   TipTap mit Variable-Insert (wenn Ad-hoc, sonst Template-Vorschau)
+//   Spalte 3 (Preview):  Wallet-Push-Mockup mit Sprach-Switcher
+//
+// Props:
+//   templates: Array<{id, name, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url}>
+//   hotelName: string
+//   hotelDefaultLang: string
+//   enabledLangs: string[]
+
+import { VARIABLE_UI_DEFS } from '@retaha/marketing';
+
+interface Tpl {
+  id: string;
+  name: string;
+  title_i18n: any;
+  body_i18n: any;
+  cta_label_i18n: any | null;
+  cta_url: string | null;
+  hero_image_url: string | null;
+}
+
+interface Props {
+  templates: Tpl[];
+  hotelName: string;
+  hotelDefaultLang: string;
+  enabledLangs: string[];
+}
+const p = Astro.props as Props;
+
+const LANGS_DISPLAY = p.enabledLangs.length > 0 ? p.enabledLangs : [p.hotelDefaultLang];
+
+const DEMO_CTX = {
+  first_name: 'Anna',
+  last_name: 'Schmidt',
+  hotel_name: p.hotelName,
+  visit_count: 3,
+  last_visit_date: '24.12.2025',
+  first_visit_date: '15.07.2024',
+};
+---
+
+<div class="ce-wrap" x-data="campaignEditor()" x-init="init()">
+  <div class="ce-grid">
+
+    <!-- ── Spalte 1: Settings ────────────────────────────────────────── -->
+    <div class="ce-col ce-col-settings">
+      <h3 class="ce-section-title">Einstellungen</h3>
+
+      <label class="ce-field">
+        <span class="ce-label">Kampagnen-Name</span>
+        <input type="text" x-model="form.name" placeholder="z.B. Sommerfest 2026" class="ce-input" />
+      </label>
+
+      <label class="ce-field">
+        <span class="ce-label">Vorlage</span>
+        <select x-model="form.template_id" @change="onTemplatePick()" class="ce-input">
+          <option value="">— Ad-hoc (ohne Vorlage) —</option>
+          {p.templates.map(t => <option value={t.id}>{t.name}</option>)}
+        </select>
+        <span class="ce-hint">Ad-hoc: Inhalt direkt hier schreiben. Mit Vorlage: Inhalt wird kopiert + ist hier nochmal editierbar.</span>
+      </label>
+
+      <h4 class="ce-sub-title">Target-Filter</h4>
+
+      <div class="ce-preset-row">
+        <button type="button" class="ce-preset-chip" :class="form.min_visits >= 2 ? 'is-on' : ''" @click="form.min_visits = form.min_visits >= 2 ? 0 : 2">
+          ★ Nur Wiederkehrer
+        </button>
+      </div>
+
+      <label class="ce-field">
+        <span class="ce-label">Sprache</span>
+        <select x-model="form.target_lang" class="ce-input">
+          <option value="">— Alle Sprachen —</option>
+          {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
+        </select>
+      </label>
+      <label class="ce-field">
+        <span class="ce-label">Mindest-Besuche</span>
+        <input type="number" min="0" x-model.number="form.min_visits" placeholder="0 = alle" class="ce-input" />
+        <span class="ce-hint">0 = alle Pässe. 2 = nur Wiederkehrer. 5 = nur Stammgäste.</span>
+      </label>
+
+      <h4 class="ce-sub-title">Versand</h4>
+      <div class="ce-radio-group">
+        <label class="ce-radio">
+          <input type="radio" x-model="form.schedule_mode" value="now" />
+          <span>Sofort versenden</span>
+        </label>
+        <label class="ce-radio">
+          <input type="radio" x-model="form.schedule_mode" value="later" />
+          <span>Geplant</span>
+        </label>
+      </div>
+      <label class="ce-field" x-show="form.schedule_mode === 'later'" x-cloak>
+        <span class="ce-label">Datum + Uhrzeit</span>
+        <input type="datetime-local" x-model="form.scheduled_at" class="ce-input" />
+      </label>
+    </div>
+
+    <!-- ── Spalte 2: Editor ──────────────────────────────────────────── -->
+    <div class="ce-col ce-col-editor">
+      <h3 class="ce-section-title">Inhalt ({p.hotelDefaultLang.toUpperCase()})</h3>
+      <p class="ce-hint">Auto-Translation in alle aktivierten Sprachen passiert beim Speichern.</p>
+
+      <label class="ce-field">
+        <span class="ce-label">Titel</span>
+        <input type="text" x-model="form.title" placeholder="z.B. Sommer im Garten — ab Juni" class="ce-input ce-input-title" />
+      </label>
+
+      <div class="ce-toolbar">
+        <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title="Fett">B</button>
+        <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title="Kursiv" class="ce-tb-i">I</button>
+        <button type="button" @click="exec('toggleHeading', {level: 2})" :class="active.h2 ? 'is-on' : ''" title="Überschrift">H2</button>
+        <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title="Liste">•</button>
+        <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title="Numm.">1.</button>
+        <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title="Link">🔗</button>
+        <span class="ce-tb-sep"></span>
+        <div class="ce-vmenu-wrap">
+          <button type="button" class="ce-vmenu-trigger" @click="varOpen = !varOpen">+ Variable</button>
+          <div class="ce-vmenu" x-show="varOpen" x-cloak @click.outside="varOpen = false">
+            {VARIABLE_UI_DEFS.map(v => (
+              <button type="button" class="ce-vmenu-item" @click={`insertVariable('${v.key}'); varOpen=false`}>
+                <strong>{v.label}</strong>
+                <code>{`{{${v.key}}}`}</code>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div id="ce-tiptap-mount" class="ce-editor"></div>
+
+      <h4 class="ce-sub-title">CTA-Button (optional)</h4>
+      <div class="ce-cta-row">
+        <input type="text" x-model="form.cta_label" placeholder="Label (z.B. Jetzt buchen)" class="ce-input" />
+        <input type="url" x-model="form.cta_url" placeholder="https://…" class="ce-input" />
+      </div>
+    </div>
+
+    <!-- ── Spalte 3: Preview ─────────────────────────────────────────── -->
+    <div class="ce-col ce-col-preview">
+      <div class="ce-preview-head">
+        <h3 class="ce-section-title">Vorschau</h3>
+        <select x-model="previewLang" class="ce-input ce-input-lang" aria-label="Sprache">
+          {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
+        </select>
+      </div>
+      <p class="ce-hint">So sieht der Push im Google Wallet aus. Variablen werden mit Demo-Werten gefüllt.</p>
+
+      <div class="ce-mockup">
+        <div class="ce-mockup-frame">
+          <div class="ce-mockup-status">retaha · Wallet-Push</div>
+          <div class="ce-mockup-card">
+            <div class="ce-mockup-brand">
+              <span class="ce-mockup-logo">{p.hotelName.slice(0, 1).toUpperCase()}</span>
+              <div>
+                <div class="ce-mockup-hotel">{p.hotelName}</div>
+                <div class="ce-mockup-now">jetzt</div>
+              </div>
+            </div>
+            <div class="ce-mockup-title" x-text="previewTitle"></div>
+            <div class="ce-mockup-body" x-html="previewBody"></div>
+            <template x-if="form.cta_label && form.cta_url">
+              <div class="ce-mockup-cta">
+                <span class="ce-mockup-cta-label" x-text="previewCtaLabel"></span>
+                <span class="ce-mockup-cta-url" x-text="previewCtaUrl"></span>
+              </div>
+            </template>
+            <div class="ce-mockup-footer">— Abmelden</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <template x-if="errorMsg">
+    <div class="ce-error" x-text="errorMsg"></div>
+  </template>
+
+  <div class="ce-actions">
+    <a href="/admin/marketing/campaigns" class="ce-btn-ghost">Abbrechen</a>
+    <button type="button" class="ce-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? 'Wird gespeichert …' : 'Kampagne anlegen'"></button>
+  </div>
+</div>
+
+<script is:inline define:vars={{
+  TEMPLATES: p.templates,
+  HOTEL_NAME: p.hotelName,
+  HOTEL_DEFAULT: p.hotelDefaultLang,
+  DEMO_CTX,
+}}>
+  window.__RETAHA_CE__ = { TEMPLATES, HOTEL_NAME, HOTEL_DEFAULT, DEMO_CTX };
+</script>
+
+<script>
+  import { Editor } from '@tiptap/core';
+  import StarterKit from '@tiptap/starter-kit';
+  import Link from '@tiptap/extension-link';
+  import Placeholder from '@tiptap/extension-placeholder';
+
+  function pickI18n(jsonb: any, fallback: string, lang: string): string {
+    if (!jsonb) return '';
+    return jsonb[lang]?.value ?? jsonb[fallback]?.value ?? '';
+  }
+
+  function renderVars(text: string, ctx: any, footer?: any): string {
+    const REGEX = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
+    return text.replace(REGEX, (full, name: string) => {
+      const key = name.toLowerCase();
+      if (key in ctx) return String(ctx[key] ?? '');
+      if (footer && key in footer) return footer[key] ?? '';
+      return full;
+    });
+  }
+
+  document.addEventListener('alpine:init', () => {
+    // @ts-expect-error - Alpine global
+    window.Alpine.data('campaignEditor', () => ({
+      cfg: (window as any).__RETAHA_CE__,
+      editor: null as any,
+      varOpen: false,
+      submitting: false,
+      errorMsg: '' as string,
+      active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
+      previewLang: this.cfg?.HOTEL_DEFAULT ?? 'de',
+      form: {
+        name: '',
+        template_id: '',
+        target_lang: '',
+        min_visits: 0,
+        schedule_mode: 'now' as 'now' | 'later',
+        scheduled_at: '',
+        title: '',
+        body_html: '<p></p>',
+        cta_label: '',
+        cta_url: '',
+      },
+
+      init() {
+        this.previewLang = this.cfg.HOTEL_DEFAULT;
+        const mount = document.getElementById('ce-tiptap-mount');
+        if (!mount) return;
+        this.editor = new Editor({
+          element: mount,
+          extensions: [
+            StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
+            Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
+            Placeholder.configure({ placeholder: 'Was möchtest du sagen? Variablen wie {{first_name}} werden beim Versand ersetzt.' }),
+          ],
+          content: '<p></p>',
+          onUpdate: () => {
+            this.form.body_html = this.editor.getHTML();
+            this._refreshActive();
+          },
+          onSelectionUpdate: () => this._refreshActive(),
+        });
+      },
+
+      onTemplatePick() {
+        const tpl = this.cfg.TEMPLATES.find((t: any) => t.id === this.form.template_id);
+        if (!tpl) return;
+        const lang = this.cfg.HOTEL_DEFAULT;
+        this.form.title = pickI18n(tpl.title_i18n, lang, lang);
+        const body = pickI18n(tpl.body_i18n, lang, lang) || '<p></p>';
+        this.form.body_html = body;
+        if (this.editor) this.editor.commands.setContent(body);
+        this.form.cta_label = pickI18n(tpl.cta_label_i18n, lang, lang);
+        this.form.cta_url = tpl.cta_url || '';
+      },
+
+      _refreshActive() {
+        if (!this.editor) return;
+        const e = this.editor;
+        this.active = {
+          bold: e.isActive('bold'), italic: e.isActive('italic'),
+          h2: e.isActive('heading', { level: 2 }),
+          bullet: e.isActive('bulletList'), ordered: e.isActive('orderedList'),
+          link: e.isActive('link'),
+        };
+      },
+
+      exec(cmd: string, opts: any = {}) {
+        if (!this.editor) return;
+        (this.editor.chain().focus() as any)[cmd](opts).run();
+      },
+
+      setLink() {
+        if (!this.editor) return;
+        const url = window.prompt('Link-URL:', this.editor.getAttributes('link').href || 'https://');
+        if (url === null) return;
+        if (url === '') {
+          this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
+          return;
+        }
+        if (!/^(https?:|mailto:)/i.test(url)) { alert('Nur https:// oder mailto:'); return; }
+        this.editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
+      },
+
+      insertVariable(key: string) {
+        if (!this.editor) return;
+        this.editor.chain().focus().insertContent(`{{${key}}}`).run();
+      },
+
+      get previewTitle() {
+        // Preview nutzt aktuell DE-Default. Sprach-Switch: für Templates die schon
+        // übersetzt sind kann hier i18n[previewLang] greifen — bei Ad-hoc ist es
+        // immer die Default-Eingabe (Preview vor Save).
+        return renderVars(this.form.title || '(kein Titel)', this.cfg.DEMO_CTX);
+      },
+      get previewBody() {
+        const html = this.form.body_html || '<p class="ce-empty">(kein Text)</p>';
+        return renderVars(html, this.cfg.DEMO_CTX, { unsubscribe_link: '#' });
+      },
+      get previewCtaLabel() {
+        return renderVars(this.form.cta_label || '', this.cfg.DEMO_CTX);
+      },
+      get previewCtaUrl() {
+        return this.form.cta_url || '';
+      },
+
+      async save() {
+        if (this.submitting) return;
+        this.errorMsg = '';
+        const bodyHtml = this.editor ? this.editor.getHTML() : this.form.body_html;
+
+        if (!this.form.name?.trim()) { this.errorMsg = 'Bitte gib einen Namen an.'; return; }
+
+        // Wenn Template gewählt: title/body via Template-ID, sonst Ad-hoc
+        const isAdHoc = !this.form.template_id;
+        if (isAdHoc) {
+          if (!this.form.title?.trim()) { this.errorMsg = 'Bitte gib einen Titel an.'; return; }
+          if (!bodyHtml?.trim() || bodyHtml === '<p></p>') { this.errorMsg = 'Bitte schreib einen Text.'; return; }
+        }
+
+        const target_filter: any = {};
+        if (this.form.target_lang) target_filter.language = this.form.target_lang;
+        if (this.form.min_visits > 0) target_filter.min_visit_count = this.form.min_visits;
+
+        const payload: any = {
+          name: this.form.name.trim(),
+          target_filter: Object.keys(target_filter).length ? target_filter : null,
+        };
+        if (this.form.template_id) {
+          payload.template_id = this.form.template_id;
+        } else {
+          payload.title_default = this.form.title.trim();
+          payload.body_default_html = bodyHtml;
+          payload.cta_label_default = this.form.cta_label?.trim() || null;
+          payload.cta_url = this.form.cta_url?.trim() || null;
+        }
+        if (this.form.schedule_mode === 'later') {
+          if (!this.form.scheduled_at) { this.errorMsg = 'Bitte wähle ein Datum.'; return; }
+          payload.scheduled_at = new Date(this.form.scheduled_at).toISOString();
+        }
+
+        this.submitting = true;
+        try {
+          const res = await fetch('/api/admin/marketing/campaigns/create', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            this.errorMsg = data.error === 'invalid_variables'
+              ? `Unbekannte Variablen: ${(data.unknown || []).join(', ')}`
+              : (data.error || 'Speichern fehlgeschlagen.');
+            return;
+          }
+          window.location.href = `/admin/marketing/campaigns/${data.id}`;
+        } catch (err: any) {
+          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+        } finally {
+          this.submitting = false;
+        }
+      },
+    }));
+  });
+</script>
+
+<style>
+  .ce-wrap { display: flex; flex-direction: column; gap: 20px; }
+  .ce-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 360px;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  @media (max-width: 1200px) { .ce-grid { grid-template-columns: 1fr; } }
+
+  .ce-col { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 20px; }
+  .ce-col-preview { background: var(--theme-bg-secondary); }
+
+  .ce-section-title { font-size: 13px; font-weight: 500; margin: 0 0 12px; color: var(--theme-text-primary); letter-spacing: 0.02em; }
+  .ce-sub-title { font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 20px 0 8px; }
+  .ce-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin-bottom: 6px; }
+  .ce-hint { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; margin: 4px 0; }
+  .ce-field { display: block; margin-bottom: 12px; }
+  .ce-input {
+    width: 100%; box-sizing: border-box; padding: 9px 11px;
+    font-family: inherit; font-size: 14px;
+    border: 1px solid var(--theme-border); background: var(--theme-bg-primary); color: var(--theme-text-primary);
+  }
+  .ce-input:focus { outline: none; border-color: var(--theme-text-primary); }
+  .ce-input-title { font-size: 18px; padding: 12px 14px; font-weight: 300; }
+  .ce-input-lang { width: auto; padding: 6px 10px; font-size: 12px; }
+  .ce-cta-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+  .ce-radio-group { display: flex; gap: 12px; }
+  .ce-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .ce-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .ce-preset-chip { padding: 6px 12px; background: transparent; border: 1px solid var(--theme-border); color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); font-size: 12px; cursor: pointer; font-family: inherit; }
+  .ce-preset-chip:hover { border-color: var(--theme-burgund); color: var(--theme-burgund); }
+  .ce-preset-chip.is-on { background: var(--theme-burgund); color: var(--theme-bg-primary); border-color: var(--theme-burgund); }
+
+  .ce-toolbar { display: flex; gap: 4px; align-items: center; padding: 6px; background: var(--theme-bg-secondary); border: 1px solid var(--theme-border); border-bottom: none; margin-top: 12px; }
+  .ce-toolbar button { width: 32px; height: 32px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--theme-text-primary) .65, transparent); cursor: pointer; }
+  .ce-toolbar button:hover { background: var(--theme-bg-primary); color: var(--theme-text-primary); }
+  .ce-toolbar button.is-on { background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); }
+  .ce-toolbar .ce-tb-i { font-style: italic; }
+  .ce-tb-sep { width: 1px; height: 20px; background: var(--theme-border); margin: 0 4px; }
+  .ce-vmenu-wrap { position: relative; margin-left: auto; }
+  .ce-vmenu-trigger { padding: 4px 12px; background: transparent; border: 1px dashed var(--theme-text-primary); color: var(--theme-text-primary); font-size: 12px; cursor: pointer; }
+  .ce-vmenu-trigger:hover { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
+  .ce-vmenu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--theme-bg-primary); border: 1px solid var(--theme-border); min-width: 240px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .ce-vmenu-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; width: 100%; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--theme-bg-tertiary); cursor: pointer; font-size: 12px; font-family: inherit; }
+  .ce-vmenu-item:last-child { border-bottom: none; }
+  .ce-vmenu-item:hover { background: rgba(var(--theme-accent-rgb), 0.06); }
+  .ce-vmenu-item code { color: var(--theme-accent); font-family: var(--theme-font-mono); }
+
+  .ce-editor { min-height: 200px; padding: 14px; background: var(--theme-bg-primary); border: 1px solid var(--theme-border); font-size: 14px; line-height: 1.6; }
+  .ce-editor :global(.ProseMirror) { min-height: 180px; outline: none; }
+  .ce-editor :global(.ProseMirror p) { margin: 0 0 10px; }
+  .ce-editor :global(.ProseMirror h2) { font-size: 18px; font-weight: 500; margin: 14px 0 6px; }
+  .ce-editor :global(.ProseMirror a) { color: var(--theme-accent); text-decoration: underline; }
+  .ce-editor :global(.ProseMirror p.is-editor-empty:first-child::before) { content: attr(data-placeholder); color: color-mix(in srgb, var(--theme-text-primary) .35, transparent); float: left; pointer-events: none; height: 0; }
+
+  .ce-preview-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .ce-mockup { padding: 20px 0; display: flex; justify-content: center; }
+  .ce-mockup-frame { width: 100%; max-width: 320px; background: var(--theme-bg-anthrazit); padding: 12px 8px 24px; border-radius: 24px; box-shadow: 0 24px 40px -16px rgba(0,0,0,.25); }
+  .ce-mockup-status { color: rgba(255,255,255,.6); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 6px 0 10px; }
+  .ce-mockup-card { background: var(--theme-bg-primary); padding: 14px; border-radius: 12px; margin: 0 8px; }
+  .ce-mockup-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ce-mockup-logo { width: 28px; height: 28px; background: var(--theme-burgund); color: var(--theme-bg-primary); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; border-radius: 4px; }
+  .ce-mockup-hotel { font-size: 12px; font-weight: 500; color: var(--theme-text-primary); }
+  .ce-mockup-now { font-size: 10px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); }
+  .ce-mockup-title { font-size: 15px; font-weight: 500; color: var(--theme-text-primary); margin: 10px 0 6px; line-height: 1.3; }
+  .ce-mockup-body { font-size: 13px; line-height: 1.5; color: color-mix(in srgb, var(--theme-text-primary) .85, transparent); }
+  .ce-mockup-body :global(p) { margin: 0 0 6px; }
+  .ce-mockup-body :global(h2), .ce-mockup-body :global(h3) { font-size: 14px; margin: 8px 0 4px; }
+  .ce-mockup-body :global(a) { color: var(--theme-accent); }
+  .ce-mockup-cta { margin-top: 10px; padding: 8px 10px; background: rgba(var(--theme-accent-rgb), .06); border-left: 3px solid var(--theme-accent); }
+  .ce-mockup-cta-label { display: block; font-size: 12px; color: var(--theme-accent); font-weight: 500; }
+  .ce-mockup-cta-url { display: block; font-size: 10px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-top: 2px; word-break: break-all; }
+  .ce-mockup-footer { font-size: 9px; color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--theme-border); text-decoration: underline; }
+
+  .ce-error { padding: 12px; background: rgba(220,53,69,.08); color: #B00020; font-size: 13px; border-left: 3px solid #B00020; }
+
+  .ce-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--theme-border); }
+  .ce-btn-ghost { padding: 12px 20px; background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); border: 1px solid var(--theme-border); text-decoration: none; font-size: 14px; }
+  .ce-btn-ghost:hover { color: var(--theme-text-primary); border-color: var(--theme-text-primary); }
+  .ce-btn-primary { padding: 12px 24px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .ce-btn-primary:hover:not(:disabled) { background: var(--theme-burgund); }
+  .ce-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+</style>

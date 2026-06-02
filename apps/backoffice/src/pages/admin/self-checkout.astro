@@ -1,0 +1,26 @@
+---
+// Sprint H · Group 4c Tag 3 — Stub-Page mit ComingSoonModal
+// Auto-generiert von scripts/generate-coming-soon-stubs.mjs
+//
+// Wenn dieses Feature implementiert wird: diese Datei überschreiben.
+
+import AdminLayout from '../../components/AdminLayout.astro';
+import ComingSoonModal from '../../components/admin/ComingSoonModal.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<AdminLayout title="Self-Checkout" hotel={hotel} user={user}>
+  <ComingSoonModal
+    feature_name="self-checkout"
+    feature_eyebrow="kontaktloser auscheck"
+    feature_description="Gäste checken selbst aus per QR — Rechnung digital, Schlüssel in der Drop-Box."
+    planned_release="Q2 2027"
+  />
+</AdminLayout>

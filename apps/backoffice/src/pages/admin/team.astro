@@ -1,0 +1,334 @@
+---
+// Sprint Functional Modul A Phase 3 — Team-Verwaltung UI
+//
+// Liste aller hotel_users für das eingeloggte Hotel mit:
+//   - aktive Mitglieder (accepted_at NOT NULL)
+//   - offene Einladungen (accepted_at IS NULL)
+//
+// Owner sieht Rollen-Dropdown + Entfernen-Button. Manager sieht nur
+// Einladen-Button. Staff sieht nur die Liste read-only.
+//
+// Discovery-Befund: user_profiles ist spärlich (nur 1 von 13 hat eins) —
+// Email aus auth.users als Fallback-Display.
+
+import AdminLayout from '../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUserRole } from '@retaha/auth';
+import { ROLE_LABELS, hasPermission, type Role } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole) return Astro.redirect('/admin/login?error=no_membership');
+
+const admin = createSupabaseServiceRoleInstance();
+
+// Team laden — alle hotel_users für dieses Hotel + matching user_profiles + auth-emails
+const { data: members } = await admin
+  .from('hotel_users')
+  .select('id, user_id, role, invited_at, accepted_at, created_at, invited_by')
+  .eq('hotel_id', hotel.id)
+  .order('created_at', { ascending: true });
+
+const memberRows = (members ?? []) as any[];
+const userIds = Array.from(new Set(memberRows.map(m => m.user_id)));
+
+// user_profiles parallel
+const { data: profiles } = userIds.length > 0
+  ? await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', userIds)
+  : { data: [] };
+const profileMap = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+
+// auth.users via Admin-API für Emails
+const { data: { users: authUsers } } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+const emailMap = new Map((authUsers ?? []).map(u => [u.id, u.email ?? '']));
+
+function displayName(member: any): string {
+  const p = profileMap.get(member.user_id);
+  if (p?.first_name || p?.last_name) {
+    return [p.first_name, p.last_name].filter(Boolean).join(' ');
+  }
+  return emailMap.get(member.user_id) || member.user_id.slice(0, 8) + '…';
+}
+
+const activeMembers = memberRows.filter(m => m.accepted_at);
+const pendingInvites = memberRows.filter(m => !m.accepted_at);
+
+const canInvite     = hasPermission(myRole, 'team.invite');
+const canChangeRole = hasPermission(myRole, 'team.change_role');
+const canRemove     = hasPermission(myRole, 'team.remove');
+---
+
+<AdminLayout title="Team" hotel={hotel} user={{ email: user.email ?? '' }} activeTab="team">
+  <div x-data={`teamPage({ canInvite: ${canInvite}, canChangeRole: ${canChangeRole}, canRemove: ${canRemove}, myUserId: ${JSON.stringify(user.id)} })`} class="team-page">
+
+    <header class="team-header">
+      <p class="team-eyebrow">— 09 · Team —</p>
+      <h1 class="team-title">Mitarbeiter dieses Hotels<span class="h-dot">.</span></h1>
+      <p class="team-sub">
+        Owner verwaltet, Manager pflegen Inhalte + bestätigen Operations,
+        Staff bearbeiten Tages-Geschäft (Service-Anfragen, Buchungen).
+      </p>
+    </header>
+
+    {canInvite && (
+      <div class="team-actions-row">
+        <button type="button" @click="openInvite = true" class="team-btn team-btn--primary">+ Mitarbeiter einladen</button>
+      </div>
+    )}
+
+    <section class="team-section">
+      <h2 class="team-section-title">Aktive Mitglieder <span class="team-counter">({activeMembers.length})</span></h2>
+      <div class="team-list">
+        {activeMembers.map(m => {
+          const isMe = m.user_id === user.id;
+          const isOwner = m.role === 'owner';
+          return (
+            <article class="team-row" data-member-id={m.id}>
+              <div class="team-row-info">
+                <p class="team-row-name">
+                  {displayName(m)}{isMe && <span class="team-row-self"> (du)</span>}
+                </p>
+                <p class="team-row-meta">{emailMap.get(m.user_id) || '—'}</p>
+              </div>
+              <div class="team-row-actions">
+                {(canChangeRole && !isOwner && !isMe) ? (
+                  <select
+                    class="team-role-select"
+                    data-member-id={m.id}
+                    data-current-role={m.role}
+                    @change="changeRole($event)"
+                  >
+                    <option value="manager" selected={m.role === 'manager'}>Manager</option>
+                    <option value="staff" selected={m.role === 'staff'}>Mitarbeiter</option>
+                  </select>
+                ) : (
+                  <span class={`team-role-badge team-role-badge--${m.role}`}>{ROLE_LABELS[m.role as Role]}{isOwner && ' ★'}</span>
+                )}
+                {(canRemove && !isOwner && !isMe) && (
+                  <button type="button" class="team-icon-btn team-icon-btn--danger" @click={`removeMember('${m.id}', '${displayName(m).replace(/'/g, "\\'")}')`}>Entfernen</button>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+
+    {pendingInvites.length > 0 && (
+      <section class="team-section">
+        <h2 class="team-section-title">Offene Einladungen <span class="team-counter">({pendingInvites.length})</span></h2>
+        <div class="team-list">
+          {pendingInvites.map(m => (
+            <article class="team-row team-row--pending">
+              <div class="team-row-info">
+                <p class="team-row-name">{emailMap.get(m.user_id) || '—'}</p>
+                <p class="team-row-meta">eingeladen als {ROLE_LABELS[m.role as Role]} · {m.invited_at ? new Date(m.invited_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+              </div>
+              <div class="team-row-actions">
+                <span class="team-role-badge team-role-badge--pending">Ausstehend</span>
+                {canRemove && (
+                  <button type="button" class="team-icon-btn team-icon-btn--danger" @click={`removeMember('${m.id}', '${(emailMap.get(m.user_id) || '').replace(/'/g, "\\'")}')`}>Widerrufen</button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- Invite-Modal -->
+    {canInvite && (
+      <div x-show="openInvite" x-cloak class="team-modal-backdrop" @click.self="openInvite = false">
+        <div class="team-modal" @click.stop>
+          <header class="team-modal-head">
+            <h3>Mitarbeiter einladen</h3>
+            <button type="button" @click="openInvite = false" class="team-modal-close">×</button>
+          </header>
+          <div class="team-modal-body">
+            <label class="team-field">
+              <span class="team-field-label">E-Mail</span>
+              <input type="email" x-model="inviteEmail" placeholder="kollege@hotel.de" class="team-input" />
+            </label>
+            <label class="team-field">
+              <span class="team-field-label">Rolle</span>
+              <select x-model="inviteRole" class="team-input">
+                <option value="manager">Manager (Inhalte + Settings + Operations)</option>
+                <option value="staff">Mitarbeiter (nur Operations)</option>
+              </select>
+            </label>
+            <p class="team-modal-hint">
+              Der Eingeladene bekommt einen Magic-Link per E-Mail. Beim ersten Login
+              ist die Einladung automatisch akzeptiert.
+            </p>
+            <p x-show="inviteError" x-text="inviteError" class="team-error" x-cloak></p>
+          </div>
+          <footer class="team-modal-foot">
+            <button type="button" @click="openInvite = false" class="team-btn team-btn--ghost">Abbrechen</button>
+            <button type="button" @click="sendInvite()" :disabled="isSending" class="team-btn team-btn--primary">
+              <span x-show="!isSending">Einladung senden</span>
+              <span x-show="isSending" x-cloak>Sende …</span>
+            </button>
+          </footer>
+        </div>
+      </div>
+    )}
+
+    <div x-show="toast" x-cloak :class="`team-toast team-toast--${toastKind}`" x-text="toast"></div>
+  </div>
+
+  <script>
+    import Alpine from 'alpinejs';
+    Alpine.data('teamPage', (init: any) => ({
+      canInvite: init.canInvite,
+      canChangeRole: init.canChangeRole,
+      canRemove: init.canRemove,
+      myUserId: init.myUserId,
+      openInvite: false,
+      inviteEmail: '',
+      inviteRole: 'staff' as 'manager' | 'staff',
+      inviteError: '',
+      isSending: false,
+      toast: '' as string,
+      toastKind: 'success' as 'success' | 'error',
+
+      showToast(msg: string, kind: 'success' | 'error' = 'success') {
+        this.toast = msg;
+        this.toastKind = kind;
+        setTimeout(() => { this.toast = ''; }, 3500);
+      },
+
+      async sendInvite() {
+        this.inviteError = '';
+        const email = this.inviteEmail.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          this.inviteError = 'Bitte eine gültige E-Mail eingeben.';
+          return;
+        }
+        this.isSending = true;
+        try {
+          const res = await fetch('/api/admin/team/invite', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, role: this.inviteRole }),
+          });
+          const data = await res.json();
+          if (!data.ok) { this.inviteError = data.message || data.error || 'Fehler.'; return; }
+          this.openInvite = false;
+          this.inviteEmail = '';
+          this.showToast(`${email} eingeladen — Magic-Link versendet.`);
+          setTimeout(() => window.location.reload(), 600);
+        } catch (err: any) {
+          this.inviteError = 'Netzwerk-Fehler: ' + (err.message ?? err);
+        } finally {
+          this.isSending = false;
+        }
+      },
+
+      async changeRole(ev: Event) {
+        const sel = ev.target as HTMLSelectElement;
+        const memberId = sel.dataset.memberId;
+        const newRole = sel.value;
+        const prev = sel.dataset.currentRole;
+        try {
+          const res = await fetch('/api/admin/team/role', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: memberId, new_role: newRole }),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            sel.value = prev || 'staff';
+            this.showToast(data.message || data.error || 'Rollen-Wechsel fehlgeschlagen.', 'error');
+            return;
+          }
+          sel.dataset.currentRole = newRole;
+          this.showToast('Rolle aktualisiert.');
+        } catch (err: any) {
+          sel.value = prev || 'staff';
+          this.showToast('Netzwerk-Fehler.', 'error');
+        }
+      },
+
+      async removeMember(memberId: string, name: string) {
+        if (!confirm(`${name} wirklich entfernen?`)) return;
+        try {
+          const res = await fetch('/api/admin/team/remove', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: memberId }),
+          });
+          const data = await res.json();
+          if (!data.ok) { this.showToast(data.error || 'Entfernen fehlgeschlagen.', 'error'); return; }
+          this.showToast(`${name} entfernt.`);
+          setTimeout(() => window.location.reload(), 400);
+        } catch (err: any) {
+          this.showToast('Netzwerk-Fehler.', 'error');
+        }
+      },
+    }));
+  </script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    .team-page { padding: 0 24px 60px; max-width: 1100px; margin: 0 auto; }
+    .team-header { margin: 20px 0 24px; }
+    .team-eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); }
+    .team-title { margin: 0 0 8px; font-size: 28px; font-weight: 300; letter-spacing: -0.01em; color: var(--theme-text-primary); }
+    .team-sub { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
+
+    .team-actions-row { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+
+    .team-section { margin-bottom: 32px; }
+    .team-section-title { margin: 0 0 12px; font-size: 16px; font-weight: 500; }
+    .team-counter { color: color-mix(in srgb, var(--theme-text-primary) .45, transparent); font-weight: 400; margin-left: 4px; }
+
+    .team-list { display: flex; flex-direction: column; gap: 8px; }
+    .team-row { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .team-row--pending { background: #fff8e1; border-color: #f5d77a; }
+    .team-row-info { min-width: 0; flex: 1; }
+    .team-row-name { margin: 0 0 2px; font-size: 15px; font-weight: 500; color: var(--theme-text-primary); }
+    .team-row-self { color: color-mix(in srgb, var(--theme-text-primary) .45, transparent); font-weight: 400; font-size: 13px; }
+    .team-row-meta { margin: 0; font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
+    .team-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    .team-role-badge { font-size: 11px; padding: 4px 10px; background: color-mix(in srgb, var(--theme-text-primary) .06, transparent); color: color-mix(in srgb, var(--theme-text-primary) .8, transparent); letter-spacing: 0.04em; }
+    .team-role-badge--owner { background: rgba(var(--theme-accent-rgb), .08); color: var(--theme-accent); }
+    .team-role-badge--pending { background: var(--theme-bg-primary); color: #8a5800; border: 1px solid #f5d77a; }
+    .team-role-select { padding: 5px 10px; font-size: 12px; border: 1px solid var(--theme-border); background: var(--theme-bg-primary); cursor: pointer; }
+    .team-role-select:hover { border-color: var(--theme-text-primary); }
+
+    .team-icon-btn { padding: 5px 12px; font-size: 12px; border: 1px solid var(--theme-border); background: var(--theme-bg-primary); cursor: pointer; }
+    .team-icon-btn:hover { background: var(--theme-bg-tertiary); }
+    .team-icon-btn--danger:hover { background: #fdeaea; border-color: #aa1f1f; color: #aa1f1f; }
+
+    .team-btn { padding: 8px 16px; font-size: 13px; font-weight: 500; border: 1px solid; cursor: pointer; background: var(--theme-bg-primary); color: var(--theme-text-primary); font-family: inherit; }
+    .team-btn:disabled { opacity: 0.5; cursor: wait; }
+    .team-btn--primary { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
+    .team-btn--primary:hover:not(:disabled) { background: var(--theme-accent-hover); }
+    .team-btn--ghost { border-color: var(--theme-border); }
+    .team-btn--ghost:hover { background: var(--theme-bg-tertiary); }
+
+    /* Modal */
+    .team-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding: 60px 24px 24px; z-index: 100; }
+    .team-modal { background: var(--theme-bg-primary); width: 100%; max-width: 480px; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+    .team-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--theme-border); }
+    .team-modal-head h3 { margin: 0; font-size: 18px; font-weight: 500; }
+    .team-modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); line-height: 1; }
+    .team-modal-body { padding: 20px; }
+    .team-modal-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--theme-border); }
+    .team-modal-hint { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin: 12px 0 0; font-style: italic; }
+    .team-error { color: #aa1f1f; font-size: 12px; margin: 8px 0 0; }
+    .team-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .team-field-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
+    .team-input { padding: 9px 12px; border: 1px solid var(--theme-border); font-size: 14px; font-family: inherit; }
+    .team-input:focus { outline: none; border-color: var(--theme-accent); }
+
+    /* Toast */
+    .team-toast { position: fixed; top: 16px; right: 16px; padding: 10px 16px; color: var(--theme-bg-primary); font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+    .team-toast--success { background: #1f7a3a; }
+    .team-toast--error { background: #aa1f1f; }
+  </style>
+</AdminLayout>

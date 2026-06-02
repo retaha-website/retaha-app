@@ -1,0 +1,124 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import BauhausToggle from '../../components/admin/BauhausToggle.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { t } from '../../i18n/helpers';
+
+const userLocale = Astro.locals.locale;
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+const featureDefs = [
+  { key: 'breakfast_reservation', label: 'Frühstück reservieren', desc: 'Gäste können einen Tisch fürs Frühstück buchen' },
+  { key: 'conference_booking', label: 'Konferenz buchen', desc: 'Gäste können Salon Linde / Eiche reservieren' },
+  { key: 'concierge_chat', label: 'Concierge-Chat', desc: 'Direkter Chat mit dem Empfang' },
+  { key: 'berlin_tips', label: 'Berliner Tipps', desc: 'Lokale Empfehlungen mit Karte' },
+  { key: 'wallet_card', label: 'Treuekarte (Wallet)', desc: 'Apple/Google Wallet-Karte für Stammgäste' },
+  { key: 'service_requests', label: 'Service-Anfragen', desc: 'Handtücher, Wasser, Bügeleisen anfordern' },
+  { key: 'checkout_flow', label: 'Self-Checkout', desc: 'Gast kann ohne Empfang auschecken' },
+];
+
+// Handle POST
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const newFeatures: Record<string, boolean> = {};
+
+  featureDefs.forEach(f => {
+    newFeatures[f.key] = form.getAll(`feature_${f.key}`).includes('on');
+  });
+
+  const { data: updatedRows, error } = await client
+    .from('hotel_settings')
+    .update({ features: newFeatures, updated_at: new Date().toISOString() })
+    .eq('hotel_id', hotel.id)
+    .select('hotel_id');
+
+  if (error) {
+    message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+  } else if (!updatedRows || updatedRows.length === 0) {
+    message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
+  } else {
+    message = { type: 'success', text: 'Funktionen aktualisiert.' };
+  }
+}
+
+// Load current
+const { data: settings } = await client
+  .from('hotel_settings')
+  .select('features')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+
+const features = (settings?.features as Record<string, boolean>) || {};
+---
+
+<AdminLayout title="Funktionen" hotel={hotel} user={user} activeTab="features">
+  <div class="-mt-10">
+    <EditorialPageHeader
+      sectionNumber={t('pages.features.section_number', userLocale)}
+      sectionLabel={t('pages.features.section_label', userLocale)}
+      headlineLight={t('pages.features.headline_light', userLocale)}
+      headlineBold={t('pages.features.headline_bold', userLocale)}
+      subtitle={t('pages.features.subtitle', userLocale)}
+    />
+  </div>
+
+  {message && (
+    <div class={`mb-6 px-4 py-3 text-sm ${
+      message.type === 'success'
+        ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
+        : 'bg-red-50 border-l-4 border-red-700 text-red-800'
+    }`}>
+      {message.text}
+    </div>
+  )}
+
+  <form method="POST">
+    <div class="flex flex-col">
+      {featureDefs.map(f => {
+        const isOn = features[f.key] !== false; // default true
+        const inputId = `toggle-feature-${f.key}`;
+        return (
+          <label
+            for={inputId}
+            class="flex items-center gap-5 py-[26px] border-b border-anthrazit/7 last:border-b-0 cursor-pointer"
+          >
+            <span
+              data-toggle-accent
+              class="w-1.5 h-1.5 rounded-full bg-anthrazit/30 transition-colors duration-200 ease-in-out flex-shrink-0 pointer-events-none"
+              aria-hidden="true"
+            ></span>
+
+            <div class="flex-1 min-w-0">
+              <p class="text-[15px] font-medium text-anthrazit leading-tight tracking-tight mb-1.5">{f.label}</p>
+              <p class="text-[13px] italic text-anthrazit/55 leading-[1.55]">{f.desc}</p>
+            </div>
+
+            <BauhausToggle id={inputId} name={`feature_${f.key}`} checked={isOn} label={f.label} />
+          </label>
+        );
+      })}
+    </div>
+
+    <div class="mt-6 flex justify-end">
+      <button type="submit" class="bauhaus-button bauhaus-button--primary">
+        Änderungen speichern
+      </button>
+    </div>
+  </form>
+
+  <p class="mt-12 eyebrow text-anthrazit/40">
+    Hinweis: deaktivierte Funktionen verschwinden sofort aus der Gast-Ansicht.
+    Aktive Buchungen bleiben aber bestehen.
+  </p>
+</AdminLayout>

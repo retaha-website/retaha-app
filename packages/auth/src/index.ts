@@ -12,15 +12,10 @@ export {
   getUserHotels,
 } from './server';
 
-// Permissions (Sprint Functional)
-export {
-  hasPermission,
-  isRole,
-  type Permission,
-  type Role,
-} from './permissions';
+// Permissions (Sprint Functional) — alle exports
+export * from './permissions';
 
-export { requirePermission } from './require-permission';
+export * from './require-permission';
 
 // Stay-Session (JWT-Cookie für Gast-Frontend via /g/[token])
 export * from './stay-session';

@@ -1,0 +1,410 @@
+---
+import AdminLayout from '../../../components/AdminLayout.astro';
+import BauhausToggle from '../../../components/admin/BauhausToggle.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { loadBreakfastItem, EU_ALLERGENS } from '@retaha/db';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const { id } = Astro.params;
+const isNew = id === 'new';
+
+let item: any = null;
+if (!isNew && id) {
+  item = await loadBreakfastItem(id, hotel.id);
+  if (!item) return Astro.redirect('/admin/menu?error=not_found');
+}
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString();
+
+  if (action === 'delete' && !isNew) {
+    const { error } = await client
+      .from('breakfast_items')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      message = { type: 'error', text: `Löschen fehlgeschlagen: ${error.message}` };
+    } else {
+      return Astro.redirect('/admin/menu?deleted=1');
+    }
+  } else {
+    const allergenValues: Record<string, boolean> = {};
+    EU_ALLERGENS.forEach(a => {
+      allergenValues[`contains_${a.key}`] = form.get(`allergen_${a.key}`) === 'on';
+    });
+
+    const updates: Record<string, any> = {
+      hotel_id: hotel.id,
+      display_order: parseInt(form.get('display_order')?.toString() || '0') || 0,
+      is_active: form.getAll('is_active').includes('on'),
+      category: form.get('category')?.toString().trim() || null,
+
+      // Sprint D Phase 6d — Preis in Brutto-EUR aus Form-Input parsen,
+      // als Cents speichern. Wird beim Mews-Charge-Push als GrossValue genutzt
+      // (Gross-Pricing-Hotels) oder via Net-Rückrechnung (Net-Hotels).
+      price_cents: Math.max(0, Math.round(parseFloat(form.get('price_eur')?.toString().replace(',', '.') || '0') * 100) || 0),
+
+      name_de: form.get('name_de')?.toString().trim() || '',
+      name_en: form.get('name_en')?.toString().trim() || null,
+      name_fr: form.get('name_fr')?.toString().trim() || null,
+      name_es: form.get('name_es')?.toString().trim() || null,
+
+      description_de: form.get('description_de')?.toString().trim() || null,
+      description_en: form.get('description_en')?.toString().trim() || null,
+      description_fr: form.get('description_fr')?.toString().trim() || null,
+      description_es: form.get('description_es')?.toString().trim() || null,
+
+      ...allergenValues,
+
+      is_vegetarian: form.getAll('is_vegetarian').includes('on'),
+      is_vegan: form.getAll('is_vegan').includes('on'),
+      is_organic: form.getAll('is_organic').includes('on'),
+
+      updated_at: new Date().toISOString(),
+    };
+
+    if (!updates.name_de) {
+      message = { type: 'error', text: 'Name (Deutsch) ist Pflichtfeld' };
+    } else {
+      if (isNew) {
+        const { data, error } = await client
+          .from('breakfast_items')
+          .insert(updates)
+          .select('id')
+          .single();
+
+        if (error) {
+          message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
+        } else if (data) {
+          return Astro.redirect(`/admin/menu/${data.id}?created=1`);
+        }
+      } else {
+        const { data: updatedRows, error } = await client
+          .from('breakfast_items')
+          .update(updates)
+          .eq('id', id)
+          .select('id');
+
+        if (error) {
+          message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+        } else if (!updatedRows || updatedRows.length === 0) {
+          message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
+        } else {
+          message = { type: 'success', text: 'Speise gespeichert.' };
+          item = { ...item, ...updates };
+        }
+      }
+    }
+  }
+}
+
+// Defaults for new item
+const data = item || {
+  display_order: 0,
+  is_active: true,
+  category: '',
+  price_cents: 0,
+  name_de: '', name_en: '', name_fr: '', name_es: '',
+  description_de: '', description_en: '', description_fr: '', description_es: '',
+  contains_gluten: false, contains_crustaceans: false, contains_eggs: false,
+  contains_fish: false, contains_peanuts: false, contains_soy: false,
+  contains_milk: false, contains_nuts: false, contains_celery: false,
+  contains_mustard: false, contains_sesame: false, contains_sulfites: false,
+  contains_lupins: false, contains_molluscs: false,
+  is_vegetarian: false, is_vegan: false, is_organic: false,
+};
+
+// Check URL params for created-message
+const url = new URL(Astro.request.url);
+if (url.searchParams.get('created') === '1' && !message) {
+  message = { type: 'success', text: 'Speise angelegt.' };
+}
+---
+
+<AdminLayout title={isNew ? 'Neue Speise' : data.name_de} hotel={hotel} user={{ email: user.email ?? '' }} activeTab="menu">
+  <div class="mb-6">
+    <a href="/admin/menu" class="text-xs text-anthrazit/55 hover:text-pink-shock transition">
+      ← Zurück zur Speisen-Liste
+    </a>
+  </div>
+
+  <div class="mb-8">
+    <p class="eyebrow text-pink-shock mb-2">— Speise —</p>
+    <h1 class="text-3xl font-light">
+      {isNew
+        ? <>Neue <span class="font-medium">Speise</span><span class="text-pink-shock">.</span></>
+        : <><span class="font-medium">{data.name_de}</span><span class="text-pink-shock">.</span></>
+      }
+    </h1>
+  </div>
+
+  {message && (
+    <div class={`mb-6 px-4 py-3 text-sm ${
+      message.type === 'success'
+        ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
+        : 'bg-red-50 border-l-4 border-red-700 text-red-800'
+    }`}>
+      {message.text}
+    </div>
+  )}
+
+  <form method="POST" class="space-y-6">
+
+    <!-- Allgemein -->
+    <section class="bg-white border border-anthrazit/[0.12] p-6">
+      <h2 class="text-lg font-medium mb-4">Allgemein</h2>
+
+      <div class="grid grid-cols-12 gap-4">
+        <label class="bauhaus-field col-span-5">
+          <span class="bauhaus-field-eyebrow">— Kategorie —</span>
+          <input
+            type="text"
+            name="category"
+            value={data.category || ''}
+            placeholder="z.B. Brot, Körnig, Warm, Beilagen"
+            class="bauhaus-input"
+          />
+        </label>
+
+        <label class="bauhaus-field col-span-2">
+          <span class="bauhaus-field-eyebrow">— Preis (EUR) —</span>
+          <input
+            type="number"
+            name="price_eur"
+            value={((data.price_cents ?? 0) / 100).toFixed(2)}
+            min="0"
+            step="0.01"
+            placeholder="0,00"
+            class="bauhaus-input"
+          />
+        </label>
+
+        <label class="bauhaus-field col-span-2">
+          <span class="bauhaus-field-eyebrow">— Reihenfolge —</span>
+          <input
+            type="number"
+            name="display_order"
+            value={data.display_order || 0}
+            class="bauhaus-input"
+          />
+        </label>
+
+        <div class="col-span-3 flex items-end">
+          <label for={`toggle-active-${id}`} class="flex items-center gap-3 cursor-pointer p-2">
+            <BauhausToggle id={`toggle-active-${id}`} name="is_active" checked={data.is_active !== false} label="Aktiv" />
+            <span class="text-sm">Aktiv</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Name (4 Sprachen) -->
+    <section class="bg-white border border-anthrazit/[0.12] p-6" data-translate-section="name">
+      <div class="flex justify-between items-start gap-4 mb-4">
+        <div>
+          <h2 class="text-lg font-medium">Name</h2>
+          <p class="text-xs text-anthrazit/55 mt-1">In allen 4 Sprachen. Pflichtfeld: Deutsch.</p>
+        </div>
+{/* Sprint i18n Phase 5: DeepL-Button entfernt — Auto-Translation in Phase 6 */}
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch *</span>
+          <input
+            type="text"
+            name="name_de"
+            data-field="name_de"
+            value={data.name_de || ''}
+            required
+            class="bauhaus-input"
+          />
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
+          <input
+            type="text"
+            name="name_en"
+            data-field="name_en"
+            value={data.name_en || ''}
+            class="bauhaus-input"
+          />
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
+          <input
+            type="text"
+            name="name_fr"
+            data-field="name_fr"
+            value={data.name_fr || ''}
+            class="bauhaus-input"
+          />
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
+          <input
+            type="text"
+            name="name_es"
+            data-field="name_es"
+            value={data.name_es || ''}
+            class="bauhaus-input"
+          />
+        </label>
+      </div>
+    </section>
+
+    <!-- Beschreibung (4 Sprachen) -->
+    <section class="bg-white border border-anthrazit/[0.12] p-6" data-translate-section="description">
+      <div class="flex justify-between items-start gap-4 mb-4">
+        <div>
+          <h2 class="text-lg font-medium">Beschreibung</h2>
+          <p class="text-xs text-anthrazit/55 mt-1">Optional. Z.B. "Hausgemacht mit Roggen-Sauerteig"</p>
+        </div>
+{/* Sprint i18n Phase 5: DeepL-Button entfernt — Auto-Translation in Phase 6 */}
+      </div>
+
+      <div class="space-y-3">
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
+          <textarea
+            name="description_de"
+            data-field="description_de"
+            rows="2"
+            class="bauhaus-textarea"
+          >{data.description_de || ''}</textarea>
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
+          <textarea
+            name="description_en"
+            data-field="description_en"
+            rows="2"
+            class="bauhaus-textarea"
+          >{data.description_en || ''}</textarea>
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
+          <textarea
+            name="description_fr"
+            data-field="description_fr"
+            rows="2"
+            class="bauhaus-textarea"
+          >{data.description_fr || ''}</textarea>
+        </label>
+        <label class="bauhaus-field">
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
+          <textarea
+            name="description_es"
+            data-field="description_es"
+            rows="2"
+            class="bauhaus-textarea"
+          >{data.description_es || ''}</textarea>
+        </label>
+      </div>
+    </section>
+
+    <!-- Allergene -->
+    <section class="bg-white border-2 border-amber-300 p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" class="text-amber-700 flex-shrink-0">
+          <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+        </svg>
+        <div>
+          <h2 class="text-lg font-medium text-amber-900">14 EU-Hauptallergene</h2>
+          <p class="text-xs text-amber-800 mt-1 max-w-xl leading-relaxed">
+            Kreuze an, was diese Speise enthält. Pflicht nach LMIV Art. 9.
+            Du musst das bei Rezeptur-Änderungen aktualisieren — die Software erinnert dich nicht.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <input type="hidden" name="_allergen_marker" value="set" />
+        {EU_ALLERGENS.map(a => (
+          <label class="flex items-center gap-2 p-2 hover:bg-amber-50 cursor-pointer transition">
+            <input
+              type="checkbox"
+              name={`allergen_${a.key}`}
+              checked={data[`contains_${a.key}`]}
+              class="w-4 h-4 accent-amber-700"
+            />
+            <span class="text-sm">{a.label_de}</span>
+          </label>
+        ))}
+      </div>
+    </section>
+
+    <!-- Diät-Flags -->
+    <section class="bg-white border border-anthrazit/[0.12] p-6">
+      <h2 class="text-lg font-medium mb-4">Diät-Flags</h2>
+
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label for={`toggle-vegetarian-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-white transition border border-anthrazit/[0.12]">
+            <BauhausToggle id={`toggle-vegetarian-${id}`} name="is_vegetarian" checked={!!data.is_vegetarian} label="Vegetarisch" />
+            <span class="text-sm">Vegetarisch</span>
+          </label>
+        </div>
+
+        <div>
+          <label for={`toggle-vegan-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-white transition border border-anthrazit/[0.12]">
+            <BauhausToggle id={`toggle-vegan-${id}`} name="is_vegan" checked={!!data.is_vegan} label="Vegan" />
+            <span class="text-sm">Vegan</span>
+          </label>
+        </div>
+
+        <div>
+          <label for={`toggle-organic-${id}`} class="flex items-center gap-3 p-3 cursor-pointer hover:bg-white transition border border-anthrazit/[0.12]">
+            <BauhausToggle id={`toggle-organic-${id}`} name="is_organic" checked={!!data.is_organic} label="Bio" />
+            <span class="text-sm">Bio</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="flex justify-between items-center pt-4">
+      {!isNew ? (
+        <button
+          type="submit"
+          name="_action"
+          value="delete"
+          onclick="return confirm('Speise wirklich löschen?')"
+          class="bauhaus-button bauhaus-button--destructive"
+        >
+          Löschen
+        </button>
+      ) : (
+        <div></div>
+      )}
+
+      <div class="flex gap-3 items-center">
+        <a href="/admin/menu" class="bauhaus-button bauhaus-button--ghost">
+          Abbrechen
+        </a>
+        <button
+          type="submit"
+          class="bauhaus-button bauhaus-button--primary"
+        >
+          {isNew ? 'Speise anlegen' : 'Änderungen speichern'}
+        </button>
+      </div>
+    </div>
+
+  </form>
+
+  <!-- Sprint i18n Phase 5: DeepL-Translate-Script entfernt.
+       Auto-Translation in Phase 6 via async Save-Hook (Haiku). -->
+</AdminLayout>

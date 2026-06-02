@@ -507,7 +507,7 @@ async function syncStaysFromReservations(
   // welcome-Trigger. Best-Effort: pro Stay isoliert, killt nicht den Sync-Run.
   if (insertedStays.length > 0) {
     try {
-      const { linkReturningGuests } = await import('../wallet/returning-guest');
+      const { linkReturningGuests } = await import('@retaha/wallet');
       await linkReturningGuests(insertedStays);
     } catch (err) {
       console.warn('[mews-sync] returning-guest-linking failed (non-fatal):', (err as Error).message);

@@ -102,5 +102,46 @@ function runMigration(name, list) {
   return total;
 }
 
+// ─────────────────────────────────────────────────────────────
+// backoffice-App: Hotelier-Config (backoffice.retaha.de)
+// ─────────────────────────────────────────────────────────────
+const BACKOFFICE_MIGRATIONS = [
+  // Admin-Pages (32 echte + 19 Coming-Soon-Stubs = 51)
+  ['src/pages/admin',                      'apps/backoffice/src/pages/admin'],
+  // Onboarding (Wizard) — public-Pages
+  ['src/pages/onboarding',                 'apps/backoffice/src/pages/onboarding'],
+  // Admin-API
+  ['src/pages/api/admin',                  'apps/backoffice/src/pages/api/admin'],
+  // Cron-Jobs für backoffice (Marketing-Scheduler, Drips, Auto-Delete, Cleanup)
+  ['src/pages/api/cron/marketing-scheduler.ts', 'apps/backoffice/src/pages/api/cron/marketing-scheduler.ts'],
+  ['src/pages/api/cron/marketing-drips.ts',     'apps/backoffice/src/pages/api/cron/marketing-drips.ts'],
+  ['src/pages/api/cron/auto-delete-stays.ts',   'apps/backoffice/src/pages/api/cron/auto-delete-stays.ts'],
+  ['src/pages/api/cron/eve-chat-cleanup.ts',    'apps/backoffice/src/pages/api/cron/eve-chat-cleanup.ts'],
+  ['src/pages/api/cron/places-refresh.ts',      'apps/backoffice/src/pages/api/cron/places-refresh.ts'],
+  ['src/pages/api/cron/places-nearby-refresh.ts','apps/backoffice/src/pages/api/cron/places-nearby-refresh.ts'],
+  // Layouts
+  ['src/components/AdminLayout.astro',     'apps/backoffice/src/components/AdminLayout.astro'],
+  ['src/components/AdminFooter.astro',     'apps/backoffice/src/components/AdminFooter.astro'],
+  ['src/components/Bell.astro',            'apps/backoffice/src/components/Bell.astro'],
+  ['src/components/CookieBanner.astro',    'apps/backoffice/src/components/CookieBanner.astro'],
+  ['src/layouts/OnboardingLayout.astro',   'apps/backoffice/src/layouts/OnboardingLayout.astro'],
+  // Admin-Components
+  ['src/components/admin',                 'apps/backoffice/src/components/admin'],
+  // Lib (alles was admin nutzt)
+  ['src/lib/mews',                         'apps/backoffice/src/lib/mews'],
+  ['src/lib/trial-status.ts',              'apps/backoffice/src/lib/trial-status.ts'],
+  ['src/lib/onboarding',                   'apps/backoffice/src/lib/onboarding'],
+  ['src/lib/legal',                        'apps/backoffice/src/lib/legal'],
+  ['src/lib/email',                        'apps/backoffice/src/lib/email'],
+  ['src/lib/push',                         'apps/backoffice/src/lib/push'],
+  ['src/lib/places',                       'apps/backoffice/src/lib/places'],
+  ['src/lib/qr',                           'apps/backoffice/src/lib/qr'],
+  ['src/lib/storage',                      'apps/backoffice/src/lib/storage'],
+  ['src/lib/showcase',                     'apps/backoffice/src/lib/showcase'],
+  // i18n (UI-strings für admin labels)
+  ['src/i18n',                             'apps/backoffice/src/i18n'],
+];
+
 if (arg === 'guest' || arg === 'all') runMigration('guest', GUEST_MIGRATIONS);
 if (arg === 'dashboard' || arg === 'all') runMigration('dashboard', DASHBOARD_MIGRATIONS);
+if (arg === 'backoffice' || arg === 'all') runMigration('backoffice', BACKOFFICE_MIGRATIONS);

@@ -1,0 +1,81 @@
+---
+// Sprint Wallet · Phase 9 — Marketing-Template Edit-Page
+//
+// Permission: content.write
+// Lädt das Template, gibt Default-Sprach-Werte an den Editor.
+
+import AdminLayout from '../../../../../components/AdminLayout.astro';
+import MarketingEditor from '../../../../../components/admin/MarketingEditor.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { getUserRole } from '@retaha/auth';
+import { hasPermission } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'content.write')) {
+  return new Response('Forbidden', { status: 403 });
+}
+
+const templateId = Astro.params.id;
+if (!templateId) return Astro.redirect('/admin/marketing/templates');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: template } = await client
+  .from('marketing_templates')
+  .select('id, hotel_id, name, category, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url, is_archived')
+  .eq('id', templateId)
+  .maybeSingle();
+
+if (!template || template.hotel_id !== hotel.id) {
+  return Astro.redirect('/admin/marketing/templates');
+}
+
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+function pickDefault(jsonb: any): string {
+  if (!jsonb) return '';
+  return jsonb[hotelDefaultLang]?.value ?? '';
+}
+
+const initialTitle    = pickDefault(template.title_i18n);
+const initialBodyHtml = pickDefault(template.body_i18n);
+const initialCtaLabel = pickDefault(template.cta_label_i18n);
+---
+
+<AdminLayout title={`Marketing · ${template.name}`} hotel={hotel} user={user}>
+  <div class="mt-page">
+    <header class="mt-header">
+      <p class="mt-eyebrow">— Marketing · Vorlage bearbeiten —</p>
+      <h1 class="mt-title">{template.name}<span class="dot">.</span></h1>
+      {template.is_archived && (
+        <p class="mt-sub mt-archived">⚠ Diese Vorlage ist archiviert. Sie wird in Drip-Sequenzen weiterhin verwendet, kann aber nicht für neue Kampagnen ausgewählt werden.</p>
+      )}
+    </header>
+
+    <MarketingEditor
+      templateId={templateId}
+      initialTitle={initialTitle}
+      initialBodyHtml={initialBodyHtml}
+      initialCtaLabel={initialCtaLabel}
+      initialCtaUrl={template.cta_url ?? ''}
+      initialHeroUrl={template.hero_image_url ?? ''}
+      initialName={template.name}
+      initialCategory={template.category ?? null}
+      hotelDefaultLang={hotelDefaultLang}
+    />
+  </div>
+
+  <style>
+    .mt-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .mt-header { margin: 20px 0 32px; }
+    .mt-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 6px; }
+    .mt-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; letter-spacing: -0.01em; }
+    .dot { color: var(--theme-accent); }
+    .mt-sub { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); max-width: 720px; line-height: 1.5; }
+    .mt-archived { background: #fff8e1; padding: 12px; border-left: 3px solid #f5d77a; color: #6b4f00; max-width: none; }
+  </style>
+</AdminLayout>

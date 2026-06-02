@@ -1,0 +1,206 @@
+---
+import AdminLayout from '../../components/AdminLayout.astro';
+import EditorialPageHeader from '../../components/admin/EditorialPageHeader.astro';
+import {
+  getUser,
+  getUserHotels,
+  createSupabaseServiceRoleInstance,
+} from '@retaha/auth';
+import { signPairToken } from '@retaha/auth';
+import { getEnv } from '@retaha/db';
+import QRCode from 'qrcode';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const supabase = createSupabaseServiceRoleInstance();
+
+// Heutige Anreisen — Brief: state=Confirmed + check_in_date = heute.
+// Pragmatic-Erweiterung: nächste 7 Tage falls heute nichts ist (besseres
+// Demo-Erlebnis). Über/in-house Anreisen werden hervorgehoben.
+const todayUtc = new Date();
+todayUtc.setUTCHours(0, 0, 0, 0);
+const horizonDays = 30;
+const sevenDaysOut = new Date(todayUtc.getTime() + horizonDays * 86_400_000);
+
+const { data: stays } = await supabase
+  .from('stays')
+  .select(`
+    id, check_in, check_out, state, room_id, wallet_pass_id,
+    rooms(room_number, room_name, room_code),
+    guests(first_name, last_name),
+    wallet_passes:wallet_pass_id(visit_count)
+  `)
+  .eq('hotel_id', hotel.id)
+  .eq('is_active', true)
+  .in('state', ['Confirmed', 'Started'])
+  .gte('check_in', todayUtc.toISOString())
+  .lt('check_in', sevenDaysOut.toISOString())
+  .order('check_in', { ascending: true })
+  .limit(50);
+
+const baseUrl = getEnv('PUBLIC_SITE_URL') ?? `http://localhost:4321`;
+
+interface PreparedStay {
+  id: string;
+  guestName: string;
+  roomLabel: string;
+  roomCode: string | null;
+  checkInLabel: string;
+  isToday: boolean;
+  pairUrl: string | null;
+  qrDataUrl: string | null;
+  /** Sprint Wallet Modul E: visit_count des verknüpften Wallet-Passes (1 = Erstbesuch). */
+  visitCount: number;
+}
+
+const prepared: PreparedStay[] = [];
+for (const s of stays ?? []) {
+  const g = s.guests as any;
+  const r = s.rooms as any;
+  const checkIn = s.check_in ? new Date(s.check_in) : null;
+  const today = new Date();
+  const isToday = !!checkIn && checkIn.toDateString() === today.toDateString();
+
+  // Pair-Token + QR
+  const pairToken = await signPairToken({ stay_id: s.id, hotel_id: hotel.id });
+  let pairUrl: string | null = null;
+  let qrDataUrl: string | null = null;
+  if (pairToken) {
+    pairUrl = `${baseUrl.replace(/\/$/, '')}/api/pair?token=${encodeURIComponent(pairToken)}`;
+    qrDataUrl = await QRCode.toDataURL(pairUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 280,
+      color: { dark: 'var(--theme-text-primary)', light: 'var(--theme-bg-primary)' },
+    });
+  }
+
+  const wp = (s as any).wallet_passes;
+  const wpRow = Array.isArray(wp) ? wp[0] : wp;
+  const visitCount = wpRow?.visit_count ?? 0;
+  prepared.push({
+    id: s.id,
+    guestName: [g?.first_name, g?.last_name].filter(Boolean).join(' ').trim() || 'Gast',
+    roomLabel: r?.room_number ? `${r.room_number}${r.room_name ? ` (${r.room_name})` : ''}` : r?.room_name ?? '—',
+    roomCode: r?.room_code ?? null,
+    checkInLabel: checkIn
+      ? checkIn.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+      : '?',
+    isToday,
+    pairUrl,
+    qrDataUrl,
+    visitCount,
+  });
+}
+
+const todayCount = prepared.filter(p => p.isToday).length;
+const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
+---
+
+<AdminLayout title="Check-ins" hotel={hotel} user={{ email: user.email }}>
+  <EditorialPageHeader
+    sectionNumber="40"
+    sectionLabel="Check-ins"
+    headlineLight="App-"
+    headlineBold="Pairing"
+    subtitle="Beim Check-in dem Gast den QR-Code mit dem Handy scannen lassen — App ist auf dem Phone gepairt, ohne Account, ohne Download."
+  />
+
+  {!tokenAvailable && prepared.length > 0 && (
+    <div class="mb-6 px-4 py-3 text-sm bg-amber-50 border-l-4 border-amber-500 text-amber-800">
+      <strong>STAY_SESSION_SECRET nicht konfiguriert</strong> — QR-Codes können nicht erzeugt werden.
+      Bitte in der .env setzen + Server neustarten.
+    </div>
+  )}
+
+  {prepared.length === 0 ? (
+    <div class="border border-stein p-12 text-center">
+      <p class="eyebrow text-anthrazit/55 mb-4">— Keine Anreisen in den nächsten 30 Tagen —</p>
+      <p class="text-sm text-anthrazit/70 max-w-md mx-auto">
+        Sobald Reservationen mit Status „Confirmed" im Sync gepullt werden, erscheinen sie hier.
+      </p>
+    </div>
+  ) : (
+    <div class="space-y-3">
+      {todayCount > 0 && (
+        <p class="eyebrow text-pink-shock mb-4">— {todayCount} Anreise{todayCount === 1 ? '' : 'n'} heute —</p>
+      )}
+
+      {prepared.map(p => (
+        <div
+          x-data={`{ open: false }`}
+          class={`border ${p.isToday ? 'border-pink-shock' : 'border-stein'} p-4 sm:p-6`}
+        >
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-1">
+                {p.checkInLabel}{p.isToday ? ' · heute' : ''}
+              </p>
+              <p class="text-lg font-medium text-anthrazit truncate">
+                {p.guestName}
+                {p.visitCount >= 5 && (
+                  <span class="ml-2 inline-flex items-center gap-1 text-xs font-medium" style="background: var(--theme-burgund); color: var(--theme-bg-primary); padding: 2px 8px; letter-spacing: 0.05em;">★ Stammgast · {p.visitCount}. Besuch</span>
+                )}
+                {p.visitCount >= 2 && p.visitCount < 5 && (
+                  <span class="ml-2 inline-flex items-center gap-1 text-xs font-medium" style="background: var(--theme-accent); color: var(--theme-bg-primary); padding: 2px 8px; letter-spacing: 0.05em;">★ {p.visitCount}. Besuch</span>
+                )}
+              </p>
+              <p class="text-sm text-anthrazit/55 mt-0.5">
+                Zimmer {p.roomLabel}
+                {p.roomCode && (
+                  <>
+                    {' '}·{' '}<span class="font-mono text-xs">{p.roomCode}</span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {p.qrDataUrl && (
+              <button
+                type="button"
+                @click="open = !open"
+                class="bauhaus-button bauhaus-button--primary bauhaus-button--small"
+              >
+                <span x-show="!open">📱 App-QR</span>
+                <span x-show="open" x-cloak>Schließen</span>
+              </button>
+            )}
+          </div>
+
+          {p.qrDataUrl && (
+            <div x-show="open" x-cloak x-transition class="mt-6 pt-6 border-t border-anthrazit/[0.12]">
+              <div class="flex flex-col sm:flex-row gap-6 items-start">
+                <div class="bg-white p-4 inline-block border border-stein">
+                  <img src={p.qrDataUrl} alt={`Pair-QR für ${p.guestName}`} width="280" height="280" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="eyebrow text-anthrazit/55 mb-2">— Anleitung für den Gast —</p>
+                  <ol class="text-sm text-anthrazit/80 leading-relaxed space-y-2 list-decimal list-inside">
+                    <li>Phone-Kamera öffnen</li>
+                    <li>QR-Code scannen — der Link öffnet im Browser</li>
+                    <li>App ist auf dem Phone gepairt — kein Login, kein Download</li>
+                  </ol>
+                  <p class="text-xs italic text-anthrazit/55 mt-4">
+                    QR-Code gültig 30 Minuten ab Anzeige. Bei Bedarf Seite neu laden für frischen Code.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+
+  <p class="text-xs italic text-anthrazit/55 mt-8 max-w-2xl leading-relaxed">
+    Architektur-Hinweis: Der QR enthält einen kurzlebigen, signierten Pair-Token (30 Min).
+    Er setzt beim Scan einen HttpOnly-Cookie auf dem Phone, der bis Check-out + 6h gültig
+    bleibt. Holzkarten mit NFC/QR im Zimmer (statischer room_code) erkennen das gepairte
+    Phone automatisch — kein erneutes Scannen nötig.
+  </p>
+</AdminLayout>
