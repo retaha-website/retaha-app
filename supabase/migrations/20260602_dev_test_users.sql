@@ -86,10 +86,15 @@ BEGIN
   -- Minimal-INSERT mit den essentiellen Columns. Andere optional-Columns
   -- (address, postal_code etc. aus sprintE2_hotels_address) bleiben NULL
   -- bzw. auf ihren DEFAULTs.
+  -- Schema-Note (via MCP verifiziert): hotels hat KEIN updated_at column.
+  -- Spalten: id, slug, name, city, country, timezone, default_language,
+  -- created_at, is_active, trial_started_at, subscription_status, stripe_*,
+  -- logo_url, address_street, address_zip, latitude, longitude,
+  -- enabled_languages, brand_color, hero_image_url, theme.
   INSERT INTO hotels (
     id, name, slug, theme, default_language, city,
     subscription_status, trial_started_at,
-    created_at, updated_at
+    created_at
   ) VALUES (
     v_hotel_id,
     'Test Hotel (Dev)',
@@ -99,22 +104,23 @@ BEGIN
     'Berlin',
     'active',
     NOW(),
-    NOW(), NOW()
+    NOW()
   ) ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     theme = EXCLUDED.theme,
-    subscription_status = EXCLUDED.subscription_status,
-    updated_at = NOW();
+    subscription_status = EXCLUDED.subscription_status;
 
   ---------------------------------------------------------------
   -- hotel_users: Rollen-Mapping
   ---------------------------------------------------------------
+  -- Schema-Note: hotel_users UNIQUE-Constraint ist (user_id, hotel_id),
+  -- nicht (hotel_id, user_id). Reihenfolge im ON CONFLICT matters.
   INSERT INTO hotel_users (hotel_id, user_id, role, invited_at, accepted_at, created_at)
   VALUES
     (v_hotel_id, v_owner_id,   'owner',   NOW(), NOW(), NOW()),
     (v_hotel_id, v_manager_id, 'manager', NOW(), NOW(), NOW()),
     (v_hotel_id, v_staff_id,   'staff',   NOW(), NOW(), NOW())
-  ON CONFLICT (hotel_id, user_id) DO UPDATE SET
+  ON CONFLICT (user_id, hotel_id) DO UPDATE SET
     role = EXCLUDED.role,
     accepted_at = COALESCE(hotel_users.accepted_at, EXCLUDED.accepted_at);
 
