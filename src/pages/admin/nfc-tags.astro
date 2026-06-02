@@ -1,0 +1,353 @@
+---
+// Sprint H · Group 3 — NFC-Tags Admin
+//
+// Liste + Create-Form + Bulk-Form + Programmier-QR + 3-Schritte-Anleitung
+
+import AdminLayout from '../../components/AdminLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '../../lib/auth';
+import { getUserRole } from '../../lib/auth/require-permission';
+import { hasPermission } from '../../lib/auth/permissions';
+import { getEnv } from '../../lib/env';
+import QRCode from 'qrcode';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole || !hasPermission(myRole, 'settings.read')) return new Response('Forbidden', { status: 403 });
+const canWrite = hasPermission(myRole, 'settings.write');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: tagRows } = await client
+  .from('nfc_tags')
+  .select('id, label, target_type, target_value, is_active, scan_count, last_scanned_at, created_at')
+  .eq('hotel_id', hotel.id)
+  .order('created_at', { ascending: false });
+const tags = (tagRows ?? []) as any[];
+
+const siteOrigin = (getEnv('PUBLIC_SITE_URL') || 'http://localhost:4321').replace(/\/$/, '');
+
+// QR-Code pro Tag (server-side, data URL)
+const tagQrMap = new Map<string, string>();
+for (const t of tags) {
+  const url = `${siteOrigin}/n/${t.id}`;
+  try {
+    const dataUrl = await QRCode.toDataURL(url, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 280,
+      color: { dark: '#1A1A1A', light: '#FFFFFF' },
+    });
+    tagQrMap.set(t.id, dataUrl);
+  } catch (err) {
+    console.warn('[nfc-tags] qr generation failed for', t.id, (err as Error).message);
+  }
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  guest_stay:    'Fester Stay-Link',
+  hotel_general: 'Allgemein (Hotel)',
+  room:          'Zimmer-Tag',
+  custom_url:    'Beliebige URL',
+};
+
+function targetSummary(t: any): string {
+  if (t.target_type === 'room' && t.target_value?.room_number) return `Zimmer ${t.target_value.room_number}`;
+  if (t.target_type === 'custom_url' && t.target_value?.url) {
+    try { return new URL(t.target_value.url).host; } catch { return t.target_value.url; }
+  }
+  if (t.target_type === 'hotel_general') return 'Aktiver Gast > Showcase > Welcome';
+  if (t.target_type === 'guest_stay' && t.target_value?.stay_id) return 'Stay ' + String(t.target_value.stay_id).slice(0, 8);
+  return '—';
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+---
+
+<AdminLayout title="NFC-Tags" hotel={hotel} user={user}>
+  <div class="nf-page" x-data="nfcTagsAdmin()">
+    <header class="nf-header">
+      <p class="nf-eyebrow">— NFC-Tags · Holzkarten —</p>
+      <h1 class="nf-title">Karten programmieren und verwalten<span class="dot">.</span></h1>
+      <p class="nf-sub">
+        Lege Tags an, drucke den <strong>Programmier-QR</strong> und schreibe damit
+        die URL auf deine physischen NFC-Holzkarten von Hannah.
+      </p>
+    </header>
+
+    <!-- 3-Schritte-Anleitung -->
+    <section class="nf-howto">
+      <p class="nf-section-eyebrow">— Wie programmiere ich einen Tag? —</p>
+      <div class="nf-steps">
+        <div class="nf-step">
+          <span class="nf-step-num">1</span>
+          <p class="nf-step-text">Tag unten anlegen (Label + Typ wählen). Bei Bulk: "+10 Zimmer-Tags" erstellt 101-110 auf einen Schlag.</p>
+        </div>
+        <div class="nf-step">
+          <span class="nf-step-num">2</span>
+          <p class="nf-step-text">Auf dem Smartphone die kostenlose App <strong>"NFC Tools"</strong> installieren (Android oder iOS).</p>
+        </div>
+        <div class="nf-step">
+          <span class="nf-step-num">3</span>
+          <p class="nf-step-text">"Programmier-QR" auf dem Tag öffnen, mit "NFC Tools" scannen, URL auf die Holzkarte schreiben. Fertig.</p>
+        </div>
+      </div>
+    </section>
+
+    {canWrite && (
+      <section class="nf-form-row">
+        <button class="nf-btn-primary" type="button" @click="single = !single; bulk = false">
+          <span x-text="single ? '✕ Schließen' : '+ Neuer Tag'"></span>
+        </button>
+        <button class="nf-btn-ghost" type="button" @click="bulk = !bulk; single = false">
+          <span x-text="bulk ? '✕ Schließen' : '+10 Zimmer-Tags'"></span>
+        </button>
+      </section>
+    )}
+
+    {canWrite && (
+      <>
+        <!-- Single-Form -->
+        <section class="nf-create" x-show="single" x-cloak>
+          <h3 class="nf-form-title">Neuer Tag</h3>
+          <label class="nf-field">
+            <span class="nf-label">Label</span>
+            <input type="text" x-model="form.label" placeholder="z.B. Lobby Empfang" class="nf-input" maxlength="60" />
+          </label>
+          <label class="nf-field">
+            <span class="nf-label">Typ</span>
+            <select x-model="form.target_type" class="nf-input">
+              <option value="hotel_general">Allgemein (Hotel) — dynamisches Routing</option>
+              <option value="room">Zimmer-Tag</option>
+              <option value="custom_url">Beliebige URL</option>
+              <option value="guest_stay">Fester Stay-Link</option>
+            </select>
+          </label>
+          <label class="nf-field" x-show="form.target_type === 'room'">
+            <span class="nf-label">Zimmer-Nummer</span>
+            <input type="text" x-model="form.room_number" placeholder="z.B. 204" class="nf-input" />
+          </label>
+          <label class="nf-field" x-show="form.target_type === 'custom_url'">
+            <span class="nf-label">URL (https://…)</span>
+            <input type="url" x-model="form.url" placeholder="https://www.google.com/maps/place/…" class="nf-input" />
+          </label>
+          <label class="nf-field" x-show="form.target_type === 'guest_stay'">
+            <span class="nf-label">Stay-ID</span>
+            <input type="text" x-model="form.stay_id" placeholder="UUID" class="nf-input" />
+          </label>
+          <template x-if="form.error">
+            <p class="nf-error" x-text="form.error"></p>
+          </template>
+          <div class="nf-actions">
+            <button type="button" class="nf-btn-primary" :disabled="form.busy" @click="createTag()" x-text="form.busy ? 'Wird erstellt …' : 'Tag erstellen'"></button>
+          </div>
+        </section>
+
+        <!-- Bulk-Form -->
+        <section class="nf-create" x-show="bulk" x-cloak>
+          <h3 class="nf-form-title">Bulk: Zimmer-Tags</h3>
+          <p class="nf-form-hint">Erstelle einen Tag pro Zimmer in einem Nummern-Bereich. Label-Format: "Prefix N".</p>
+          <div class="nf-row">
+            <label class="nf-field">
+              <span class="nf-label">Von</span>
+              <input type="number" min="1" x-model.number="bulkForm.from" class="nf-input nf-input--narrow" />
+            </label>
+            <label class="nf-field">
+              <span class="nf-label">Bis</span>
+              <input type="number" min="1" x-model.number="bulkForm.to" class="nf-input nf-input--narrow" />
+            </label>
+            <label class="nf-field nf-flex-1">
+              <span class="nf-label">Label-Prefix</span>
+              <input type="text" x-model="bulkForm.prefix" placeholder="z.B. Zimmer" class="nf-input" />
+            </label>
+          </div>
+          <template x-if="bulkForm.error">
+            <p class="nf-error" x-text="bulkForm.error"></p>
+          </template>
+          <div class="nf-actions">
+            <button type="button" class="nf-btn-primary" :disabled="bulkForm.busy" @click="createBulk()" x-text="bulkForm.busy ? 'Wird erstellt …' : `${(bulkForm.to - bulkForm.from + 1)} Tags erstellen`"></button>
+          </div>
+        </section>
+      </>
+    )}
+
+    <!-- Tag-Liste -->
+    <section class="nf-list-section">
+      <p class="nf-section-eyebrow">— {tags.length} {tags.length === 1 ? 'Tag' : 'Tags'} —</p>
+      {tags.length === 0 ? (
+        <div class="nf-empty"><p>Noch keine Tags. Lege deinen ersten an oder Bulk-erstelle Zimmer-Tags.</p></div>
+      ) : (
+        <ul class="nf-list">
+          {tags.map((t) => (
+            <li class={`nf-tag-card${!t.is_active ? ' nf-tag-card--off' : ''}`} x-data={`{ showQr: false, busy: false }`}>
+              <div class="nf-tag-main">
+                <div class="nf-tag-head">
+                  <span class={`nf-tag-pill${t.is_active ? ' is-on' : ''}`}>{t.is_active ? 'aktiv' : 'inaktiv'}</span>
+                  <span class="nf-tag-type">{TYPE_LABELS[t.target_type] ?? t.target_type}</span>
+                </div>
+                <h3 class="nf-tag-label">{t.label}</h3>
+                <p class="nf-tag-target">→ {targetSummary(t)}</p>
+                <div class="nf-tag-meta">
+                  <span><strong>{t.scan_count}</strong> Scans</span>
+                  <span class="nf-tag-meta-sep">·</span>
+                  <span>letzter: {fmtDate(t.last_scanned_at)}</span>
+                </div>
+              </div>
+              <div class="nf-tag-actions">
+                <button class="nf-btn-ghost nf-btn-small" type="button" @click="showQr = !showQr" x-text="showQr ? '✕ QR' : '📱 Programmier-QR'"></button>
+                {canWrite && (
+                  <button
+                    class="nf-btn-danger nf-btn-small"
+                    type="button"
+                    :disabled="busy"
+                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                  >Löschen</button>
+                )}
+              </div>
+              <div x-show="showQr" x-cloak class="nf-qr">
+                {tagQrMap.has(t.id) ? (
+                  <>
+                    <img src={tagQrMap.get(t.id)} alt={`QR für ${t.label}`} class="nf-qr-img" />
+                    <p class="nf-qr-help">Diesen QR in der "NFC Tools"-App scannen → "Schreiben"-Befehl → URL auf Holzkarte übertragen.</p>
+                    <code class="nf-qr-url">{`${siteOrigin}/n/${t.id}`}</code>
+                  </>
+                ) : (
+                  <p class="nf-qr-help">QR-Code konnte nicht generiert werden.</p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      // @ts-expect-error - Alpine global
+      window.Alpine.data('nfcTagsAdmin', () => ({
+        single: false,
+        bulk: false,
+        form: {
+          label: '', target_type: 'hotel_general', room_number: '', url: '', stay_id: '',
+          busy: false, error: '',
+        },
+        bulkForm: { from: 101, to: 110, prefix: 'Zimmer', busy: false, error: '' },
+
+        async createTag() {
+          if (this.form.busy) return;
+          this.form.error = '';
+          const payload: any = { label: this.form.label?.trim(), target_type: this.form.target_type };
+          if (!payload.label) { this.form.error = 'Label fehlt.'; return; }
+          if (this.form.target_type === 'room') payload.target_value = { room_number: this.form.room_number?.trim() };
+          if (this.form.target_type === 'custom_url') payload.target_value = { url: this.form.url?.trim() };
+          if (this.form.target_type === 'guest_stay') payload.target_value = { stay_id: this.form.stay_id?.trim() };
+          this.form.busy = true;
+          try {
+            const res = await fetch('/api/admin/nfc-tags/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!data.ok) { this.form.error = data.error || 'Fehler'; return; }
+            location.reload();
+          } finally { this.form.busy = false; }
+        },
+
+        async createBulk() {
+          if (this.bulkForm.busy) return;
+          this.bulkForm.error = '';
+          if (this.bulkForm.to < this.bulkForm.from) { this.bulkForm.error = 'Bis muss größer als Von sein.'; return; }
+          this.bulkForm.busy = true;
+          try {
+            const res = await fetch('/api/admin/nfc-tags/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bulk: { mode: 'room_range', from: this.bulkForm.from, to: this.bulkForm.to, label_prefix: this.bulkForm.prefix } }),
+            });
+            const data = await res.json();
+            if (!data.ok) { this.bulkForm.error = data.error || 'Fehler'; return; }
+            location.reload();
+          } finally { this.bulkForm.busy = false; }
+        },
+      }));
+    });
+  </script>
+
+  <style>
+    .nf-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .nf-header { margin: 20px 0 24px; }
+    .nf-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 6px; }
+    .nf-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
+    .dot { color: var(--theme-brand, #FF4A82); }
+    .nf-sub { margin: 0; font-size: 14px; color: rgba(26,26,26,.65); max-width: 720px; line-height: 1.5; }
+    .nf-sub strong { color: #1A1A1A; }
+
+    .nf-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,.5); margin: 0 0 8px; }
+
+    .nf-howto { background: #FAFAF8; padding: 20px; margin-bottom: 24px; border-left: 3px solid var(--theme-brand, #FF4A82); }
+    .nf-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; }
+    @media (max-width: 720px) { .nf-steps { grid-template-columns: 1fr; } }
+    .nf-step { display: flex; gap: 10px; align-items: flex-start; }
+    .nf-step-num { width: 24px; height: 24px; background: #1A1A1A; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .nf-step-text { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: rgba(26,26,26,.75); }
+    .nf-step-text strong { color: #1A1A1A; }
+
+    .nf-form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .nf-btn-primary { padding: 10px 18px; background: #1A1A1A; color: #fff; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
+    .nf-btn-primary:hover:not(:disabled) { background: var(--theme-brand, #FF4A82); }
+    .nf-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .nf-btn-ghost { padding: 10px 18px; background: transparent; color: rgba(26,26,26,.65); border: 1px solid #e8e8e8; cursor: pointer; font-family: inherit; font-size: 13px; }
+    .nf-btn-ghost:hover { color: #1A1A1A; border-color: #1A1A1A; }
+    .nf-btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+    .nf-btn-small { padding: 6px 12px; font-size: 12px; }
+    .nf-btn-danger { padding: 10px 18px; background: transparent; color: #B00020; border: 1px solid #f3b8b8; cursor: pointer; font-family: inherit; font-size: 13px; }
+    .nf-btn-danger:hover:not(:disabled) { background: #fdeaea; }
+
+    .nf-create { background: #fff; border: 1px solid #e8e8e8; padding: 20px; margin-bottom: 24px; }
+    .nf-form-title { font-size: 14px; font-weight: 500; margin: 0 0 12px; }
+    .nf-form-hint { font-size: 12px; color: rgba(26,26,26,.6); font-style: italic; margin: 0 0 12px; }
+    .nf-field { display: block; margin-bottom: 12px; }
+    .nf-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(26,26,26,.55); margin-bottom: 6px; }
+    .nf-input { width: 100%; box-sizing: border-box; padding: 9px 12px; font-family: inherit; font-size: 14px; border: 1px solid #e0e0e0; background: #fff; color: #1A1A1A; }
+    .nf-input:focus { outline: none; border-color: #1A1A1A; }
+    .nf-input--narrow { width: 100px; }
+    .nf-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+    .nf-flex-1 { flex: 1; min-width: 160px; }
+    .nf-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .nf-error { color: #B00020; font-size: 13px; margin: 8px 0; }
+
+    .nf-list-section { margin-top: 8px; }
+    .nf-empty { padding: 48px 24px; background: #fff; border: 1px dashed #ddd; text-align: center; color: rgba(26,26,26,.55); font-style: italic; }
+    .nf-empty p { margin: 0; }
+    .nf-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 10px; }
+
+    .nf-tag-card { background: #fff; border: 1px solid #e8e8e8; padding: 16px; display: grid; grid-template-columns: 1fr auto; gap: 12px; transition: border-color .15s; }
+    .nf-tag-card:hover { border-color: #1A1A1A; }
+    .nf-tag-card--off { opacity: .55; }
+    .nf-tag-main { min-width: 0; }
+    .nf-tag-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .nf-tag-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; background: #f4f4f4; color: rgba(26,26,26,.5); }
+    .nf-tag-pill.is-on { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .nf-tag-type { font-size: 11px; color: rgba(26,26,26,.55); }
+    .nf-tag-label { font-size: 16px; font-weight: 500; margin: 0 0 4px; color: #1A1A1A; }
+    .nf-tag-target { font-size: 12px; color: rgba(26,26,26,.7); margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; }
+    .nf-tag-meta { font-size: 11px; color: rgba(26,26,26,.5); display: flex; gap: 6px; }
+    .nf-tag-meta strong { color: #1A1A1A; font-weight: 500; }
+    .nf-tag-meta-sep { color: rgba(26,26,26,.25); }
+    .nf-tag-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    @media (max-width: 600px) { .nf-tag-card { grid-template-columns: 1fr; } .nf-tag-actions { flex-direction: row; } }
+
+    .nf-qr { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid #f4f4f4; margin-top: 8px; text-align: center; }
+    .nf-qr-img { display: block; margin: 0 auto 12px; max-width: 240px; width: 100%; height: auto; }
+    .nf-qr-help { font-size: 12px; color: rgba(26,26,26,.65); margin: 0 0 8px; line-height: 1.5; }
+    .nf-qr-url { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 6px 10px; background: #FAFAF8; color: #1A1A1A; word-break: break-all; display: inline-block; }
+  </style>
+</AdminLayout>
