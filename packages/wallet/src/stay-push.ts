@@ -25,7 +25,7 @@
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { canSendPush } from './push-guard';
 import { addMessageToPass } from './google';
-import { renderVariables, type VariableContext } from '@retaha/marketing';
+import { renderVariables, type VariableContext } from './variables';
 import { pickI18n } from '@retaha/i18n';
 import { asLanguageCode } from '@retaha/i18n';
 import type { LanguageCode } from '@retaha/i18n';

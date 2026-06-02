@@ -28,7 +28,7 @@
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { canSendPush } from '@retaha/wallet';
 import { addMessageToPass } from '@retaha/wallet';
-import { renderVariables, type VariableContext } from './variables';
+import { renderVariables, type VariableContext } from '@retaha/wallet';
 import { pickI18n } from '@retaha/i18n';
 import { asLanguageCode } from '@retaha/i18n';
 import { buildOptOutUrl } from '@retaha/wallet';

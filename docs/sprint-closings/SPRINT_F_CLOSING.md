@@ -195,6 +195,18 @@ weiter grün auf root-Astro-Setup. Nach Sprint-F-Merge zu main und Entfernung vo
 
 ---
 
+## Post-Sprint-G Cleanup
+
+- [ ] Root `src/` entfernen nach erfolgreichem Vercel-Production-Deploy
+  - **Zeitpunkt:** nach Sprint G abgeschlossen + Soft-Launch erfolgreich
+  - **Aktion:** `git rm -r src/ && git commit -m "cleanup: remove legacy single-app src/"`
+  - **Risiko:** minimal (alle 4 Apps in apps/ etabliert)
+  - **Sicherheits-Container:** nur löschen wenn Pilot-Hotel mindestens 24h ohne Issues läuft
+- [ ] `dev:legacy` + `build:legacy` + `preview:legacy` Scripts aus root `package.json` entfernen
+- [ ] README-Erwähnung der Legacy-App entfernen
+- [ ] Test-Scripts (`scripts/test-*.ts`) von `src/lib/*` auf `@retaha/*`-Imports umstellen
+- [ ] Migration-Tools (`scripts/sprint-f-*.mjs`) als historische Referenz behalten oder in `scripts/archive/` verschieben
+
 ## Merge-Strategie
 
 ```

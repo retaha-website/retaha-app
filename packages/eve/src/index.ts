@@ -1,6 +1,7 @@
 // @retaha/eve
 // Eve-KI-Concierge: Hybrid Router (Haiku/Sonnet), Tools, Context-Loader.
 
+export * from './lang';
 export * from './anthropic-client';
 export * from './router';
 export * from './system-prompt';

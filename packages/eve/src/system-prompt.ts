@@ -13,7 +13,7 @@
 //
 // Token-Estimate am Ende geloggt (chars / 4 ≈ Tokens) für Cache-Planung.
 
-import type { Lang } from '@retaha/i18n';
+import type { Lang } from './lang';
 import type { TuningRule } from './router';
 
 // ============================================================

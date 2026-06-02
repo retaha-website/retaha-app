@@ -3,7 +3,7 @@
 // 4 Sets pro Sprache (morning / midday / evening / night), plus 2
 // universelle Chips die immer dabei sind (WLAN, Check-out).
 
-import type { Lang } from '@retaha/i18n';
+import type { Lang } from './lang';
 
 export interface SuggestionChip {
   key: string;
