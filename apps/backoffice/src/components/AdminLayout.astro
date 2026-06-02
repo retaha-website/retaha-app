@@ -4,6 +4,7 @@
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/global.css';
 import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui/styles/icons.css';
 import '@retaha/ui/styles/components/buttons.css';
 import '@retaha/ui/styles/components/inputs.css';
 import '@retaha/ui/styles/components/pills.css';
@@ -22,7 +23,9 @@ import '@fontsource/cormorant-garamond/400.css';
 import '@fontsource/cormorant-garamond/500.css';
 import '@fontsource/cormorant-garamond/600.css';
 import AdminFooter from './AdminFooter.astro';
-import NotificationBell from './admin/NotificationBell.astro';
+import NotificationBell from '@retaha/ui/components/admin/NotificationBell.astro';
+import type { TrialUrgency } from '@retaha/ui/components/admin/NotificationBell.astro';
+import { calculateTrialStatus, TRIAL_DURATION_DAYS } from '../lib/trial-status';
 import { t } from '../i18n/helpers';
 import { resolveTheme } from '@retaha/ui/theme';
 
@@ -49,6 +52,48 @@ const activeTheme = resolveTheme({
   hotelTheme: hotel.theme,
   requestUrl: Astro.url,
 });
+
+// Sprint I Phase 1: Trial-Status-Berechnung wandert vom NotificationBell-
+// Component ins Layout, damit die Bell als reine packages/ui-Component
+// keine app-spezifischen Imports (trial-status.ts, i18n/helpers) braucht.
+const trialStatus = calculateTrialStatus({
+  trial_started_at: hotel.trial_started_at ?? null,
+  subscription_status: hotel.subscription_status ?? '',
+});
+const trialUrgency: TrialUrgency = trialStatus.urgencyLevel;
+const trialHasNotification = trialStatus.isInTrial || trialStatus.urgencyLevel === 'expired';
+const trialCurrentDay = Math.max(
+  1,
+  Math.min(TRIAL_DURATION_DAYS - trialStatus.daysRemaining + 1, TRIAL_DURATION_DAYS),
+);
+
+const trialHeadlineKey =
+  trialUrgency === 'warning'  ? 'notification_bell.headline_warning' :
+  trialUrgency === 'critical' ? 'notification_bell.headline_critical' :
+  trialUrgency === 'expired'  ? 'notification_bell.headline_expired' :
+                                'notification_bell.headline_normal';
+
+const trialBodyKey =
+  trialUrgency === 'warning'  ? 'notification_bell.body_warning' :
+  trialUrgency === 'critical' ? 'notification_bell.body_critical' :
+  trialUrgency === 'expired'  ? 'notification_bell.body_expired' :
+                                'notification_bell.body_normal';
+
+const trialCtaKey =
+  trialUrgency === 'critical' || trialUrgency === 'expired'
+    ? 'notification_bell.cta_critical'
+    : 'notification_bell.cta_normal';
+
+const trialTexts = {
+  eyebrow:        'bell',
+  headline:       t(trialHeadlineKey, userLocale),
+  body:           t(trialBodyKey, userLocale),
+  cta:            t(trialCtaKey, userLocale),
+  ariaLabel:      t('notification_bell.aria_label', userLocale),
+  popoverAria:    t('notification_bell.popover_aria', userLocale),
+  testphaseLabel: t('notification_bell.testphase_label', userLocale),
+  daysLabel:      t('notification_bell.days_label', userLocale),
+};
 ---
 
 <!DOCTYPE html>
@@ -91,7 +136,14 @@ const activeTheme = resolveTheme({
 
         <!-- RECHTS: Bell + Burger -->
         <div class="justify-self-end flex items-center gap-6">
-          <NotificationBell hotel={hotel} locale={userLocale} />
+          <NotificationBell
+            urgency={trialUrgency}
+            hasNotification={trialHasNotification}
+            currentDay={trialCurrentDay}
+            totalDays={TRIAL_DURATION_DAYS}
+            ctaHref="/admin/subscription"
+            texts={trialTexts}
+          />
           <button
             type="button"
             class="menu-trigger"
