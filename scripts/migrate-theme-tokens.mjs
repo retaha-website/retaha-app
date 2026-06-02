@@ -88,21 +88,28 @@ const REPLACEMENTS = [
   { from: /#FFFFFF\b/gi,                                      to: 'var(--theme-bg-primary)' },
   { from: /#FAFAF8\b/gi,                                      to: 'var(--theme-bg-secondary)' },
   { from: /#FAFAFA\b/gi,                                      to: 'var(--theme-bg-secondary)' },
+  { from: /#FAF8F5\b/gi,                                      to: 'var(--theme-bg-secondary)' },
   { from: /#F4F4F2\b/gi,                                      to: 'var(--theme-bg-tertiary)' },
   { from: /#F4F4F4\b/gi,                                      to: 'var(--theme-bg-tertiary)' },
   // Whites — 3-stellig (#fff, #eee, etc.)
   { from: /(?<![A-Za-z0-9])#fff(?![0-9A-Fa-f])/gi,            to: 'var(--theme-bg-primary)' },
   { from: /(?<![A-Za-z0-9])#fafafa(?![0-9A-Fa-f])/gi,         to: 'var(--theme-bg-secondary)' },
   { from: /(?<![A-Za-z0-9])#f5f5f5(?![0-9A-Fa-f])/gi,         to: 'var(--theme-bg-tertiary)' },
+  { from: /(?<![A-Za-z0-9])#f1f1f1(?![0-9A-Fa-f])/gi,         to: 'var(--theme-bg-tertiary)' },
 
   // Border / Stein — 6-stellig
   { from: /#E8E4DD\b/gi,                                      to: 'var(--theme-border)' },
   { from: /#e8e8e8\b/gi,                                      to: 'var(--theme-border)' },
+  { from: /#e0e0e0\b/gi,                                      to: 'var(--theme-border)' },
   // Border-Greys (3-stellig)
   { from: /(?<![A-Za-z0-9])#eee(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border)' },
   { from: /(?<![A-Za-z0-9])#ddd(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border)' },
+  { from: /(?<![A-Za-z0-9])#ccc(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border-strong)' },
   { from: /(?<![A-Za-z0-9])#f0f0f0(?![0-9A-Fa-f])/gi,         to: 'var(--theme-border)' },
   { from: /(?<![A-Za-z0-9])#999(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border-strong)' },
+
+  // Burgund (Sekundärfarbe — Stammgast-Marker, Premium-Akzente)
+  { from: /#8C2128\b/gi,                                      to: 'var(--theme-burgund)' },
 
   // Pink-Tint-Backgrounds (Highlight-States)
   { from: /(?<![A-Za-z0-9])#fff5f8(?![0-9A-Fa-f])/gi,         to: 'rgba(var(--theme-accent-rgb), 0.06)' },
