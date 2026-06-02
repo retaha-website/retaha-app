@@ -1,7 +1,22 @@
-# Modul-Inventur (Stand: 2026-05-28)
+# Modul-Inventur (Stand: 2026-05-28, Patch 2026-06-02)
 
 > Discovery-Bericht: was existiert, was ist Mock, was nutzt echte DB.
 > Rein dokumentarisch, kein Code geändert.
+
+> **Patch 2026-06-02 (Sprint H Group 4c):**
+> - 19 Stub-Pages haben jetzt `ComingSoonModal` mit Feature-Beschreibung
+>   + geplantem Quartal statt leerem Lorem-ipsum-Body
+> - Theme-System ist auf **3 Themes** ausgeweitet via `data-theme`:
+>   `bauhaus_manufaktur` (default), `premium_anthrazit`, `warmes_burgund`
+> - **Alle Surfaces theme-aware:** Gast-Frontend (Hub + 8 Sheets +
+>   Eve-Chat + Legal-Pages), Hotelier-Admin (32 Pages + 9 Components),
+>   Operations-Dashboard (`/app/`), Cookie-Banner, Onboarding-Wizard
+> - **Marken-Signaturen einheitlich:** Pink-Punkt-Span an Statement-h1
+>   (theme-aware via `--theme-h-dot-color`), Bauhaus-Status-Vokabular
+>   ●/■/─/▲ geometrisch erhalten, Border-Radius 3px konstant (6px Modals)
+> - Showcase-Mode (Group 2) + NFC-Tag-Routing (Group 3) produktiv
+> - **Sed-Codemod `scripts/migrate-theme-tokens.mjs`** als wiederverwendbares
+>   Werkzeug für zukünftige Hex→Token-Migrationen
 
 ---
 

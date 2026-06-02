@@ -1,4 +1,4 @@
-# Component-Gap-Inventar (Stand: 2026-05-26)
+# Component-Gap-Inventar (Stand: 2026-05-26, Patch 2026-06-02)
 
 ## Zusammenfassung
 
@@ -7,6 +7,16 @@
 - **7 FEHLT** (kein CSS, kein Markup): Modals & Slide-Overs (Backoffice), Slider, Search Input, Date Picker, Tables (strukturiert), Tooltips, Pagination, Skeleton Loaders
 - **~18 Systemische Inkonsistenzen** identifiziert — hauptsächlich um Save-Feedback und Loading-States
 - **Geschätzter MVP-Sprint-Aufwand (Quick Wins):** 3–5 Tage für Top-10 Inkonsistenzen; 10–15 Tage für fehlende Komponenten-Vollständigkeit
+
+> **Patch 2026-06-02 (Sprint H Group 4c):**
+> Position 3.9 (Modals & Slide-Overs Admin) wurde teilweise adressiert
+> via neuer `components/admin/ComingSoonModal.astro` (theme-aware,
+> a11y-konform: role="dialog", aria-modal, ESC-Close, Focus-Trap-Light,
+> Backdrop-Click, lowercase aria-Labels). Verwendet von 19 Stub-Pages.
+> Pattern ist für Confirm-Dialog-Migration der 4 `confirm()`-Notlösungen
+> wiederverwendbar. Reifegrad-Update: **1/5 → 3/5**.
+> Reste-Backlog: vollständiger Slide-Over für Detail-Editing (z.B.
+> Action-Card-Detail-View), Confirm-Dialog-Variante, Skeleton-Loaders.
 
 ---
 

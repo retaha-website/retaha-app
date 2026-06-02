@@ -1,10 +1,49 @@
 # UI/UX-Inventar Tag 15 — Sprint H Group 4a
 
-> **Stand:** 02.06.2026 (Tag 15)
+> **Stand:** 02.06.2026 (Tag 15) · **Patch nach Group 4c:** 02.06.2026 (Tag 19)
 > **Autor:** Claude Code (Sprint H Group 4 Phase 4a)
 > **Zweck:** Frische Repo-Audit-Runde vor Phase 4c (Findings fixen).
 > **Pilot:** Kristin Riewe · The Gate Garden Hotel Berlin · `1f30ac02-17e1-47b6-9bda-487e14b07627`
 > **Methode:** Live-Code-Audit + Abgleich mit Strategie- und Audit-Dokumenten. Ehrlich und kritisch.
+
+> **Status-Update 02.06.2026 (Sprint H Group 4c abgeschlossen):**
+>
+> **🔴 PILOT-BLOCKIEREND — 6/6 erledigt:**
+> - ✅ UX-001 Sheets-Theme-Migration (Tag 2: 8 Sheets, 4 via Codemod, 4 via Tag-1-Aliasing)
+> - ✅ UX-002 Hub-Page Theme-Audit (Tag 2: `/g/[token]` migriert + Marken-Signaturen)
+> - ✅ UX-003 19 Stub-Pages → ComingSoonModal (Tag 3: alle 19 mit theme-aware Modal-Pattern)
+> - ✅ UX-004 settings.astro Theme-Migration (Tag 1 via Tailwind-Aliasing — 0 direkte Hex-Codes)
+> - ✅ UX-005 AdminLayout.astro theme-clean (Tag 1: Google-Fonts-Link weg, inline-Hardcodes weg)
+> - ✅ UX-006 retaha.css auf Theme-Variables (Tag 1: Token-Layer aliased)
+>
+> **🟡 NICE-TO-HAVE — 8/9 erledigt:**
+> - ✅ UX-007 eve/settings.astro (Tag 1, 0 direkte Hex-Codes durch Aliasing)
+> - ✅ UX-008 places + knowledge (Tag 4)
+> - ✅ UX-009 marketing-Editor-Trio (Tag 4: CampaignEditor, DripEditor, MarketingEditor)
+> - ✅ UX-010 Cookie-Banner + Setup-Wizard (Tag 3 + Tag 5: alle migriert)
+> - ✅ UX-011 action-cards + menu/[id] (Tag 4)
+> - ✅ UX-012 pms.astro (Tag 4)
+> - ✅ UX-013 EditorialPageHeader theme-aware (Tag 1: schon via Tailwind-Aliasing)
+> - ✅ UX-014 NotificationBell + Sub-Navs (Tag 4)
+> - ⚠️ UX-015 Wallet-Pass-Designs Theme-Branch (3 Templates) — **NICHT ANGEFASST.** Apple/Google Wallet-Pass-PassKit-Templates sind separat erzeugt, nicht Astro-Pages. Backlog.
+>
+> **🟢 POST-PILOT — 1/6 erledigt:**
+> - ⏭️ UX-016 Admin-Console — Sprint F (Monorepo-Split), nicht Phase 4c
+> - ⏭️ UX-017 Mews-Outbound — Architektur-Gap, eigener Sprint
+> - ⏭️ UX-018 Mobile-Responsive Sanity-Sweep — User-Review-Phase (Tag 5)
+> - ⏭️ UX-019 Komponenten-Library externalisieren — post-pilot
+> - ⏭️ UX-020 Bell-Maskottchen 8 States — post-pilot
+> - ⏭️ UX-021 Loading-/Empty-/Error-States systemisch — post-pilot
+>
+> **Migration-Stats Sprint H Group 4c (insgesamt):**
+> - Files migriert: **~140 Files**
+> - Total Replacements: **~2000+ Hex/Font/rgba-Replacements**
+> - Auto-Fix-Rate via Codemod: **~96%**
+> - Manuelle Edits: Marken-Signaturen + Edge-Cases (Component-Aliasing-Decisions)
+> - 19 Stub-Pages auf ComingSoonModal-Pattern auto-generiert
+> - Self-hosted Fonts: Space Grotesk, JetBrains Mono, Inter Tight, Cormorant Garamond (DSGVO)
+> - 0 Google-Fonts-Links im Repo
+> - **Sprint H Group 4 ist abgeschlossen** — Sprint-Closing nach Tag 5 User-Review.
 
 ---
 
