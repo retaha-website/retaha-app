@@ -5,6 +5,7 @@ import { sendHotelierPush } from '../../../lib/push/send';
 import { createSupabaseServiceRoleInstance } from '../../../lib/auth';
 import { hasPermission, type Role } from '../../../lib/auth/permissions';
 import { sendStayPush, type StayPushTrigger } from '../../../lib/wallet/stay-push';
+import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
 
 interface CreateBookingPayload {
   access_token: string;
@@ -35,6 +36,37 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const supabase = createServerClient();
+
+  // Sprint H · Group 2 — Showcase-Mode-Branch
+  // Bei Showcase-Tokens: insert in bookings mit stay_id=NULL +
+  // showcase_session_id gesetzt. KEINE Mews-Push, KEINE Email-Notification,
+  // KEINE Stay-Push — Demo-Mode ist clean isoliert.
+  if (isShowcaseToken(payload.access_token)) {
+    const showcase = await findShowcaseSessionByToken(payload.access_token);
+    if (!showcase) {
+      return new Response(JSON.stringify({ ok: false, error: 'Invalid stay' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const admin = createSupabaseServiceRoleInstance();
+    const { data: demoBooking, error: demoErr } = await admin.from('bookings').insert({
+      hotel_id: showcase.hotel_id,
+      stay_id: null,
+      showcase_session_id: showcase.id,
+      type: payload.type,
+      status: 'pending',
+      details: payload.details,
+    }).select('id, status, created_at').single();
+    if (demoErr || !demoBooking) {
+      console.error('[bookings/create showcase] insert failed:', demoErr);
+      return new Response(JSON.stringify({ ok: false, error: demoErr?.message || 'Insert failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, booking: demoBooking, showcase: true }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   // Verify token → resolve to stay
   const { data: stay, error: stayErr } = await supabase

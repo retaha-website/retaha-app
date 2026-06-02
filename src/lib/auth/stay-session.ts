@@ -24,6 +24,9 @@ export interface StaySessionPayload {
   stay_id: string;
   hotel_id: string;
   exp: number;  // Unix-Timestamp (Sekunden)
+  /** Sprint H Group 2: true für Showcase-Demo-Sessions. Endpoints skippen
+   *  dann Mews-Push, Hotelier-Email-Notification, Stay-Push etc. */
+  is_showcase?: boolean;
 }
 
 function getSecret(): Uint8Array | null {
@@ -44,6 +47,8 @@ export async function signStaySession(params: {
   hotel_id: string;
   check_out_utc: string;  // ISO-Datum
   toleranceHours?: number;
+  /** Sprint H Group 2 — Showcase-Demo-Session */
+  is_showcase?: boolean;
 }): Promise<string | null> {
   const secret = getSecret();
   if (!secret) return null;
@@ -55,7 +60,10 @@ export async function signStaySession(params: {
   }
   const expSec = Math.floor((checkOutMs + (params.toleranceHours ?? CHECK_OUT_TOLERANCE_HOURS) * 3600 * 1000) / 1000);
 
-  return new SignJWT({ stay_id: params.stay_id, hotel_id: params.hotel_id })
+  const claims: Record<string, any> = { stay_id: params.stay_id, hotel_id: params.hotel_id };
+  if (params.is_showcase) claims.is_showcase = true;
+
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: ALGORITHM })
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
@@ -81,7 +89,12 @@ export async function verifyStaySession(jwt: string): Promise<StaySessionPayload
     if (typeof payload.stay_id !== 'string' || typeof payload.hotel_id !== 'string' || typeof payload.exp !== 'number') {
       return null;
     }
-    return { stay_id: payload.stay_id, hotel_id: payload.hotel_id, exp: payload.exp };
+    return {
+      stay_id: payload.stay_id,
+      hotel_id: payload.hotel_id,
+      exp: payload.exp,
+      is_showcase: payload.is_showcase === true,
+    };
   } catch (err) {
     // Erwartete Fehler still — JWTExpired, JWSSignatureVerificationFailed, etc.
     if (!(err instanceof joseErrors.JOSEError)) {
@@ -106,7 +119,7 @@ export async function getStaySession(cookies: AstroCookies): Promise<StaySession
  */
 export async function setStaySessionCookie(
   cookies: AstroCookies,
-  params: { stay_id: string; hotel_id: string; check_out_utc: string },
+  params: { stay_id: string; hotel_id: string; check_out_utc: string; is_showcase?: boolean },
 ): Promise<boolean> {
   const jwt = await signStaySession(params);
   if (!jwt) return false;

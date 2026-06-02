@@ -64,8 +64,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const requestedLang = normalizeLang(body.lang);
 
   // 3. Context laden + Eve-Enabled-Check
+  // Sprint H · Group 2 — Showcase-Branch
+  //   session.is_showcase === true bedeutet: stay_id ist showcase.id, kein
+  //   echter Stay. Wir laden Demo-Daten statt stay/guest/room.
   const supabase = createSupabaseServiceRoleInstance();
-  const ctx = await loadEveChatContext(supabase, session.hotel_id, session.stay_id, requestedLang);
+  const isShowcase = session.is_showcase === true;
+  const ctx = await loadEveChatContext(supabase, session.hotel_id, session.stay_id, requestedLang, isShowcase);
   if (!ctx) {
     return json({ ok: false, error: 'Context-Load fehlgeschlagen' }, 500);
   }
@@ -73,16 +77,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ ok: false, error: 'Eve ist in diesem Hotel nicht aktiviert.' }, 403);
   }
 
+  // Helper für chat_messages-Insert (stay_id NULL + showcase_session_id wenn demo)
+  const chatBaseFields = isShowcase
+    ? { hotel_id: session.hotel_id, stay_id: null as any, showcase_session_id: session.stay_id }
+    : { hotel_id: session.hotel_id, stay_id: session.stay_id, showcase_session_id: null as any };
+
   // 4. User-Message sofort persistieren
   await supabase.from('chat_messages').insert({
-    hotel_id: session.hotel_id,
-    stay_id: session.stay_id,
+    ...chatBaseFields,
     role: 'user',
     content: userMessage,
   });
 
   // 5. History für Router (excluding user-message die wir grad erst inserten haben? — wir laden VOR insert idealerweise, aber pragmatisch lesen wir nochmal)
-  const history = await loadHistory(supabase, session.stay_id, userMessage);
+  const history = await loadHistory(supabase, session.stay_id, userMessage, isShowcase);
 
   // 6. Router-Decision
   const tuningRules = (ctx.hotelSettings.eve_tuning_rules ?? []) as TuningRule[];
@@ -206,8 +214,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         // ─── Persist Assistant-Message ─────────────────────────
         await supabase.from('chat_messages').insert({
-          hotel_id: session.hotel_id,
-          stay_id: session.stay_id,
+          ...chatBaseFields,
           role: 'assistant',
           content: accumulatedText,
           model_used: decision.model,
@@ -239,8 +246,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         // Best-Effort: speichern was wir haben (closure-Zugriff auf accumulatedText)
         if (typeof accumulatedText === 'string' && accumulatedText.length > 0) {
           await supabase.from('chat_messages').insert({
-            hotel_id: session.hotel_id,
-            stay_id: session.stay_id,
+            ...chatBaseFields,
             role: 'assistant',
             content: accumulatedText + '\n\n[Stream abgebrochen wegen Fehler]',
             model_used: decision.model,
@@ -272,7 +278,35 @@ function json(body: unknown, status: number): Response {
   });
 }
 
-async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requestedLang?: Lang): Promise<EveContext | null> {
+async function loadEveChatContext(sb: any, hotelId: string, stayOrShowcaseId: string, requestedLang?: Lang, isShowcase = false): Promise<EveContext | null> {
+  // Sprint H Group 2 — Showcase: Pseudo-Stay/Guest aus showcase_sessions.demo_data
+  if (isShowcase) {
+    const [hotelRes, settingsRes, knowledgeRes, showcaseRes] = await Promise.all([
+      sb.from('hotels').select('id, name, city, country, default_language').eq('id', hotelId).maybeSingle(),
+      sb.from('hotel_settings').select('eve_enabled, eve_name, eve_tonality, eve_custom_persona, eve_tuning_rules, guest_address_form, wifi_ssid, wifi_password, wifi_speed_mbits, breakfast_start_time, breakfast_end_time, breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es, conference_rooms, conference_start_time, conference_end_time').eq('hotel_id', hotelId).maybeSingle(),
+      sb.from('eve_knowledge').select('category, question, answer').eq('hotel_id', hotelId).eq('language_code', 'de').eq('is_published', true),
+      sb.from('showcase_sessions').select('demo_data').eq('id', stayOrShowcaseId).maybeSingle(),
+    ]);
+    if (!hotelRes.data || !settingsRes.data || !showcaseRes.data) return null;
+    const demo = showcaseRes.data.demo_data || {};
+    const lang: Lang = requestedLang ?? normalizeLang(hotelRes.data.default_language ?? 'de');
+    const knowledge = lang === 'de' ? (knowledgeRes.data ?? []) as any
+      : await getTranslatedKnowledge(hotelId, lang as 'en' | 'fr' | 'es');
+    const now = new Date();
+    const todayCi = new Date(now); todayCi.setUTCHours(14, 0, 0, 0);
+    const tomorrowCo = new Date(todayCi); tomorrowCo.setUTCDate(tomorrowCo.getUTCDate() + 1); tomorrowCo.setUTCHours(11, 0, 0, 0);
+    return {
+      hotel: hotelRes.data,
+      hotelSettings: settingsRes.data,
+      stay: { id: stayOrShowcaseId, check_in: todayCi.toISOString(), check_out: tomorrowCo.toISOString(), raw_mews_data: null },
+      guest: { first_name: demo.guest_first_name ?? 'Anna', last_name: demo.guest_last_name ?? 'Demo', language: lang },
+      room: { room_number: demo.room_number ?? '101', room_name: demo.room_name ?? 'Demo-Suite' },
+      walletStatus: null,
+      knowledge,
+      language: lang,
+    } as EveContext;
+  }
+
   const [hotelRes, settingsRes, knowledgeRes, stayRes] = await Promise.all([
     sb.from('hotels').select('id, name, city, country, default_language').eq('id', hotelId).maybeSingle(),
     sb.from('hotel_settings').select(`
@@ -288,7 +322,7 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requ
       .eq('hotel_id', hotelId).eq('language_code', 'de').eq('is_published', true),
     sb.from('stays')
       .select('id, check_in, check_out, raw_mews_data, wallet_pass_id, guests(first_name, last_name, language), rooms(room_number, room_name), wallet_passes:wallet_pass_id(visit_count, first_visit_at)')
-      .eq('id', stayId).maybeSingle(),
+      .eq('id', stayOrShowcaseId).maybeSingle(),
   ]);
 
   if (!hotelRes.data || !settingsRes.data) return null;
@@ -330,16 +364,18 @@ async function loadEveChatContext(sb: any, hotelId: string, stayId: string, requ
   };
 }
 
-async function loadHistory(sb: any, stayId: string, excludeContent: string): Promise<EveMessage[]> {
+async function loadHistory(sb: any, sessionRef: string, excludeContent: string, isShowcase = false): Promise<EveMessage[]> {
   // Letzte 20 Messages exklusive der gerade-inserted User-Message.
-  // Wir matchen excludeContent als zusätzlichen Filter (chronologisch hilft sortieren).
-  const { data } = await sb
+  // Sprint H Group 2 — Showcase: Filter via showcase_session_id statt stay_id.
+  const query = sb
     .from('chat_messages')
     .select('role, content, created_at')
-    .eq('stay_id', stayId)
     .in('role', ['user', 'assistant'])
     .order('created_at', { ascending: false })
     .limit(20);
+  const { data } = await (isShowcase
+    ? query.eq('showcase_session_id', sessionRef)
+    : query.eq('stay_id', sessionRef));
 
   const rows = (data ?? []) as Array<{ role: 'user' | 'assistant'; content: string }>;
   // Newest first → reverse für chronologische Reihenfolge, plus die gerade-inserted-Message rausfiltern

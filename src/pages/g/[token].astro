@@ -30,9 +30,56 @@ import '@fontsource/cormorant-garamond/400.css';
 import '@fontsource/cormorant-garamond/500.css';
 import '@fontsource/cormorant-garamond/600.css';
 import { resolveTheme } from '../../lib/theme';
+import { isShowcaseToken, findShowcaseSessionByToken, type ShowcaseSession } from '../../lib/showcase/session';
 
 const { token } = Astro.params;
-const ctx = token ? await loadStayByToken(token) : null;
+
+// Sprint H · Group 2 — Showcase-Mode-Erkennung
+//   Token mit Prefix 'showcase_' → Pseudo-Stay-Context aus showcase_sessions.
+//   Normale Stay-Tokens laufen via loadStayByToken weiter.
+let showcaseSession: ShowcaseSession | null = null;
+let ctx: any = null;
+if (token && isShowcaseToken(token)) {
+  showcaseSession = await findShowcaseSessionByToken(token);
+  if (showcaseSession) {
+    // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
+    const sbSrInit = createSupabaseServiceRoleInstance();
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, theme').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
+    ]);
+    if (hotelRow && settingsRow) {
+      // Demo-Daten: check_in = heute, check_out = morgen 11:00
+      const now = new Date();
+      const todayStart = new Date(now); todayStart.setUTCHours(14, 0, 0, 0);
+      const tomorrowCheckout = new Date(todayStart); tomorrowCheckout.setUTCDate(tomorrowCheckout.getUTCDate() + 1); tomorrowCheckout.setUTCHours(11, 0, 0, 0);
+      ctx = {
+        stay: {
+          id: showcaseSession.id,
+          check_in: todayStart.toISOString(),
+          check_out: tomorrowCheckout.toISOString(),
+          is_active: true,
+        },
+        guest: {
+          id: showcaseSession.id,
+          first_name: showcaseSession.demo_data?.guest_first_name ?? 'Anna',
+          last_name: showcaseSession.demo_data?.guest_last_name ?? 'Demo',
+          language: hotelRow.default_language ?? 'de',
+          visit_count: 1,
+        },
+        room: {
+          id: showcaseSession.id,
+          room_number: showcaseSession.demo_data?.room_number ?? '101',
+          room_name: showcaseSession.demo_data?.room_name ?? 'Demo-Suite',
+        },
+        hotel: hotelRow,
+        settings: settingsRow,
+      };
+    }
+  }
+} else {
+  ctx = token ? await loadStayByToken(token) : null;
+}
 
 if (!ctx) {
   // Fix 4: graceful Fallback statt 404. Gestalteter Showcase kommt im Design-Sprint.
@@ -66,11 +113,13 @@ const { stay, guest, room, hotel, settings } = ctx;
 // kriegt automatisch eine Stay-Session-Cookie. Konsistent zum Sprint-D-Pair-
 // Pattern (/api/pair?token=...). Eve-Chat (/api/eve/chat) braucht den Cookie.
 const existingSession = await getStaySession(Astro.cookies);
-if (!existingSession || existingSession.stay_id !== stay.id) {
+const isShowcase = !!showcaseSession;
+if (!existingSession || existingSession.stay_id !== stay.id || !!existingSession.is_showcase !== isShowcase) {
   await setStaySessionCookie(Astro.cookies, {
     stay_id: stay.id,
     hotel_id: hotel.id,
     check_out_utc: stay.check_out,
+    is_showcase: isShowcase,
   });
 }
 
@@ -351,6 +400,11 @@ const showPostStay = stayEnded && !hasStayFeedback;
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body class="gate-guest">
+    {isShowcase && (
+      <div class="demo-mode-badge" role="status" aria-label="Demo-Modus aktiv">
+        DEMO-MODE
+      </div>
+    )}
     <main x-data="guestPage" x-cloak>
       <!-- HERO -->
       <section class="gate-hero">
