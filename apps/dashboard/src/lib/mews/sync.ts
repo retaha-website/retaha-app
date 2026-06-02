@@ -329,14 +329,23 @@ async function syncRoomsFromResources(
   const roomMap = new Map<string, string>();
   if (roomRows.length === 0) return { roomMap, count: 0, skipped };
 
+  // BRAND-003 fix: onConflict auf composite (hotel_id, mews_resource_id) —
+  // sonst kollidieren rooms aus mehreren Hotels die denselben Mews-Demo-Account
+  // nutzen (gleiche mews_resource_id) auf dem alten globalen UNIQUE-Index.
+  // Voraussetzung: Migration 20260603_brand003_room_hotel_isolation.sql
+  // (Composite-UNIQUE-Index idx_rooms_hotel_mews_resource).
   const { data, error } = await supabase
     .from('rooms')
-    .upsert(roomRows, { onConflict: 'mews_resource_id' })
-    .select('id, mews_resource_id');
+    .upsert(roomRows, { onConflict: 'hotel_id,mews_resource_id' })
+    .select('id, hotel_id, mews_resource_id');
   if (error) throw new Error(`rooms upsert failed: ${error.message}`);
 
-  for (const row of (data ?? []) as Array<{ id: string; mews_resource_id: string | null }>) {
-    if (row.mews_resource_id) roomMap.set(row.mews_resource_id, row.id);
+  // Defensive: nur Rows die zu DIESEM hotel gehoeren in den roomMap (verhindert
+  // Cross-Hotel-Mapping selbst wenn upsert eine fremde Row zurueckgaebe).
+  for (const row of (data ?? []) as Array<{ id: string; hotel_id: string; mews_resource_id: string | null }>) {
+    if (row.mews_resource_id && row.hotel_id === hotelId) {
+      roomMap.set(row.mews_resource_id, row.id);
+    }
   }
   return { roomMap, count: data?.length ?? 0, skipped };
 }
