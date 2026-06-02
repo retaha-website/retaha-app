@@ -1,0 +1,454 @@
+/* === Header-Höhe als CSS-Variable (Sub-Header-Menu hängt darunter) === */
+:root {
+  --header-height: 60px;
+}
+
+/* === Marker-Trigger im Header (Header-Kind, horizontal) === */
+
+.menu-trigger {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.menu-trigger-shapes {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Nur Marker-Trio bekommt Burgund-Background — Label bleibt unangetastet */
+.menu-trigger-circle,
+.menu-trigger-line,
+.menu-trigger-square {
+  display: block;
+  background-color: var(--color-pink-shock);
+  transition:
+    transform 250ms ease-out,
+    opacity 200ms ease-out 50ms,
+    width 250ms ease-out,
+    height 250ms ease-out;
+}
+
+.menu-trigger-circle {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.menu-trigger-line {
+  width: 9px;
+  height: 1px;
+}
+
+.menu-trigger-square {
+  width: 7px;
+  height: 7px;
+}
+
+.menu-trigger-label {
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-anthrazit) 55%, transparent);
+  letter-spacing: 0;
+  background: transparent;
+  transition: opacity 150ms ease-out;
+}
+
+.menu-trigger:focus-visible {
+  outline: 2px solid var(--color-pink-shock);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* === Burger → X Animation === */
+
+.menu-trigger.menu-trigger-active .menu-trigger-circle {
+  transform: translateY(6px) scale(0);
+  opacity: 0;
+}
+
+.menu-trigger.menu-trigger-active .menu-trigger-square {
+  transform: translateY(-6px) scale(0);
+  opacity: 0;
+}
+
+.menu-trigger.menu-trigger-active .menu-trigger-line {
+  width: 14px;
+  height: 1px;
+  transform: rotate(45deg);
+  /* Bleibt Burgund — auf bone gut sichtbar */
+}
+
+/* Zweite ×-Linie via ::after auf .menu-trigger-shapes (zentriert über Marker-Block) */
+.menu-trigger-shapes::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 1px;
+  background-color: var(--color-pink-shock);
+  transform: translate(-50%, -50%) rotate(-45deg);
+  transition: width 250ms ease-out 100ms;
+  pointer-events: none;
+}
+
+.menu-trigger.menu-trigger-active .menu-trigger-shapes::after {
+  width: 14px;
+}
+
+.menu-trigger.menu-trigger-active .menu-trigger-label {
+  opacity: 0;
+}
+
+/* === Editorial Menu (Sub-Header-Overlay, bone-Background) === */
+
+.editorial-menu {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background-color: var(--color-white);
+  padding: 32px 24px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+  transition: opacity 350ms ease-out, transform 350ms ease-out;
+}
+
+.editorial-menu.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  .editorial-menu {
+    padding: 40px 32px 32px;
+  }
+}
+
+/* === Top-Bar: User-Email + Logout (kein × — Burger im Header übernimmt) === */
+
+.editorial-menu-topbar {
+  margin-bottom: 48px;
+}
+
+.editorial-menu-user-email {
+  margin: 0 0 4px;
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--color-anthrazit) 55%, transparent);
+  letter-spacing: 0.02em;
+}
+
+.editorial-menu-logout {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--color-anthrazit);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-pink-shock) 50%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.editorial-menu-logout:hover {
+  text-decoration-color: var(--color-pink-shock);
+}
+
+.editorial-menu-logout:focus-visible {
+  outline: 2px solid var(--color-pink-shock);
+  outline-offset: 3px;
+}
+
+/* === Items (anthrazit-Schrift auf bone) === */
+
+.editorial-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.editorial-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.editorial-menu-item-label {
+  font-size: 24px;
+  color: color-mix(in srgb, var(--color-anthrazit) 60%, transparent);
+  font-weight: 400;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+  transition: color 200ms ease-in-out, font-weight 200ms ease-in-out;
+}
+
+.editorial-menu-item-strich {
+  display: block;
+  width: 20px;
+  height: 1px;
+  background-color: color-mix(in srgb, var(--color-anthrazit) 18%, transparent);
+  transition: width 250ms ease-out, height 250ms ease-out, background-color 250ms ease-out;
+}
+
+.editorial-menu-item:hover .editorial-menu-item-label {
+  color: var(--color-anthrazit);
+}
+
+.editorial-menu-item[data-active="true"] .editorial-menu-item-label {
+  color: var(--color-anthrazit);
+  font-weight: 500;
+}
+
+.editorial-menu-item[data-active="true"] .editorial-menu-item-strich {
+  width: 36px;
+  height: 2px;
+  background-color: var(--color-pink-shock);
+}
+
+/* === Stagger-Animation === */
+
+.editorial-menu.is-open .editorial-menu-item {
+  animation: editorial-menu-item-in 250ms ease-out forwards;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.editorial-menu.is-open .editorial-menu-item:nth-child(1) { animation-delay: 150ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(2) { animation-delay: 200ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(3) { animation-delay: 250ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(4) { animation-delay: 300ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(5) { animation-delay: 350ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(6) { animation-delay: 400ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(7) { animation-delay: 450ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(8) { animation-delay: 500ms; }
+.editorial-menu.is-open .editorial-menu-item:nth-child(9) { animation-delay: 550ms; }
+
+@keyframes editorial-menu-item-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === Reduced-Motion === */
+
+@media (prefers-reduced-motion: reduce) {
+  .editorial-menu.is-open .editorial-menu-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .menu-trigger-circle,
+  .menu-trigger-line,
+  .menu-trigger-square,
+  .menu-trigger-shapes::after,
+  .menu-trigger-label,
+  .editorial-menu,
+  .editorial-menu-item-label,
+  .editorial-menu-item-strich {
+    transition: none;
+  }
+}
+
+/* === Akkordeon-Navigation (8-Gruppen-System) === */
+
+.editorial-menu-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 32px 24px;
+  max-width: 560px;
+}
+
+@media (min-width: 768px) {
+  .editorial-menu-nav {
+    padding: 40px 32px;
+  }
+}
+
+.menu-user-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-stein);
+  margin-bottom: 8px;
+}
+
+.menu-user-email {
+  font-size: 11px;
+  color: var(--color-anthrazit);
+  opacity: 0.45;
+  font-family: Menlo, 'SF Mono', monospace;
+  letter-spacing: 0.01em;
+}
+
+.menu-logout-btn {
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  color: var(--color-pink-shock);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  border-bottom: 1px solid var(--color-pink-shock);
+  padding-bottom: 1px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s ease;
+}
+
+.menu-logout-btn:hover {
+  opacity: 0.7;
+}
+
+/* Übersicht — direkter Link */
+.menu-direct-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-size: 18px;
+  color: color-mix(in srgb, var(--color-anthrazit) 65%, transparent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  border-bottom: 1px solid var(--color-stein);
+}
+
+.menu-direct-link:hover {
+  color: var(--color-anthrazit);
+}
+
+.menu-direct-link.is-active {
+  color: var(--color-anthrazit);
+  font-weight: 500;
+  font-style: normal;
+  padding-left: 30px;
+}
+
+/* Gruppen */
+.menu-group {
+  border-bottom: 1px solid var(--color-stein);
+}
+
+.menu-group-header {
+  width: 100%;
+  background: transparent;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.menu-group-header:hover {
+  background: color-mix(in srgb, var(--color-stein) 40%, transparent);
+}
+
+.group-label {
+  font-size: 9px;
+  color: var(--color-anthrazit);
+  opacity: 0.45;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.group-chevron {
+  font-size: 16px;
+  color: var(--color-pink-shock);
+  transition: transform 0.25s ease;
+  line-height: 1;
+  font-weight: 300;
+  font-family: var(--font-sans);
+}
+
+.menu-group-header.is-expanded .group-chevron {
+  transform: rotate(45deg);
+}
+
+.menu-group-header.is-expanded .group-label {
+  opacity: 0.85;
+  color: var(--color-pink-shock);
+}
+
+/* Items */
+.menu-group-items {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 10px;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 9px 16px 9px 32px;
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--color-anthrazit) 65%, transparent);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.menu-item:hover {
+  color: var(--color-anthrazit);
+}
+
+.menu-item.is-active {
+  color: var(--color-anthrazit);
+  font-weight: 500;
+  font-style: normal;
+}
+
+.active-dot {
+  position: absolute;
+  left: 16px;
+  width: 5px;
+  height: 5px;
+  background: var(--color-pink-shock);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-chevron,
+  .menu-group-header,
+  .menu-item,
+  .menu-direct-link {
+    transition: none;
+  }
+}

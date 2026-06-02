@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Sprint H · Group 4c Tag 1 — Tailwind-Theme aliased auf Theme-Variables.
+ *
+ * Tailwind-v4 löst @theme-Werte zu :root-Custom-Properties auf und
+ * generiert Utility-Klassen wie `.bg-bone { background-color: var(--color-bone) }`.
+ * Wenn der @theme-Wert selbst eine var(--theme-*) Indirection ist, kaskadiert
+ * der [data-theme]-Override zur Render-Zeit durch — Tailwind-Klassen werden
+ * automatisch theme-aware, ohne dass Pages umgeschrieben werden müssen.
+ *
+ * Voraussetzung: themes.css muss vor global.css importiert werden, damit
+ * die --theme-*-Defaults definiert sind. In AdminLayout.astro ist das der
+ * Fall (themes.css am Anfang importiert).
+ */
+
+@theme {
+  /* Legacy-Tailwind-Color-Tokens als Aliases auf Theme-Variables
+   * (bg-bone, bg-burgund, bg-anthrazit, text-anthrazit, bg-stein, ... bleiben
+   * funktional, ziehen aber durch alle 3 Themes durch).
+   *
+   * Hinweis: --color-burgund war seit Phase 2 auf Pink-Shock gemappt — heißt
+   * bestehende Tailwind-Klassen `bg-burgund`/`text-burgund` erwarten die
+   * aktuelle Akzentfarbe (nicht das echte Burgund #8C2128 aus dem Styleguide).
+   * Naming-Schuld aus Phase 2, hier konsistent fortgeführt.
+   */
+  --color-bone:       var(--theme-bg-primary);   /* warm-Off-White / Cream */
+  --color-stein:      var(--theme-border);       /* sanfter Border */
+  --color-burgund:    var(--theme-accent);       /* Phase-2-Mapping: Akzentfarbe */
+  --color-anthrazit:  var(--theme-text-primary); /* dunkler Text */
+  --color-waldgruen:  var(--theme-success);      /* = sage */
+  --color-pink-shock: var(--theme-accent);       /* primary akzent */
+  --color-sage:       var(--theme-success);
+  --color-white:      var(--theme-bg-primary);
+
+  /* Font-Tokens — Tailwind-Klassen font-sans/font-serif/font-mono */
+  --font-sans:         var(--theme-font-sans);
+  --font-serif:        var(--theme-font-serif);
+  --font-mono-display: var(--theme-font-mono);
+}
+
+/* Semantische Aliases — Tailwind-fremde Custom-Properties */
+:root {
+  --color-primary: var(--theme-accent);
+  --color-accent:  var(--theme-accent);
+  --color-error:   var(--theme-accent);
+  --color-success: var(--theme-success);
+  --color-text:    var(--theme-text-primary);
+  --color-surface: var(--theme-bg-primary);
+  --color-border:  var(--theme-border-subtle);
+}
+
+label:has(input[type="checkbox"]:checked) [data-toggle-accent] {
+  background-color: var(--theme-success);
+}
+
+/* Theme-aware Body-Class für AdminLayout. Ersetzt das frühere
+ * "bg-white text-anthrazit" — Tailwind-Klassen waren bereits aliased,
+ * aber expliziter Custom-Class macht Theme-Awareness lesbarer. */
+.bauhaus-app-body {
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-sans);
+}
+
+/* Alpine.js: x-cloak verhindert Flash of Unstyled Content beim Page-Load */
+[x-cloak] {
+  display: none !important;
+}
+
+/* ================================================================ */
+/* MONO UTILITY CLASSES — Phase 6b: JetBrains Mono Uppercase        */
+/* Eyebrows, Labels, Meta, Table-Headers                            */
+/* ================================================================ */
+
+/* Eyebrow — section intros, page context labels */
+.eyebrow {
+  font-family: var(--font-mono-display);
+  font-size: 10px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--theme-text-primary) 55%, transparent);
+  line-height: 1.4;
+}
+
+/* Section-Label — nav section headers, group labels */
+.section-label {
+  font-family: var(--font-mono-display);
+  font-size: 11px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+/* Meta-Mono — timestamps, IDs, technical metadata (NOT uppercase) */
+.meta-mono {
+  font-family: var(--font-mono-display);
+  font-size: 11px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+/* Tbl-Th — table column headers */
+.tbl-th {
+  font-family: var(--font-mono-display);
+  font-size: 10px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
