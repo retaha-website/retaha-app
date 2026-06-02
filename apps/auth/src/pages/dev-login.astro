@@ -1,0 +1,171 @@
+---
+/**
+ * Dev-Login-UI — DEV-ONLY Direct-Login ohne Magic-Link-Email.
+ *
+ * HARD-BLOCKS:
+ *   1. Production → 404 via Astro.redirect (Page-Level)
+ *   2. API-Endpoint /api/auth/dev-login hat eigenen Production-Block
+ *   3. Nur @retaha.de-Emails erlaubt (Endpoint-Side)
+ */
+
+import AuthLayout from '../layouts/AuthLayout.astro';
+import { getEnv } from '@retaha/db';
+
+function isProduction(): boolean {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.PROD) return true;
+  return getEnv('NODE_ENV') === 'production';
+}
+
+if (isProduction()) {
+  return new Response('Not Found', { status: 404 });
+}
+
+const TEST_USERS = [
+  { email: 'owner@retaha.de',   label: 'Owner (full access)' },
+  { email: 'manager@retaha.de', label: 'Manager' },
+  { email: 'staff@retaha.de',   label: 'Staff' },
+];
+
+const defaultReturnTo =
+  getEnv('DEFAULT_REDIRECT_TARGET') ?? 'http://backoffice.retaha.local:4324/admin/dashboard';
+const url = new URL(Astro.request.url);
+const returnTo = url.searchParams.get('return_to') ?? defaultReturnTo;
+---
+
+<AuthLayout title="dev login" eyebrow="dev only · lokal">
+  <h1 class="dev-headline">
+    dev login<span class="h-dot">.</span>
+  </h1>
+  <p class="dev-sub">
+    schnelles login fuer entwicklung. nur fuer @retaha.de testaccounts.
+    diese seite gibt in production 404 zurueck.
+  </p>
+
+  <div class="dev-form">
+    <label class="dev-label" for="user-select">test-user</label>
+    <select id="user-select" class="dev-select">
+      {TEST_USERS.map(u => (
+        <option value={u.email}>{u.label} — {u.email}</option>
+      ))}
+    </select>
+
+    <button id="dev-login-btn" type="button" class="dev-submit">
+      einloggen
+    </button>
+
+    <p id="dev-status" class="dev-status" hidden></p>
+  </div>
+
+  <script type="module" is:inline define:vars={{ returnTo }}>
+    const btn = document.getElementById('dev-login-btn');
+    const select = document.getElementById('user-select');
+    const status = document.getElementById('dev-status');
+
+    function setStatus(msg, isError) {
+      if (!status) return;
+      status.textContent = msg;
+      status.hidden = false;
+      status.classList.toggle('is-error', !!isError);
+    }
+
+    btn?.addEventListener('click', async () => {
+      const email = select?.value;
+      if (!email) return;
+      btn.disabled = true;
+      setStatus('einloggen…', false);
+
+      try {
+        const res = await fetch('/api/auth/dev-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, return_to: returnTo }),
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setStatus(`eingeloggt als ${data.user.email}. weiterleitung…`, false);
+          setTimeout(() => { window.location.href = data.redirect || returnTo; }, 600);
+        } else {
+          setStatus(`fehler: ${data.error || res.status}`, true);
+          btn.disabled = false;
+        }
+      } catch (e) {
+        setStatus(`netzwerk-fehler: ${String(e)}`, true);
+        btn.disabled = false;
+      }
+    });
+  </script>
+
+  <style>
+    .dev-headline {
+      font-family: var(--theme-font-headline);
+      font-size: 30px;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+      text-align: center;
+      text-transform: lowercase;
+    }
+    .dev-sub {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--theme-text-secondary);
+      text-align: center;
+      margin: 0 0 28px;
+    }
+    .dev-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dev-label {
+      font-family: var(--theme-font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--theme-text-tertiary);
+    }
+    .dev-select {
+      padding: 12px 14px;
+      font-family: var(--theme-font-sans);
+      font-size: 15px;
+      border: 1px solid var(--theme-border);
+      background: var(--theme-bg-primary);
+      color: var(--theme-text-primary);
+      border-radius: var(--theme-radius-input);
+    }
+    .dev-submit {
+      margin-top: 12px;
+      padding: 14px 22px;
+      background: var(--theme-text-primary);
+      color: var(--theme-bg-primary);
+      border: none;
+      border-radius: var(--theme-radius-button);
+      font-family: var(--theme-font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: lowercase;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .dev-submit:hover:not(:disabled),
+    .dev-submit:focus-visible:not(:disabled) {
+      background: var(--theme-accent);
+      color: var(--theme-text-on-accent);
+      outline: none;
+    }
+    .dev-submit:disabled { opacity: 0.5; cursor: wait; }
+    .dev-status {
+      margin: 16px 0 0;
+      padding: 10px 12px;
+      background: var(--theme-bg-secondary);
+      border-left: 3px solid var(--theme-accent);
+      font-size: 13px;
+      border-radius: var(--theme-radius);
+    }
+    .dev-status.is-error {
+      background: rgba(var(--theme-accent-rgb), 0.08);
+      color: var(--theme-accent);
+    }
+  </style>
+</AuthLayout>
