@@ -8,6 +8,9 @@ import type { AdminLocale, AddressForm } from '../../i18n/types';
 import { mergeAndTranslate, asLanguageCode } from '../../lib/i18n/save-hook.ts';
 import { getVapidPublicKey } from '../../lib/push/config';
 const vapidPublicKey = getVapidPublicKey();
+// Sprint H · Group 1 — Theme-Picker
+import ThemePicker from '../../components/admin/ThemePicker.astro';
+import { resolveTheme, type ThemeId } from '../../lib/theme';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -19,6 +22,11 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 // Defensive fallbacks falls Middleware Astro.locals nicht gesetzt hat
 const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
+
+// Sprint H · Group 1 — Preview-Token für Theme-Picker (irgendein aktiver Stay)
+const { data: previewStayRow } = await client
+  .from('stays').select('access_token').eq('hotel_id', hotel.id).eq('is_active', true).limit(1).maybeSingle();
+const previewToken: string | null = previewStayRow?.access_token ?? null;
 
 // Sprint i18n Phase 5.8 — Hotel-Sprach-Settings VOR POST-Handler laden
 const { data: hotelPreLang } = await client
@@ -656,6 +664,12 @@ const currentAddressForm: AddressForm = ((s as any).guest_address_form ?? DEFAUL
       </div>
     </div>
   </section>
+
+  {/* Sprint H · Group 1 — Theme-Picker (außerhalb des Forms, eigene API) */}
+  <ThemePicker
+    currentTheme={resolveTheme({ hotelTheme: (hotel as any).theme }) as ThemeId}
+    previewToken={previewToken}
+  />
 
   <form method="POST">
     <input type="hidden" name="_action" value="save_general" />

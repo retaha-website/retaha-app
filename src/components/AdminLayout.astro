@@ -5,9 +5,17 @@ import '../styles/components/inputs.css';
 import '../styles/components/pills.css';
 import '../styles/components/menu.css';
 import '../styles/components/settings.css';
+import '../styles/themes.css';
+// Sprint H · Group 1 — Theme-Fonts via @fontsource (self-hosted, DSGVO-konform)
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
 import AdminFooter from './AdminFooter.astro';
 import NotificationBell from './admin/NotificationBell.astro';
 import { t } from '../i18n/helpers';
+import { resolveTheme } from '../lib/theme';
 
 interface Props {
   title: string;
@@ -17,6 +25,7 @@ interface Props {
     logo_url?: string | null;
     trial_started_at?: string | null;
     subscription_status?: string;
+    theme?: string | null;
   };
   user: { email: string };
   activeTab?: string;
@@ -25,10 +34,16 @@ interface Props {
 const { title, hotel, user } = Astro.props;
 const userLocale = Astro.locals.locale;
 const currentPath = Astro.url.pathname;
+
+// Theme: Preview-Query > hotel.theme > Default
+const activeTheme = resolveTheme({
+  hotelTheme: hotel.theme,
+  requestUrl: Astro.url,
+});
 ---
 
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme={activeTheme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

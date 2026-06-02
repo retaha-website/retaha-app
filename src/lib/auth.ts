@@ -76,7 +76,7 @@ export async function getUserHotels(cookies: AstroCookies, request: Request) {
 
   const { data, error } = await client
     .from('hotel_users')
-    .select('role, hotel:hotels(id, slug, name, city, logo_url, trial_started_at, subscription_status)')
+    .select('role, hotel:hotels(id, slug, name, city, logo_url, trial_started_at, subscription_status, theme)')
     .eq('user_id', user.id);
 
   if (error || !data) return null;

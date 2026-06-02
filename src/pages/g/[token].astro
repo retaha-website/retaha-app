@@ -22,6 +22,14 @@ import '../../styles/retaha.css';
 import '../../styles/components/buttons.css';
 import '../../styles/components/inputs.css';
 import '../../styles/components/pills.css';
+import '../../styles/themes.css';
+// Sprint H · Group 1 — Theme-Fonts (Inter Tight für Premium, Cormorant für Burgund)
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+import { resolveTheme } from '../../lib/theme';
 
 const { token } = Astro.params;
 const ctx = token ? await loadStayByToken(token) : null;
@@ -304,6 +312,12 @@ const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_inclu
 
 const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
+// Sprint H · Group 1 — Theme aktiv (Preview-Query ?preview_theme=X > hotel.theme > Default)
+const activeTheme = resolveTheme({
+  hotelTheme: (hotel as any).theme,
+  requestUrl: Astro.url,
+});
+
 // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
 // Cooldown (24h via localStorage) entscheidet danach Client-seitig, ob das
@@ -326,7 +340,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
 ---
 
 <!DOCTYPE html>
-<html lang={lang} dir={htmlDir}>
+<html lang={lang} dir={htmlDir} data-theme={activeTheme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
