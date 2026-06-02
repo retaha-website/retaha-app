@@ -204,6 +204,28 @@ if (Astro.request.method === 'POST') {
         return Astro.redirect('/admin/pms?saved=config');
       }
     }
+  } else if (action === 'save_charge_config') {
+    // UX-017 P3 — Charge-Required-Toggle pro Booking-Type.
+    // HTML-Checkboxen senden nur Wert wenn checked → fehlende Felder = false.
+    const CHARGE_TYPES = [
+      'breakfast', 'conference', 'service',
+      'restaurant', 'spa', 'late_checkout', 'housekeeping',
+    ] as const;
+    const update: Record<string, boolean | string> = {
+      updated_at: new Date().toISOString(),
+    };
+    for (const t of CHARGE_TYPES) {
+      update[`${t}_charge_enabled`] = form.get(`${t}_charge_enabled`) === 'on';
+    }
+    const { error } = await ssrClient
+      .from('mews_integrations')
+      .update(update)
+      .eq('hotel_id', hotel.id);
+    if (error) {
+      message = { type: 'error', text: `Charge-Konfig speichern fehlgeschlagen: ${error.message}` };
+    } else {
+      return Astro.redirect('/admin/pms?saved=charge_config');
+    }
   } else if (action === 'disconnect') {
     // Sprint D Phase 6b — Reconnect-Symmetrie: Row NICHT löschen, nur Auth-Felder
     // nullen. Service-Mappings + Tax/Currency/Pricing-Defaults bleiben erhalten.
@@ -258,7 +280,10 @@ const { data: integration } = await ssrClient
     enterprise_id, environment, last_sync_at, sync_status, sync_error_message, created_at, updated_at,
     pricing_source, default_currency, default_tax_code, default_tax_rate, pricing_mode,
     service_id_breakfast, service_id_service, service_id_conference,
-    mews_products_count
+    mews_products_count,
+    breakfast_charge_enabled, conference_charge_enabled, service_charge_enabled,
+    restaurant_charge_enabled, spa_charge_enabled,
+    late_checkout_charge_enabled, housekeeping_charge_enabled
   `)
   .eq('hotel_id', hotel.id)
   .maybeSingle();
@@ -613,6 +638,137 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
             </button>
           </div>
         </form>
+      </section>
+
+      <!-- UX-017 P3 — Charge-Required-Toggle pro Booking-Type -->
+      <section class="border-t border-anthrazit/[0.12] pt-8 mt-8">
+        <p class="themed-eyebrow-flank text-pink-shock mb-2 inline-block">charge-konfiguration</p>
+        <h2 class="text-2xl font-light mb-3">
+          welche buchungen werden mews-belastet<span class="h-dot">.</span>
+        </h2>
+        <p class="text-sm text-anthrazit/60 mb-6 max-w-2xl">
+          pro buchungs-typ: soll bei bestätigung automatisch eine
+          mews-charge an das gäste-zimmer geschickt werden? deaktiviere
+          für reservation-only-typen (z.b. spa wo zahlung vor ort erfolgt).
+        </p>
+
+        <form method="POST" class="space-y-3 max-w-2xl">
+          <input type="hidden" name="_action" value="save_charge_config" />
+
+          <div class="charge-toggle-grid">
+            {[
+              { type: 'breakfast',     label: 'frühstück',     hint: 'preis aus /admin/breakfast' },
+              { type: 'conference',    label: 'konferenz',     hint: 'preis aus /admin/conference' },
+              { type: 'service',       label: 'service',       hint: 'preis aus /admin/service' },
+              { type: 'restaurant',    label: 'restaurant',    hint: 'reservation-only — zahlung vor ort' },
+              { type: 'spa',           label: 'spa',           hint: 'reservation-only — zahlung vor ort' },
+              { type: 'late_checkout', label: 'late checkout', hint: 'kostet meist extra' },
+              { type: 'housekeeping',  label: 'housekeeping',  hint: 'kostenfreier service' },
+            ].map(({ type, label, hint }) => {
+              const colKey = `${type}_charge_enabled` as keyof typeof integration;
+              // null → fallback true (Backward-Compat fuer Rows ohne Default)
+              const checked = (integration as any)?.[colKey] !== false;
+              return (
+                <label class="charge-toggle-card">
+                  <div class="charge-toggle-info">
+                    <p class="charge-toggle-label">{label}</p>
+                    <p class="charge-toggle-hint">{hint}</p>
+                  </div>
+                  <span class="bauhaus-toggle">
+                    <input
+                      type="checkbox"
+                      name={`${type}_charge_enabled`}
+                      checked={checked}
+                      class="bauhaus-toggle-input"
+                    />
+                    <span class="bauhaus-toggle-track">
+                      <span class="bauhaus-toggle-thumb"></span>
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div class="pt-4">
+            <button type="submit" class="bauhaus-button bauhaus-button--primary">
+              charge-konfiguration speichern
+            </button>
+          </div>
+        </form>
+
+        <style>
+          .charge-toggle-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          @media (min-width: 640px) {
+            .charge-toggle-grid { grid-template-columns: 1fr 1fr; }
+          }
+          .charge-toggle-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 16px;
+            background: var(--theme-bg-secondary);
+            border: 1px solid var(--theme-border);
+            border-radius: var(--theme-radius);
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+          }
+          .charge-toggle-card:hover { border-color: var(--theme-accent); }
+          .charge-toggle-info { min-width: 0; }
+          .charge-toggle-label {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--theme-text-primary);
+            text-transform: lowercase;
+          }
+          .charge-toggle-hint {
+            margin: 2px 0 0;
+            font-size: 11px;
+            color: color-mix(in srgb, var(--theme-text-primary) 0.55, transparent);
+          }
+          .bauhaus-toggle {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+          }
+          .bauhaus-toggle-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 2;
+          }
+          .bauhaus-toggle-track {
+            position: absolute;
+            inset: 0;
+            background: color-mix(in srgb, var(--theme-text-primary) 0.18, transparent);
+            border-radius: var(--theme-radius-toggle);
+            transition: background 0.18s ease;
+          }
+          .bauhaus-toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: var(--theme-bg-primary);
+            border-radius: var(--theme-radius-toggle);
+            transition: transform 0.18s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+          }
+          .bauhaus-toggle-input:checked + .bauhaus-toggle-track { background: var(--theme-accent); }
+          .bauhaus-toggle-input:checked + .bauhaus-toggle-track .bauhaus-toggle-thumb {
+            transform: translateX(18px);
+          }
+        </style>
       </section>
 
       <!-- Aktionen -->

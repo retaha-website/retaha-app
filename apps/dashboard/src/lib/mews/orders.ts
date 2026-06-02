@@ -32,7 +32,20 @@ export type PushSkipReason =
   | 'no_service_id_for_type'
   | 'no_default_tax_code'
   | 'no_default_tax_rate'
-  | 'unknown_pricing_mode';
+  | 'unknown_pricing_mode'
+  | 'charge_disabled_for_type';
+
+/**
+ * UX-017 P3 — Hotelier hat in /admin/pms den Charge-Toggle pro Booking-Type.
+ * Mapping booking.type → mews_integrations.{type}_charge_enabled column.
+ * Wenn explizit false → PushSkipped. Wenn null/undefined → behandelt als true
+ * (Backward-Compat, falls Migration noch nicht durchgelaufen — NOT NULL DEFAULT
+ * sollte das aber sowieso verhindern).
+ */
+function isChargeDisabledForType(integration: any, bookingType: string): boolean {
+  const col = `${bookingType}_charge_enabled`;
+  return integration[col] === false;
+}
 
 export class PushSkipped extends Error {
   constructor(public readonly reason: PushSkipReason, message: string) {
@@ -334,6 +347,14 @@ export async function pushBookingToMews(bookingId: string): Promise<{ orderId: s
     throw new PushSkipped(
       'pfad_c_plus_not_implemented',
       'Pfad C+ (Mews-Products) noch nicht implementiert — Backlog',
+    );
+  }
+
+  // UX-017 P3 — Per-Type Charge-Toggle aus /admin/pms
+  if (isChargeDisabledForType(integration, booking.type)) {
+    throw new PushSkipped(
+      'charge_disabled_for_type',
+      `charge for booking type "${booking.type}" is disabled for this hotel (admin/pms config)`,
     );
   }
 
