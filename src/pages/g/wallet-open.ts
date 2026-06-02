@@ -33,11 +33,11 @@ function htmlMessage(title: string, body: string, status = 200): Response {
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet" />
-</head><body style="margin:0;font-family:'Space Grotesk',system-ui,sans-serif;background:#fff;color:#1A1A1A;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
+</head><body style="margin:0;font-family:'Space Grotesk',system-ui,sans-serif;background:var(--theme-bg-primary);color:var(--theme-text-primary);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
 <div style="max-width:480px;text-align:center">
-<p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#FF4A82;margin:0 0 20px">retaha · Wallet</p>
-<h1 style="font-size:26px;font-weight:300;letter-spacing:-0.02em;line-height:1.2;margin:0 0 12px">${title}<span style="color:#FF4A82">.</span></h1>
-<p style="font-size:14px;line-height:1.5;color:rgba(26,26,26,0.65);margin:0">${body}</p>
+<p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--theme-accent);margin:0 0 20px">retaha · Wallet</p>
+<h1 style="font-size:26px;font-weight:300;letter-spacing:-0.02em;line-height:1.2;margin:0 0 12px">${title}<span style="color:var(--theme-accent)">.</span></h1>
+<p style="font-size:14px;line-height:1.5;color:color-mix(in srgb, var(--theme-text-primary) 0.65, transparent);margin:0">${body}</p>
 </div></body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
@@ -97,6 +97,6 @@ export const GET: APIRoute = async ({ url }) => {
   const siteOrigin = (getEnv('PUBLIC_SITE_URL') || 'https://demo.retaha.de').replace(/\/$/, '');
   return htmlMessage(
     'Schön, dich zu sehen',
-    `Du hast aktuell keinen laufenden Aufenthalt. Wenn du dich für einen Besuch interessierst, schau gerne unter <a style="color:#FF4A82" href="${siteOrigin}">${siteOrigin.replace(/^https?:\/\//, '')}</a> vorbei.`,
+    `Du hast aktuell keinen laufenden Aufenthalt. Wenn du dich für einen Besuch interessierst, schau gerne unter <a style="color:var(--theme-accent)" href="${siteOrigin}">${siteOrigin.replace(/^https?:\/\//, '')}</a> vorbei.`,
   );
 };

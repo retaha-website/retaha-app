@@ -65,11 +65,13 @@ const EXCLUDED_FILES = new Set([
 ]);
 
 // Order matters: more-specific patterns first.
+// All regexes are case-insensitive via /i where hex-letters appear.
 const REPLACEMENTS = [
-  // Pink-Shock + Hover
-  { from: /#FF4A82\b/g,                                       to: 'var(--theme-accent)' },
-  { from: /#E63F71\b/g,                                       to: 'var(--theme-accent-hover)' },
+  // Pink-Shock + Hover (6-stellig, mit Variants)
+  { from: /#FF4A82\b/gi,                                      to: 'var(--theme-accent)' },
+  { from: /#E63F71\b/gi,                                      to: 'var(--theme-accent-hover)' },
   { from: /#d63870\b/gi,                                      to: 'var(--theme-accent-hover)' },
+  { from: /#e63d72\b/gi,                                      to: 'var(--theme-accent-hover)' },
   { from: /rgba\(\s*255\s*,\s*74\s*,\s*130\s*,\s*([\d.]+)\)/g,
     to: 'rgba(var(--theme-accent-rgb), $1)' },
 
@@ -78,21 +80,36 @@ const REPLACEMENTS = [
   { from: /(background(?:-color)?:\s*(?:linear-gradient\([^)]*?\s*)?)#1A1A1A/gi,
     to: '$1var(--theme-bg-anthrazit)' },
   // sonst → --theme-text-primary
-  { from: /#1A1A1A\b/g,                                       to: 'var(--theme-text-primary)' },
+  { from: /#1A1A1A\b/gi,                                      to: 'var(--theme-text-primary)' },
   { from: /rgba\(\s*26\s*,\s*26\s*,\s*26\s*,\s*([\d.]+)\)/g,
     to: 'color-mix(in srgb, var(--theme-text-primary) $1, transparent)' },
 
-  // Whites
-  { from: /#FFFFFF\b/g,                                       to: 'var(--theme-bg-primary)' },
-  { from: /#FAFAF8\b/g,                                       to: 'var(--theme-bg-secondary)' },
-  { from: /#F4F4F2\b/g,                                       to: 'var(--theme-bg-tertiary)' },
+  // Whites — 6-stellig
+  { from: /#FFFFFF\b/gi,                                      to: 'var(--theme-bg-primary)' },
+  { from: /#FAFAF8\b/gi,                                      to: 'var(--theme-bg-secondary)' },
+  { from: /#FAFAFA\b/gi,                                      to: 'var(--theme-bg-secondary)' },
+  { from: /#F4F4F2\b/gi,                                      to: 'var(--theme-bg-tertiary)' },
+  { from: /#F4F4F4\b/gi,                                      to: 'var(--theme-bg-tertiary)' },
+  // Whites — 3-stellig (#fff, #eee, etc.)
+  { from: /(?<![A-Za-z0-9])#fff(?![0-9A-Fa-f])/gi,            to: 'var(--theme-bg-primary)' },
+  { from: /(?<![A-Za-z0-9])#fafafa(?![0-9A-Fa-f])/gi,         to: 'var(--theme-bg-secondary)' },
+  { from: /(?<![A-Za-z0-9])#f5f5f5(?![0-9A-Fa-f])/gi,         to: 'var(--theme-bg-tertiary)' },
 
-  // Border / Stein
-  { from: /#E8E4DD\b/g,                                       to: 'var(--theme-border)' },
+  // Border / Stein — 6-stellig
+  { from: /#E8E4DD\b/gi,                                      to: 'var(--theme-border)' },
+  { from: /#e8e8e8\b/gi,                                      to: 'var(--theme-border)' },
+  // Border-Greys (3-stellig)
+  { from: /(?<![A-Za-z0-9])#eee(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border)' },
+  { from: /(?<![A-Za-z0-9])#ddd(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border)' },
+  { from: /(?<![A-Za-z0-9])#f0f0f0(?![0-9A-Fa-f])/gi,         to: 'var(--theme-border)' },
+  { from: /(?<![A-Za-z0-9])#999(?![0-9A-Fa-f])/gi,            to: 'var(--theme-border-strong)' },
+
+  // Pink-Tint-Backgrounds (Highlight-States)
+  { from: /(?<![A-Za-z0-9])#fff5f8(?![0-9A-Fa-f])/gi,         to: 'rgba(var(--theme-accent-rgb), 0.06)' },
 
   // Sage
-  { from: /#5C9070\b/g,                                       to: 'var(--theme-sage)' },
-  { from: /#7DAA8F\b/g,                                       to: 'var(--theme-sage-dark)' },
+  { from: /#5C9070\b/gi,                                      to: 'var(--theme-sage)' },
+  { from: /#7DAA8F\b/gi,                                      to: 'var(--theme-sage-dark)' },
 
   // Echtes Burgund (sparsam — meist als var(--color-burgund))
   // KEINE Migration #8C2128 → var(--theme-burgund), denn der Wert ist in Theme 1
