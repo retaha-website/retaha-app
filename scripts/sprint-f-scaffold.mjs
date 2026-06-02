@@ -197,7 +197,7 @@ function appPackageJson(app) {
     type: 'module',
     private: true,
     scripts: {
-      dev: `astro dev --port ${app.port}`,
+      dev: `astro dev --port ${app.port} --host`,
       build: 'astro build',
       preview: `astro preview --port ${app.port}`,
       'type-check': 'astro check',
@@ -230,6 +230,14 @@ export default defineConfig({
   server: { port: ${app.port} },
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      allowedHosts: [
+        'auth.retaha.local',
+        'app.retaha.local',
+        'dashboard.retaha.local',
+        'backoffice.retaha.local',
+      ],
+    },
   },
 });
 `;

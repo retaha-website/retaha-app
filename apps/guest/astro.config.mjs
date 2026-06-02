@@ -9,5 +9,13 @@ export default defineConfig({
   server: { port: 4322 },
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      allowedHosts: [
+        'auth.retaha.local',
+        'app.retaha.local',
+        'dashboard.retaha.local',
+        'backoffice.retaha.local',
+      ],
+    },
   },
 });
