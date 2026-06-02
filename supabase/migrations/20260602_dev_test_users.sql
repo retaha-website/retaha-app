@@ -87,7 +87,7 @@ BEGIN
   -- (address, postal_code etc. aus sprintE2_hotels_address) bleiben NULL
   -- bzw. auf ihren DEFAULTs.
   INSERT INTO hotels (
-    id, name, slug, theme, language_default,
+    id, name, slug, theme, default_language, city,
     subscription_status, trial_started_at,
     created_at, updated_at
   ) VALUES (
@@ -96,6 +96,7 @@ BEGIN
     'test-hotel-dev',
     'bauhaus_manufaktur',
     'de',
+    'Berlin',
     'active',
     NOW(),
     NOW(), NOW()
