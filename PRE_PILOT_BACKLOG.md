@@ -1,12 +1,14 @@
 # Pre-Pilot Backlog — Konsolidiert vor Kristin-Onboarding
 
-**Generiert:** 2026-06-02 (durchsucht 10 Sprint-Closings + Code-Greps)
+**Generiert:** 2026-06-02 · letztes Update: 2026-06-02 (+ Sprint H/F/G + GAP-Analyse-Hinweis)
 **Sprint-Stand:** 8 Sprints durch (D, E1, E2, E3, E4, E7, i18n, Legal, Functional, Wallet)
-**Aktuelle Branch:** `main` @ `926d397`
+**Aktuelle Branch:** `main` @ `5db9703`
 
 > Single Source of Truth für alles was vor Pilot mit Kristin/Gate Garden noch passieren muss.
 > Aggregiert aus: SPRINT_*_CLOSING.md (10 Docs), Code-TODOs/Backlog-Comments (20+ Files),
 > TEST_BACKLOG.md, .env-Gaps, Pre-Production-Tasks pro Sprint.
+>
+> **Ergänzende Quelle:** [GAP_ANALYSIS.md](GAP_ANALYSIS.md) — 37 weitere Items aus Strategie-Docs (MVP_ARCHITEKTUR, MODUL_INVENTUR, COMPONENT_GAP_INVENTAR, FUNCTION_AUDIT, ONBOARDING_AUDIT) **wartet auf User-Review** bevor in diesen Backlog gemerged.
 
 ---
 
@@ -322,3 +324,174 @@ Damit der nächste Dev (oder Production-Deploy-Wizard) keine ENVs vergisst:
 ---
 
 *Konsolidiert aus 10 SPRINT_*_CLOSING.md, 20+ Code-Files mit Backlog/TODO-Kommentaren, TEST_BACKLOG.md, .env vs .env.example. Wird kontinuierlich aktualisiert sobald Items abgehakt werden.*
+
+---
+
+## 🔮 GEPLANTE SPRINTS (Pre-Pilot, in dieser Reihenfolge)
+
+> Drei Sprints die in der User-Konversation Tag 11-14 strategisch entschieden aber nie als Briefing dokumentiert wurden. Hier explizit erfasst mit IDs für Tracking.
+
+### Sprint H · UI/UX-Polish + Hotel-Themes (kombiniert, ~7-10 Tage)
+
+**Briefing-Quelle:** User-Strategie-Diskussion Tag 14 (UI/UX-Sprint zusammenführen mit Hotel-Themes wegen geteilter CSS-Variable-Infrastruktur)
+
+**Items aus aktuellem Backlog (MITTEL → ziehen in Sprint H):**
+
+| Sprint-H-ID | Quelle | Item | Aufwand |
+|---|---|---|---|
+| **H-001** | UX-001 | Hotel-Branding-UI in `/admin/settings` (Logo/Hero/Color-Picker + Auto-Re-Submit-Pass-Class) | 3-4h |
+| **H-002** | UX-002 | Hotelier-Pflichten zur Gast-Information explizit im Onboarding | 2-3h |
+| **H-003** | UX-003 | `/admin/eve/audit` — Hotelier sieht Eve-Actions + Filter | 4-6h |
+| **H-004** | UX-004 | Eve-Statistik-Mini-Widget im Dashboard | 2-3h |
+| **H-005** | UX-005 | Push-Notification-Settings pro Typ | 3-4h |
+| **H-006** | UX-006 | `/admin/profile` für Vor-/Nachname-Änderung | 2h |
+| **H-007** | UX-007 | Magic-Link-Email-Template anpassen | 30min |
+| **H-008** | UX-008 | "Auf Karte zeigen"-Button im Place-Detail | 1h |
+| **H-009** | UX-009 | Translation-Status-Badge im UI | 2h |
+| **H-010** | UX-010 | lang-switcher Native-Labels | 1h |
+
+**Neue Items für Sprint H (3 retaha-Themes pro Hotel):**
+
+| Sprint-H-ID | Item | Aufwand |
+|---|---|---|
+| **H-011** | **Theme-Picker UI** in `/admin/settings` mit Live-Preview | 4-6h |
+| **H-012** | **Tailwind-CSS-Variables für Theme-Switching** (CSS-Custom-Properties pro Theme) | 6-8h |
+| **H-013** | **Theme 1: "Bauhaus Manufaktur"** (default, aktuelle Pink-Shock + Anthrazit-Optik) | inkl. |
+| **H-014** | **Theme 2: "Premium Anthrazit"** (Anthrazit-dominant, Gold-Akzent, Serif-Headlines) | 4-6h Asset-Design + Implementation |
+| **H-015** | **Theme 3: "Warmes Burgund"** (Burgund-Akzent, Cream-BG, warme Töne) | 4-6h |
+| **H-016** | Pro Theme: Brand-Color-Default, Font-Family-Set, Hero-Image-Default | 2-3h |
+| **H-017** | Theme-Migration: `hotels.theme TEXT DEFAULT 'manufaktur'`-Spalte | 30min |
+
+**Plus erwartete Findings aus GAP_ANALYSIS.md (Pending User-Review):**
+
+| Sprint-H-ID | GAP-Quelle | Item | Aufwand |
+|---|---|---|---|
+| **H-018** | GAP-026 | **Component-Familie Sprint** — SaveFeedback, BauhausToast, Alert, Modal, EmptyState, LoadingState (aus COMPONENT_GAP_INVENTAR) | 5-7d (Kern-Scope von H) |
+| **H-019** | GAP-009 | **Showcase-Modus** für Demo-Tour mit Kristin (Sprint 4 aus MVP_ARCHITEKTUR nie umgesetzt) | 4-6h |
+| **H-020** | GAP-016 | Cockpit-Aggregation (Live-To-Dos im Dashboard statt statische Karten) | 1-2d |
+| **H-021** | GAP-018 | 19 Stub-Pages aufräumen (hide aus Nav ODER "Roadmap" anzeigen) | 2-3h |
+| **H-022** | GAP-021 | Wetter-API für Concierge-Card (statt hardcoded `temperature: 21`) | 2-3h |
+| **H-023** | GAP-028 | Frühstück-Item-Preise UI (Hannah braucht price_cents Input) | 2-3h |
+| **H-024** | GAP-029 | Service-Items strukturiertes UI (statt rohes JSON) | 4-6h |
+| **H-025** | GAP-030 | Konferenz-Räume strukturiertes UI | 4-6h |
+| **H-026** | GAP-027 | Logo-Upload im Branding-Onboarding-Step | 2-3h |
+| **H-027** | GAP-022 | Modal/Slide-Over-Komponente Admin (statt confirm()) | 4-6h |
+| **H-028** | GAP-007 | RTL-Support für Arabisch (Master-Plan Q7b MVP-Pflicht) | 2-3d (CSS-Refactor) |
+| **H-029** | GAP-005 + GAP-006 | TR + AR in UI-Inline-Strings + Backoffice-Locales auf 100% | 1-2d |
+
+**Sprint H Total Aufwand:** 7-10 Tage Core-Items + 5-7 Tage GAP-Findings = **~12-17 Tage** wenn alle GAP-Findings drin sind. Briefing-Phase entscheidet Scope.
+
+**Big-Test-Day-Findings als zusätzlicher Input:** Nach Browser-Test-Day mit Kristin werden hier weitere Items aufgenommen.
+
+---
+
+### Sprint F · Monorepo-Split mit Turborepo (~3-5 Tage)
+
+**Briefing-Quelle:** User-Strategie-Diskussion Tag 13 (Architektur-Entscheidung)
+**Vorbereitung:** Sprint E3 hat `/app/*` schon strukturell separiert — Refactor mechanisch
+
+| Sprint-F-ID | Item | Aufwand |
+|---|---|---|
+| **F-001** | **Turborepo-Setup** (`turbo.json`, Pipeline-Config) | 4-6h |
+| **F-002** | **3 Apps-Struktur:** `apps/guest`, `apps/dashboard`, `apps/backoffice` | 1d |
+| **F-003** | `apps/guest` → `app.retaha.de` (alle `/g/*` Routes + `/m/*` + `/wallet/*`) | 4-6h |
+| **F-004** | `apps/dashboard` → `dashboard.retaha.de` (Operations: `/admin/bookings`, `/admin/checkins`, `/app/*`) | 4-6h |
+| **F-005** | `apps/backoffice` → `backoffice.retaha.de` (Config: `/admin/settings`, `/admin/marketing`, `/admin/eve`, etc.) | 4-6h |
+| **F-006** | **Shared Lib `packages/shared/`** für gemeinsame Komponenten (AdminLayout, EditorialPageHeader, etc.) | 6-8h |
+| **F-007** | **Shared Lib `packages/db/`** für Supabase-Clients + Migrations | 4-6h |
+| **F-008** | **Shared Lib `packages/types/`** für i18n-Types, Auth-Types, etc. | 2-3h |
+| **F-009** | **ENV-Migration pro App** (z.B. `apps/guest/.env.example`) | 2-3h |
+| **F-010** | **Vercel Multi-Project-Setup** (3 Projekte, je eigene Domain) | 4-6h |
+| **F-011** | **Build-Pipeline** anpassen (`turbo run build`, parallel Builds) | 2-3h |
+| **F-012** | **Branch-Strategie überdenken** (Mono-Repo mit Branches vs Trunk-based) | Diskussion |
+| **F-013** | **CORS-Setup** zwischen den 3 Domains (Cookie-Sharing für Stay-Session) | 4-6h |
+| **F-014** | **Sprint-E3-Kapselung-Verifikation** — `/app/*` darf keine AdminLayout-Internals nutzen (siehe SPRINT_E3 Code-Verifikation) | 2-3h |
+
+**Resolves:** GAP-003 (Hotel-Switcher), GAP-010 (Subdomain-Struktur) aus GAP_ANALYSIS.
+
+**Risiken:**
+- Browser-Tests müssen über alle 3 Subdomains laufen (Auth, Cookies, Cross-Site-Requests)
+- Stay-Session-Cookie muss Cross-Subdomain funktionieren (`Domain=.retaha.de`)
+- ENV-Verteilung kann zu Drift führen — `.env.example` pro App muss synchron bleiben
+
+**Sprint F Total Aufwand:** ~3-5 Tage mit Risiko nach oben auf 7 wenn CORS+Cookie-Probleme
+
+---
+
+### Sprint G · Production-Migration (~3-5 Tage)
+
+**Briefing-Quelle:** User-Strategie-Diskussion Tag 11 + [MIGRATION_STRATEGY_BACKLOG.md](MIGRATION_STRATEGY_BACKLOG.md)
+**Vorbedingung:** Sprint H + F durch, GAP-035 (Baseline-Dump-Lehre aus Tag 11) berücksichtigen
+
+| Sprint-G-ID | Item | Aufwand |
+|---|---|---|
+| **G-001** | **Vercel-Projekt(e) anlegen** (1 Projekt wenn vor Sprint F, 3 Projekte wenn nach F) | 1-2h |
+| **G-002** | **GitHub-Repo verknüpfen** + Branch-Protection auf `main` | 30min |
+| **G-003** | **Production-Supabase aktivieren** (Project-ID `twmzhrcadixzcdlupisd`) | 1h |
+| **G-004** | **Baseline-Dump als Initial-Migration** (Lehre aus Tag 11 — supabase db dump --schema-only → 0001_baseline.sql) | 4-6h |
+| **G-005** | **Alle 50+ Migrations re-applizieren** auf Production-Supabase via `supabase migration up` | 2-3h |
+| **G-006** | **Data-Migration für Demo-Hotel** (Gate Garden Daten als Seed) | 4-6h |
+| **G-007** | **DNS bei Strato:** A-Record / CNAME auf Vercel (für jedes der 3 Subdomain wenn Sprint F durch) | 2-3h pro Domain |
+| **G-008** | **Alle Vercel-ENVs setzen** — aus PRE_PILOT-HOCH-Sektion (ENV-001 bis ENV-008) | 1-2h |
+| **G-009** | **Crons aktivieren** — `AUTO_DELETE_ENABLED=true`, `MARKETING_ENABLED=true`, `STAY_PUSH_ENABLED=true` | 5min |
+| **G-010** | **First-Deploy-Test mit Dummy-User** (Self-Sign-Up via Magic-Link) | 1-2h |
+| **G-011** | **Production-Smoketest:** alle 5 Wallet-Module + Cron-Endpoints (ein Auth-Roundtrip, ein Booking-Roundtrip) | 4-6h |
+| **G-012** | **Sentry erste Errors verifizieren** (gewolltes Throw via `/api/admin/sentry-test`) | 30min |
+| **G-013** | **Performance-Baseline messen** (Page-Load-Times, API-Latenzen, Eve-Streaming-Latency) | 2-3h |
+| **G-014** | **Backup-Strategie definieren** (Supabase Auto-Backup + Off-Site?) | 2-3h |
+| **G-015** | **Monitoring-Dashboard** (Vercel-Logs + Sentry-Filter-Setups) | 2-3h |
+
+**Resolves:** GAP-035 (Production-Migration), Pre-Production-Tasks ENV-001 bis ENV-008, APPROVAL-001 (Pass-Class), CRON-001.
+
+**Sprint G Total Aufwand:** ~3-5 Tage wenn Sprint F vorher durch, sonst eher 5-7 Tage wegen Subdomain-Setup mit Mono-Repo
+
+---
+
+### Sprint-Reihenfolge
+
+**Empfohlene Reihenfolge:**
+
+```
+Heute → Anwalts-Mandat starten (LEGAL-001 bis LEGAL-005)
+       ↓
+Sprint H (UI/UX + Themes, parallel zu Anwalt + Google-Wait)
+       ↓
+Sprint F (Monorepo) — OPTIONAL vor Pilot, kann auch nach Pilot
+       ↓
+Sprint G (Production-Migration)
+       ↓
+Big-Test-Day mit Kristin
+       ↓
+Soft-Launch
+```
+
+**Alternative:** Sprint F nach Pilot (= weniger Risiko, aber Hotel-Switcher fehlt im Pilot-Demo)
+
+### Aufwand-Summary aller Sprints
+
+| Sprint | Min | Max | Resolves |
+|---|---|---|---|
+| Sprint H · UI/UX + Themes | 7d | 17d | UX-001 bis UX-010 + 7 GAP-Items + 3 Themes |
+| Sprint F · Monorepo | 3d | 7d | GAP-003, GAP-010 |
+| Sprint G · Production | 3d | 7d | GAP-035 + alle ENV-Tasks |
+| **Total Sprints H+F+G** | **13d** | **31d** | 25+ Items |
+
+Plus Anwalts-Wartezeit (LEGAL-001 bis LEGAL-005) + Google-Wait (APPROVAL-001) → **realistischer Pilot in 5-6 Wochen** wenn alles parallel läuft.
+
+---
+
+## 🎯 Empfehlung für nächste Schritte
+
+1. **`.env.example` updaten** (CODE-012, 5min) — kann jetzt sofort
+2. **GAP_ANALYSIS.md reviewen** → entscheiden welche GAP-Items in Sprint H einfließen
+3. **Anwalts-Mandat-Briefing** schreiben (LEGAL-001 bis LEGAL-005 bundeln)
+4. **Vercel-ENVs setzen** (ENV-001 bis ENV-008, ~3h gesamt)
+5. **Sprint H Briefing schreiben** mit User-bestätigten H-001 bis H-029 Items
+6. **Wait for Anwalt + Google** → in dieser Zeit Sprint H ziehen
+7. **Sprint G** nach Sprint H abschließen
+8. **Big-Test-Day** mit Kristin
+9. **Soft-Launch**
+
+---
+
+*Ende des Backlogs · Wird aktualisiert sobald Sprint H Items konkretisiert sind (GAP-Findings User-Review pending).*
