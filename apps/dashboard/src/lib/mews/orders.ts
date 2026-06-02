@@ -127,6 +127,55 @@ async function loadHotelSettings(hotelId: string) {
   return data;
 }
 
+interface BreakfastItemRow {
+  id: string;
+  name_i18n: { de?: string; en?: string; fr?: string; es?: string } | null;
+  price_cents: number | null;
+  display_order: number | null;
+}
+
+/**
+ * UX-017 P1 — Echter Preis-Lookup für breakfast bookings.
+ *
+ * Lädt entweder spezifische Items (Multi-Item-Schema, zukünftig) oder
+ * das "default item" (aktuelles Pauschal-Schema: 1 Tisch für N Personen).
+ *
+ * Pauschal-Logik: nimmt das erste aktive breakfast_item mit display_order ASC
+ * als "Standard-Frühstück-Pauschale". Hotelier kann via /admin/breakfast die
+ * Reihenfolge + Preise steuern.
+ *
+ * Returns leere Array wenn keine Items für Hotel — Caller fällt auf Fallback-
+ * Konstante zurück.
+ */
+async function loadBreakfastItems(
+  hotelId: string,
+  itemIds?: string[] | null,
+): Promise<BreakfastItemRow[]> {
+  const supabase = createSupabaseServiceRoleInstance();
+  let query = supabase
+    .from('breakfast_items')
+    .select('id, name_i18n, price_cents, display_order')
+    .eq('hotel_id', hotelId)
+    .eq('is_active', true);
+  if (itemIds && itemIds.length > 0) {
+    query = query.in('id', itemIds);
+  } else {
+    // Pauschal-Pfad: nimm nur das erste aktive Item als Standard-Frühstück
+    query = query.order('display_order', { ascending: true, nullsFirst: false }).limit(1);
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.warn('[mews/orders] loadBreakfastItems failed:', error.message);
+    return [];
+  }
+  return (data ?? []) as BreakfastItemRow[];
+}
+
+function pickBreakfastName(item: BreakfastItemRow | undefined, fallback = 'Frühstück'): string {
+  if (!item?.name_i18n) return fallback;
+  return item.name_i18n.de ?? item.name_i18n.en ?? Object.values(item.name_i18n)[0] ?? fallback;
+}
+
 function pickServiceId(integration: any, type: string): string | null {
   switch (type) {
     case 'breakfast':  return integration.service_id_breakfast ?? null;
@@ -145,11 +194,11 @@ function pickServiceId(integration: any, type: string): string | null {
  *   Wir würden den Net-Wert aus brutto/(1+rate) berechnen müssen, wofür
  *   wir den TaxRate.Value live nachladen müssten — Backlog.
  */
-export function buildOrderItems(
+export async function buildOrderItems(
   booking: any,
   integration: any,
   hotelSettings?: { conference_rooms?: any[]; service_items?: any[] } | null,
-): MewsOrderItem[] {
+): Promise<MewsOrderItem[]> {
   const Currency: string = integration.default_currency ?? 'GBP';
   const taxCode: string | null = integration.default_tax_code ?? null;
   if (!taxCode) {
@@ -188,12 +237,52 @@ export function buildOrderItems(
   switch (booking.type) {
     case 'breakfast': {
       const details = booking.details ?? {};
-      // TODO Sprint-D: Hotel-spezifischer Preis aus breakfast_items pro Item-ID.
-      // Aktuell ein zusammengefasstes Item mit Fallback-Default.
+
+      // UX-017 P1 — Hybrid-Schema:
+      //   (a) Multi-Item (zukünftig): details.items = [{id, quantity?, name?}]
+      //   (b) Pauschal (aktuell):     details = {people, date, time, ...}
+      //
+      // Beide Pfade lookupen breakfast_items.price_cents — Fallback nur wenn
+      // weder Multi-Item-IDs gefunden noch ein aktives Default-Item existiert.
+
+      // (a) Multi-Item-Schema
+      if (Array.isArray(details.items) && details.items.length > 0) {
+        const itemIds = details.items
+          .map((it: any) => it?.id)
+          .filter((id: any) => typeof id === 'string') as string[];
+        const dbItems = itemIds.length > 0
+          ? await loadBreakfastItems(booking.hotel_id, itemIds)
+          : [];
+        return details.items.map((orderItem: any) => {
+          const dbItem = dbItems.find(b => b.id === orderItem.id);
+          const price =
+            dbItem?.price_cents && dbItem.price_cents > 0
+              ? dbItem.price_cents
+              : DEFAULT_BREAKFAST_PRICE_CENTS;
+          return {
+            Name: pickBreakfastName(dbItem, orderItem.name ?? 'Frühstück'),
+            UnitCount: typeof orderItem.quantity === 'number' && orderItem.quantity > 0
+              ? orderItem.quantity
+              : 1,
+            UnitAmount: makeUnitAmount(price),
+          };
+        });
+      }
+
+      // (b) Pauschal-Pfad: Standard-Frühstück-Item (display_order=0)
+      const people = typeof details.people === 'number' && details.people > 0
+        ? details.people
+        : 1;
+      const defaultItems = await loadBreakfastItems(booking.hotel_id, null);
+      const defaultItem = defaultItems[0];
+      const price =
+        defaultItem?.price_cents && defaultItem.price_cents > 0
+          ? defaultItem.price_cents
+          : DEFAULT_BREAKFAST_PRICE_CENTS;
       return [{
-        Name: 'Frühstück',
-        UnitCount: details.people ?? 1,
-        UnitAmount: makeUnitAmount(DEFAULT_BREAKFAST_PRICE_CENTS),
+        Name: pickBreakfastName(defaultItem),
+        UnitCount: people,
+        UnitAmount: makeUnitAmount(price),
       }];
     }
 
@@ -271,7 +360,7 @@ export async function pushBookingToMews(bookingId: string): Promise<{ orderId: s
   const hotelSettings = await loadHotelSettings(booking.hotel_id);
 
   // Items bauen (kann PushSkipped werfen wenn TaxCode/PricingMode fehlt)
-  const Items = buildOrderItems(booking, integration, hotelSettings);
+  const Items = await buildOrderItems(booking, integration, hotelSettings);
 
   // Mews-Client (decryptet Token + holt clientToken aus ENV)
   const mews = await getMewsClientForHotel(booking.hotel_id);
