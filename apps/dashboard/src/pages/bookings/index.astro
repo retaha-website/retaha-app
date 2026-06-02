@@ -268,6 +268,28 @@ function formatItems(items: any[]): string[] {
                 </div>
               )}
 
+              <!-- UX-017 P2 — Mews-Charge-Fehler-Banner + Retry-Button -->
+              {b.mews_push_error && !b.mews_cancelled_at && (
+                <div class="mews-error-banner">
+                  <p class="mews-error-eyebrow themed-eyebrow-flank">mews-charge fehlgeschlagen</p>
+                  <p class="mews-error-meta">
+                    letzter versuch:&nbsp;
+                    {b.mews_push_attempted_at
+                      ? new Date(b.mews_push_attempted_at).toLocaleString('de-DE', {
+                          dateStyle: 'short', timeStyle: 'short',
+                        })
+                      : '—'}
+                  </p>
+                  <pre class="mews-error-reason">{b.mews_push_error}</pre>
+                  <button
+                    type="button"
+                    class="bk-btn bk-btn--primary mews-retry-btn"
+                    data-action="retry-mews"
+                    data-booking-id={b.id}
+                  >erneut versuchen</button>
+                </div>
+              )}
+
               <!-- Action-Buttons -->
               <div class="bk-actions">
                 {b.status !== 'confirmed' && (
@@ -301,9 +323,36 @@ function formatItems(items: any[]): string[] {
       setTimeout(() => t.remove(), 3500);
     }
 
+    async function handleRetryMewsClick(e) {
+      const btn = e.currentTarget;
+      const bookingId = btn.dataset.bookingId;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'wird gesendet…';
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}/retry-mews-push`, {
+          method: 'POST',
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('charge erfolgreich gesendet', 'success');
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          showToast('fehler: ' + (data.error || 'unbekannt'), 'error');
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      } catch (err) {
+        showToast('netzwerk-fehler: ' + (err.message || ''), 'error');
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+
     async function handleActionClick(e) {
       const btn = e.currentTarget;
       const action = btn.dataset.action;
+      if (action === 'retry-mews') return handleRetryMewsClick(e);
       const bookingId = btn.dataset.bookingId;
       const map = { confirm: 'confirmed', cancel: 'cancelled', reset: 'pending' };
       const newStatus = map[action];
@@ -454,6 +503,42 @@ function formatItems(items: any[]): string[] {
     .bk-btn--secondary:hover:not(:disabled) { background: var(--theme-bg-tertiary); }
     .bk-btn--ghost { background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .45, transparent); border-color: transparent; }
     .bk-btn--ghost:hover:not(:disabled) { color: var(--theme-text-primary); }
+
+    /* UX-017 P2 — Mews-Charge-Fehler-Banner */
+    .mews-error-banner {
+      margin: 20px 0 0;
+      padding: 14px 16px;
+      background: rgba(var(--theme-accent-rgb), .06);
+      border-left: 3px solid var(--theme-accent);
+      border-radius: var(--theme-radius);
+    }
+    .mews-error-eyebrow {
+      margin: 0 0 4px;
+      font-family: var(--theme-font-mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--theme-accent);
+    }
+    .mews-error-meta {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: color-mix(in srgb, var(--theme-text-primary) .55, transparent);
+    }
+    .mews-error-reason {
+      margin: 0 0 12px;
+      padding: 8px 10px;
+      background: var(--theme-bg-secondary);
+      border-radius: var(--theme-radius);
+      font-family: var(--theme-font-mono);
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--theme-text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+    .mews-retry-btn { margin-top: 0; }
 
     /* Toast */
     .bk-toast-container { position: fixed; top: 16px; right: 16px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }

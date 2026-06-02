@@ -155,6 +155,12 @@ export interface BookingWithGuest {
   details: any;
   created_at: string;
   updated_at: string;
+  // Mews-Charge-Tracking (UX-017 P2 — Banner zeigt Retry-Button bei Error)
+  mews_order_id: string | null;
+  mews_push_attempted_at: string | null;
+  mews_push_error: string | null;
+  mews_cancelled_at: string | null;
+  mews_cancel_error: string | null;
   stay: {
     id: string;
     check_in: string;
