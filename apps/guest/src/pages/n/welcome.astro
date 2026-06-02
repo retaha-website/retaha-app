@@ -1,0 +1,109 @@
+---
+// Sprint H · Group 3 — NFC-Welcome Empty-State
+//
+// /n/welcome?hotel=<uuid>[&room=<nr>]
+//
+// Zeigt: "Willkommen im Hotel X — frag an der Rezeption nach deinem Zugang"
+// Mit Hotel-Logo + Brand-Color + Theme.
+
+import { createServerClient } from '@retaha/db';
+import { resolveTheme } from '@retaha/ui/theme';
+import '@retaha/ui/styles/themes.css';
+
+const url = new URL(Astro.request.url);
+const hotelId = url.searchParams.get('hotel');
+const roomNumber = url.searchParams.get('room');
+
+let hotel: { name: string; logo_url: string | null; theme: string | null } | null = null;
+if (hotelId && /^[0-9a-f-]{36}$/i.test(hotelId)) {
+  const sb = createServerClient();
+  const { data } = await sb
+    .from('hotels').select('name, logo_url, theme').eq('id', hotelId).maybeSingle();
+  if (data) hotel = data;
+}
+
+const hotelName = hotel?.name ?? 'das Hotel';
+const activeTheme = resolveTheme({ hotelTheme: hotel?.theme });
+
+const heading = roomNumber
+  ? `Willkommen in Zimmer ${roomNumber}`
+  : `Willkommen im ${hotelName}`;
+
+const subtitle = roomNumber
+  ? `Es ist gerade kein aktiver Aufenthalt für dieses Zimmer hinterlegt. Frag an der Rezeption nach deinem Zugang.`
+  : `Frag an der Rezeption nach deinem persönlichen Zugang oder scanne den QR-Code auf deinem Schlüsselanhänger.`;
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme={activeTheme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>{hotelName} · retaha</title>
+  </head>
+  <body class="nw-body">
+    <main class="nw-shell">
+      {hotel?.logo_url && (
+        <img class="nw-logo" src={hotel.logo_url} alt={hotelName} />
+      )}
+      <p class="nw-eyebrow">— retaha —</p>
+      <h1 class="nw-heading">{heading}<span class="nw-dot">.</span></h1>
+      <p class="nw-sub">{subtitle}</p>
+      <div class="nw-hint">
+        <p class="nw-hint-line">📱 Karte am Empfang scannen lassen.</p>
+      </div>
+    </main>
+
+    <style>
+      .nw-body {
+        margin: 0;
+        font-family: var(--theme-font-sans, 'Space Grotesk', system-ui, sans-serif);
+        background: var(--theme-bg-primary, #fff);
+        color: var(--theme-text-primary, #1A1A1A);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 24px;
+      }
+      .nw-shell { max-width: 520px; width: 100%; text-align: center; }
+      .nw-logo { max-height: 56px; width: auto; margin-bottom: 24px; }
+      .nw-eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--theme-accent, #FF4A82);
+        margin: 0 0 16px;
+        font-weight: 500;
+      }
+      .nw-heading {
+        font-family: var(--theme-font-headline, var(--theme-font-sans));
+        font-size: 30px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin: 0 0 16px;
+        color: var(--theme-text-primary);
+      }
+      .nw-dot { color: var(--theme-accent, #FF4A82); }
+      .nw-sub {
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--theme-text-secondary, rgba(26,26,26,.65));
+        margin: 0 0 32px;
+      }
+      .nw-hint {
+        padding: 16px 20px;
+        background: var(--theme-bg-secondary, #FAFAF8);
+        border-left: 3px solid var(--theme-accent, #FF4A82);
+        text-align: left;
+      }
+      .nw-hint-line {
+        font-size: 14px;
+        color: var(--theme-text-primary);
+        margin: 0;
+      }
+    </style>
+  </body>
+</html>

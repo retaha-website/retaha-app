@@ -9,7 +9,7 @@
 
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isLookupTool, isActionTool } from './tools';
-import { haversineMeters, walkingMinutes } from '../places/distance';
+import { haversineMeters, walkingMinutes } from './places/distance';
 
 const sb = () => createSupabaseServiceRoleInstance();
 

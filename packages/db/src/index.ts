@@ -6,4 +6,5 @@
 
 export { supabase, createServerClient } from './supabase';
 export { getEnv } from './env';
+export * from './queries';
 export type { SupabaseClient } from '@supabase/supabase-js';

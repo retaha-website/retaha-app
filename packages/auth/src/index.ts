@@ -23,7 +23,13 @@ export {
 export { requirePermission } from './require-permission';
 
 // Stay-Session (JWT-Cookie für Gast-Frontend via /g/[token])
-export * as StaySession from './stay-session';
+export * from './stay-session';
+
+// Encryption (AES-256-GCM für Mews-Token-Storage)
+export { encryptToken, decryptToken } from './encryption';
+
+// User-Profile-Helpers
+export { hotelOwnerFirstName } from './user-profile';
 
 // Cross-Subdomain SSO-Cookie (Sprint F)
 export {

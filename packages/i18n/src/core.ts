@@ -1,8 +1,8 @@
 // Sprint i18n-Expansion Phase 9 — Lang erweitert auf alle 10 Sprachen.
 // Re-export aus dem zentralen Type-System (src/lib/i18n/types.ts) damit
 // Lang und LanguageCode dasselbe sind und bestehende Caller weiter funktionieren.
-import { LANGUAGES as ALL_LANGS, type LanguageCode, normalizeLanguage } from './i18n/types.ts';
-import { UI_STRINGS_EXTRA } from './i18n.extra-langs.ts';
+import { LANGUAGES as ALL_LANGS, type LanguageCode, normalizeLanguage } from './helpers/types';
+import { UI_STRINGS_EXTRA } from './extra-langs';
 
 export type Lang = LanguageCode;
 export const SUPPORTED_LANGS: Lang[] = [...ALL_LANGS];

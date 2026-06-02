@@ -12,12 +12,20 @@ import { join, extname } from 'node:path';
 const REPLACEMENTS = [
   // env + supabase
   { from: /from ['"]\.\.\/env['"]/g,                       to: "from '@retaha/db'" },
+  { from: /from ['"]\.\.\/env\.ts['"]/g,                   to: "from '@retaha/db'" },
   { from: /from ['"]\.\.\/\.\.\/env['"]/g,                 to: "from '@retaha/db'" },
   { from: /from ['"]\.\.\/supabase['"]/g,                  to: "from '@retaha/db'" },
   { from: /from ['"]\.\.\/\.\.\/supabase['"]/g,            to: "from '@retaha/db'" },
   // auth.ts (src/lib/auth.ts) — server-client helpers
   { from: /from ['"]\.\.\/auth['"]/g,                      to: "from '@retaha/auth'" },
   { from: /from ['"]\.\.\/\.\.\/auth['"]/g,                to: "from '@retaha/auth'" },
+  // auth/X (stay-session etc.)
+  { from: /from ['"]\.\.\/auth\/[^'"]+['"]/g,              to: "from '@retaha/auth'" },
+  // encryption + user-profile sind Teil von @retaha/auth (oder bleiben local)
+  // encryption.ts wurde noch nicht migriert in packages/auth, lass es lokal
+  // user-profile.ts dito
+  { from: /from ['"]\.\.\/encryption['"]/g,                to: "from '@retaha/auth'" },
+  { from: /from ['"]\.\.\/user-profile['"]/g,              to: "from '@retaha/auth'" },
   // wallet/X → @retaha/wallet (Inner-Package wallet stays self-relative)
   { from: /from ['"]\.\.\/wallet\/[^'"]+['"]/g,            to: "from '@retaha/wallet'" },
   // marketing/X → @retaha/marketing
@@ -33,12 +41,14 @@ const REPLACEMENTS = [
   { from: /from ['"](@retaha\/[^'"]+)\.ts['"]/g,           to: "from '$1'" },
 ];
 
-const TARGETS = [
-  'packages/wallet/src',
-  'packages/marketing/src',
-  'packages/eve/src',
-  'packages/i18n/src',
-];
+const TARGETS = process.argv.slice(2).length > 0
+  ? process.argv.slice(2)
+  : [
+      'packages/wallet/src',
+      'packages/marketing/src',
+      'packages/eve/src',
+      'packages/i18n/src',
+    ];
 
 function* walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

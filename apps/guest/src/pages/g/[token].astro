@@ -1,0 +1,1853 @@
+---
+import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
+import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
+import WeatherIcon from '../../components/WeatherIcon.astro';
+import WifiSheet from '../../components/sheets/WifiSheet.astro';
+import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
+import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
+import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
+import EveChatSheet from '../../components/eve/EveChatSheet.astro';
+import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
+import CookieBanner from '../../components/CookieBanner.astro';
+import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
+import PlaceDetailSheet from '../../components/sheets/PlaceDetailSheet.astro';
+import PostStaySheet from '../../components/sheets/PostStaySheet.astro';
+import WalletAddSheet from '../../components/sheets/WalletAddSheet.astro';
+import { isWalletConfigured } from '@retaha/wallet';
+import { buildPhotoUrl } from '../../lib/places/google-client';
+import { setStaySessionCookie, getStaySession } from '@retaha/auth';
+import { getEveSuggestions } from '@retaha/eve';
+import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui/styles/components/buttons.css';
+import '@retaha/ui/styles/components/inputs.css';
+import '@retaha/ui/styles/components/pills.css';
+// Theme-Fonts self-hosted (DSGVO-konform, ersetzt Google-Fonts-Link)
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+import { resolveTheme } from '@retaha/ui/theme';
+import { isShowcaseToken, findShowcaseSessionByToken, type ShowcaseSession } from '../../lib/showcase/session';
+
+const { token } = Astro.params;
+
+// Sprint H · Group 2 — Showcase-Mode-Erkennung
+//   Token mit Prefix 'showcase_' → Pseudo-Stay-Context aus showcase_sessions.
+//   Normale Stay-Tokens laufen via loadStayByToken weiter.
+let showcaseSession: ShowcaseSession | null = null;
+let ctx: any = null;
+if (token && isShowcaseToken(token)) {
+  showcaseSession = await findShowcaseSessionByToken(token);
+  if (showcaseSession) {
+    // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
+    const sbSrInit = createSupabaseServiceRoleInstance();
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, theme').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
+    ]);
+    if (hotelRow && settingsRow) {
+      // Demo-Daten: check_in = heute, check_out = morgen 11:00
+      const now = new Date();
+      const todayStart = new Date(now); todayStart.setUTCHours(14, 0, 0, 0);
+      const tomorrowCheckout = new Date(todayStart); tomorrowCheckout.setUTCDate(tomorrowCheckout.getUTCDate() + 1); tomorrowCheckout.setUTCHours(11, 0, 0, 0);
+      ctx = {
+        stay: {
+          id: showcaseSession.id,
+          check_in: todayStart.toISOString(),
+          check_out: tomorrowCheckout.toISOString(),
+          is_active: true,
+        },
+        guest: {
+          id: showcaseSession.id,
+          first_name: showcaseSession.demo_data?.guest_first_name ?? 'Anna',
+          last_name: showcaseSession.demo_data?.guest_last_name ?? 'Demo',
+          language: hotelRow.default_language ?? 'de',
+          visit_count: 1,
+        },
+        room: {
+          id: showcaseSession.id,
+          room_number: showcaseSession.demo_data?.room_number ?? '101',
+          room_name: showcaseSession.demo_data?.room_name ?? 'Demo-Suite',
+        },
+        hotel: hotelRow,
+        settings: settingsRow,
+      };
+    }
+  }
+} else {
+  ctx = token ? await loadStayByToken(token) : null;
+}
+
+if (!ctx) {
+  // Fix 4: graceful Fallback statt 404. Gestalteter Showcase kommt im Design-Sprint.
+  return new Response(
+    `<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="var(--theme-bg-primary)" />
+    <title>retaha</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <style>:root { --theme-accent: #FF4A82; --theme-bg-primary: #FFFFFF; --theme-text-primary: #1A1A1A; }</style>
+  </head>
+  <body style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Space Grotesk',system-ui,sans-serif;background:var(--theme-bg-primary);color:var(--theme-text-primary);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px">
+    <div style="text-align:center;max-width:420px">
+      <p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--theme-accent);margin:0 0 20px 0">— retaha</p>
+      <h1 style="font-size:26px;font-weight:300;letter-spacing:-0.02em;line-height:1.2;margin:0 0 12px 0">diese einladung ist nicht (mehr) gültig<span style="color:var(--theme-accent)">.</span></h1>
+      <p style="opacity:0.55;font-size:14px;line-height:1.5;margin:0">bitte frag an der rezeption nach einem neuen link.</p>
+    </div>
+  </body>
+</html>`,
+    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}
+
+const { stay, guest, room, hotel, settings } = ctx;
+
+// Sprint E4 Phase 9 Fix — Auto-Pair: wer den access_token in der URL hat,
+// kriegt automatisch eine Stay-Session-Cookie. Konsistent zum Sprint-D-Pair-
+// Pattern (/api/pair?token=...). Eve-Chat (/api/eve/chat) braucht den Cookie.
+const existingSession = await getStaySession(Astro.cookies);
+const isShowcase = !!showcaseSession;
+if (!existingSession || existingSession.stay_id !== stay.id || !!existingSession.is_showcase !== isShowcase) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id,
+    hotel_id: hotel.id,
+    check_out_utc: stay.check_out,
+    is_showcase: isShowcase,
+  });
+}
+
+const menuItems = await loadActiveBreakfastItems(hotel.id);
+
+const existingBreakfastBookings = await loadBookingsForStay(stay.id, 'breakfast');
+// Show the most recent booking regardless of status (pending/confirmed/cancelled)
+// so the guest knows what happened. They can rebook if cancelled.
+const activeBreakfastBooking = existingBreakfastBookings[0] || null;
+
+const existingConferenceBookings = await loadBookingsForStay(stay.id, 'conference');
+const activeConferenceBooking = existingConferenceBookings[0] || null;
+
+const existingServiceBookings = await loadBookingsForStay(stay.id, 'service');
+const activeServiceBooking = existingServiceBookings[0] || null;
+
+// Sprint i18n Phase 7 — Sprach-Resolution erweitert um Browser-Locale + enabled_languages
+// Hierarchie: ?lang= URL > guest.language > Accept-Language (gegen enabled) > hotel.default_language > 'de'
+const langParam = new URL(Astro.request.url).searchParams.get('lang');
+const acceptLangHeader = Astro.request.headers.get('accept-language') ?? '';
+const hotelEnabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
+  ? (hotel as any).enabled_languages : ['de','en','fr','es'];
+
+function pickBrowserLang(acceptHeader: string, enabled: string[]): string | null {
+  // "de-DE,de;q=0.9,en;q=0.8" → ['de-DE','de','en']
+  const tags = acceptHeader.split(',').map(s => s.split(';')[0].trim().toLowerCase()).filter(Boolean);
+  for (const tag of tags) {
+    const stripped = tag.slice(0, 2);
+    if (enabled.includes(stripped)) return stripped;
+  }
+  return null;
+}
+
+const browserLang = pickBrowserLang(acceptLangHeader, hotelEnabledLangs);
+const resolvedRaw = langParam || guest?.language || browserLang || hotel.default_language;
+const lang: Lang = normalizeLang(resolvedRaw);
+const hotelDefaultLang: Lang = normalizeLang(hotel.default_language);
+
+import { pickI18n as pickI18nHelper } from '@retaha/i18n';
+import { LANGUAGE_LABELS as LANG_LABELS_FULL, isRTL as isRTLHelper } from '@retaha/i18n';
+const isRTL = isRTLHelper(lang as any);
+const htmlDir = isRTL ? 'rtl' : 'ltr';
+
+// Sprint E4 Phase 10 — Tageszeit-Chips (hotel-timezone-aware) + History pre-load
+const hotelTz = (hotel as any).timezone || 'Europe/Berlin';
+let localHour = 9;
+try {
+  localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', { timeZone: hotelTz, hour: 'numeric', hourCycle: 'h23' }).format(new Date()),
+    10,
+  );
+  if (!Number.isFinite(localHour)) localHour = 9;
+} catch { localHour = 9; }
+const eveSuggestions = getEveSuggestions(localHour, lang);
+
+// Pre-load chat_messages für diesen Stay (letzte 20) — Frontend startet mit
+// History statt leerem Sheet. Wenn 0 Messages: Welcome-Trigger im Frontend.
+const sbSr = createSupabaseServiceRoleInstance();
+const { data: initialChatRows } = (settings as any).eve_enabled
+  ? await sbSr
+      .from('chat_messages')
+      .select('id, role, content, created_at, eve_message_feedback(rating)')
+      .eq('stay_id', stay.id)
+      .order('created_at', { ascending: true })
+      .limit(20)
+  : { data: [] };
+// Sprint Functional Modul C Phase 7 — id + feedback-Rating für Daumen-UI mitladen
+const initialEveMessages = (initialChatRows ?? [])
+  .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+  .map((m: any) => ({
+    id: m.id,
+    role: m.role as 'user' | 'assistant',
+    content: m.content,
+    streaming: false,
+    feedback: m.eve_message_feedback?.[0]?.rating ?? null,
+  }));
+
+// Sprint E2 Phase 7 — Places-Sheet-Daten: Picks + Nearby-Cache + hotel lat/lng
+const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = await Promise.all([
+  sbSr.from('hotels').select('latitude, longitude').eq('id', hotel.id).maybeSingle(),
+  sbSr.from('hotel_place_picks')
+    .select('id, place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, cached_data, photo_references, sort_order')
+    .eq('hotel_id', hotel.id)
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false }),
+  sbSr.from('hotel_place_nearby_cache')
+    .select('category, cached_places')
+    .eq('hotel_id', hotel.id),
+]);
+const placesHotelLat = (hotelGeoRow?.latitude as number | null) ?? null;
+const placesHotelLng = (hotelGeoRow?.longitude as number | null) ?? null;
+const placesPicks = (placePicksRows ?? []) as any[];
+const placesNearby = (nearbyRows ?? []) as any[];
+
+// Sprint E2 Phase 8 — Pre-render Pick-Detail-Daten als window-Global damit
+// PlaceDetailSheet sie sofort hat (kein fetch). Auto-Places werden on-demand
+// via /api/places/details geholt — die haben hier KEINE Daten.
+const PRICE_SYMBOLS: Record<string, string> = {
+  PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+  PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+};
+const placeDetailCache: Record<string, any> = {};
+for (const p of placesPicks) {
+  const cd = p.cached_data ?? {};
+  const note = lang === 'de' ? p.hotel_note
+    : lang === 'en' ? (p.hotel_note_en ?? p.hotel_note)
+    : lang === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
+    : (p.hotel_note_es ?? p.hotel_note);
+  placeDetailCache[p.place_id] = {
+    name: cd.name,
+    rating: cd.rating,
+    userRatingCount: cd.user_ratings_total,
+    priceSymbol: PRICE_SYMBOLS[cd.price_level] ?? '',
+    hotelNote: note?.trim() || null,
+    formattedAddress: cd.formatted_address,
+    phone: cd.international_phone_number,
+    website: cd.website_uri,
+    googleMapsUri: cd.google_maps_uri,
+    openNow: cd.opening_hours?.openNow ?? null,
+    weekdayDescriptions: cd.opening_hours?.weekdayDescriptions ?? [],
+    reviews: (cd.reviews ?? []).slice(0, 3),
+    photoUrls: (p.photo_references ?? []).slice(0, 8).map((n: string) => buildPhotoUrl(n, 1200)),
+  };
+}
+
+// Sprint i18n Phase 7 — pickI18n statt Hand-Mapping (mit Safety-Fallback auf alte _de-Spalte)
+const welcomeMsg = pickI18nHelper((settings as any).welcome_message_i18n, hotelDefaultLang as any, lang as any)
+  || settings.welcome_message_de;
+const hotelEyebrow = pickI18nHelper((settings as any).hotel_eyebrow_i18n, hotelDefaultLang as any, lang as any)
+  || settings.hotel_eyebrow_de || (hotel.city || '');
+
+const greetingLabel = t('hero.greeting', lang);
+const greetingFallback = t('hero.greetingFallback', lang);
+const greetingName = guest?.first_name
+  ? `${greetingLabel} ${guest.first_name}`
+  : greetingFallback;
+
+// Visit-Ordinals nur wenn guest existiert (sonst kein Besuch-Counter)
+let visitText = '';
+if (guest) {
+  const visitOrdinals: Record<Lang, string> = {
+    de: `dein ${guest.visit_count}. Besuch`,
+    en: `your ${guest.visit_count}${guest.visit_count === 1 ? 'st' : guest.visit_count === 2 ? 'nd' : guest.visit_count === 3 ? 'rd' : 'th'} visit`,
+    fr: `votre ${guest.visit_count}${guest.visit_count === 1 ? 'ère' : 'ème'} visite`,
+    es: `tu ${guest.visit_count}ª visita`,
+  };
+  visitText = visitOrdinals[lang];
+}
+
+const checkInDate = new Date(stay.check_in);
+const checkOutDate = new Date(stay.check_out);
+const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+
+const fmtShort = (d: Date) => d.toLocaleDateString(localeMap[lang], {
+  weekday: 'short', day: '2-digit', month: 'short',
+});
+
+const checkInLabel = fmtShort(checkInDate);
+const checkOutLabel = fmtShort(checkOutDate);
+
+// Calculate nights
+const msPerDay = 1000 * 60 * 60 * 24;
+const nightsCount = Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / msPerDay));
+
+// Stay range label
+const stayLabels = {
+  de: { range: 'Aufenthalt', nights: nightsCount === 1 ? 'Nacht' : 'Nächte' },
+  en: { range: 'Stay', nights: nightsCount === 1 ? 'night' : 'nights' },
+  fr: { range: 'Séjour', nights: nightsCount === 1 ? 'nuit' : 'nuits' },
+  es: { range: 'Estancia', nights: nightsCount === 1 ? 'noche' : 'noches' },
+};
+const stayLabel = stayLabels[lang];
+const stayRange = `${checkInLabel} – ${checkOutLabel} · ${nightsCount} ${stayLabel.nights}`;
+
+const now = new Date();
+const dayPartLabel = dayPart(lang, now.getHours());
+const dateLabel = now.toLocaleDateString(localeMap[lang], { weekday: 'long', day: 'numeric', month: 'short' });
+
+// Sprint E7 Phase 4/5 — Action-Cards aus relationaler Tabelle.
+// Verifikation Phase 5: alle Hotels mit JSONB-Cards haben action_cards
+// → JSONB-Fallback entfernt. Die Spalte hotel_settings.recommendations
+// existiert noch (deprecated), wird in Sprint G nach Production-Verifikation
+// gedroppt.
+const { data: actionCardsRows } = await sbSr
+  .from('hotel_action_cards')
+  .select('id, card_type, action_target, title_de, title_i18n, subtitle_de, subtitle_i18n, eyebrow_de, eyebrow_i18n, cta_de, cta_i18n, image_url, card_class, sort_order')
+  .eq('hotel_id', hotel.id)
+  .eq('is_published', true)
+  .order('sort_order', { ascending: true });
+
+function defaultIconForType(card_type: string): 'sun' | 'square' | 'triangle' {
+  switch (card_type) {
+    case 'external_link': return 'square';
+    case 'phone': case 'email': case 'info': return 'triangle';
+    default: return 'sun';
+  }
+}
+
+const recs = (actionCardsRows ?? []).map((card: any) => ({
+  id: card.id,
+  cardType: card.card_type,
+  actionTarget: card.action_target,
+  imageUrl: card.image_url,
+  // Sprint i18n Phase 7 — pickI18n mit Safety-Fallback auf alte _de-Spalten
+  eyebrow: pickI18nHelper(card.eyebrow_i18n,  hotelDefaultLang as any, lang as any) || card.eyebrow_de || '',
+  title:   pickI18nHelper(card.title_i18n,    hotelDefaultLang as any, lang as any) || card.title_de    || '',
+  sub:     pickI18nHelper(card.subtitle_i18n, hotelDefaultLang as any, lang as any) || card.subtitle_de || '',
+  cta:     pickI18nHelper(card.cta_i18n,      hotelDefaultLang as any, lang as any) || card.cta_de      || '',
+  cardClass: card.card_class || 'rec-anthrazit',
+  icon: defaultIconForType(card.card_type),
+}));
+
+const weather = {
+  temperature: 21,
+  iconType: 'partly' as 'sun' | 'partly' | 'cloud' | 'rain' | 'night',
+  labelKey: 'weather.partly' as const,
+};
+
+const f = settings.features;
+
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+
+const breakfastLocationMap: Record<Lang, string | null> = {
+  de: settings.breakfast_location_de,
+  en: settings.breakfast_location_en,
+  fr: settings.breakfast_location_fr,
+  es: settings.breakfast_location_es,
+};
+const breakfastLocation = breakfastLocationMap[lang] || settings.breakfast_location_de || 'im Wintergarten';
+
+const breakfastIncludedMap: Record<Lang, string | null> = {
+  de: settings.breakfast_included_de,
+  en: settings.breakfast_included_en,
+  fr: settings.breakfast_included_fr,
+  es: settings.breakfast_included_es,
+};
+const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_included_de || '';
+
+const reservationEnabled = settings.features?.breakfast_reservation !== false;
+
+// Sprint H · Group 1 — Theme aktiv (Preview-Query ?preview_theme=X > hotel.theme > Default)
+const activeTheme = resolveTheme({
+  hotelTheme: (hotel as any).theme,
+  requestUrl: Astro.url,
+});
+
+// Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
+// Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
+// Cooldown (24h via localStorage) entscheidet danach Client-seitig, ob das
+// Sheet wirklich aufpoppt — Render-Aufwand sparen wir trotzdem schon hier.
+// Sprint Wallet Phase 5 — Add-to-Wallet nur anzeigen wenn Wallet konfiguriert
+// UND der Gast eine Email hat (Pass braucht guest_email).
+const walletAvailable = isWalletConfigured() && !!guest?.email;
+
+const stayEnded = Date.parse(stay.check_out) < Date.now();
+let hasStayFeedback = false;
+if (stayEnded) {
+  const { data: existingFb } = await sbSr
+    .from('stay_feedback')
+    .select('id')
+    .eq('stay_id', stay.id)
+    .maybeSingle();
+  hasStayFeedback = !!existingFb;
+}
+const showPostStay = stayEnded && !hasStayFeedback;
+---
+
+<!DOCTYPE html>
+<html lang={lang} dir={htmlDir} data-theme={activeTheme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="var(--theme-text-primary)" />
+    <title>{hotel.name} · {greetingName}</title>
+  </head>
+  <body class="gate-guest">
+    {isShowcase && (
+      <div class="demo-mode-badge" role="status" aria-label="Demo-Modus aktiv">
+        DEMO-MODE
+      </div>
+    )}
+    <main x-data="guestPage" x-cloak>
+      <!-- HERO -->
+      <section class="gate-hero">
+        <div class="gate-hero-bg"></div>
+        <div class="gate-hero-overlay"></div>
+        <div class="gate-hero-content">
+          <div class="gate-hero-top">
+            <div class="gate-hero-tag">
+              <span class="gate-hero-tag-shapes">
+                <span class="circle"></span>
+                <span class="square"></span>
+                <span class="triangle"></span>
+              </span>
+              <span>{hotelEyebrow}</span>
+            </div>
+            <div class="lang-switcher" data-stay-token={token}>
+              {hotelEnabledLangs.map(l => (
+                <a
+                  href={switchUrl(l)}
+                  class={`lang-btn ${lang === l ? 'active' : ''}`}
+                  data-lang={l}
+                  title={LANG_LABELS_FULL[l as keyof typeof LANG_LABELS_FULL] ?? l}
+                >{l.toUpperCase()}</a>
+              ))}
+            </div>
+          </div>
+
+          <img class="gate-hero-logo" src={hotel.logo_url || '/specht-anthrazit.svg'} alt={hotel.name} />
+
+          <div class="gate-hero-welcome">
+            <div class="gate-hero-kicker">{t('hero.kicker', lang)}</div>
+            <h1 class="gate-hero-greeting">
+              {greetingName}<span class="dot">.</span>
+            </h1>
+            <p class="gate-hero-sub">{welcomeMsg}{visitText && ` — ${visitText}`}.</p>
+          </div>
+
+          <div class="gate-hero-stay">
+            {room && (
+              <div class="gate-hero-stay-block">
+                <div class="label">{t('hero.stay.room', lang)}</div>
+                <div class="value">{[room.room_number, room.room_name].filter(Boolean).join(' · ')}</div>
+              </div>
+            )}
+            <div class="gate-hero-stay-block">
+              <div class="label">{stayLabel.range}</div>
+              <div class="value">{stayRange}</div>
+            </div>
+          </div>
+
+          {walletAvailable && (
+            <button type="button" class="gate-hero-wallet-btn" @click="walletOpen = true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                <path d="M21 7H3c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm0 8H3V9h18v6zm-9-5h2v3h-2v-3z"/>
+              </svg>
+              <span>Zur Google Wallet hinzufügen</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      <!-- CONCIERGE CARD -->
+      <div class="gate-recommend-card">
+        <div class="gate-recommend-card-left">
+          <div class="gate-recommend-eyebrow">{t('concierge.eyebrow', lang).replace('{name}', settings.eve_name || 'das Team')}</div>
+          <p class="gate-recommend-text">{t('concierge.text.default', lang)}</p>
+        </div>
+        <div class="gate-recommend-weather">
+          <WeatherIcon type={weather.iconType} />
+          <span class="weather-readout">
+            <span class="weather-readout-temp">{weather.temperature}°</span>
+            <span class="weather-readout-label">{t(weather.labelKey, lang)}</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- RECOMMENDATION SLIDER -->
+      {recs.length > 0 && (
+        <section class="rec-slider-section">
+          <div class="rec-slider-eyebrow">{t('rec.eyebrow', lang)}</div>
+          <div class="rec-slider"
+               @pointerdown="startRecSwipe($event)"
+               @touchstart.passive="startRecSwipeTouch($event)">
+            <div class="rec-slider-track"
+                 :style="`transform: translateX(calc(-${recSlideIndex * 100}% + ${recDragOffset}px))`"
+                 :class="{ dragging: recIsDragging }">
+              {recs.map((rec) => (
+                <div class="rec-slide">
+                  <div
+                    class={`rec-card ${rec.cardClass}${rec.cardType === 'info' ? ' rec-card--info' : ''}`}
+                    data-card-id={rec.id}
+                    data-card-type={rec.cardType}
+                    data-action-target={rec.actionTarget ?? ''}
+                    @click={rec.cardType === 'info' ? undefined : `handleRecClick($el)`}
+                    role={rec.cardType === 'info' ? undefined : 'button'}
+                    tabindex={rec.cardType === 'info' ? undefined : '0'}
+                  >
+                    {rec.imageUrl ? (
+                      <img class="rec-card-image" src={rec.imageUrl} alt="" loading="lazy" />
+                    ) : (
+                    <span class="rec-card-icon">
+                      {rec.icon === 'sun' && (
+                        <svg viewBox="0 0 100 100" style="overflow:visible">
+                          <circle cx="50" cy="50" r="36" fill="currentColor" opacity="0.18" style="transform-origin:center;animation:sunHaloBreath 3.2s ease-in-out infinite"/>
+                          <circle cx="50" cy="50" r="18" fill="currentColor" style="transform-origin:center;animation:sunOrbBreath 3.2s ease-in-out infinite"/>
+                          <g stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none">
+                            <line class="sun-ray sun-ray-1" x1="50" y1="6"  x2="50" y2="16"/>
+                            <line class="sun-ray sun-ray-2" x1="81" y1="19" x2="74" y2="26"/>
+                            <line class="sun-ray sun-ray-3" x1="94" y1="50" x2="84" y2="50"/>
+                            <line class="sun-ray sun-ray-4" x1="81" y1="81" x2="74" y2="74"/>
+                            <line class="sun-ray sun-ray-5" x1="50" y1="94" x2="50" y2="84"/>
+                            <line class="sun-ray sun-ray-6" x1="19" y1="81" x2="26" y2="74"/>
+                            <line class="sun-ray sun-ray-7" x1="6"  y1="50" x2="16" y2="50"/>
+                            <line class="sun-ray sun-ray-8" x1="19" y1="19" x2="26" y2="26"/>
+                          </g>
+                        </svg>
+                      )}
+                      {rec.icon === 'square' && (
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor"><rect x="5" y="5" width="14" height="14"/></svg>
+                      )}
+                      {rec.icon === 'triangle' && (
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor"><polygon points="12,4 20,18 4,18"/></svg>
+                      )}
+                    </span>
+                    )}
+                    {rec.eyebrow && <div class="rec-card-eyebrow">{rec.eyebrow}</div>}
+                    <div class="rec-card-title">{rec.title}</div>
+                    {rec.sub && <div class="rec-card-sub">{rec.sub}</div>}
+                    {rec.cta && rec.cardType !== 'info' && (
+                      <button class="rec-card-cta" type="button" @click.stop={`handleRecClick($el.closest('.rec-card'))`}>{rec.cta}</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="rec-slider-dots">
+            {recs.map((_, i) => (
+              <button class="rec-slider-dot" :class={`{ active: recSlideIndex === ${i} }`} @click={`setRecSlide(${i})`} type="button" aria-label={`Slide ${i+1}`}></button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <!-- ACTION TILES -->
+      <section class="gate-actions">
+        <div class="gate-actions-head">
+          <div class="gate-actions-eyebrow">{t('actions.eyebrow', lang)}</div>
+          <div class="gate-actions-time">{dayPartLabel} · {dateLabel}</div>
+        </div>
+
+        <div class="gate-grid">
+          <button class="gate-tile" type="button" @click="openSheet('wifi')">
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5 a16 16 0 0 1 20 0"/><path d="M5 12 a11 11 0 0 1 14 0"/><path d="M8.5 15.5 a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+            </span>
+            <span class="gate-tile-label">{t('tile.wifi', lang)}</span>
+            <span class="gate-tile-sub">{t('tile.wifi.sub', lang)}</span>
+          </button>
+
+          {f.concierge_chat !== false && (settings as any).eve_enabled && (
+            <button class="gate-tile" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.concierge', lang)}</span>
+              <span class="gate-tile-sub">{settings.eve_name} · {t('tile.concierge.sub', lang)}</span>
+            </button>
+          )}
+
+          <button class="gate-tile" type="button" @click="openSheet('breakfast')">
+            <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
+            </span>
+            <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
+            <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
+          </button>
+
+          {f.conference_booking !== false && settings.conference_rooms && settings.conference_rooms.length > 0 && (
+            <button class="gate-tile" type="button" @click="openSheet('conference')">
+              <span class="gate-tile-badge">{t('tile.conference.badge', lang)}</span>
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="12"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.conference', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.conference.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.service_requests !== false && settings.service_items && settings.service_items.length > 0 && (
+            <button class="gate-tile" type="button" @click="openSheet('service')">
+              <span class="gate-tile-badge orange">{t('tile.service.badge', lang)}</span>
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.service', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.service.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.berlin_tips !== false && (
+            <button class="gate-tile" type="button" @click="openSheet('places')">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.berlin', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.berlin.sub', lang)}</span>
+            </button>
+          )}
+
+          {f.checkout_flow !== false && (
+            <button class="gate-tile tile-checkout" type="button">
+              <div class="checkout-left">
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12 L10 17 L19 7"/></svg>
+                </span>
+                <div class="checkout-info">
+                  <span class="gate-tile-label">{t('tile.checkout.label', lang)}</span>
+                  <span class="gate-tile-sub">{t('tile.checkout.sub', lang)}</span>
+                </div>
+              </div>
+              <span class="arrow">›</span>
+            </button>
+          )}
+        </div>
+      </section>
+
+      <!-- MADE BY FOOTER + Legal-Links (Sprint Legal Phase 10) -->
+      <div class="gate-made-by">
+        <span class="gate-made-by-shapes">
+          <span class="circle"></span>
+          <span class="square"></span>
+          <span class="triangle"></span>
+        </span>
+        <span>{t('footer.madeBy', lang)} </span>
+        <a href="https://retaha.de" target="_blank" rel="noopener">demo.retaha.de</a>
+      </div>
+      <div class="gate-legal-links">
+        <a href={`/g/${token}/datenschutz`}>Datenschutz</a>
+        <span aria-hidden="true">·</span>
+        <a href={`/g/${token}/impressum`}>Impressum</a>
+      </div>
+
+      <!-- SHEETS (rendered as overlays) -->
+      <WifiSheet
+        hotelId={hotel.id}
+        ssid={settings.wifi_ssid || 'Gate-Guest'}
+        password={settings.wifi_password || ''}
+        speedMbits={settings.wifi_speed_mbits || 320}
+        lang={lang}
+      />
+
+      <BreakfastSheet
+        lang={lang}
+        startTime={settings.breakfast_start_time || '07:30:00'}
+        endTime={settings.breakfast_end_time || '10:30:00'}
+        slotMinutes={settings.breakfast_slot_minutes || 30}
+        location={breakfastLocation}
+        accessToken={token!}
+        existingBooking={activeBreakfastBooking}
+        conciergeName={settings.eve_name || 'das Team'}
+        checkIn={stay.check_in}
+        checkOut={stay.check_out}
+        reservationEnabled={reservationEnabled}
+        includedText={breakfastIncluded}
+        menuItems={menuItems}
+      />
+
+      {f.conference_booking !== false && settings.conference_rooms && settings.conference_rooms.length > 0 && (
+        <ConferenceSheet
+          lang={lang}
+          rooms={settings.conference_rooms}
+          startTime={settings.conference_start_time || '08:00'}
+          endTime={settings.conference_end_time || '20:00'}
+          slotMinutes={settings.conference_slot_minutes || 60}
+          accessToken={token!}
+          existingBooking={activeConferenceBooking}
+          conciergeName={settings.eve_name || 'das Team'}
+          checkIn={stay.check_in}
+          checkOut={stay.check_out}
+        />
+      )}
+
+      {f.berlin_tips !== false && (
+        <>
+          <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang })};`} />
+          <PlacesSheet
+            lang={lang}
+            hotelLat={placesHotelLat}
+            hotelLng={placesHotelLng}
+            picks={placesPicks}
+            nearby={placesNearby}
+          />
+          <PlaceDetailSheet />
+        </>
+      )}
+
+      {f.service_requests !== false && settings.service_items && settings.service_items.length > 0 && (
+        <ServiceSheet
+          lang={lang}
+          items={settings.service_items}
+          startTime={settings.service_start_time || '07:00'}
+          endTime={settings.service_end_time || '22:00'}
+          accessToken={token!}
+          existingBooking={activeServiceBooking}
+          conciergeName={settings.eve_name || 'das Team'}
+          checkIn={stay.check_in}
+          checkOut={stay.check_out}
+        />
+      )}
+
+      {(settings as any).eve_enabled && (
+        <>
+          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang })};`} />
+          <EveChatSheet
+            lang={lang}
+            eveName={settings.eve_name || 'Eve'}
+            chips={eveSuggestions}
+          />
+          <EveFloatingBubble />
+        </>
+      )}
+
+      {showPostStay && (
+        <PostStaySheet lang={lang} stayId={stay.id} hotelName={hotel.name} />
+      )}
+
+      {walletAvailable && (
+        <WalletAddSheet lang={lang} hotelName={hotel.name} />
+      )}
+    </main>
+
+    {/* Sprint Legal Phase 2 — Cookie-Banner (zeigt sich nur beim ersten Besuch) */}
+    <CookieBanner stayToken={token} />
+
+    <script>
+      import Alpine from 'alpinejs';
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('guestPage', () => ({
+        init() {
+          // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet ggf. anzeigen
+          if (typeof (this as any)._initPostStay === 'function') {
+            (this as any)._initPostStay();
+          }
+        },
+        recSlideIndex: 0,
+        recDragOffset: 0,
+        recIsDragging: false,
+        _swipeStart: 0,
+        _swipeStartTime: 0,
+
+        get slideCount() {
+          return document.querySelectorAll('.rec-slide').length;
+        },
+
+        setRecSlide(i: number) {
+          this.recSlideIndex = i;
+        },
+
+        startRecSwipe(event: PointerEvent) {
+          const target = event.target as HTMLElement;
+          if (target.closest('button')) return;
+          event.preventDefault();
+          this._swipeStart = event.clientX;
+          this._swipeStartTime = Date.now();
+          this.recIsDragging = true;
+          this.recDragOffset = 0;
+
+          const onMove = (e: PointerEvent) => {
+            const delta = e.clientX - this._swipeStart;
+            const max = this.slideCount - 1;
+            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
+              this.recDragOffset = delta * 0.3;
+            } else {
+              this.recDragOffset = delta;
+            }
+          };
+          const onEnd = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onEnd);
+            document.removeEventListener('pointercancel', onEnd);
+            this.recIsDragging = false;
+            const delta = this.recDragOffset;
+            const elapsed = Date.now() - this._swipeStartTime;
+            const velocity = Math.abs(delta) / elapsed;
+            const threshold = 60;
+            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
+            const max = this.slideCount - 1;
+            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
+              this.recSlideIndex++;
+            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
+              this.recSlideIndex--;
+            }
+            this.recDragOffset = 0;
+          };
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+          document.addEventListener('pointercancel', onEnd);
+        },
+
+        startRecSwipeTouch(event: TouchEvent) {
+          const target = event.target as HTMLElement;
+          if (target.closest('button')) return;
+          this._swipeStart = event.touches[0].clientX;
+          this._swipeStartTime = Date.now();
+          this.recIsDragging = true;
+          this.recDragOffset = 0;
+
+          const onMove = (e: TouchEvent) => {
+            const delta = e.touches[0].clientX - this._swipeStart;
+            const max = this.slideCount - 1;
+            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
+              this.recDragOffset = delta * 0.3;
+            } else {
+              this.recDragOffset = delta;
+            }
+          };
+          const onEnd = () => {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+            document.removeEventListener('touchcancel', onEnd);
+            this.recIsDragging = false;
+            const delta = this.recDragOffset;
+            const elapsed = Date.now() - this._swipeStartTime;
+            const velocity = Math.abs(delta) / elapsed;
+            const threshold = 60;
+            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
+            const max = this.slideCount - 1;
+            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
+              this.recSlideIndex++;
+            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
+              this.recSlideIndex--;
+            }
+            this.recDragOffset = 0;
+          };
+          document.addEventListener('touchmove', onMove, { passive: true });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
+        },
+
+        // Sheet state
+        activeSheet: null as string | null,
+        sheetDragOffset: 0,
+        sheetIsDragging: false,
+        _sheetDragStart: 0,
+
+        // Eve state (Sprint E4 Phase 9 + 10)
+        eveOpen: false,
+        eveMessages: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.messages)
+          ? [...(window as any).__EVE_INITIAL__.messages]
+          : [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
+        eveTyping: false,
+        evePendingAction: null as any,
+        eveError: null as string | null,
+        eveConfirming: false,
+        eveSeenBefore: typeof window !== 'undefined' ? !!localStorage.getItem('retaha_eve_seen') : false,
+        _eveLastConversation: '' as string,  // für Audit-Context
+        _eveWelcomeTried: false,  // Phase 10: idempotenter Welcome-Trigger
+        _eveLang: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.lang) || 'de',
+
+        // Sprint E2 Phase 8 — Place-Detail-Sheet (layered über PlacesSheet)
+        activeDetailPlaceId: null as string | null,
+        activeDetailData: null as any,
+        detailLoading: false,
+        detailError: null as string | null,
+
+        async openPlaceDetail(placeId: string) {
+          this.activeDetailError = null;
+          this.detailError = null;
+          this.activeDetailPlaceId = placeId;
+
+          // 1. Cache-Lookup (Picks haben pre-loaded data im window-Global)
+          const cache = (typeof window !== 'undefined' && (window as any).__PLACE_DETAILS__?.cache) || {};
+          if (cache[placeId]) {
+            this.activeDetailData = cache[placeId];
+            this.detailLoading = false;
+            return;
+          }
+
+          // 2. Auto-Place → on-demand fetch
+          this.activeDetailData = null;
+          this.detailLoading = true;
+          try {
+            const lang = (typeof window !== 'undefined' && (window as any).__PLACE_DETAILS__?.lang) || 'de';
+            const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}&lang=${lang}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const body = await res.json();
+            if (!body.ok) throw new Error(body.error || 'Unknown error');
+            const d = body.details as any;
+            const PRICE_SYMBOLS: Record<string, string> = {
+              PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+              PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+            };
+            this.activeDetailData = {
+              name: d.name,
+              rating: d.rating,
+              userRatingCount: d.userRatingCount,
+              priceSymbol: PRICE_SYMBOLS[d.priceLevel ?? ''] ?? '',
+              hotelNote: null,  // Auto-Places haben keine Hotel-Notiz
+              formattedAddress: d.formattedAddress,
+              phone: d.internationalPhoneNumber,
+              website: d.websiteUri,
+              googleMapsUri: d.googleMapsUri,
+              openNow: d.openingHours?.openNow ?? null,
+              weekdayDescriptions: d.openingHours?.weekdayDescriptions ?? [],
+              reviews: d.reviews ?? [],
+              photoUrls: d.photoUrls ?? [],
+            };
+          } catch (err) {
+            this.detailError = `Details konnten nicht geladen werden: ${(err as Error).message}`;
+          } finally {
+            this.detailLoading = false;
+          }
+        },
+
+        closePlaceDetail() {
+          this.activeDetailPlaceId = null;
+          this.activeDetailData = null;
+          this.detailError = null;
+        },
+
+        async eveSend(text: string) {
+          const message = (text || '').trim();
+          if (!message || this.eveTyping) return;
+
+          this.eveError = null;
+          this.evePendingAction = null;
+          this.eveMessages.push({ role: 'user', content: message });
+          this.eveTyping = true;
+          this._scrollEveBottom();
+
+          // Mark als seen für Pulse-Disable
+          try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
+          this.eveSeenBefore = true;
+
+          try {
+            const res = await fetch('/api/eve/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message, lang: this._eveLang }),
+            });
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => '');
+              throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+            }
+
+            // Assistant-Bubble pushen + Index tracken. WICHTIG: nach push() greifen
+            // wir IMMER via this.eveMessages[msgIdx] zu, damit Alpine den reaktiven
+            // Proxy sieht (nicht die Original-Object-Reference).
+            this.eveMessages.push({ role: 'assistant', content: '', streaming: true });
+            const msgIdx = this.eveMessages.length - 1;
+            this.eveTyping = false;
+
+            const reader = res.body!.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const blocks = buffer.split('\n\n');
+              buffer = blocks.pop() ?? '';
+              for (const block of blocks) {
+                const line = block.trim();
+                if (!line.startsWith('data:')) continue;
+                try {
+                  const ev = JSON.parse(line.slice(5).trim());
+                  if (ev.type === 'text_delta') {
+                    this.eveMessages[msgIdx].content += ev.text;
+                    this._scrollEveBottom();
+                  } else if (ev.type === 'pending_action') {
+                    this.evePendingAction = ev.action;
+                    this._scrollEveBottom();
+                  } else if (ev.type === 'error') {
+                    this.eveError = ev.message;
+                  } else if (ev.type === 'message_complete') {
+                    this.eveMessages[msgIdx].streaming = false;
+                  } else if (ev.type === 'escalating') {
+                    this.eveMessages[msgIdx].content = '';
+                  }
+                  // router_decision + tool_use_preview ignorieren wir im UI
+                } catch (_) {
+                  // unbekannter chunk, weiter
+                }
+              }
+            }
+            this.eveMessages[msgIdx].streaming = false;
+            this._eveLastConversation = this._buildConversationContext();
+          } catch (err) {
+            this.eveTyping = false;
+            const msg = (err as Error).message || 'Unbekannter Fehler';
+            this.eveError = msg;
+            console.error('[eve] chat failed:', err);
+          }
+        },
+
+        async eveConfirm() {
+          if (!this.evePendingAction || this.eveConfirming) return;
+          this.eveConfirming = true;
+          this.eveError = null;
+          const pending = this.evePendingAction;
+
+          try {
+            const res = await fetch('/api/eve/confirm-action', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pending_action: pending,
+                conversation_context: this._eveLastConversation,
+              }),
+            });
+            const body = await res.json();
+            if (body.ok) {
+              this.eveMessages.push({ role: 'assistant', content: 'Erledigt — der Hotelier bekommt deine Anfrage gleich.' });
+              this.evePendingAction = null;
+            } else {
+              this.eveError = body.error || 'Bestätigung fehlgeschlagen.';
+            }
+          } catch (err) {
+            this.eveError = (err as Error).message || 'Bestätigung fehlgeschlagen.';
+          } finally {
+            this.eveConfirming = false;
+            this._scrollEveBottom();
+          }
+        },
+
+        eveCancel() {
+          this.evePendingAction = null;
+          this.eveMessages.push({ role: 'assistant', content: 'Kein Problem, sag Bescheid wenn ich helfen kann.' });
+          this._scrollEveBottom();
+        },
+
+        eveClose() {
+          this.eveOpen = false;
+        },
+
+        // Phase 10: Welcome-Trigger beim ersten Sheet-Open ohne History.
+        // Idempotent: Server-Side checks chat_messages.count + Client-Side
+        // checks _eveWelcomeTried (prevents Doppel-Calls beim raschen Reopen).
+        async eveMaybeWelcome() {
+          if (this._eveWelcomeTried) return;
+          if (this.eveMessages.length > 0) return;
+          this._eveWelcomeTried = true;
+
+          this.eveTyping = true;
+          try {
+            const res = await fetch('/api/eve/welcome', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lang: this._eveLang }),
+            });
+            if (!res.ok) {
+              console.warn('[eve/welcome] HTTP', res.status);
+              return;
+            }
+            const body = await res.json();
+            if (body.ok && body.welcome) {
+              this.eveMessages.push({ role: 'assistant', content: body.welcome, streaming: false });
+              this._scrollEveBottom();
+            }
+          } catch (err) {
+            console.warn('[eve/welcome] failed', err);
+          } finally {
+            this.eveTyping = false;
+          }
+        },
+
+        _scrollEveBottom() {
+          requestAnimationFrame(() => {
+            const el = this.$refs.eveMessagesEl as HTMLElement | undefined;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        },
+
+        _buildConversationContext(): string {
+          return this.eveMessages.slice(-3).map((m: any) =>
+            `${m.role === 'user' ? 'Gast' : 'Eve'}: ${m.content}`
+          ).join('\n');
+        },
+
+        // Sprint Wallet · Phase 5 — Add-to-Google-Wallet State
+        walletOpen: false,
+        walletConsent: false,
+        walletSubmitting: false,
+        walletDone: false,
+        walletError: '' as string,
+        walletThanksMessage: '' as string,
+
+        async walletSubmit() {
+          if (this.walletSubmitting) return;
+          this.walletSubmitting = true;
+          this.walletError = '';
+          try {
+            const res = await fetch('/api/g/wallet/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ marketing_consent: this.walletConsent }),
+            });
+            const data = await res.json();
+            if (!data.ok || !data.save_link_url) {
+              this.walletError = data.error === 'wallet_not_configured'
+                ? 'Wallet ist auf diesem System noch nicht aktiviert.'
+                : (data.error || 'Unbekannter Fehler.');
+              return;
+            }
+            // Erfolg: Save-Link in selbem Tab öffnen (Google Wallet entscheidet
+            // basierend auf Plattform: Android-App, Web-Wallet, Fallback)
+            this.walletDone = true;
+            this.walletThanksMessage = data.pass_state?.is_returning
+              ? `Willkommen zurück! Dein ${data.pass_state.visit_count}. Besuch.`
+              : 'Pass wird gleich geöffnet …';
+            // Kurzer Delay damit Thanks-View sichtbar wird, dann redirect
+            setTimeout(() => { window.location.href = data.save_link_url; }, 500);
+          } catch (err) {
+            this.walletError = (err as Error).message || 'Netzwerk-Fehler.';
+          } finally {
+            this.walletSubmitting = false;
+          }
+        },
+
+        // Sprint Functional Modul C Phase 8 — Post-Stay-Rating-State
+        postStayOpen: false,
+        postStayRating: 0,
+        postStayHover: 0,
+        postStayComment: '',
+        postStaySubmitting: false,
+        postStayDone: false,
+        postStayError: '' as string,
+
+        // Wird bei init() vom Alpine-Component aufgerufen (s. registerguestPageInit).
+        _initPostStay() {
+          const cfg = (window as any).__RETAHA_POSTSTAY__;
+          if (!cfg || !cfg.shouldAutoOpen) return;
+          // Sanfter Auto-Open: 1.6s damit Gast die Seite zuerst sieht.
+          setTimeout(() => { this.postStayOpen = true; }, 1600);
+        },
+
+        postStayDismiss() {
+          this.postStayOpen = false;
+          const cfg = (window as any).__RETAHA_POSTSTAY__;
+          if (!cfg) return;
+          try {
+            localStorage.setItem('retaha_poststay_dismissed_' + cfg.stayId, String(Date.now()));
+          } catch (_) { /* localStorage blocked — egal */ }
+        },
+
+        async postStaySubmit() {
+          if (!this.postStayRating || this.postStaySubmitting) return;
+          this.postStaySubmitting = true;
+          this.postStayError = '';
+          try {
+            const res = await fetch('/api/g/stay-feedback', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rating: this.postStayRating,
+                comment: this.postStayComment.trim() || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              this.postStayError = data.error || 'unknown';
+              return;
+            }
+            this.postStayDone = true;
+            // Cleanup Cooldown — Gast hat ja bewertet, soll nie wieder gefragt werden
+            const cfg = (window as any).__RETAHA_POSTSTAY__;
+            if (cfg) {
+              try { localStorage.removeItem('retaha_poststay_dismissed_' + cfg.stayId); } catch(_){}
+            }
+          } catch (err) {
+            this.postStayError = (err as Error).message || 'network';
+          } finally {
+            this.postStaySubmitting = false;
+          }
+        },
+
+        // Sprint Functional Modul C Phase 7 — Eve-Feedback (Daumen)
+        async sendEveFeedback(messageId: string, rating: 1 | -1) {
+          if (!messageId) return;
+          const idx = this.eveMessages.findIndex((m: any) => m.id === messageId);
+          if (idx < 0) return;
+          // Optimistic Update
+          const prev = this.eveMessages[idx].feedback;
+          (this.eveMessages[idx] as any).feedback = rating;
+          try {
+            const res = await fetch('/api/g/eve-feedback', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message_id: messageId, rating }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              (this.eveMessages[idx] as any).feedback = prev;
+              this._showRecToast('Feedback fehlgeschlagen.');
+              return;
+            }
+            this._showRecToast(rating === 1 ? 'Danke!' : 'Danke für dein Feedback.');
+          } catch (_) {
+            (this.eveMessages[idx] as any).feedback = prev;
+            this._showRecToast('Netzwerk-Fehler.');
+          }
+        },
+
+        openSheet(id: string) {
+          this.activeSheet = id;
+          this.sheetDragOffset = 0;
+          document.body.style.overflow = 'hidden';
+        },
+
+        // Sprint E7 Phase 4 — Action-Card-Click dispatch (5 Typen)
+        handleRecClick(el: HTMLElement) {
+          if (!el) return;
+          const cardType = el.dataset.cardType;
+          const target = el.dataset.actionTarget || '';
+
+          switch (cardType) {
+            case 'internal_action': {
+              if (!target) return;
+              const sheetId = target.replace(/^open_/, '');
+              if (sheetId === 'eve') {
+                this.eveOpen = true;
+                this.eveSeenBefore = true;
+                try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
+                if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
+                return;
+              }
+              const KNOWN_SHEETS = new Set(['wifi', 'breakfast', 'conference', 'service', 'places']);
+              if (KNOWN_SHEETS.has(sheetId)) {
+                this.openSheet(sheetId);
+              } else {
+                this._showRecToast('Diese Funktion ist bald verfügbar.');
+              }
+              return;
+            }
+            case 'external_link':
+              if (target) window.open(target, '_blank', 'noopener,noreferrer');
+              return;
+            case 'phone':
+              if (target) window.location.href = `tel:${target.replace(/\s+/g, '')}`;
+              return;
+            case 'email':
+              if (target) window.location.href = `mailto:${target}`;
+              return;
+            case 'info':
+            default:
+              return;
+          }
+        },
+
+        _showRecToast(text: string) {
+          let t = document.getElementById('rec-toast');
+          if (!t) {
+            t = document.createElement('div');
+            t.id = 'rec-toast';
+            t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;background:color-mix(in srgb, var(--theme-text-primary) .92, transparent);color:var(--theme-bg-primary);font-size:14px;font-family:inherit;border-radius:0;z-index:1000;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.2);';
+            document.body.appendChild(t);
+          }
+          t.textContent = text;
+          t.style.opacity = '1';
+          setTimeout(() => { if (t) t.style.opacity = '0'; t.style.transition = 'opacity .4s'; }, 2500);
+        },
+
+        closeSheet() {
+          this.activeSheet = null;
+          this.sheetDragOffset = 0;
+          document.body.style.overflow = '';
+        },
+
+        copyText(text: string, event: Event) {
+          // Find the button first — needed for visual feedback regardless of copy method
+          let btn = event.target as HTMLElement;
+          while (btn && !btn.classList.contains('wifi-copy')) {
+            btn = btn.parentElement as HTMLElement;
+          }
+
+          const showFeedback = () => {
+            if (!btn) return;
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.classList.remove('copied');
+            }, 1500);
+          };
+
+          // Method 1: modern clipboard API (works on Chrome, Firefox, Safari macOS)
+          // CRITICAL: must be called synchronously, no await — iOS loses gesture trust on await
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              showFeedback();
+            }).catch((err) => {
+              console.warn('clipboard.writeText failed, trying fallback', err);
+              fallbackCopy(text);
+              showFeedback();
+            });
+          } else {
+            // Method 2: fallback for old iOS / restricted contexts
+            fallbackCopy(text);
+            showFeedback();
+          }
+
+          function fallbackCopy(value: string) {
+            try {
+              const textarea = document.createElement('textarea');
+              textarea.value = value;
+              textarea.setAttribute('readonly', '');
+              textarea.style.position = 'fixed';
+              textarea.style.top = '0';
+              textarea.style.left = '0';
+              textarea.style.opacity = '0';
+              textarea.style.pointerEvents = 'none';
+              document.body.appendChild(textarea);
+
+              // iOS Safari requires selecting via Range, not just .select()
+              const range = document.createRange();
+              range.selectNodeContents(textarea);
+              const selection = window.getSelection();
+              if (selection) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+              textarea.setSelectionRange(0, value.length);
+
+              document.execCommand('copy');
+              document.body.removeChild(textarea);
+            } catch (e) {
+              console.error('Fallback copy failed:', e);
+            }
+          }
+        },
+
+        startSheetDrag(event: PointerEvent) {
+          event.preventDefault();
+          this._sheetDragStart = event.clientY;
+          this.sheetIsDragging = true;
+          this.sheetDragOffset = 0;
+
+          const onMove = (e: PointerEvent) => {
+            const delta = e.clientY - this._sheetDragStart;
+            this.sheetDragOffset = Math.max(0, delta);
+          };
+          const onEnd = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onEnd);
+            document.removeEventListener('pointercancel', onEnd);
+            this.sheetIsDragging = false;
+            if (this.sheetDragOffset > 120) {
+              this.closeSheet();
+            } else {
+              this.sheetDragOffset = 0;
+            }
+          };
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+          document.addEventListener('pointercancel', onEnd);
+        },
+
+        startSheetDragTouch(event: TouchEvent) {
+          this._sheetDragStart = event.touches[0].clientY;
+          this.sheetIsDragging = true;
+          this.sheetDragOffset = 0;
+
+          const onMove = (e: TouchEvent) => {
+            const delta = e.touches[0].clientY - this._sheetDragStart;
+            this.sheetDragOffset = Math.max(0, delta);
+          };
+          const onEnd = () => {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+            document.removeEventListener('touchcancel', onEnd);
+            this.sheetIsDragging = false;
+            if (this.sheetDragOffset > 120) {
+              this.closeSheet();
+            } else {
+              this.sheetDragOffset = 0;
+            }
+          };
+          document.addEventListener('touchmove', onMove, { passive: true });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
+        },
+      }));
+
+      // Sprint E2 Phase 7 — PlacesSheet Alpine-Component
+      // (im selben bundled Script wie guestPage, damit Timing mit Alpine.start() stimmt)
+      // @ts-expect-error - Alpine types
+      Alpine.data('placesSheet', (initialTab: string) => ({
+        activeTab: initialTab,
+        showAllAuto: false,
+      }));
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('breakfastForm', (initial: any) => ({
+        view: initial.existingBooking
+          ? 'status'
+          : (initial.reservationEnabled === false ? 'info' : 'form'),
+        reservationEnabled: initial.reservationEnabled !== false,
+        includedText: initial.includedText || '',
+        location: initial.location || '',
+
+        // Menu state
+        menuItems: initial.menuItems || [],
+        allergenLabels: initial.allergenLabels || {},
+        allergenKeys: initial.allergenKeys || [],
+        selectedAllergens: [] as string[],
+        activeTab: 'main' as 'main' | 'menu',
+        filterCollapsed: false,
+
+        toggleAllergen(key: string) {
+          if (this.selectedAllergens.includes(key)) {
+            this.selectedAllergens = this.selectedAllergens.filter((k: string) => k !== key);
+          } else {
+            this.selectedAllergens = [...this.selectedAllergens, key];
+          }
+        },
+
+        clearAllergenFilter() {
+          this.selectedAllergens = [];
+        },
+
+        getMatchingAllergens(item: any) {
+          return item.allergens.filter((a: string) => this.selectedAllergens.includes(a));
+        },
+
+        get groupedMenuItems() {
+          const groups: Record<string, any[]> = {};
+          this.menuItems.forEach((item: any) => {
+            const cat = item.category || 'Allgemein';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(item);
+          });
+          return groups;
+        },
+
+        stayRangeDates: initial.stayRangeDates,
+        allSlots: initial.allSlots,
+        startTime: initial.startTime,
+        endTime: initial.endTime,
+        peopleOptions: initial.peopleOptions,
+        tableOptions: initial.tableOptions,
+        labels: initial.labels,
+        accessToken: initial.accessToken,
+        existingBooking: initial.existingBooking,
+        lang: initial.lang,
+
+        // Live-updating "now" — tick every 60s to handle slot expiration
+        nowTick: 0,
+
+        form: {
+          date: '',
+          people: 2,
+          time: '',
+          table_preference: 'any',
+          notes: '',
+        },
+
+        submitting: false,
+        errorMsg: '',
+
+        init() {
+          // Pre-select first available date
+          const firstAvail = this.availableDates[0];
+          if (firstAvail) this.form.date = firstAvail.iso;
+
+          // Tick every 60s for slot expiry on "today"
+          setInterval(() => {
+            this.nowTick = Date.now();
+            // If currently selected date or slot expired, reset
+            if (!this.availableDates.find((d: any) => d.iso === this.form.date)) {
+              const newFirst = this.availableDates[0];
+              this.form.date = newFirst ? newFirst.iso : '';
+              this.form.time = '';
+            }
+            if (this.form.time && !this.slots.includes(this.form.time)) {
+              this.form.time = '';
+            }
+          }, 60000);
+        },
+
+        // Computed: today as local ISO (recomputes on tick)
+        get todayIso() {
+          // nowTick triggers reactivity
+          this.nowTick;
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        },
+
+        // Filter slots for a given date based on current time
+        slotsForDate(dateIso: string) {
+          if (dateIso !== this.todayIso) return this.allSlots;
+          const now = new Date();
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          return this.allSlots.filter((slot: string) => {
+            const [h, m] = slot.split(':').map(Number);
+            return h * 60 + m > nowMin;
+          });
+        },
+
+        // Available dates: those in stay range, in the present or future, with slots
+        get availableDates() {
+          const today = this.todayIso;
+          return this.stayRangeDates
+            .filter((d: any) => d.iso >= today)
+            .filter((d: any) => this.slotsForDate(d.iso).length > 0)
+            .slice(0, 5);
+        },
+
+        get slots() {
+          return this.slotsForDate(this.form.date);
+        },
+
+        get dateLabels() {
+          // Build labels live based on current today
+          const today = new Date();
+          const todayIso = this.todayIso;
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomIso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}`;
+          const dayAfter = new Date(today);
+          dayAfter.setDate(dayAfter.getDate() + 2);
+          const dayAfterIso = `${dayAfter.getFullYear()}-${String(dayAfter.getMonth()+1).padStart(2,'0')}-${String(dayAfter.getDate()).padStart(2,'0')}`;
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+
+          return this.availableDates.map((d: any) => {
+            if (d.iso === todayIso) return this.labels.today;
+            if (d.iso === tomIso) return this.labels.tomorrow;
+            if (d.iso === dayAfterIso) return this.labels.dayAfter;
+            return new Date(d.iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { weekday: 'long' });
+          });
+        },
+
+        get canSubmit() {
+          return this.form.date && this.form.time && this.form.people > 0;
+        },
+
+        get statusInfo() {
+          if (!this.existingBooking) return { iconClass: '', icon: '', title: '', sub: '' };
+          const status = (this.existingBooking.status || 'pending').toLowerCase();
+          if (status === 'confirmed') {
+            return { iconClass: 'confirmed', icon: 'check', title: this.labels.confirmedTitle, sub: this.labels.confirmedSub };
+          }
+          if (status === 'cancelled') {
+            return { iconClass: 'cancelled', icon: 'cross', title: this.labels.cancelledTitle, sub: this.labels.cancelledSub };
+          }
+          return { iconClass: 'pending', icon: 'clock', title: this.labels.pendingTitle, sub: this.labels.pendingSub };
+        },
+
+        formatDate(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', {
+            weekday: 'long', day: 'numeric', month: 'long'
+          });
+        },
+
+        formatDateShort(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', {
+            day: '2-digit', month: 'short'
+          });
+        },
+
+        tableLabelFor(value: string) {
+          const opt = this.tableOptions.find((o: any) => o.value === value);
+          return opt ? opt.label : value;
+        },
+
+        startRebook() {
+          // Reset form for new booking
+          this.form = {
+            date: this.availableDates[0]?.iso || '',
+            people: 2,
+            time: '',
+            table_preference: 'any',
+            notes: '',
+          };
+          // Mark existingBooking as gone so we land on the form, not the status view
+          this.existingBooking = null;
+          this.view = 'form';
+        },
+
+        setDate(iso: string) {
+          this.form.date = iso;
+          if (this.form.time && !this.slots.includes(this.form.time)) {
+            this.form.time = '';
+          }
+        },
+
+        async submitBooking() {
+          if (!this.canSubmit || this.submitting) return;
+          this.submitting = true;
+          this.errorMsg = '';
+
+          try {
+            const resp = await fetch('/api/bookings/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: this.accessToken,
+                type: 'breakfast',
+                details: {
+                  date: this.form.date,
+                  time: this.form.time,
+                  people: this.form.people,
+                  table_preference: this.form.table_preference,
+                  notes: this.form.notes || null,
+                },
+              }),
+            });
+
+            const data = await resp.json();
+
+            if (!data.ok) {
+              this.errorMsg = `${this.labels.errorPrefix}: ${data.error || 'unknown'}`;
+              this.submitting = false;
+              return;
+            }
+
+            this.existingBooking = {
+              id: data.booking.id,
+              status: 'pending',
+              details: {
+                date: this.form.date,
+                time: this.form.time,
+                people: this.form.people,
+                table_preference: this.form.table_preference,
+                notes: this.form.notes,
+              },
+            };
+            this.view = 'status';
+            this.submitting = false;
+          } catch (e: any) {
+            this.errorMsg = `${this.labels.errorPrefix}: ${e.message || 'network error'}`;
+            this.submitting = false;
+          }
+        },
+      }));
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('conferenceForm', (initial: any) => ({
+        rooms: initial.rooms,
+        stayRangeDates: initial.stayRangeDates,
+        allSlots: initial.allSlots,
+        durationOptions: initial.durationOptions,
+        labels: initial.labels,
+        accessToken: initial.accessToken,
+        existingBooking: initial.existingBooking,
+        lang: initial.lang,
+
+        view: initial.existingBooking ? 'status' : 'form',
+        submitting: false,
+
+        form: {
+          room_id: '',
+          date: '',
+          time: '',
+          duration_hours: 0,
+          people: 0,
+          occasion: '',
+          notes: '',
+        },
+
+        get currentRoomCapacity() {
+          const r = this.rooms.find((r: any) => r.id === this.form.room_id);
+          return r ? r.capacity : 12;
+        },
+
+        get peopleOptions() {
+          const cap = this.currentRoomCapacity;
+          return Array.from({ length: cap }, (_, i) => i + 1);
+        },
+
+        get canSubmit() {
+          return this.form.room_id && this.form.date && this.form.time &&
+                 this.form.duration_hours && this.form.people && this.form.occasion.trim();
+        },
+
+        get statusInfo() {
+          const status = (this.existingBooking?.status || 'pending').toLowerCase();
+          if (status === 'confirmed') return { title: this.labels.statusConfirmedTitle, sub: this.labels.statusConfirmedSub };
+          if (status === 'cancelled') return { title: this.labels.statusCancelledTitle, sub: this.labels.statusCancelledSub };
+          return { title: this.labels.statusPendingTitle, sub: this.labels.statusPendingSub };
+        },
+
+        startRebook() {
+          this.form = {
+            room_id: '',
+            date: '',
+            time: '',
+            duration_hours: 0,
+            people: 0,
+            occasion: '',
+            notes: '',
+          };
+          this.existingBooking = null;
+          this.view = 'form';
+        },
+
+        async submit() {
+          if (!this.canSubmit || this.submitting) return;
+          this.submitting = true;
+
+          const room = this.rooms.find((r: any) => r.id === this.form.room_id);
+
+          try {
+            const resp = await fetch('/api/bookings/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: this.accessToken,
+                type: 'conference',
+                details: {
+                  room_id: this.form.room_id,
+                  room_name: room?.name || '',
+                  date: this.form.date,
+                  time: this.form.time,
+                  duration_hours: this.form.duration_hours,
+                  people: this.form.people,
+                  occasion: this.form.occasion.trim(),
+                  notes: this.form.notes.trim() || null,
+                },
+              }),
+            });
+
+            const data = await resp.json();
+            if (!data.ok) {
+              alert('Fehler: ' + (data.error || 'unbekannt'));
+              this.submitting = false;
+              return;
+            }
+
+            this.existingBooking = data.booking;
+            this.view = 'status';
+          } catch (err: any) {
+            alert('Netzwerk-Fehler: ' + (err.message || 'unbekannt'));
+          } finally {
+            this.submitting = false;
+          }
+        },
+      }));
+
+      // @ts-expect-error - Alpine types
+      Alpine.data('serviceForm', (initial: any) => ({
+        items: initial.items,
+        allSlots: initial.allSlots,
+        labels: initial.labels,
+        accessToken: initial.accessToken,
+        existingBooking: initial.existingBooking,
+        lang: initial.lang,
+
+        view: initial.existingBooking ? 'status' : 'form',
+        submitting: false,
+
+        form: {
+          item_id: '',
+          timing: '',
+          time: '',
+          notes: '',
+        },
+
+        get canSubmit() {
+          if (!this.form.item_id || !this.form.timing) return false;
+          if (this.form.timing === 'scheduled' && !this.form.time) return false;
+          return true;
+        },
+
+        get statusInfo() {
+          const status = (this.existingBooking?.status || 'pending').toLowerCase();
+          if (status === 'confirmed') return { title: this.labels.statusConfirmedTitle, sub: this.labels.statusConfirmedSub };
+          if (status === 'cancelled') return { title: this.labels.statusCancelledTitle, sub: this.labels.statusCancelledSub };
+          return { title: this.labels.statusPendingTitle, sub: this.labels.statusPendingSub };
+        },
+
+        startRebook() {
+          this.form = { item_id: '', timing: '', time: '', notes: '' };
+          this.existingBooking = null;
+          this.view = 'form';
+        },
+
+        async submit() {
+          if (!this.canSubmit || this.submitting) return;
+          this.submitting = true;
+
+          const item = this.items.find((i: any) => i.id === this.form.item_id);
+
+          try {
+            const resp = await fetch('/api/bookings/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: this.accessToken,
+                type: 'service',
+                details: {
+                  item_id: this.form.item_id,
+                  item_name: item?.name || '',
+                  timing: this.form.timing,
+                  time: this.form.timing === 'scheduled' ? this.form.time : null,
+                  notes: this.form.notes.trim() || null,
+                },
+              }),
+            });
+
+            const data = await resp.json();
+            if (!data.ok) {
+              alert('Fehler: ' + (data.error || 'unbekannt'));
+              this.submitting = false;
+              return;
+            }
+
+            this.existingBooking = data.booking;
+            this.view = 'status';
+          } catch (err: any) {
+            alert('Netzwerk-Fehler: ' + (err.message || 'unbekannt'));
+          } finally {
+            this.submitting = false;
+          }
+        },
+      }));
+
+      Alpine.start();
+    </script>
+
+    <!-- Sprint i18n Phase 7 — Sprach-Wechsel-Persistenz via sendBeacon -->
+    <script is:inline>
+      document.querySelectorAll('.lang-switcher .lang-btn').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          const lang = btn.dataset.lang;
+          const switcher = btn.closest('.lang-switcher');
+          const token = switcher && switcher.dataset.stayToken;
+          if (!lang || !token) return;
+          // sendBeacon damit Persistenz vor Navigation garantiert flusht
+          try {
+            const payload = JSON.stringify({ token, lang });
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon('/api/g/set-language', blob);
+          } catch (_) { /* non-fatal */ }
+          // Navigation läuft normal weiter (href greift)
+        });
+      });
+    </script>
+  </body>
+</html>

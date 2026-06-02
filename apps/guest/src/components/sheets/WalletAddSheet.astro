@@ -1,0 +1,255 @@
+---
+// Sprint Wallet · Phase 5 — Add-to-Google-Wallet-Modal
+//
+// Triggered durch Button in /g/[token]. Modal mit Consent-Checkbox, dann
+// POST /api/g/wallet/create → erhaltenen save_link_url im selben Tab öffnen.
+
+import type { Lang } from '@retaha/i18n';
+
+interface Props {
+  lang: Lang;
+  hotelName: string;
+}
+const { lang, hotelName } = Astro.props;
+
+const STRINGS: Record<string, Record<string, string>> = {
+  de: {
+    title: 'Zum Wallet hinzufügen',
+    eyebrow: 'Google Wallet',
+    intro: 'Mit dem Wallet-Pass bekommst du:',
+    bullet1: 'Schnellzugriff zu Eve und deinem Aufenthalt',
+    bullet2: 'Service-Bestätigungen direkt aufs Handy',
+    bullet3: `Aktionen und Events von ${hotelName}`,
+    consentLabel: `Ja, ich möchte Marketing-Benachrichtigungen von ${hotelName}.`,
+    consentSub: 'Jederzeit abbestellbar — Service-Updates während Aufenthalt bleiben unabhängig.',
+    submit: 'Add to Google Wallet',
+    later: 'Abbrechen',
+    submitting: 'Wird erstellt …',
+    close: 'Schließen',
+    errorTitle: 'Wallet-Pass konnte nicht erstellt werden',
+  },
+  en: {
+    title: 'Add to your wallet',
+    eyebrow: 'Google Wallet',
+    intro: 'Your wallet pass gives you:',
+    bullet1: 'Quick access to Eve and your stay',
+    bullet2: 'Service confirmations on your phone',
+    bullet3: `Promotions and events from ${hotelName}`,
+    consentLabel: `Yes, I want marketing notifications from ${hotelName}.`,
+    consentSub: 'Unsubscribe anytime — service updates during your stay are separate.',
+    submit: 'Add to Google Wallet',
+    later: 'Cancel',
+    submitting: 'Creating …',
+    close: 'Close',
+    errorTitle: 'Could not create wallet pass',
+  },
+  fr: {
+    title: 'Ajouter au wallet',
+    eyebrow: 'Google Wallet',
+    intro: 'Votre pass wallet vous donne :',
+    bullet1: 'Un accès rapide à Eve et à votre séjour',
+    bullet2: 'Les confirmations de service sur votre téléphone',
+    bullet3: `Les offres et événements de ${hotelName}`,
+    consentLabel: `Oui, je souhaite recevoir les notifications marketing de ${hotelName}.`,
+    consentSub: 'Désabonnement à tout moment — les mises à jour de séjour restent séparées.',
+    submit: 'Add to Google Wallet',
+    later: 'Annuler',
+    submitting: 'Création …',
+    close: 'Fermer',
+    errorTitle: 'Impossible de créer le pass wallet',
+  },
+  es: {
+    title: 'Añadir al wallet',
+    eyebrow: 'Google Wallet',
+    intro: 'Tu pass wallet te ofrece:',
+    bullet1: 'Acceso rápido a Eve y a tu estancia',
+    bullet2: 'Confirmaciones de servicio en tu móvil',
+    bullet3: `Promociones y eventos de ${hotelName}`,
+    consentLabel: `Sí, quiero notificaciones de marketing de ${hotelName}.`,
+    consentSub: 'Puedes darte de baja en cualquier momento — las actualizaciones de tu estancia son independientes.',
+    submit: 'Add to Google Wallet',
+    later: 'Cancelar',
+    submitting: 'Creando …',
+    close: 'Cerrar',
+    errorTitle: 'No se pudo crear el wallet pass',
+  },
+};
+const L = STRINGS[lang] ?? STRINGS.en;
+---
+
+<div
+  class="wallet-overlay"
+  x-show="walletOpen"
+  x-cloak
+  x-transition.opacity
+  @click.self="walletOpen = false"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="wallet-add-title"
+>
+  <div class="wallet-sheet" x-transition>
+    <button type="button" class="wallet-close" @click="walletOpen = false" aria-label={L.close}>×</button>
+
+    <template x-if="!walletDone">
+      <div>
+        <div class="wallet-eyebrow">
+          <span class="wallet-eyebrow-shapes">
+            <span class="circle"></span><span class="square"></span><span class="triangle"></span>
+          </span>
+          <span>{L.eyebrow}</span>
+        </div>
+
+        <h2 id="wallet-add-title" class="wallet-title">{L.title}<span class="h-dot">.</span></h2>
+        <p class="wallet-intro">{L.intro}</p>
+
+        <ul class="wallet-bullets">
+          <li>{L.bullet1}</li>
+          <li>{L.bullet2}</li>
+          <li>{L.bullet3}</li>
+        </ul>
+
+        <label class="wallet-consent">
+          <input type="checkbox" x-model="walletConsent" />
+          <span>
+            <span class="wallet-consent-label">{L.consentLabel}</span>
+            <span class="wallet-consent-sub">{L.consentSub}</span>
+          </span>
+        </label>
+
+        <template x-if="walletError">
+          <div class="wallet-error">
+            <strong>{L.errorTitle}</strong>
+            <p x-text="walletError"></p>
+          </div>
+        </template>
+
+        <div class="wallet-actions">
+          <button type="button" class="wallet-btn-later" @click="walletOpen = false" :disabled="walletSubmitting">{L.later}</button>
+          <button
+            type="button"
+            class="wallet-btn-submit"
+            :disabled="walletSubmitting"
+            @click="walletSubmit()"
+            x-text={`walletSubmitting ? ${JSON.stringify(L.submitting)} : ${JSON.stringify(L.submit)}`}
+          ></button>
+        </div>
+      </div>
+    </template>
+
+    <template x-if="walletDone">
+      <div class="wallet-thanks">
+        <div class="wallet-thanks-icon">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 24 L20 34 L38 14"/>
+          </svg>
+        </div>
+        <h2 class="wallet-title">{L.title}<span class="h-dot">.</span></h2>
+        <p class="wallet-intro" x-text="walletThanksMessage"></p>
+        <button type="button" class="wallet-btn-submit" style="margin-top:24px" @click="walletOpen = false">{L.close}</button>
+      </div>
+    </template>
+  </div>
+</div>
+
+<style>
+  .wallet-overlay {
+    position: fixed; inset: 0; z-index: 1100;
+    background: color-mix(in srgb, var(--theme-text-primary) .55, transparent);
+    display: flex; align-items: flex-end; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  @media (min-width: 640px) {
+    .wallet-overlay { align-items: center; padding: 24px; }
+  }
+  .wallet-sheet {
+    position: relative;
+    width: 100%; max-width: 480px;
+    background: var(--theme-bg-primary);
+    padding: 28px 24px 32px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.18);
+  }
+  @media (min-width: 640px) {
+    .wallet-sheet { padding: 32px 32px 36px; }
+  }
+  .wallet-close {
+    position: absolute; top: 12px; right: 12px;
+    width: 40px; height: 40px;
+    background: transparent; border: none;
+    font-size: 28px; line-height: 1; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent);
+    cursor: pointer;
+  }
+  .wallet-close:hover { color: var(--theme-text-primary); }
+  .wallet-eyebrow {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--theme-accent); font-weight: 500;
+    margin-bottom: 16px;
+  }
+  .wallet-eyebrow-shapes { display: inline-flex; gap: 4px; align-items: center; }
+  .wallet-eyebrow-shapes .circle  { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .wallet-eyebrow-shapes .square  { width: 6px; height: 6px; background: currentColor; }
+  .wallet-eyebrow-shapes .triangle{ width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 6px solid currentColor; }
+  .wallet-title {
+    font-size: 24px; font-weight: 300; letter-spacing: -.02em;
+    line-height: 1.2; margin: 0 0 8px 0; color: var(--theme-text-primary);
+  }
+  .wallet-intro { font-size: 14px; line-height: 1.5; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); margin: 0 0 16px; }
+  .wallet-bullets {
+    margin: 0 0 20px 0; padding: 0;
+    list-style: none;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .wallet-bullets li {
+    position: relative;
+    padding-left: 22px;
+    font-size: 14px; line-height: 1.5; color: var(--theme-text-primary);
+  }
+  .wallet-bullets li::before {
+    content: ''; position: absolute; left: 4px; top: 8px;
+    width: 8px; height: 8px;
+    background: var(--theme-accent); border-radius: 50%;
+  }
+  .wallet-consent {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--theme-text-primary) .03, transparent);
+    border: 1px solid var(--theme-border);
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+  .wallet-consent input[type="checkbox"] {
+    width: 20px; height: 20px;
+    margin-top: 2px; flex-shrink: 0;
+    accent-color: var(--theme-accent);
+  }
+  .wallet-consent-label { display: block; font-size: 13px; color: var(--theme-text-primary); line-height: 1.45; }
+  .wallet-consent-sub   { display: block; font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin-top: 4px; line-height: 1.45; }
+  .wallet-error {
+    padding: 12px;
+    background: rgba(220,53,69,.08);
+    color: #B00020;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .wallet-error strong { display: block; margin-bottom: 4px; }
+  .wallet-error p { margin: 0; opacity: .85; }
+  .wallet-actions { display: flex; gap: 12px; align-items: stretch; }
+  .wallet-btn-later, .wallet-btn-submit {
+    flex: 1; padding: 14px 16px;
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    letter-spacing: .02em; cursor: pointer;
+    border: none; transition: opacity .15s ease, background .15s ease;
+    min-height: 48px;
+  }
+  .wallet-btn-later  { background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); border: 1px solid var(--theme-border); }
+  .wallet-btn-later:hover:not(:disabled) { color: var(--theme-text-primary); border-color: var(--theme-text-primary); }
+  .wallet-btn-submit { background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); }
+  .wallet-btn-submit:hover:not(:disabled) { background: var(--theme-accent); }
+  .wallet-btn-submit:disabled, .wallet-btn-later:disabled { opacity: .4; cursor: not-allowed; }
+  .wallet-thanks { text-align: center; padding: 16px 0 8px; }
+  .wallet-thanks-icon {
+    width: 64px; height: 64px; margin: 0 auto 16px;
+    color: #00A86B;
+  }
+  .wallet-thanks-icon svg { width: 100%; height: 100%; }
+</style>

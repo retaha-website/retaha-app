@@ -1,0 +1,397 @@
+---
+// Sprint E3 Phase 4 — Service-Anfragen-Flow (volle Liste + Detail-Expansion)
+//
+// Dashboard-Quick-Actions (Phase 2) bleiben als Schnellzugriff. /app/service
+// ist die volle Liste mit Filter (pending/confirmed/all) + Detail-Expansion
+// analog /app/bookings.
+//
+// Status-Change via existing /api/bookings/update-status (Sprint C). Mews-Push
+// passiert dort automatisch wenn service_id_service gemappt ist — Sprint D
+// Phase 3 §14-Scope-Korrektur: aktuell nur Frühstück gemappt, also Service-
+// Confirms greifen mit no_service_id_for_type-Skip (kein Mews-Push, kein Fehler).
+
+import AppLayout from '../layouts/AppLayout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { loadBookingsForHotel } from '@retaha/db';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+const url = new URL(Astro.request.url);
+const filter = url.searchParams.get('filter') || 'pending';
+
+const allServices = await loadBookingsForHotel(hotel.id, 'service');
+
+// Eve-Audit-Lookup parallel — pattern aus /app/bookings
+const bookingIds = allServices.map((b: any) => b.id);
+let auditByBookingId: Record<string, any> = {};
+if (bookingIds.length > 0) {
+  const { data: audits } = await client
+    .from('eve_action_log')
+    .select('id, action_type, action_params, conversation_context, result, result_data, created_at')
+    .eq('hotel_id', hotel.id)
+    .filter('result_data->>booking_id', 'in', `(${bookingIds.map(id => `"${id}"`).join(',')})`);
+  for (const a of (audits ?? []) as any[]) {
+    const bId = a.result_data?.booking_id;
+    if (bId) auditByBookingId[bId] = a;
+  }
+}
+
+// Filter
+let filtered = allServices;
+if (filter === 'pending') filtered = allServices.filter((b: any) => (b.status || '').toLowerCase() === 'pending');
+else if (filter === 'confirmed') filtered = allServices.filter((b: any) => (b.status || '').toLowerCase() === 'confirmed');
+
+const counts = {
+  pending: allServices.filter((b: any) => (b.status || '').toLowerCase() === 'pending').length,
+  confirmed: allServices.filter((b: any) => (b.status || '').toLowerCase() === 'confirmed').length,
+  all: allServices.length,
+};
+
+// Service-Types nach kostenpflichtig vs kostenlos (UI-Hint)
+const PAID_SERVICE_TYPES = new Set(['late_checkout', 'minibar', 'spa', 'extra_bed']);
+const FREE_SERVICE_TYPES = new Set(['wakeup_call', 'towels', 'taxi', 'cleaning']);
+
+function isPaidService(serviceType: string | undefined): boolean | null {
+  if (!serviceType) return null;
+  if (PAID_SERVICE_TYPES.has(serviceType)) return true;
+  if (FREE_SERVICE_TYPES.has(serviceType)) return false;
+  return null;
+}
+
+const fmtTimeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'gerade eben';
+  if (mins < 60) return `vor ${mins} Min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `vor ${hours} Std`;
+  const days = Math.floor(hours / 24);
+  return `vor ${days} Tag${days > 1 ? 'en' : ''}`;
+};
+
+const statusLabels: Record<string, { label: string; cls: string }> = {
+  pending:   { label: 'Wartet auf Bestätigung', cls: 'status-pending' },
+  confirmed: { label: 'Bestätigt',              cls: 'status-confirmed' },
+  cancelled: { label: 'Abgelehnt',              cls: 'status-cancelled' },
+};
+
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  late_checkout: 'Late-Check-out',
+  wakeup_call:   'Wake-up-Call',
+  laundry:       'Wäscheservice',
+  towels:        'Extra-Handtücher',
+  minibar:       'Minibar-Auffüllung',
+  taxi:          'Taxi-Bestellung',
+  cleaning:      'Extra-Reinigung',
+  spa:           'Spa-Termin',
+  extra_bed:     'Zustellbett',
+  other:         'Sonstiges',
+};
+---
+
+<AppLayout title="Service-Anfragen" hotel={hotel} user={{ email: user.email ?? '' }}>
+  <header class="app-page-header">
+    <p class="app-page-eyebrow">— Operations —</p>
+    <h1 class="app-page-title">Service-Anfragen.</h1>
+  </header>
+
+  <!-- Stats -->
+  <div class="svc-stats">
+    <div class={`svc-stat-card${counts.pending > 0 ? ' svc-stat-card--warning' : ''}`}>
+      <div class="svc-stat-label">— Wartet auf dich —</div>
+      <div class="svc-stat-value">{counts.pending}</div>
+    </div>
+    <div class="svc-stat-card">
+      <div class="svc-stat-label">— Bestätigt —</div>
+      <div class="svc-stat-value">{counts.confirmed}</div>
+    </div>
+    <div class="svc-stat-card">
+      <div class="svc-stat-label">— Gesamt —</div>
+      <div class="svc-stat-value">{counts.all}</div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="svc-tabs">
+    {[
+      { v: 'pending',   label: 'Pending', n: counts.pending },
+      { v: 'confirmed', label: 'Bestätigt', n: counts.confirmed },
+      { v: 'all',       label: 'Alle', n: counts.all },
+    ].map(t => (
+      <a href={`?filter=${t.v}`} class={`svc-tab${filter === t.v ? ' is-active' : ''}`}>
+        {t.label}
+        {t.n > 0 && <span class="svc-tab-counter">({t.n})</span>}
+      </a>
+    ))}
+  </div>
+
+  <!-- Liste -->
+  {filtered.length === 0 ? (
+    <div class="svc-empty">
+      <p class="svc-empty-icon">✓</p>
+      <p class="svc-empty-text">
+        {filter === 'pending'
+          ? 'Keine offenen Anfragen — alles erledigt.'
+          : filter === 'confirmed'
+          ? 'Noch keine bestätigten Anfragen.'
+          : 'Noch keine Service-Anfragen in diesem Hotel.'}
+      </p>
+    </div>
+  ) : (
+    <div class="svc-list">
+      {filtered.map((b: any) => {
+        const guest = b.stay?.guest;
+        const room = b.stay?.room;
+        const guestName = [guest?.first_name, guest?.last_name].filter(Boolean).join(' ') || 'Unbekannter Gast';
+        const roomLabel = room ? [room.room_number, room.room_name].filter(Boolean).join(' · ') || '—' : '—';
+        const normalizedStatus = (b.status || 'pending').toLowerCase();
+        const status = statusLabels[normalizedStatus] || statusLabels.pending;
+        const details = b.details || {};
+        const audit = auditByBookingId[b.id];
+        const isEveBooked = !!audit;
+        const serviceTypeLabel = SERVICE_TYPE_LABELS[details.service_type] || details.service_type || 'Service';
+        const paid = isPaidService(details.service_type);
+        const summary = details.item_name ?? serviceTypeLabel;
+        const when = [details.date, details.time].filter(Boolean).join(' · ');
+
+        return (
+          <article class="svc-row" data-booking-id={b.id} x-data="{ open: false }">
+            <button type="button" class="svc-row-head" @click="open = !open" :class="{ 'is-open': open }">
+              <div class="svc-row-head-left">
+                <div class="svc-row-badges">
+                  <span class={`svc-status-badge ${status.cls}`}>{status.label}</span>
+                  {isEveBooked && <span class="svc-eve-badge">🤖 Via Eve</span>}
+                  {paid === true && <span class="svc-paid-badge">€ kostenpflichtig</span>}
+                  {paid === false && <span class="svc-free-badge">kostenfrei</span>}
+                  <span class="svc-time-ago">{fmtTimeAgo(b.created_at)}</span>
+                </div>
+                <p class="svc-row-summary">{summary}</p>
+                <p class="svc-row-meta">{guestName} · Zimmer {roomLabel}{when && ` · ${when}`}</p>
+              </div>
+              <span class="svc-row-chevron" :class="{ 'is-open': open }">▾</span>
+            </button>
+
+            <div x-show="open" x-cloak class="svc-row-expanded">
+              <!-- Details -->
+              <div class="svc-detail-grid">
+                <div>
+                  <div class="svc-detail-label">Service-Typ</div>
+                  <div class="svc-detail-value">{serviceTypeLabel}</div>
+                </div>
+                {details.date && (
+                  <div>
+                    <div class="svc-detail-label">Datum</div>
+                    <div class="svc-detail-value">{details.date}</div>
+                  </div>
+                )}
+                {details.time && (
+                  <div>
+                    <div class="svc-detail-label">Uhrzeit</div>
+                    <div class="svc-detail-value">{details.time}</div>
+                  </div>
+                )}
+                <div>
+                  <div class="svc-detail-label">Eingegangen</div>
+                  <div class="svc-detail-value">{new Date(b.created_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              </div>
+
+              {details.details && (
+                <div class="svc-detail-block">
+                  <div class="svc-detail-label">Anfrage-Details</div>
+                  <p class="svc-detail-quote">„{details.details}"</p>
+                </div>
+              )}
+
+              {details.notes && (
+                <div class="svc-detail-block">
+                  <div class="svc-detail-label">Notiz vom Gast</div>
+                  <p class="svc-detail-quote">„{details.notes}"</p>
+                </div>
+              )}
+
+              <!-- Mews-Push-Status (wenn Push lief — Sprint C-Felder) -->
+              {b.mews_push_attempted_at && (
+                <div class="svc-detail-block">
+                  <div class="svc-detail-label">Mews-Push</div>
+                  {b.mews_order_id ? (
+                    <p class="svc-detail-text" style="color: #145c2a;">
+                      ✓ Order erstellt: <code>{b.mews_order_id}</code>
+                    </p>
+                  ) : (
+                    <p class="svc-detail-text" style="color: #7a1515;">
+                      ⚠ Push fehlgeschlagen: <code>{b.mews_push_error || 'unknown'}</code>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <!-- Eve-Audit-Context -->
+              {isEveBooked && (
+                <div class="svc-detail-block svc-eve-context">
+                  <div class="svc-detail-label">🤖 Via Eve gebucht</div>
+                  {audit.conversation_context ? (
+                    <pre class="svc-eve-conversation">{audit.conversation_context}</pre>
+                  ) : (
+                    <p class="svc-detail-text">Conversation-Context nicht gespeichert.</p>
+                  )}
+                </div>
+              )}
+
+              <!-- Actions -->
+              <div class="svc-actions">
+                {b.status !== 'confirmed' && (
+                  <button type="button" data-action="confirm" data-booking-id={b.id} class="svc-btn svc-btn--primary">Bestätigen</button>
+                )}
+                {b.status !== 'cancelled' && (
+                  <button type="button" data-action="cancel" data-booking-id={b.id} class="svc-btn svc-btn--secondary">Ablehnen</button>
+                )}
+                {b.status !== 'pending' && (
+                  <button type="button" data-action="reset" data-booking-id={b.id} class="svc-btn svc-btn--ghost" title="Zurück auf Wartend">↺ Zurück</button>
+                )}
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  )}
+
+  <div id="toast-container" class="svc-toast-container"></div>
+
+  <script is:inline>
+    function showToast(message, type) {
+      const c = document.getElementById('toast-container'); if (!c) return;
+      const t = document.createElement('div');
+      t.className = 'svc-toast svc-toast--' + (type === 'error' ? 'error' : 'success');
+      t.textContent = message;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+    async function handleActionClick(e) {
+      const btn = e.currentTarget;
+      const action = btn.dataset.action;
+      const bookingId = btn.dataset.bookingId;
+      const map = { confirm: 'confirmed', cancel: 'cancelled', reset: 'pending' };
+      const newStatus = map[action]; if (!newStatus) return;
+      if (action === 'cancel' && !confirm('Wirklich ablehnen? Der Gast sieht das sofort.')) return;
+      const row = btn.closest('[data-booking-id]');
+      const buttons = row ? row.querySelectorAll('button[data-action]') : [];
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch('/api/bookings/update-status', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId, status: newStatus }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          showToast('Fehler: ' + (data.error || 'unbekannt'), 'error');
+          buttons.forEach(b => b.disabled = false); return;
+        }
+        // Mews-Push-Hinweis wenn vorhanden
+        let mewsHint = '';
+        if (data.mews_push) {
+          if (data.mews_push.ok) mewsHint = ' (Mews-Order erstellt)';
+          else if (data.mews_push.reason !== 'no_service_id_for_type') mewsHint = ' (Mews-Push fehlgeschlagen: ' + data.mews_push.reason + ')';
+        }
+        showToast({
+          confirmed: 'Bestätigt' + mewsHint + ' — Gast sieht das beim nächsten Reload.',
+          cancelled: 'Abgelehnt — Gast sieht das beim nächsten Reload.',
+          pending: 'Zurück auf Wartend.',
+        }[newStatus] || 'Status geändert.', 'success');
+        setTimeout(() => window.location.reload(), 1200);
+      } catch (err) {
+        showToast('Netzwerk-Fehler: ' + (err.message || ''), 'error');
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+    document.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', handleActionClick));
+  </script>
+
+  <style>
+    .app-page-header { margin-bottom: 24px; }
+    .app-page-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .45, transparent); margin: 0 0 8px; }
+    .app-page-title { font-size: 26px; font-weight: 300; letter-spacing: -0.01em; margin: 0; color: var(--theme-text-primary); }
+    @media (min-width: 768px) { .app-page-title { font-size: 32px; } }
+
+    /* Stats */
+    .svc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+    @media (min-width: 640px) { .svc-stats { gap: 12px; } }
+    .svc-stat-card { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 14px; }
+    .svc-stat-card--warning { background: rgba(var(--theme-accent-rgb), .04); border-color: var(--theme-accent); }
+    .svc-stat-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-bottom: 6px; }
+    .svc-stat-value { font-size: 24px; font-weight: 300; color: var(--theme-text-primary); font-variant-numeric: tabular-nums; }
+    .svc-stat-card--warning .svc-stat-value { font-weight: 500; color: var(--theme-accent); }
+
+    /* Tabs */
+    .svc-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--theme-border); margin-bottom: 20px; overflow-x: auto; }
+    .svc-tab { padding: 10px 16px; font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color .15s, border-color .15s; }
+    .svc-tab:hover { color: var(--theme-text-primary); }
+    .svc-tab.is-active { color: var(--theme-text-primary); border-bottom-color: var(--theme-accent); font-weight: 500; }
+    .svc-tab-counter { margin-left: 4px; opacity: 0.5; font-size: 11px; }
+
+    /* Empty */
+    .svc-empty { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 48px 24px; text-align: center; }
+    .svc-empty-icon { font-size: 48px; color: #1f7a3a; margin: 0 0 12px; line-height: 1; }
+    .svc-empty-text { font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); font-style: italic; margin: 0; }
+
+    .svc-list { display: flex; flex-direction: column; gap: 8px; }
+
+    /* Row */
+    .svc-row { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); }
+    .svc-row-head { width: 100%; padding: 16px; background: transparent; border: none; cursor: pointer; text-align: left; display: flex; align-items: flex-start; gap: 16px; justify-content: space-between; transition: background .12s; }
+    .svc-row-head:hover { background: rgba(0,0,0,.02); }
+    .svc-row-head.is-open { background: rgba(0,0,0,.02); border-bottom: 1px solid var(--theme-border); }
+    .svc-row-head-left { flex: 1; min-width: 0; }
+    .svc-row-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+    .svc-status-badge { font-size: 10px; padding: 3px 8px; border: 1px solid; letter-spacing: 0.04em; }
+    .status-pending   { background: #fff8e1; color: #8a5800; border-color: #f5d77a; }
+    .status-confirmed { background: #e8f5ec; color: #145c2a; border-color: #a8d9b6; }
+    .status-cancelled { background: #fdeaea; color: #7a1515; border-color: #f3b8b8; }
+    .svc-eve-badge { font-size: 10px; padding: 3px 8px; background: rgba(var(--theme-accent-rgb), .08); color: var(--theme-accent); border: 1px solid rgba(var(--theme-accent-rgb), .3); }
+    .svc-paid-badge { font-size: 10px; padding: 3px 8px; background: rgba(245, 158, 11, .08); color: #b45309; border: 1px solid rgba(245, 158, 11, .3); }
+    .svc-free-badge { font-size: 10px; padding: 3px 8px; background: color-mix(in srgb, var(--theme-text-primary) .04, transparent); color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); border: 1px solid color-mix(in srgb, var(--theme-text-primary) .12, transparent); }
+    .svc-time-ago { font-size: 11px; color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); font-family: var(--theme-font-mono); }
+    .svc-row-summary { margin: 0 0 4px; font-size: 16px; font-weight: 500; color: var(--theme-text-primary); }
+    .svc-row-meta { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
+    .svc-row-chevron { transition: transform .2s; font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); flex-shrink: 0; }
+    .svc-row-chevron.is-open { transform: rotate(180deg); }
+
+    /* Expanded */
+    .svc-row-expanded { padding: 20px; background: var(--theme-bg-secondary); }
+    .svc-detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 0; }
+    @media (min-width: 640px) { .svc-detail-grid { grid-template-columns: repeat(4, 1fr); } }
+    .svc-detail-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-bottom: 4px; }
+    .svc-detail-value { font-size: 14px; font-weight: 500; color: var(--theme-text-primary); }
+    .svc-detail-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--theme-border); }
+    .svc-detail-text { margin: 4px 0 0; font-size: 14px; color: var(--theme-text-primary); }
+    .svc-detail-text code { background: color-mix(in srgb, var(--theme-text-primary) .06, transparent); padding: 1px 6px; font-family: var(--theme-font-mono); font-size: 12px; }
+    .svc-detail-quote { margin: 6px 0 0; padding: 10px 12px; background: var(--theme-bg-primary); border-left: 3px solid color-mix(in srgb, var(--theme-text-primary) .2, transparent); font-size: 14px; font-style: italic; color: color-mix(in srgb, var(--theme-text-primary) .85, transparent); }
+    .svc-eve-context .svc-detail-label { color: var(--theme-accent); }
+    .svc-eve-conversation { margin: 8px 0 0; padding: 12px; background: var(--theme-bg-primary); border-left: 3px solid var(--theme-accent); font-family: var(--theme-font-mono); font-size: 12px; line-height: 1.5; color: color-mix(in srgb, var(--theme-text-primary) .75, transparent); white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto; }
+
+    /* Actions */
+    .svc-actions { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--theme-border); flex-wrap: wrap; }
+    .svc-btn { padding: 8px 16px; font-size: 13px; font-weight: 500; border: 1px solid; cursor: pointer; transition: background .15s; }
+    .svc-btn:disabled { opacity: 0.5; cursor: wait; }
+    .svc-btn--primary { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
+    .svc-btn--primary:hover:not(:disabled) { background: var(--theme-accent-hover); }
+    .svc-btn--secondary { background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); border-color: var(--theme-border); }
+    .svc-btn--secondary:hover:not(:disabled) { background: var(--theme-bg-tertiary); }
+    .svc-btn--ghost { background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .45, transparent); border-color: transparent; }
+    .svc-btn--ghost:hover:not(:disabled) { color: var(--theme-text-primary); }
+
+    /* Toast */
+    .svc-toast-container { position: fixed; top: 16px; right: 16px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+    .svc-toast { padding: 12px 16px; font-size: 13px; color: var(--theme-bg-primary); box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+    .svc-toast--success { background: #1f7a3a; }
+    .svc-toast--error { background: #aa1f1f; }
+  </style>
+</AppLayout>
