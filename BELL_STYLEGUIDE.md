@@ -1,5 +1,16 @@
 # Bell — Maskottchen-Styleguide
 
+> **⚠️ DEPRECATED — Stand 2026-06-03**
+>
+> Bell wird in Sprint I komplett zum reinen Notification-Icon umgebaut.
+> Maskottchen-Status entfernt. Burgund-Farbgebung weg.
+>
+> Die hier dokumentierten Patterns sind historisch und gelten NICHT mehr.
+> Authoritative Quelle für Bell-Verhalten ab 2026-06-03:
+> APP_STYLEGUIDE.md Sektion 3.x (Notification-Icon).
+>
+> Dieses Doc wird nach Sprint I komplett archiviert.
+
 **Stand:** 24. Mai 2026
 **Designsystem:** Bauhaus geometrisch · warmherzig durch Haltung
 **Status:** v1.0 — erste Implementierung, professioneller Schliff Phase 11

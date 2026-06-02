@@ -103,16 +103,33 @@ konkurrenzposition zu mews/toast: "wir sind viel zu premium, die machen spaß" �
 
 dinge die retaha sofort identifizierbar machen:
 
-### all-lowercase überall
-auch englisch. auch in headlines. auch in buttons. selbst eigennamen wenn integriert in ui-text. **ausnahme:** mono uppercase für labels — das ist gewollt anders (technische stimme).
+### selektives lowercase als marken-akzent
 
-```
-ja:    "neue anfrage"
-nein:  "Neue Anfrage", "NEUE ANFRAGE"
+deutsche grammatik bleibt erhalten — substantive werden groß geschrieben.
+lowercase wird zur bewussten marken-geste an klar definierten stellen:
 
-ja:    "the gate garden hotel"  (im fließtext)
-nein:  "The Gate Garden Hotel"  (auch wenn es ein eigenname ist)
-```
+**lowercase einsetzen bei:**
+- primary-buttons mit pink-punkt ("neue anfrage")
+- eyebrows (mono uppercase, aber inhalt klein wenn aus sans-text)
+- status-marker-labels ("aktiv", "erledigt", "wartend")
+- nav-items in sidebar
+- tags und badges
+
+**großschreibung beibehalten:**
+- h1/h2/h3 mit deutschen substantiven ("Frühstück", "Gäste-Übersicht")
+- body-text und beschreibungen
+- sekundär-buttons ("Speichern", "Abbrechen")
+- form-inputs (placeholder, hints)
+- tabellen-inhalte (namen, beschreibungen)
+- modal-titel
+
+**uppercase nur in mono-system:**
+- tabellen-header in mono
+- eyebrow-labels in mono
+
+**hintergrund:** lowercase überall wirkte bei der internen testung
+amateurhaft (deutsche substantive). selektives lowercase macht
+die geste bewusst und kuratiert statt erzwungen.
 
 ### pink-punkt am ende von h1 + h2
 
@@ -149,6 +166,27 @@ vier formen mit fester bedeutung:
 | **dreieck** ▲ | live, aufmerksamkeit, neu | pulse 2s ease-in-out (stoppt nach 5s) |
 
 dieses vokabular ist **eigenständig** vom icon-system (komp. 22). status-marker sind reine css-shapes, niemals tabler-icons.
+
+## 1.5 bauhaus-stempel als marken-maskottchen
+
+retaha hat KEIN charakter-maskottchen. statt dessen ist das
+bauhaus-vokabular (●/■/─/▲) die eigenständige marken-identität:
+
+**vier formen, eine sprache:**
+- ● kreis: ruhend, abgeschlossen, identität
+- ■ quadrat: in bearbeitung, sweep, status
+- ─ linie: verbindung, akzent
+- ▲ dreieck: live, aufmerksamkeit, neu
+
+**einsatz als marken-stempel:**
+- als logo-variation (3 formen kombiniert als signatur)
+- in headers, eyebrows, footers
+- auf print/marketing-materialien
+- als loading-states
+- als status-marker
+
+**bell ist KEIN maskottchen mehr** — siehe BELL_STYLEGUIDE.md (deprecated).
+bell wird zum reinen notification-icon umgebaut.
 
 ---
 
@@ -1599,7 +1637,7 @@ niemals beides (pagination + load-more) gleichzeitig.
 
 1. **3px border-radius konstant** (außer modals 6px, toggle 6px, avatare 50%)
 2. **44px min-tap-target** auf mobile für alle interaktiven elemente
-3. **all-lowercase** überall (außer mono uppercase für labels)
+3. **selektives lowercase** als marken-akzent (NICHT durchgängig — siehe 1.4)
 4. **pink-punkt** nur bei h1+h2 (nicht bei h3+)
 5. **hover bringt pink** — überall ohne ausnahme
 6. **mono für daten** (zahlen, datum, ids, codes)
