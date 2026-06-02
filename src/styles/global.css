@@ -1,43 +1,65 @@
 @import "tailwindcss";
 
+/* Sprint H · Group 4c Tag 1 — Tailwind-Theme aliased auf Theme-Variables.
+ *
+ * Tailwind-v4 löst @theme-Werte zu :root-Custom-Properties auf und
+ * generiert Utility-Klassen wie `.bg-bone { background-color: var(--color-bone) }`.
+ * Wenn der @theme-Wert selbst eine var(--theme-*) Indirection ist, kaskadiert
+ * der [data-theme]-Override zur Render-Zeit durch — Tailwind-Klassen werden
+ * automatisch theme-aware, ohne dass Pages umgeschrieben werden müssen.
+ *
+ * Voraussetzung: themes.css muss vor global.css importiert werden, damit
+ * die --theme-*-Defaults definiert sind. In AdminLayout.astro ist das der
+ * Fall (themes.css am Anfang importiert).
+ */
+
 @theme {
-  /* ================================================================ */
-  /* DEPRECATED — bleiben für Migration (Tailwind-Klassen weiterhin   */
-  /* verfügbar: bg-burgund, bg-bone, text-burgund, etc.)              */
-  /* ================================================================ */
-  --color-bone: #FFFFFF;        /* Phase 2: gemappt #FAF8F2 → #FFFFFF */
-  --color-stein: #E8E4DD;
-  --color-burgund: #FF4A82;     /* Phase 2: gemappt #8C2128 → #FF4A82 */
-  --color-anthrazit: #1A1A1A;
-  --color-waldgruen: #5C9070;   /* unverändert = sage */
-  --font-serif: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;  /* Phase 6a: gemappt auf Space Grotesk */
+  /* Legacy-Tailwind-Color-Tokens als Aliases auf Theme-Variables
+   * (bg-bone, bg-burgund, bg-anthrazit, text-anthrazit, bg-stein, ... bleiben
+   * funktional, ziehen aber durch alle 3 Themes durch).
+   *
+   * Hinweis: --color-burgund war seit Phase 2 auf Pink-Shock gemappt — heißt
+   * bestehende Tailwind-Klassen `bg-burgund`/`text-burgund` erwarten die
+   * aktuelle Akzentfarbe (nicht das echte Burgund #8C2128 aus dem Styleguide).
+   * Naming-Schuld aus Phase 2, hier konsistent fortgeführt.
+   */
+  --color-bone:       var(--theme-bg-primary);   /* warm-Off-White / Cream */
+  --color-stein:      var(--theme-border);       /* sanfter Border */
+  --color-burgund:    var(--theme-accent);       /* Phase-2-Mapping: Akzentfarbe */
+  --color-anthrazit:  var(--theme-text-primary); /* dunkler Text */
+  --color-waldgruen:  var(--theme-success);      /* = sage */
+  --color-pink-shock: var(--theme-accent);       /* primary akzent */
+  --color-sage:       var(--theme-success);
+  --color-white:      var(--theme-bg-primary);
 
-  /* ================================================================ */
-  /* NEUE BRANDED STAMM-FARBEN (Pink-Shock-DNA)                       */
-  /* Erzeugen Tailwind-Klassen: bg-pink-shock, text-pink-shock, etc.  */
-  /* ================================================================ */
-  --color-pink-shock: #FF4A82;
-  --color-sage: #5C9070;
-  --color-white: #FFFFFF;
-
-  /* NEUE FONT-TOKENS */
-  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono-display: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  /* Font-Tokens — Tailwind-Klassen font-sans/font-serif/font-mono */
+  --font-sans:         var(--theme-font-sans);
+  --font-serif:        var(--theme-font-serif);
+  --font-mono-display: var(--theme-font-mono);
 }
 
-/* SEMANTISCHE ALIASES — keine Tailwind-Klassen nötig, nur CSS-Vars */
+/* Semantische Aliases — Tailwind-fremde Custom-Properties */
 :root {
-  --color-primary: var(--color-pink-shock);
-  --color-accent: var(--color-pink-shock);
-  --color-error: var(--color-pink-shock);
-  --color-success: var(--color-sage);
-  --color-text: var(--color-anthrazit);
-  --color-surface: var(--color-white);
-  --color-border: rgba(26, 26, 26, 0.12);
+  --color-primary: var(--theme-accent);
+  --color-accent:  var(--theme-accent);
+  --color-error:   var(--theme-accent);
+  --color-success: var(--theme-success);
+  --color-text:    var(--theme-text-primary);
+  --color-surface: var(--theme-bg-primary);
+  --color-border:  var(--theme-border-subtle);
 }
 
 label:has(input[type="checkbox"]:checked) [data-toggle-accent] {
-  background-color: var(--color-sage);
+  background-color: var(--theme-success);
+}
+
+/* Theme-aware Body-Class für AdminLayout. Ersetzt das frühere
+ * "bg-white text-anthrazit" — Tailwind-Klassen waren bereits aliased,
+ * aber expliziter Custom-Class macht Theme-Awareness lesbarer. */
+.bauhaus-app-body {
+  background-color: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
+  font-family: var(--theme-font-sans);
 }
 
 /* Alpine.js: x-cloak verhindert Flash of Unstyled Content beim Page-Load */
@@ -58,7 +80,7 @@ label:has(input[type="checkbox"]:checked) [data-toggle-accent] {
   font-style: normal;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(26, 26, 26, 0.55);
+  color: color-mix(in srgb, var(--theme-text-primary) 55%, transparent);
   line-height: 1.4;
 }
 

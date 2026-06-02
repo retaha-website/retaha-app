@@ -1,55 +1,65 @@
-/* retaha · global tokens & utilities */
+/* retaha · global tokens & utilities
+ *
+ * Sprint H · Group 4c Tag 1 — Token-Layer alias-mapped auf theme-Variables.
+ * Alle Legacy-Namen (--color-pink-shock, --color-anthrazit, --color-white,
+ * --color-sage, --font-inter, --font-georgia) sind jetzt Aliases auf
+ * --theme-*-Tokens aus themes.css. Damit zieht das gesamte Repo-CSS auto-
+ * matisch durch alle 3 Themes durch, ohne dass die ~900 LOC darunter
+ * geändert werden müssen.
+ *
+ * Verwendung in neuen Files: bevorzugt direkt var(--theme-*).
+ * Verwendung in alten Files: var(--color-*) und var(--font-*) bleiben.
+ */
 
 :root {
   /* ================================================================ */
-  /* DEPRECATED — bleiben für Migration                               */
+  /* Legacy-Color-Tokens als Aliases auf Theme-Variables              */
   /* ================================================================ */
-  --color-burgund: var(--color-pink-shock);   /* Phase 2: gemappt #8C2128 → #FF4A82 */
-  --color-bone: var(--color-white);           /* Phase 2: gemappt #FAF8F2 → #FFFFFF */
-  --color-anthrazit: #1A1A1A;
-  --color-anthrazit-70: rgba(26, 26, 26, 0.70);
-  --color-anthrazit-60: rgba(26, 26, 26, 0.60);
-  --color-anthrazit-40: rgba(26, 26, 26, 0.40);
-  --font-inter: var(--font-sans);    /* Phase 6a: gemappt auf Space Grotesk */
-  --font-georgia: var(--font-sans);  /* Phase 6a: gemappt auf Space Grotesk */
+  --color-pink-shock:   var(--theme-accent);
+  --color-burgund:      var(--theme-burgund);
+  --color-anthrazit:    var(--theme-text-primary);
+  --color-anthrazit-70: var(--theme-text-secondary);
+  --color-anthrazit-60: color-mix(in srgb, var(--theme-text-primary) 60%, transparent);
+  --color-anthrazit-40: var(--theme-text-muted);
+  --color-sage:         var(--theme-sage);
+  --color-white:        var(--theme-bg-primary);
+  --color-bone:         var(--theme-bg-primary);
 
-  /* ================================================================ */
-  /* NEUE BRANDED STAMM-FARBEN (Pink-Shock-DNA)                       */
-  /* ================================================================ */
-  --color-pink-shock: #FF4A82;
-  --color-sage: #5C9070;
-  --color-white: #FFFFFF;
+  /* Semantische Aliases */
+  --color-primary:      var(--theme-accent);
+  --color-accent:       var(--theme-accent);
+  --color-error:        var(--theme-accent);
+  --color-success:      var(--theme-success);
+  --color-text:         var(--theme-text-primary);
+  --color-surface:      var(--theme-bg-primary);
+  --color-border:       var(--theme-border-subtle);
 
-  /* SEMANTISCHE ALIASES */
-  --color-primary: var(--color-pink-shock);
-  --color-accent: var(--color-pink-shock);
-  --color-error: var(--color-pink-shock);
-  --color-success: var(--color-sage);
-  --color-text: var(--color-anthrazit);
-  --color-surface: var(--color-white);
-  --color-border: rgba(26, 26, 26, 0.12);
-
-  /* NEUE FONT-TOKENS */
-  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono-display: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  /* Legacy-Font-Tokens als Aliases auf Theme-Variables */
+  --font-sans:          var(--theme-font-sans);
+  --font-inter:         var(--theme-font-sans);
+  --font-georgia:       var(--theme-font-serif);
+  --font-mono-display:  var(--theme-font-mono);
 }
 
-/* Sprint H · Group 2 — Showcase/Demo-Mode-Badge */
+/* Sprint H · Group 2 — Showcase/Demo-Mode-Badge
+ * Bewusst NICHT theme-aware: Gold-Badge ist eindeutiger Demo-Marker
+ * (Gold-Akzent matched zwar zufällig Theme "premium_anthrazit", aber das
+ * ist OK — Demo-Marker bleibt visuell konstant über alle Themes). */
 .demo-mode-badge {
   position: fixed;
   top: 12px;
   right: 12px;
   z-index: 9999;
   padding: 6px 12px;
-  background: #C49A2C;
-  color: #FFFFFF;
-  font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  background: #C49A2C;  /* Gold-Badge bewusst hartkodiert */
+  color: #FFFFFF;       /* Demo-Marker konstant über alle Themes */
+  font-family: var(--theme-font-mono);
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(196, 154, 44, 0.3);
-  border-radius: 2px;
+  border-radius: var(--theme-radius);
   pointer-events: none;
 }
 
@@ -92,7 +102,7 @@ body.gate-guest {
   margin-top: 20px;
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.96); color: #1A1A1A;
+  background: rgba(255, 255, 255, 0.96); color: var(--color-anthrazit);
   border: none;
   font-family: var(--font-inter); font-size: 13px; font-weight: 500;
   letter-spacing: 0.02em; cursor: pointer;
@@ -170,7 +180,7 @@ body.gate-guest {
 .rec-card:has(.rec-card-image) > *:not(.rec-card-image) { position: relative; z-index: 2; }
 .rec-card:has(.rec-card-image)::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 35%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.85) 100%); z-index: 1; pointer-events: none; }
 .rec-card.rec-white:has(.rec-card-image)::after { background: linear-gradient(to bottom, rgba(255,255,255,0.0) 35%, rgba(255,255,255,0.85) 80%, var(--color-white) 100%); }
-.rec-card.rec-anthrazit { background: linear-gradient(155deg, #1A1A1A 0%, #2A2024 100%); color: var(--color-white); box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.55), 0 8px 20px -6px rgba(140, 33, 40, 0.18); }
+.rec-card.rec-anthrazit { background: linear-gradient(155deg, var(--theme-bg-anthrazit) 0%, var(--theme-bg-anthrazit-2) 100%); color: var(--theme-text-on-dark); box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.55), 0 8px 20px -6px rgba(var(--theme-accent-rgb), 0.18); }
 .rec-card.rec-anthrazit::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent 0%, var(--color-pink-shock) 50%, transparent 100%); }
 .rec-card.rec-anthrazit::after { content: ''; position: absolute; bottom: -80px; left: -40px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(140, 33, 40, 0.18) 0%, transparent 70%); pointer-events: none; }
 .rec-card-icon { position: absolute; top: 22px; right: 24px; width: 36px; height: 36px; opacity: 0.92; z-index: 2; }
@@ -178,8 +188,8 @@ body.gate-guest {
 .rec-card.rec-anthrazit .rec-card-icon { color: var(--color-white); }
 .rec-card-eyebrow { font-family: var(--font-georgia); font-style: italic; font-size: 12px; letter-spacing: 0.04em; opacity: 0.85; position: relative; z-index: 2; }
 /* === .rec-pink + .rec-white — Pink-Shock DNA (Phase 7) === */
-.rec-card.rec-pink { background: linear-gradient(155deg, #FF4A82 0%, #d63870 100%); color: var(--color-white); box-shadow: 0 20px 48px -12px rgba(255, 74, 130, 0.45), 0 8px 20px -6px rgba(0, 0, 0, 0.25); }
-.rec-card.rec-pink::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent 0%, #FFFFFF 50%, transparent 100%); opacity: 0.5; }
+.rec-card.rec-pink { background: linear-gradient(155deg, var(--theme-accent) 0%, var(--theme-accent-hover) 100%); color: var(--theme-text-on-accent); box-shadow: 0 20px 48px -12px rgba(var(--theme-accent-rgb), 0.45), 0 8px 20px -6px rgba(0, 0, 0, 0.25); }
+.rec-card.rec-pink::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent 0%, var(--theme-text-on-accent) 50%, transparent 100%); opacity: 0.5; }
 .rec-card.rec-pink::after { content: ''; position: absolute; top: -60px; right: -40px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(255, 255, 255, 0.10) 0%, transparent 70%); pointer-events: none; }
 .rec-card.rec-white { background: var(--color-white); color: var(--color-anthrazit); border: 2px solid var(--color-anthrazit); box-shadow: 8px 8px 0 -2px var(--color-pink-shock), 0 12px 32px -10px rgba(0, 0, 0, 0.2); margin-right: 12px; }
 .rec-card.rec-white .rec-card-icon { opacity: 1; color: var(--color-anthrazit); }

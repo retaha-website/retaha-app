@@ -1,12 +1,21 @@
 ---
+// Theme-Variables zuerst — definiert die --theme-*-Tokens, auf die
+// global.css's @theme-Block via var() referenziert.
+import '../styles/themes.css';
 import '../styles/global.css';
+import '../styles/retaha.css';
 import '../styles/components/buttons.css';
 import '../styles/components/inputs.css';
 import '../styles/components/pills.css';
 import '../styles/components/menu.css';
 import '../styles/components/settings.css';
-import '../styles/themes.css';
-// Sprint H · Group 1 — Theme-Fonts via @fontsource (self-hosted, DSGVO-konform)
+// Theme-Fonts via @fontsource (self-hosted, DSGVO-konform)
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/inter-tight/400.css';
 import '@fontsource/inter-tight/500.css';
 import '@fontsource/cormorant-garamond/400.css';
@@ -48,23 +57,20 @@ const activeTheme = resolveTheme({
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} · retaha backoffice</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body
-    class="min-h-screen bg-white font-sans antialiased text-anthrazit"
+    class="min-h-screen bauhaus-app-body antialiased"
     x-data="{ menuOpen: false }"
     @keydown.escape.window="menuOpen = false"
     x-init="$watch('menuOpen', v => { document.body.style.overflow = v ? 'hidden' : '' })"
   >
     <!-- Top bar: Slug links, Logo/Name zentriert, Bell+Burger rechts -->
-    <header class="border-b border-stein bg-white">
+    <header class="border-b border-stein bg-bone">
       <div class="max-w-6xl mx-auto px-6 py-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
         <!-- LINKS: Slug -->
         <div class="justify-self-start min-w-0">
-          <span class="text-xs text-anthrazit/40 font-mono truncate hidden sm:inline">/{hotel.slug}</span>
+          <span class="text-xs font-mono truncate hidden sm:inline" style="color: var(--theme-text-muted);">/{hotel.slug}</span>
         </div>
 
         <!-- MITTE: Hotel-Logo oder Fallback auf Hotel-Name -->
@@ -77,7 +83,7 @@ const activeTheme = resolveTheme({
               style="max-height: 28px;"
             />
           ) : (
-            <p class="m-0 truncate" style="font-family: var(--font-sans); font-size: 20px; font-weight: 300; color: #1A1A1A; letter-spacing: -0.01em; line-height: 1;">
+            <p class="m-0 truncate" style="font-family: var(--theme-font-headline); font-size: 20px; font-weight: 300; color: var(--theme-text-primary); letter-spacing: -0.01em; line-height: 1;">
               {hotel.name}
             </p>
           )}
@@ -130,7 +136,7 @@ const activeTheme = resolveTheme({
         <a
           href="/app"
           class="menu-direct-link"
-          style="border-left: 3px solid #FF4A82; padding-left: 13px;"
+          style="border-left: 3px solid var(--theme-accent); padding-left: 13px;"
         >
           → Operations-Dashboard
         </a>
