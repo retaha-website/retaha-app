@@ -1,0 +1,144 @@
+---
+import AuthLayout from '../layouts/AuthLayout.astro';
+import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+
+const url = new URL(Astro.request.url);
+const rawReturnTo = url.searchParams.get('return_to');
+// Whitelist-Check schon hier, damit return_to in form-action sicher ist.
+const returnTo = sanitizeReturnTo(rawReturnTo);
+const flashSent = url.searchParams.get('sent') === '1';
+const flashError = url.searchParams.get('error');
+---
+
+<AuthLayout title="anmeldung" eyebrow="hotelier anmeldung">
+  <h1 class="login-headline">
+    {flashSent ? 'check deine mailbox' : 'willkommen zurück'}<span class="h-dot">.</span>
+  </h1>
+
+  {flashSent ? (
+    <p class="login-sub">
+      wir haben dir einen magic-link an deine email-adresse gesendet.
+      <br />öffne ihn auf diesem gerät — dann bist du eingeloggt.
+    </p>
+  ) : (
+    <p class="login-sub">
+      gib deine email ein. wir senden dir einen einmal-link für die anmeldung.
+    </p>
+  )}
+
+  {flashError && (
+    <p class="login-error">{flashError}</p>
+  )}
+
+  {!flashSent && (
+    <form
+      class="login-form"
+      method="POST"
+      action="/api/auth/send-magic-link"
+      autocomplete="off"
+    >
+      <input type="hidden" name="return_to" value={returnTo} />
+      <label class="login-label" for="email">email</label>
+      <input
+        id="email"
+        type="email"
+        name="email"
+        required
+        autocomplete="email"
+        inputmode="email"
+        placeholder="hotelier@example.com"
+        class="login-input"
+      />
+      <button type="submit" class="login-submit">
+        magic-link senden
+      </button>
+    </form>
+  )}
+
+  <p class="login-foot">
+    kein zugang? frag deinen team-owner um eine einladung.
+  </p>
+
+  <style>
+    .login-headline {
+      font-family: var(--theme-font-headline);
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 0 0 16px;
+      text-align: center;
+      text-transform: lowercase;
+    }
+    .login-sub {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--theme-text-secondary);
+      text-align: center;
+      margin: 0 0 28px;
+    }
+    .login-error {
+      padding: 12px 14px;
+      background: rgba(var(--theme-accent-rgb), 0.08);
+      border-left: 3px solid var(--theme-accent);
+      font-size: 13px;
+      color: var(--theme-accent);
+      margin: 0 0 20px;
+      border-radius: var(--theme-radius);
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .login-label {
+      font-family: var(--theme-font-mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--theme-text-tertiary);
+    }
+    .login-input {
+      padding: 12px 14px;
+      font-family: var(--theme-font-sans);
+      font-size: 15px;
+      border: 1px solid var(--theme-border);
+      background: var(--theme-bg-primary);
+      color: var(--theme-text-primary);
+      border-radius: var(--theme-radius-input);
+      transition: border-color 0.15s ease;
+    }
+    .login-input:focus {
+      outline: none;
+      border-color: var(--theme-accent);
+    }
+    .login-submit {
+      margin-top: 16px;
+      padding: 14px 22px;
+      background: var(--theme-text-primary);
+      color: var(--theme-bg-primary);
+      border: none;
+      border-radius: var(--theme-radius-button);
+      font-family: var(--theme-font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .login-submit:hover,
+    .login-submit:focus-visible {
+      background: var(--theme-accent);
+      color: var(--theme-text-on-accent);
+      outline: none;
+    }
+    .login-foot {
+      text-align: center;
+      font-size: 12px;
+      color: var(--theme-text-muted);
+      margin: 16px 0 0;
+    }
+  </style>
+</AuthLayout>

@@ -1,0 +1,50 @@
+---
+import AuthLayout from '../layouts/AuthLayout.astro';
+import { clearSessionCookie } from '@retaha/auth';
+
+// Logout via GET ist OK weil Idempotent (Cookie löschen).
+// Für CSRF-strikten Flow gibt es zusätzlich /api/auth/logout POST.
+clearSessionCookie(Astro.cookies);
+---
+
+<AuthLayout title="abgemeldet" eyebrow="bis bald">
+  <h1 class="lo-headline">
+    abgemeldet<span class="h-dot">.</span>
+  </h1>
+  <p class="lo-sub">
+    dein cookie ist gelöscht. willst du dich erneut anmelden?
+  </p>
+  <a href="/login" class="lo-link">→ zur anmeldung</a>
+
+  <style>
+    .lo-headline {
+      font-family: var(--theme-font-headline);
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+      text-align: center;
+      text-transform: lowercase;
+    }
+    .lo-sub {
+      text-align: center;
+      color: var(--theme-text-secondary);
+      margin: 0 0 24px;
+    }
+    .lo-link {
+      display: block;
+      text-align: center;
+      color: var(--theme-accent);
+      font-size: 14px;
+      text-decoration: none;
+      padding: 12px;
+      border: 1px solid var(--theme-border);
+      border-radius: var(--theme-radius-button);
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .lo-link:hover {
+      background: var(--theme-accent);
+      color: var(--theme-text-on-accent);
+    }
+  </style>
+</AuthLayout>

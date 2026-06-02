@@ -1,0 +1,152 @@
+---
+/**
+ * Magic-Link Callback — Supabase verify + setSessionCookie + Redirect.
+ *
+ * Flow:
+ *   Supabase sendet Magic-Link an Email, der User klickt → Browser landet hier.
+ *   Bei Implicit Flow: Token ist im URL-Fragment (#access_token=...) — wir können
+ *   das server-seitig nicht sehen. Daher rendern wir eine kleine Bootstrap-Page,
+ *   die im Browser den Token via JS aus dem Fragment liest und POST an
+ *   /api/auth/callback macht. Der API-Endpoint setzt das Cookie und antwortet
+ *   mit einem 302-Redirect zu return_to.
+ *
+ *   Alternative (PKCE/OTP-Verify-Flow): Supabase sendet uns einen ?code=...
+ *   in der URL. Den können wir server-seitig direkt mit exchangeCodeForSession
+ *   verifizieren.
+ *
+ * Wir handhaben beide Fälle:
+ *   - ?code=...&return_to=... → server-side exchange
+ *   - #access_token=...       → JS Bootstrap → POST API
+ */
+
+import AuthLayout from '../layouts/AuthLayout.astro';
+import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+import { setSessionCookie } from '@retaha/auth';
+import { createClient } from '@supabase/supabase-js';
+import { getEnv } from '@retaha/db';
+
+const url = new URL(Astro.request.url);
+const code = url.searchParams.get('code');
+const errorParam = url.searchParams.get('error');
+const errorDesc = url.searchParams.get('error_description');
+const returnTo = sanitizeReturnTo(url.searchParams.get('return_to'));
+
+// Supabase-Fehler vom Magic-Link selbst (z.B. expired token)
+if (errorParam) {
+  return Astro.redirect(`/error?reason=${encodeURIComponent(errorDesc || errorParam)}`, 302);
+}
+
+// PKCE-Flow: ?code=... → server-side exchange für Session
+if (code) {
+  const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getEnv('PUBLIC_SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return Astro.redirect('/error?reason=server-config', 302);
+  }
+
+  const client = createClient(supabaseUrl, supabaseAnonKey);
+  const { data, error } = await client.auth.exchangeCodeForSession(code);
+  if (error || !data.session) {
+    return Astro.redirect(`/error?reason=${encodeURIComponent(error?.message ?? 'invalid-code')}`, 302);
+  }
+
+  setSessionCookie(Astro.cookies, data.session.access_token);
+  return Astro.redirect(returnTo, 302);
+}
+
+// Implicit-Flow (Hash-Fragment): Bootstrap-JS extrahiert Token im Browser.
+---
+
+<AuthLayout title="anmeldung wird abgeschlossen">
+  <h1 class="cb-headline">
+    moment<span class="h-dot">.</span>
+  </h1>
+  <p class="cb-sub">wir richten deine session ein.</p>
+  <noscript>
+    <p class="cb-error">
+      javascript muss aktiviert sein um den anmelde-vorgang abzuschließen.
+    </p>
+  </noscript>
+
+  <div id="cb-error" class="cb-error" hidden></div>
+
+  <script type="module" is:inline define:vars={{ returnTo }}>
+    (async () => {
+      const errEl = document.getElementById('cb-error');
+      function showError(msg) {
+        if (errEl) {
+          errEl.textContent = msg;
+          errEl.hidden = false;
+        }
+      }
+
+      // Implicit-Flow: Token ist im Hash
+      const hash = window.location.hash.startsWith('#')
+        ? window.location.hash.slice(1)
+        : '';
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const hashError = hashParams.get('error') || hashParams.get('error_description');
+
+      if (hashError) {
+        showError(`anmeldung fehlgeschlagen: ${hashError}`);
+        return;
+      }
+
+      if (!accessToken) {
+        showError('kein zugangs-token gefunden. öffne den magic-link erneut.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            return_to: returnTo,
+          }),
+          credentials: 'include',
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          showError(`server-fehler: ${j.error || res.status}`);
+          return;
+        }
+        const data = await res.json();
+        // Hash entfernen + redirect zu return_to
+        window.location.replace(data.redirect || returnTo);
+      } catch (e) {
+        showError(`netzwerk-fehler: ${String(e)}`);
+      }
+    })();
+  </script>
+
+  <style>
+    .cb-headline {
+      font-family: var(--theme-font-headline);
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+      text-align: center;
+      text-transform: lowercase;
+    }
+    .cb-sub {
+      text-align: center;
+      color: var(--theme-text-secondary);
+      margin: 0 0 24px;
+    }
+    .cb-error {
+      padding: 12px 14px;
+      background: rgba(var(--theme-accent-rgb), 0.08);
+      border-left: 3px solid var(--theme-accent);
+      font-size: 13px;
+      color: var(--theme-accent);
+      margin: 16px 0 0;
+      border-radius: var(--theme-radius);
+    }
+  </style>
+</AuthLayout>
