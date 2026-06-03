@@ -1,22 +1,29 @@
 ---
 /**
- * apps/auth/src/pages/login.astro — v2.1
+ * apps/auth/src/pages/login.astro — v4g (Final-Implementation)
  *
- * Sprint-I-Findings-Fix-Run Round 2 (8-Bug-Fix):
- * - Bug 1: Layout 100vh ohne Scroll (Desktop)
- * - Bug 2: "Anmeldung." Grossschreibung
- * - Bug 3: H1 Editorial-Magazine-Groesse (32/48/56px)
- * - Bug 4: Eyebrow Pink-Shock auch auf dunklem BG
- * - Bug 5: Meta UPPERCASE via CSS
- * - Bug 6: Form-Toggle via Alpine x-data (exklusiv)
- * - Bug 7: Footer-Legal auf app.retaha.de
- * - Bug 8: Logo via <Logo /> Komponente aus @retaha/ui
+ * Sprint-I-Findings-Fix-Run Round 3 nach 7 Iterationen mit User.
+ *
+ * Layout:
+ *   45% Anthrazit-Hero (Logo + DashboardShowcase + Headline + Hero-Bottom)
+ *   55% White-Form (Anmeldung mit Progressive-Disclosure-Password)
+ *   Mobile: Stack vertikal, scrollbar
+ *
+ * Animationen aus Prototyp v4g (alle Timings exakt):
+ *   - DashboardShowcase: 4s interval, 700ms cross-fade
+ *   - Password-Section Expand: 900ms max-height + 700ms opacity (ease-out-expo)
+ *   - Password-Field Stagger: 350ms delay
+ *   - Button-Text Cross-Fade: 450ms
+ *   - Toggle-Link Fade + Collapse: 700ms
+ *   - Auto-Focus Password: 700ms timeout
+ *   - Logo Hover Rotate: 600ms ease-in-out-back
  */
 
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
 import Logo from '@retaha/ui/components/brand/Logo.astro';
+import DashboardShowcase from '@retaha/ui/components/showcase/DashboardShowcase.astro';
 import '@retaha/ui/styles/themes.css';
-import '@retaha/ui/styles/components/login.css';
+import '@retaha/ui/styles/tokens.css';
 import '@retaha/ui/styles/components/bauhaus-stamp.css';
 import '@fontsource/space-grotesk/300.css';
 import '@fontsource/space-grotesk/400.css';
@@ -38,175 +45,637 @@ const flashError = url.searchParams.get('error');
     <meta name="robots" content="noindex,nofollow" />
     <title>Anmeldung · retaha</title>
   </head>
-  <body class="login-page">
-    <!-- ═══════════ HERO 40% (links, Anthrazit) ═══════════ -->
-    <aside class="login-hero">
-      <Logo
-        variant="light"
-        size="md"
-        href="https://retaha.de"
-        ariaLabel="retaha · zur startseite"
-        class="login-hero-brand"
-      />
+  <body class="lv-body">
 
-      <div class="login-hero-stack">
-        <p class="login-hero-eyebrow">— manufaktur —</p>
-        <h1 class="login-hero-headline">
-          Willkommen zurück<span class="login-hero-dot">.</span>
-        </h1>
-        <p class="login-hero-tagline">Premium-Handwerk für Hotels.</p>
+    <!-- ═══════════ HERO 45% (links, Anthrazit) ═══════════ -->
+    <aside class="lv-hero">
+      <!-- Top: Logo -->
+      <div class="lv-hero-top">
+        <Logo
+          variant="light"
+          size="md"
+          href="https://retaha.de"
+          ariaLabel="retaha · zur Startseite"
+          class="lv-hero-logo-link"
+        />
       </div>
 
-      <div class="login-hero-meta">
-        <span class="bauhaus-stamp bauhaus-stamp--md bauhaus-stamp--on-dark" aria-hidden="true">●  ■  ▲</span>
-        <span>retaha hospitality · niedernhall</span>
+      <!-- Middle: Dashboard-Showcase + Headline -->
+      <div class="lv-hero-middle">
+        <DashboardShowcase autoplaySeconds={4} />
+
+        <div class="lv-hero-text">
+          <p class="lv-hero-eyebrow">— Manufaktur —</p>
+          <h1 class="lv-hero-headline">
+            Willkommen<br />
+            zurück<span class="lv-hero-dot">.</span>
+          </h1>
+          <p class="lv-hero-tagline">Manufaktur-Handwerk für Premium-Hotels.</p>
+        </div>
       </div>
+
+      <!-- Bottom: Marker + Meta + Legal + Trademark -->
+      <footer class="lv-hero-bottom">
+        <span class="bauhaus-stamp bauhaus-stamp--sm bauhaus-stamp--on-dark" aria-hidden="true">●  ■  ▲</span>
+
+        <div class="lv-hero-meta">
+          <span>retaha hospitality · niedernhall</span>
+        </div>
+
+        <nav class="lv-hero-legal" aria-label="Rechtliches">
+          <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
+          <span aria-hidden="true">·</span>
+          <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
+          <span aria-hidden="true">·</span>
+          <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
+        </nav>
+
+        <p class="lv-hero-trademark">
+          retaha&reg; ist eine eingetragene Marke der retaha GmbH.<br />
+          &copy; 2026 retaha GmbH. Alle Rechte vorbehalten.
+        </p>
+      </footer>
     </aside>
 
-    <!-- ═══════════ FORM-SIDE 60% (rechts, weiß) ═══════════ -->
-    <section class="login-form-side" x-data="{ mode: 'magic' }">
-      <div class="login-form-container">
+    <!-- ═══════════ FORM-SIDE 55% (rechts, weiß) ═══════════ -->
+    <section
+      class="lv-form-side"
+      x-data={`{
+        passwordExpanded: false,
+        email: '',
+        password: '',
+        isSubmitting: false,
+        errorMessage: ${JSON.stringify(flashError ?? '')},
+        flashSent: ${flashSent ? 'true' : 'false'},
+        returnTo: ${JSON.stringify(returnTo)},
 
-        {flashSent ? (
-          <header class="login-form-header">
-            <h2 class="login-form-title">
-              Check deine Mailbox<span class="h-dot">.</span>
-            </h2>
-            <p class="login-form-sub">
-              Wir haben dir einen Magic-Link an deine E-Mail-Adresse gesendet.
-              Öffne ihn auf diesem Gerät — dann bist du eingeloggt.
+        togglePassword() {
+          this.passwordExpanded = !this.passwordExpanded;
+          this.errorMessage = '';
+          if (this.passwordExpanded) {
+            this.$nextTick(() => {
+              setTimeout(() => this.$refs.passwordInput?.focus(), 700);
+            });
+          } else {
+            this.password = '';
+          }
+        },
+
+        async submit(e) {
+          e?.preventDefault?.();
+          this.errorMessage = '';
+          if (!this.email) {
+            this.$refs.emailInput?.focus();
+            return;
+          }
+          this.isSubmitting = true;
+          try {
+            if (this.passwordExpanded) {
+              if (!this.password || this.password.length < 8) {
+                this.$refs.passwordInput?.focus();
+                this.errorMessage = 'Passwort muss mindestens 8 Zeichen haben.';
+                this.isSubmitting = false;
+                return;
+              }
+              const res = await fetch('/api/auth/login-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.email, password: this.password, return_to: this.returnTo }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (data.ok && data.redirect) {
+                window.location.href = data.redirect;
+                return;
+              }
+              this.errorMessage = data.ok === false ? 'E-Mail oder Passwort falsch.' : 'Anmeldung fehlgeschlagen.';
+            } else {
+              const res = await fetch('/api/auth/send-magic-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.email, return_to: this.returnTo }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (data.ok) {
+                this.flashSent = true;
+                return;
+              }
+              this.errorMessage = data.error === 'unknown-email'
+                ? 'Diese E-Mail ist nicht hinterlegt. Frag deinen Admin um eine Einladung.'
+                : data.error === 'rate-limited'
+                ? 'Zu viele Anfragen. Versuche es in einer Stunde erneut.'
+                : 'Fehler beim Senden. Versuche es erneut.';
+            }
+          } catch (err) {
+            this.errorMessage = 'Netzwerk-Fehler. Versuche es erneut.';
+          } finally {
+            this.isSubmitting = false;
+          }
+        },
+      }`}
+    >
+      <div class="lv-form-container">
+
+        <!-- Success-State: Magic-Link gesendet -->
+        <template x-if="flashSent">
+          <div class="lv-form-state">
+            <header class="lv-form-header">
+              <h2 class="lv-form-title">Check deine Mailbox<span class="h-dot">.</span></h2>
+              <p class="lv-form-sub">
+                Wir haben dir einen Magic-Link gesendet. Öffne ihn auf diesem Gerät —
+                dann bist du eingeloggt.
+              </p>
+            </header>
+          </div>
+        </template>
+
+        <!-- Default: Anmelde-Form -->
+        <template x-if="!flashSent">
+          <div class="lv-form-state">
+            <header class="lv-form-header">
+              <h2 class="lv-form-title">Anmeldung<span class="h-dot">.</span></h2>
+              <p class="lv-form-sub" x-show="!passwordExpanded" x-transition.opacity.duration.450ms>
+                Gib deine E-Mail ein. Wir senden dir einen Einmal-Link.
+              </p>
+              <p class="lv-form-sub" x-show="passwordExpanded" x-cloak x-transition.opacity.duration.450ms>
+                Melde dich mit deinem Passwort an.
+              </p>
+            </header>
+
+            <form @submit="submit($event)" novalidate class="lv-form">
+              <!-- E-Mail (immer sichtbar) -->
+              <div class="lv-field">
+                <label class="lv-label" for="email-input">E-Mail</label>
+                <input
+                  id="email-input"
+                  x-ref="emailInput"
+                  type="email"
+                  inputmode="email"
+                  autocomplete="email"
+                  required
+                  placeholder="hotelier@example.com"
+                  class="lv-input"
+                  x-model="email"
+                />
+              </div>
+
+              <!-- Password-Section (Progressive Disclosure) -->
+              <div
+                class="lv-expandable"
+                :class="passwordExpanded ? 'is-expanded' : ''"
+                x-cloak
+              >
+                <div class="lv-expandable-inner">
+                  <div class="lv-password-section">
+                    <div class="lv-password-head">
+                      <span class="lv-password-eyebrow">— mit Passwort —</span>
+                      <button
+                        type="button"
+                        class="lv-password-close"
+                        @click="togglePassword()"
+                        aria-label="Zurück zu Magic-Link"
+                      >&times;</button>
+                    </div>
+                    <div class="lv-field">
+                      <label class="lv-label" for="password-input">Passwort</label>
+                      <input
+                        id="password-input"
+                        x-ref="passwordInput"
+                        type="password"
+                        autocomplete="current-password"
+                        minlength="8"
+                        placeholder="dein passwort"
+                        class="lv-input"
+                        x-model="password"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Submit-Button (Text wechselt mit Cross-Fade) -->
+              <button
+                type="submit"
+                class="lv-submit"
+                :disabled="isSubmitting"
+              >
+                <span class="lv-submit-text">
+                  <span x-show="!passwordExpanded && !isSubmitting" x-transition.opacity.duration.450ms>magic-link senden</span>
+                  <span x-show="passwordExpanded && !isSubmitting" x-cloak x-transition.opacity.duration.450ms>anmelden</span>
+                  <span x-show="isSubmitting" x-cloak x-transition.opacity.duration.250ms>einen moment ...</span>
+                </span>
+              </button>
+
+              <!-- Toggle-Link (zeigt nur wenn Password NICHT expanded) -->
+              <button
+                type="button"
+                class="lv-toggle"
+                @click="togglePassword()"
+                x-show="!passwordExpanded"
+                x-transition:leave="lv-toggle-leave"
+                x-transition:leave-start="lv-toggle-leave-start"
+                x-transition:leave-end="lv-toggle-leave-end"
+              >
+                → stattdessen mit Passwort anmelden
+              </button>
+
+              <!-- Error-Message -->
+              <p
+                class="lv-error"
+                x-show="errorMessage"
+                x-cloak
+                x-text="errorMessage"
+                x-transition.opacity.duration.450ms
+              ></p>
+            </form>
+
+            <p class="lv-support">
+              Kein Zugang? Schreib uns an
+              <a href="mailto:support@retaha.de">support@retaha.de</a>
+              oder bitte deinen Admin um eine Einladung.
             </p>
-          </header>
-        ) : (
-          <>
-            <!-- MAGIC-LINK STATE (default) -->
-            <div x-show="mode === 'magic'" x-cloak>
-              <header class="login-form-header">
-                <h2 class="login-form-title">
-                  Anmeldung<span class="h-dot">.</span>
-                </h2>
-                <p class="login-form-sub">
-                  Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.
-                </p>
-              </header>
-
-              {flashError && (
-                <p class="login-error">{flashError}</p>
-              )}
-
-              <form
-                class="login-form"
-                method="POST"
-                action="/api/auth/send-magic-link"
-                autocomplete="off"
-              >
-                <input type="hidden" name="return_to" value={returnTo} />
-                <label class="login-label" for="ml-email">E-Mail</label>
-                <input
-                  id="ml-email"
-                  type="email"
-                  name="email"
-                  required
-                  autocomplete="email"
-                  inputmode="email"
-                  placeholder="hotelier@example.com"
-                  class="login-input"
-                />
-                <button type="submit" class="login-submit">
-                  magic-link senden
-                </button>
-              </form>
-
-              <button
-                type="button"
-                class="login-toggle"
-                @click="mode = 'password'"
-              >
-                → stattdessen mit passwort anmelden
-              </button>
-            </div>
-
-            <!-- PASSWORD STATE (hinter Toggle) -->
-            <div x-show="mode === 'password'" x-cloak>
-              <header class="login-form-header">
-                <h2 class="login-form-title">
-                  Mit Passwort anmelden<span class="h-dot">.</span>
-                </h2>
-                <p class="login-form-sub">
-                  Wenn du lieber dein Passwort verwendest.
-                </p>
-              </header>
-
-              {flashError && (
-                <p class="login-error">{flashError}</p>
-              )}
-
-              <form
-                class="login-form"
-                method="POST"
-                action="/api/auth/login-password"
-                autocomplete="on"
-              >
-                <input type="hidden" name="return_to" value={returnTo} />
-                <label class="login-label" for="pw-email">E-Mail</label>
-                <input
-                  id="pw-email"
-                  type="email"
-                  name="email"
-                  required
-                  autocomplete="email"
-                  inputmode="email"
-                  placeholder="hotelier@example.com"
-                  class="login-input"
-                />
-                <label class="login-label" for="pw-pass">Passwort</label>
-                <input
-                  id="pw-pass"
-                  type="password"
-                  name="password"
-                  required
-                  autocomplete="current-password"
-                  minlength="8"
-                  placeholder="dein passwort"
-                  class="login-input"
-                />
-                <button type="submit" class="login-submit">
-                  anmelden
-                </button>
-              </form>
-
-              <button
-                type="button"
-                class="login-toggle"
-                @click="mode = 'magic'"
-              >
-                ← stattdessen magic-link senden
-              </button>
-            </div>
-          </>
-        )}
-
-        <p class="login-support">
-          Kein Zugang? Kontaktiere den retaha-Support unter
-          <a href="mailto:support@retaha.de">support@retaha.de</a>
-          oder bitte deinen Admin um eine Einladung.
-        </p>
-
-        <footer class="login-form-footer">
-          <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
-          <span class="login-form-footer-sep" aria-hidden="true">·</span>
-          <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
-          <span class="login-form-footer-sep" aria-hidden="true">·</span>
-          <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
-        </footer>
+          </div>
+        </template>
       </div>
     </section>
 
     <script>
       import Alpine from 'alpinejs';
-      // @ts-expect-error - Alpine types
+      // @ts-expect-error
       window.Alpine = Alpine;
       Alpine.start();
     </script>
+
+    <style>
+      [x-cloak] { display: none !important; }
+
+      .lv-body {
+        margin: 0;
+        font-family: var(--theme-font-sans);
+        background: var(--theme-bg-primary);
+        color: var(--theme-text-primary);
+        display: grid;
+        grid-template-columns: 45% 55%;
+        min-height: 100vh;
+      }
+      @media (min-width: 768px) {
+        .lv-body { height: 100vh; min-height: 100vh; overflow: hidden; }
+      }
+      @media (max-width: 767px) {
+        .lv-body { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+      }
+
+      /* ─── HERO ─── */
+      .lv-hero {
+        background: var(--theme-bg-anthrazit);
+        color: var(--theme-text-on-dark);
+        padding: 36px 40px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        min-height: 100vh;
+      }
+      @media (min-width: 768px) { .lv-hero { height: 100vh; overflow: hidden; } }
+      @media (max-width: 1023px) { .lv-hero { padding: 32px 28px 24px; } }
+      @media (max-width: 767px) {
+        .lv-hero { min-height: auto; padding: 24px 20px; gap: 18px; }
+      }
+
+      .lv-hero-top { flex-shrink: 0; }
+      .lv-hero-logo-link { color: rgba(255, 255, 255, 0.94); }
+      .lv-hero-logo-link :global(svg) {
+        transition: transform var(--duration-slow, 600ms) var(--ease-in-out-back, cubic-bezier(0.68, -0.55, 0.265, 1.55));
+      }
+      .lv-hero-logo-link:hover :global(svg) { transform: rotate(-8deg); }
+
+      .lv-hero-middle {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      .lv-hero-text { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
+
+      .lv-hero-eyebrow {
+        margin: 0;
+        font-family: var(--theme-font-mono);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: lowercase;
+        color: var(--theme-accent);
+      }
+
+      .lv-hero-headline {
+        margin: 0;
+        font-family: var(--theme-font-sans);
+        font-size: 44px;
+        font-weight: 300;
+        line-height: 1.02;
+        letter-spacing: -0.025em;
+        color: var(--theme-text-on-dark);
+      }
+      @media (min-width: 1280px) { .lv-hero-headline { font-size: 54px; } }
+      @media (max-width: 1023px) { .lv-hero-headline { font-size: 36px; } }
+      @media (max-width: 767px)  { .lv-hero-headline { font-size: 30px; } }
+
+      .lv-hero-dot { color: var(--theme-accent); }
+
+      .lv-hero-tagline {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.6);
+        font-style: italic;
+      }
+
+      /* ─── HERO-BOTTOM ─── */
+      .lv-hero-bottom {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .lv-hero-meta,
+      .lv-hero-legal {
+        font-family: var(--theme-font-mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.4);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .lv-hero-legal a {
+        color: rgba(255, 255, 255, 0.55);
+        text-decoration: none;
+        transition: color var(--duration-fast, 250ms) ease;
+      }
+      .lv-hero-legal a:hover,
+      .lv-hero-legal a:focus-visible {
+        color: var(--theme-accent);
+        outline: none;
+      }
+
+      .lv-hero-trademark {
+        margin: 6px 0 0;
+        font-family: var(--theme-font-mono);
+        font-size: 9px;
+        line-height: 1.6;
+        letter-spacing: 0.06em;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      /* ─── FORM-SIDE ─── */
+      .lv-form-side {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 48px;
+        background: var(--theme-bg-primary);
+      }
+      @media (min-width: 768px) { .lv-form-side { height: 100vh; overflow-y: auto; } }
+      @media (max-width: 767px) {
+        .lv-form-side { padding: 32px 24px 48px; align-items: flex-start; }
+      }
+
+      .lv-form-container { width: 100%; max-width: 420px; }
+      .lv-form-state { display: flex; flex-direction: column; gap: 28px; }
+      .lv-form-header { display: flex; flex-direction: column; gap: 10px; }
+
+      .lv-form-title {
+        margin: 0;
+        font-family: var(--theme-font-sans);
+        font-size: 32px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        color: var(--theme-text-primary);
+      }
+      .lv-form-title .h-dot { color: var(--theme-accent); }
+
+      .lv-form-sub {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--theme-text-secondary);
+      }
+
+      .lv-form { display: flex; flex-direction: column; gap: 18px; }
+      .lv-field { display: flex; flex-direction: column; gap: 6px; }
+
+      .lv-label {
+        font-family: var(--theme-font-mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--theme-text-tertiary);
+      }
+
+      .lv-input {
+        padding: 13px 14px;
+        font-family: var(--theme-font-sans);
+        font-size: 15px;
+        border: 1px solid var(--theme-border);
+        background: var(--theme-bg-primary);
+        color: var(--theme-text-primary);
+        border-radius: var(--theme-radius-input);
+        transition:
+          border-color var(--duration-fast, 250ms) ease,
+          box-shadow var(--duration-fast, 250ms) ease;
+      }
+      .lv-input:focus {
+        outline: none;
+        border-color: var(--theme-accent);
+        box-shadow: 0 0 0 3px var(--color-pink-glow, rgba(255, 74, 130, 0.18));
+      }
+
+      /* Progressive-Disclosure */
+      .lv-expandable {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition:
+          max-height var(--duration-very-slow, 900ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+          opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+      }
+      .lv-expandable.is-expanded {
+        max-height: 240px;
+        opacity: 1;
+      }
+      .lv-expandable-inner {
+        padding-top: 8px;
+        transform: translateY(-6px);
+        transition: transform var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 350ms;
+      }
+      .lv-expandable.is-expanded .lv-expandable-inner {
+        transform: translateY(0);
+      }
+
+      .lv-password-section {
+        padding: 16px;
+        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
+        border: 1px solid rgba(255, 74, 130, 0.18);
+        border-radius: var(--theme-radius);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .lv-password-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .lv-password-eyebrow {
+        font-family: var(--theme-font-mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: lowercase;
+        color: var(--theme-accent);
+      }
+
+      .lv-password-close {
+        background: transparent;
+        border: none;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        font-size: 20px;
+        line-height: 1;
+        color: var(--theme-text-tertiary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition:
+          transform 350ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+          background var(--duration-fast, 250ms) ease,
+          color var(--duration-fast, 250ms) ease;
+      }
+      .lv-password-close:hover,
+      .lv-password-close:focus-visible {
+        transform: rotate(90deg);
+        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
+        color: var(--theme-accent);
+        outline: none;
+      }
+
+      /* Submit-Button */
+      .lv-submit {
+        position: relative;
+        margin-top: 6px;
+        padding: 14px 22px;
+        background: var(--theme-text-primary);
+        color: var(--theme-bg-primary);
+        border: none;
+        border-radius: var(--theme-radius-button);
+        font-family: var(--theme-font-sans);
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        text-transform: lowercase;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition:
+          background var(--duration-fast, 250ms) ease,
+          color var(--duration-fast, 250ms) ease,
+          opacity var(--duration-fast, 250ms) ease;
+      }
+      .lv-submit::before {
+        content: '';
+        display: block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--theme-accent);
+        flex-shrink: 0;
+      }
+      .lv-submit:hover:not(:disabled),
+      .lv-submit:focus-visible:not(:disabled) {
+        background: var(--theme-accent);
+        color: var(--theme-text-on-accent);
+        outline: none;
+      }
+      .lv-submit:disabled { opacity: 0.6; cursor: wait; }
+
+      .lv-submit-text {
+        position: relative;
+        display: inline-grid;
+        place-items: center;
+      }
+      .lv-submit-text > * { grid-area: 1 / 1; }
+
+      /* Toggle-Link */
+      .lv-toggle {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 4px 0 0;
+        font-family: var(--theme-font-sans);
+        font-size: 13px;
+        color: var(--theme-accent);
+        cursor: pointer;
+        text-align: left;
+        text-transform: lowercase;
+        letter-spacing: 0.02em;
+        align-self: flex-start;
+        transition: color var(--duration-fast, 250ms) ease;
+      }
+      .lv-toggle:hover, .lv-toggle:focus-visible {
+        color: var(--theme-text-primary);
+        outline: none;
+      }
+      .lv-toggle-leave {
+        transition:
+          opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+          max-height var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+        max-height: 40px;
+        overflow: hidden;
+      }
+      .lv-toggle-leave-start { opacity: 1; max-height: 40px; }
+      .lv-toggle-leave-end   { opacity: 0; max-height: 0; }
+
+      /* Error */
+      .lv-error {
+        margin: 4px 0 0;
+        padding: 10px 12px;
+        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
+        border-left: 3px solid var(--theme-accent);
+        font-size: 13px;
+        color: var(--theme-accent);
+        border-radius: var(--theme-radius);
+      }
+
+      /* Support */
+      .lv-support {
+        padding-top: 16px;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--theme-text-secondary);
+        border-top: 1px solid var(--theme-border-subtle);
+      }
+      .lv-support a { color: var(--theme-accent); text-decoration: none; }
+      .lv-support a:hover { text-decoration: underline; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lv-expandable, .lv-expandable-inner, .lv-submit, .lv-toggle, .lv-password-close, .lv-hero-logo-link :global(svg) {
+          transition: none;
+        }
+      }
+    </style>
   </body>
 </html>
