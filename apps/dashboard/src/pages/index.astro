@@ -135,8 +135,8 @@ const showChecklist = !checklist.completed_at;
 
 <AppLayout title="Übersicht" hotel={hotel} user={{ email: user.email ?? '' }}>
   <header class="app-page-header">
-    <p class="app-page-eyebrow">— {weekdayDate} —</p>
-    <h1 class="app-page-title">{greeting}, {hotel.name}.</h1>
+    <p class="app-page-eyebrow themed-eyebrow-flank">{weekdayDate}</p>
+    <h1 class="app-page-title">{greeting}, {hotel.name}<span class="h-dot">.</span></h1>
   </header>
 
   {message && (
@@ -148,7 +148,7 @@ const showChecklist = !checklist.completed_at;
   {showChecklist && (
     <section class="onboarding-widget">
       <div class="onboarding-head">
-        <p class="onboarding-eyebrow">— Setup-Checkliste —</p>
+        <p class="onboarding-eyebrow themed-eyebrow-flank">Setup-Checkliste</p>
         <h2 class="onboarding-title">{checklist.doneCount}/{checklist.totalCount} abgeschlossen</h2>
         <p class="onboarding-sub">Ein paar Schritte noch — dann ist dein Hotel pilot-bereit.</p>
         <div class="onboarding-progress">
@@ -172,19 +172,19 @@ const showChecklist = !checklist.completed_at;
   <!-- Stat-Cards -->
   <section class="stat-grid">
     <div class="stat-card">
-      <p class="stat-card-label">— Belegung jetzt —</p>
+      <p class="stat-card-label themed-eyebrow-flank">Belegung jetzt</p>
       <p class="stat-card-value">{occ.value}</p>
       <p class="stat-card-sub">{occ.sub}</p>
     </div>
 
     <div class="stat-card">
-      <p class="stat-card-label">— Frühstück heute —</p>
+      <p class="stat-card-label themed-eyebrow-flank">Frühstück heute</p>
       <p class="stat-card-value">{breakfastToday}</p>
       <p class="stat-card-sub">{breakfastToday === 1 ? 'Buchung' : 'Buchungen'}</p>
     </div>
 
     <a href="/app/service" class={`stat-card stat-card--link${servicePending > 0 ? ' stat-card--warning' : ''}`}>
-      <p class="stat-card-label">— Service offen —</p>
+      <p class="stat-card-label themed-eyebrow-flank">Service offen</p>
       <p class="stat-card-value">{servicePending}</p>
       <p class="stat-card-sub">{servicePending > 0 ? 'wartet auf Bestätigung →' : 'alles erledigt ✓'}</p>
     </a>
@@ -290,8 +290,17 @@ const showChecklist = !checklist.completed_at;
       font-size: 14px;
       border-left: 3px solid;
     }
-    .app-flash--success { background: #e8f5ec; border-left-color: #1f7a3a; color: #145c2a; }
-    .app-flash--error { background: #fdeaea; border-left-color: #aa1f1f; color: #7a1515; }
+    /* Marken-DNA: success = sage, error = pink */
+    .app-flash--success {
+      background: color-mix(in srgb, var(--theme-success) 10%, transparent);
+      border-left-color: var(--theme-success);
+      color: var(--theme-success);
+    }
+    .app-flash--error {
+      background: rgba(var(--theme-accent-rgb), 0.08);
+      border-left-color: var(--theme-accent);
+      color: var(--theme-accent);
+    }
 
     /* Stat-Cards */
     .stat-grid {
@@ -419,7 +428,8 @@ const showChecklist = !checklist.completed_at;
     @media (min-width: 768px) { .onboarding-items { grid-template-columns: repeat(2, 1fr); } }
     .onboarding-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--theme-text-primary) .06, transparent); }
     .onboarding-item-check { font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); width: 18px; flex-shrink: 0; line-height: 1.3; }
-    .onboarding-item.is-done .onboarding-item-check { color: #1f7a3a; font-weight: 600; }
+    /* Marken-DNA: done = sage */
+    .onboarding-item.is-done .onboarding-item-check { color: var(--theme-success); font-weight: 600; }
     .onboarding-item-body { min-width: 0; flex: 1; }
     .onboarding-item-link { font-size: 13px; font-weight: 500; color: var(--theme-text-primary); text-decoration: none; }
     .onboarding-item-link:hover { color: var(--theme-accent); }

@@ -1,0 +1,156 @@
+/* Sprint I · Phase 2 Foundation — Bauhaus-Status-Marker als CSS-Shapes.
+ *
+ * Marken-Vokabular aus APP_STYLEGUIDE.md Sektion 3.3 + 1.4:
+ *   ● kreis    — ruhend, abgeschlossen, identität           (statisch)
+ *   ■ quadrat  — in bearbeitung, processing                 (sweep, infinite)
+ *   ─ linie    — verbindung, akzent                         (statisch)
+ *   ▲ dreieck  — live, aufmerksamkeit, neu                  (pulse, stoppt nach 5s)
+ *
+ * WICHTIG (Styleguide):
+ *   - Status-Marker sind KEINE Icons (Tabler etc.), sondern reine CSS-Shapes
+ *   - Eine Form = eine Bedeutung (semantisches Vokabular)
+ *   - Pulse stoppt nach 5s automatisch (2.5 iterations × 2s)
+ *   - prefers-reduced-motion respektieren
+ *
+ * Farben kommen über `color`/`background` aus dem aufrufenden Kontext —
+ * default pink für aktive Status, sage für "erledigt + positiv", grau für ruhend.
+ */
+
+/* ═══ BASE ═══ */
+
+.shape-circle,
+.shape-square,
+.shape-line,
+.shape-triangle {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ═══ ● KREIS ═══ */
+
+.shape-circle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.shape-circle--sm { width: 6px; height: 6px; }
+.shape-circle--lg { width: 12px; height: 12px; }
+
+/* Farb-Modifier (semantic) */
+.shape-circle--pink { color: var(--theme-accent); }
+.shape-circle--sage { color: var(--theme-success); }
+.shape-circle--muted { color: var(--theme-text-tertiary); }
+
+/* ═══ ■ QUADRAT (mit Sweep) ═══ */
+
+.shape-square {
+  width: 10px;
+  height: 10px;
+  position: relative;
+  overflow: hidden;
+  background: currentColor;
+}
+
+.shape-square--sm { width: 8px; height: 8px; }
+.shape-square--lg { width: 14px; height: 14px; }
+
+/* Sweep-Variante: läuft pink-gradient horizontal durch.
+ * Nicht via pulse ersetzen — unterschiedliche Semantik
+ * (sweep = in bearbeitung, pulse = aufmerksamkeit). */
+.shape-square--sweep {
+  background: rgba(var(--theme-accent-rgb), 0.18);
+}
+.shape-square--sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--theme-accent) 50%,
+    transparent 100%
+  );
+  animation: shape-sweep 1.5s linear infinite;
+}
+
+.shape-square--pink { color: var(--theme-accent); }
+.shape-square--sage { color: var(--theme-success); }
+.shape-square--muted { color: var(--theme-text-tertiary); }
+
+@keyframes shape-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ═══ ─ LINIE ═══ */
+
+.shape-line {
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+}
+
+.shape-line--sm { width: 8px; height: 2px; }
+.shape-line--lg { width: 18px; height: 2px; }
+
+.shape-line--pink { color: var(--theme-accent); }
+.shape-line--sage { color: var(--theme-success); }
+.shape-line--muted { color: var(--theme-text-tertiary); }
+
+/* ═══ ▲ DREIECK (mit Pulse, stoppt nach 5s) ═══ */
+
+.shape-triangle {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 6px solid currentColor;
+  background: transparent;  /* override base */
+}
+
+.shape-triangle--sm {
+  border-left-width: 3px;
+  border-right-width: 3px;
+  border-bottom-width: 5px;
+}
+.shape-triangle--lg {
+  border-left-width: 6px;
+  border-right-width: 6px;
+  border-bottom-width: 8px;
+}
+
+.shape-triangle--pink { color: var(--theme-accent); }
+.shape-triangle--sage { color: var(--theme-success); }
+.shape-triangle--muted { color: var(--theme-text-tertiary); }
+
+/* Pulse: 2s pro Cycle × 2.5 iterations = 5s gesamt, dann static.
+ * Styleguide: "stoppt nach 5s automatisch (sonst nervig)". */
+.shape-triangle.pulse {
+  animation: shape-triangle-pulse 2s ease-in-out;
+  animation-iteration-count: 2.5;
+  animation-fill-mode: forwards;
+}
+
+@keyframes shape-triangle-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* ═══ ACCESSIBILITY ═══ */
+
+@media (prefers-reduced-motion: reduce) {
+  .shape-square--sweep::after,
+  .shape-triangle.pulse {
+    animation: none !important;
+  }
+  /* Sweep wird statisch sichtbar als gefülltes Quadrat */
+  .shape-square--sweep {
+    background: var(--theme-accent);
+  }
+  .shape-square--sweep::after {
+    display: none;
+  }
+}

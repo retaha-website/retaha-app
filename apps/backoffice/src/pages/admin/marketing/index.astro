@@ -128,8 +128,8 @@ function pct(n: number): string {
 <AdminLayout title="Marketing" hotel={hotel} user={user}>
   <div class="md-page">
     <header class="md-header">
-      <p class="md-eyebrow">— Marketing · Übersicht —</p>
-      <h1 class="md-title">Wie kommt das Marketing an<span class="dot">?</span></h1>
+      <p class="md-eyebrow themed-eyebrow-flank">Marketing · Übersicht</p>
+      <h1 class="md-title">Wie kommt das Marketing an<span class="h-dot">?</span></h1>
     </header>
 
     <!-- Section 1: KPI-Cards -->
@@ -160,7 +160,7 @@ function pct(n: number): string {
     <section class="md-chart-section">
       <div class="md-section-head">
         <div>
-          <p class="md-section-eyebrow">— letzte 30 Tage —</p>
+          <p class="md-section-eyebrow themed-eyebrow-flank">letzte 30 Tage</p>
           <h2 class="md-section-title">Aktivität über Zeit</h2>
         </div>
         <div class="md-chart-legend">
@@ -176,7 +176,7 @@ function pct(n: number): string {
 
     <!-- Section 3: Top-Performer -->
     <section class="md-top-section">
-      <p class="md-section-eyebrow">— Top 3 nach Click-Rate —</p>
+      <p class="md-section-eyebrow themed-eyebrow-flank">Top 3 nach Click-Rate</p>
       <h2 class="md-section-title">Was kommt am besten an</h2>
 
       {ranked.length === 0 ? (
@@ -211,7 +211,7 @@ function pct(n: number): string {
     <!-- Section 4: Quick-Actions -->
     {canWrite && (
       <section class="md-quick-section">
-        <p class="md-section-eyebrow">— Quick Actions —</p>
+        <p class="md-section-eyebrow themed-eyebrow-flank">Quick Actions</p>
         <h2 class="md-section-title">Was möchtest du tun</h2>
         <div class="md-quick-grid">
           <a href="/admin/marketing/campaigns/new" class="md-quick-card md-quick-card--primary">
@@ -260,7 +260,10 @@ function pct(n: number): string {
           datasets: [
             { label: 'Sends',  data: cfg.sends,  borderColor: 'var(--theme-burgund)', backgroundColor: 'rgba(140,33,40,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
             { label: 'Opens',  data: cfg.opens,  borderColor: 'var(--theme-text-primary)', backgroundColor: 'color-mix(in srgb, var(--theme-text-primary) .1, transparent)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
-            { label: 'Clicks', data: cfg.clicks, borderColor: '#C49A2C', backgroundColor: 'rgba(196,154,44,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
+            /* Marken-DNA: Pink-Shock für Clicks (Primary-Engagement-Metric).
+             * Chart.js parst keine CSS-vars — Hex direkt. Sprint J Backlog:
+             * gesamte Chart-Colors via getComputedStyle(--theme-*) auflösen. */
+            { label: 'Clicks', data: cfg.clicks, borderColor: '#FF4A82', backgroundColor: 'rgba(255,74,130,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
           ],
         },
         options: {
@@ -283,12 +286,11 @@ function pct(n: number): string {
   <style>
     .md-page { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
     .md-header { margin: 20px 0 28px; }
-    .md-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 6px; }
+    .md-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent); margin: 0 0 6px; }
     .md-title { margin: 0; font-size: 28px; font-weight: 300; letter-spacing: -0.01em; }
-    .dot { color: var(--theme-accent); }
 
     /* Section heads */
-    .md-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 4px; }
+    .md-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent); margin: 0 0 4px; }
     .md-section-title { font-size: 20px; font-weight: 300; margin: 0; }
     .md-section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 
@@ -308,7 +310,8 @@ function pct(n: number): string {
     .md-dot { display: inline-block; width: 10px; height: 10px; }
     .md-dot-burgundy { background: var(--theme-burgund); }
     .md-dot-anthrazit { background: var(--theme-bg-anthrazit); }
-    .md-dot-gold { background: #C49A2C; }
+    /* Click-Legend-Dot = Pink-Shock (Marken-DNA, korrespondiert mit Chart-Linie) */
+    .md-dot-gold { background: var(--theme-accent); }
     .md-chart-wrap { height: 280px; position: relative; }
 
     /* Top-Performer */
@@ -325,7 +328,8 @@ function pct(n: number): string {
     .md-bar-track { height: 6px; background: var(--theme-bg-tertiary); position: relative; overflow: hidden; }
     .md-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; transition: width .3s ease; }
     .md-bar-fill--anthrazit { background: var(--theme-bg-anthrazit); }
-    .md-bar-fill--gold { background: #C49A2C; }
+    /* Click-Bar = Pink-Shock (Marken-DNA) */
+    .md-bar-fill--gold { background: var(--theme-accent); }
     .md-bar-pct { font-size: 11px; color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); font-variant-numeric: tabular-nums; text-align: right; }
     .md-empty { padding: 24px; background: var(--theme-bg-primary); border: 1px dashed var(--theme-border); text-align: center; font-style: italic; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
 
