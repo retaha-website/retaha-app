@@ -7,15 +7,15 @@
 // (analog Bookings-update-status aus Sprint C).
 
 import AppLayout from '../layouts/AppLayout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance, buildLoginRedirect } from '@retaha/auth';
 import { getOnboardingChecklist, maybeMarkCompleted } from '../lib/onboarding/checklist';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) return Astro.redirect('/admin/login');
+if (!user) return Astro.redirect(buildLoginRedirect(Astro.url));
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+if (!hotel) return Astro.redirect(buildLoginRedirect(Astro.url));
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
