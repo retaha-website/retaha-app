@@ -107,3 +107,11 @@ Hier nur Notiz für Closing-Doc.**
   - `apps/backoffice/src/pages/admin/pms.astro` (`"30"`)
   - `apps/backoffice/src/pages/admin/places/index.astro` (`"07"`)
   Aufwand: ~30 min (mechanische Locale-Key-Ergänzung in 10 admin locales).
+
+- **Chart.js CSS-Variable-Bug** in `apps/backoffice/src/pages/admin/marketing/index.astro`
+  (Sprint I Phase 4c Befund): Chart-Colors als `var(--theme-burgund)`-Strings übergeben —
+  Chart.js parst keine CSS-Vars, Colors fallen silently auf default zurück.
+  Fix-Pattern: `getComputedStyle(document.documentElement).getPropertyValue('--theme-burgund')`
+  vor Chart-Init lesen, dann als konkrete Hex an Chart.js. Sprint I 4c hat Clicks-Line
+  als #FF4A82 hardcoded (Marken-konformes Pink) — Sends/Opens haben gleichen Bug,
+  Click-Patch ist Migration-Pattern. ~20 min.
