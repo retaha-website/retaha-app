@@ -1,33 +1,31 @@
 import type { AstroCookies } from 'astro';
-import { createServerClient, parseCookieHeader } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
+import { getSessionToken } from './cross-subdomain-cookie';
 
 /**
- * Creates a Supabase server client bound to the current request's cookies.
- * Standard @supabase/ssr-Pattern — kein customFetch, keine handgebaute Token-Reassembly.
+ * Creates a Supabase server client mit der aktuellen Session.
+ *
+ * Sprint F SSO setzt einen Cross-Subdomain-Cookie `retaha_session` mit
+ * dem rohen Supabase-Access-Token (JWT). Wir lesen diesen Token und
+ * setzen ihn als Authorization-Header, damit RLS-Policies via auth.uid()
+ * funktionieren.
+ *
+ * (Wir nutzen NICHT @supabase/ssr's createServerClient, weil der nach
+ * nativen `sb-<ref>-auth-token` Cookies sucht die wir nicht setzen.)
  */
-export function createSupabaseServerInstance(cookies: AstroCookies, request: Request) {
+export function createSupabaseServerInstance(cookies: AstroCookies, _request: Request) {
   const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
   const supabaseAnonKey = getEnv('PUBLIC_SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase env vars missing: PUBLIC_SUPABASE_URL and/or PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return parseCookieHeader(request.headers.get('cookie') ?? '')
-          .map(c => ({ name: c.name, value: c.value ?? '' }));
-      },
-      setAll(cookiesToSet, _headers) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          cookies.set(name, value, options);
-        });
-        // TODO: _headers (Cache-Control/Expires/Pragma) auf Astro.response.headers setzen,
-        // sobald Helper das Response-Objekt erreicht. Aktuell nicht im Scope.
-      },
-    },
+  const token = getSessionToken(cookies);
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
   });
 }
 
@@ -59,10 +57,19 @@ export function createSupabaseServiceRoleInstance() {
 
 /**
  * Returns the logged-in user, or null. Use in Astro pages to gate access.
+ *
+ * Validates the retaha_session Cookie's JWT against Supabase auth.
  */
-export async function getUser(cookies: AstroCookies, request: Request) {
-  const client = createSupabaseServerInstance(cookies, request);
-  const { data: { user } } = await client.auth.getUser();
+export async function getUser(cookies: AstroCookies, _request: Request) {
+  const token = getSessionToken(cookies);
+  if (!token) return null;
+
+  const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getEnv('PUBLIC_SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  const client = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user } } = await client.auth.getUser(token);
   return user;
 }
 
@@ -70,9 +77,10 @@ export async function getUser(cookies: AstroCookies, request: Request) {
  * Returns the hotel(s) the user can manage, or null if not logged in.
  */
 export async function getUserHotels(cookies: AstroCookies, request: Request) {
-  const client = createSupabaseServerInstance(cookies, request);
-  const { data: { user } } = await client.auth.getUser();
+  const user = await getUser(cookies, request);
   if (!user) return null;
+
+  const client = createSupabaseServerInstance(cookies, request);
 
   const { data, error } = await client
     .from('hotel_users')
