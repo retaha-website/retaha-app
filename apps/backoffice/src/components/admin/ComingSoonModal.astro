@@ -1,6 +1,7 @@
 ---
 /*
  * Sprint H · Group 4c Tag 3 — Coming-Soon-Modal
+ * (Sprint I Phase 4e: Variante-B-Refresh)
  *
  * Theme-aware Modal-Pattern für 19 Stub-Pages der Sidebar.
  * Liegt als Overlay über AdminLayout, schließt per ESC / Close-Button /
@@ -9,8 +10,10 @@
  * Marken-Signaturen:
  *   - .themed-eyebrow mit Theme-spezifischem Marker
  *   - .h-dot Pink-Punkt am Ende h2
- *   - All-lowercase (auch Buttons)
+ *   - Variante B: deutsche Substantive groß, lowercase nur als Akzent
  *   - Border-radius 6px (Modal-Ausnahme aus APP_STYLEGUIDE)
+ *   - Pulse-Animation 3 iterations × 1.8s = 5.4s, dann statisch
+ *     (Marken-DNA: nicht permanent animieren)
  *
  * A11y:
  *   - role="dialog" + aria-modal="true" + aria-labelledby
@@ -61,7 +64,7 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
       class="coming-soon-close"
       x-ref="closeBtn"
       @click="close()"
-      aria-label="schließen, zurück zur übersicht"
+      aria-label="Schließen, zurück zur Übersicht"
     >×</button>
 
     <div class="coming-soon-shapes" aria-hidden="true">
@@ -78,14 +81,14 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
 
     <p class="coming-soon-status-line">
       <span class="coming-soon-status-marker"></span>
-      <span class="coming-soon-status-text">in arbeit</span>
+      <span class="coming-soon-status-text">In Arbeit</span>
     </p>
 
     <p class="coming-soon-description">{feature_description}</p>
 
     {planned_release && (
       <p class="coming-soon-meta">
-        <span class="coming-soon-meta-label">geplant für</span>
+        <span class="coming-soon-meta-label">Geplant für</span>
         <span class="coming-soon-meta-value">{planned_release}</span>
       </p>
     )}
@@ -95,7 +98,7 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
       class="coming-soon-back-btn"
       @click="close()"
     >
-      → zurück zur übersicht
+      → Zurück zur Übersicht
     </button>
   </div>
 </div>
@@ -201,7 +204,7 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
     letter-spacing: -0.02em;
     line-height: 1.15;
     margin: 0 0 16px;
-    text-transform: lowercase;
+    /* Variante B: feature_name entscheidet selbst über Groß-/Kleinschreibung */
   }
 
   .coming-soon-status-line {
@@ -221,11 +224,18 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
     border-radius: var(--theme-radius-pill);
     background: var(--theme-accent);
     display: inline-block;
-    animation: cs-pulse 1.8s ease-in-out infinite;
+    /* Marken-DNA: Pulse stoppt nach ~5s (3 iterations × 1.8s = 5.4s),
+     * dann statisch sichtbar via animation-fill-mode: forwards */
+    animation: cs-pulse 1.8s ease-in-out;
+    animation-iteration-count: 3;
+    animation-fill-mode: forwards;
   }
   @keyframes cs-pulse {
     0%, 100% { opacity: 0.4; transform: scale(0.85); }
     50%      { opacity: 1;   transform: scale(1.1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .coming-soon-status-marker { animation: none; opacity: 1; }
   }
 
   .coming-soon-description {
@@ -269,9 +279,9 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
     font-weight: 500;
     cursor: pointer;
     border-radius: var(--theme-radius-button);
-    text-transform: lowercase;
     transition: background 0.18s ease, color 0.18s ease;
     width: 100%;
+    /* Variante B: Substantive groß ("Zurück zur Übersicht") */
   }
   .coming-soon-back-btn:hover,
   .coming-soon-back-btn:focus-visible {
