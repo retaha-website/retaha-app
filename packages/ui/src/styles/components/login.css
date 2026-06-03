@@ -1,16 +1,24 @@
 /* ============================================================
-   Login-Page v2 — Asymmetrisches 40/60 Split-Layout
+   Login-Page v2.1 — Asymmetrisches 40/60 Split-Layout
    ------------------------------------------------------------
-   Aus Sprint-I-Findings-Fix-Run Phase 1.
-   Prototyp v2: 40% Anthrazit-Hero / 60% White-Form.
+   Sprint-I-Findings-Fix-Run Round 2 (8-Bug-Fix).
 
-   Mobile (<768px): Stack — Hero oben (kompakter), Form unten.
+   Aenderungen ggue. v2:
+   - Bug 1: height:100vh + overflow:hidden (Desktop), Stack+scroll (Mobile)
+   - Bug 3: H1 groesser (32/48/56px)
+   - Bug 4: Eyebrow Pink (--theme-accent) statt weisz
+   - Bug 5: Meta UPPERCASE via text-transform
    ============================================================ */
+
+/* Alpine.js x-cloak: bis Alpine geladen ist, ausblenden -> kein FOUC */
+[x-cloak] { display: none !important; }
 
 .login-page {
   display: grid;
   grid-template-columns: 40% 60%;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background: var(--theme-bg-primary);
   font-family: var(--theme-font-sans);
   color: var(--theme-text-primary);
@@ -21,6 +29,10 @@
   .login-page {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: visible;
   }
 }
 
@@ -33,82 +45,57 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   position: relative;
 }
 
 @media (max-width: 1023px) {
-  .login-hero {
-    padding: 40px 32px;
-  }
+  .login-hero { padding: 40px 32px; }
 }
 
 @media (max-width: 768px) {
   .login-hero {
-    padding: 32px 24px;
+    padding: 28px 24px;
+    height: auto;
     min-height: auto;
+    gap: 20px;
   }
 }
 
-/* Brand-Block oben (Logo + Wordmark) */
-.login-hero-brand-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-  color: var(--theme-text-on-dark);
-}
-.login-hero-brand-link:hover .login-hero-logo,
-.login-hero-brand-link:focus-visible .login-hero-logo {
-  color: var(--theme-accent);
-}
-.login-hero-brand-link:focus-visible {
-  outline: 2px solid var(--theme-accent);
-  outline-offset: 4px;
-}
-
-.login-hero-logo {
-  display: inline-block;
-  width: 28px;
-  height: auto;
-  color: var(--theme-text-on-dark);
-  transition: color 0.2s ease;
-}
-
-.login-hero-logo svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
+/* Brand-Block oben (Logo-Komponente) */
 .login-hero-brand {
-  font-family: var(--theme-font-sans);
-  font-size: 22px;
-  font-weight: 300;
-  letter-spacing: -0.005em;
-  line-height: 1;
+  align-self: flex-start;
   color: var(--theme-text-on-dark);
-  margin: 0;
+}
+
+.login-hero-brand:hover,
+.login-hero-brand:focus-visible {
+  color: var(--theme-accent);
+  outline: none;
 }
 
 /* Mittlere Stack: Eyebrow + Headline + Tagline */
 .login-hero-stack {
-  max-width: 320px;
+  max-width: 460px;
 }
 
 .login-hero-eyebrow {
   margin: 0 0 16px;
   font-family: var(--theme-font-mono);
   font-size: 12px;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  /* Bug 4: Eyebrow Pink-Shock auch auf dunklem BG */
+  color: var(--theme-accent);
   font-style: normal;
 }
 
+/* Bug 3: H1 Editorial-Magazine-Groesse */
 .login-hero-headline {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   font-family: var(--theme-font-sans);
-  font-size: 42px;
+  font-size: 32px;
   font-weight: 300;
   line-height: 1.05;
   letter-spacing: -0.025em;
@@ -124,27 +111,32 @@
   font-size: 15px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.65);
+  max-width: 360px;
 }
 
-@media (max-width: 1023px) {
-  .login-hero-headline { font-size: 36px; }
+@media (min-width: 768px) {
+  .login-hero-headline { font-size: 48px; }
 }
 
-@media (max-width: 768px) {
-  .login-hero-stack { max-width: 100%; margin: 16px 0 12px; }
-  .login-hero-headline { font-size: 28px; }
+@media (min-width: 1280px) {
+  .login-hero-headline { font-size: 56px; }
+}
+
+@media (max-width: 767px) {
+  .login-hero-stack { max-width: 100%; }
   .login-hero-tagline { font-size: 14px; }
 }
 
-/* Meta unten: Bauhaus-Stempel + Zeile */
+/* Meta unten: Bauhaus-Stempel + UPPERCASE-Zeile */
 .login-hero-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--theme-font-mono);
   font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: lowercase;
+  letter-spacing: 0.16em;
+  /* Bug 5: UPPERCASE via CSS */
+  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.4);
 }
 
@@ -152,7 +144,7 @@
   .login-hero-meta {
     flex-direction: row;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
 }
 
@@ -164,15 +156,23 @@
   justify-content: center;
   padding: 48px 40px;
   background: var(--theme-bg-primary);
+  height: 100vh;
+  overflow-y: auto;
 }
 
 @media (max-width: 768px) {
-  .login-form-side { padding: 32px 24px; align-items: flex-start; }
+  .login-form-side {
+    padding: 32px 24px 40px;
+    align-items: flex-start;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
 }
 
 .login-form-container {
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -180,6 +180,7 @@
 
 .login-form-header { text-align: left; }
 
+/* Bug 2: Anmeldung Grossschreibung — KEIN text-transform:lowercase */
 .login-form-title {
   margin: 0 0 8px;
   font-family: var(--theme-font-sans);
@@ -210,7 +211,7 @@
   border-radius: var(--theme-radius);
 }
 
-/* ─── Forms (Magic-Link + Password) ──────────────────────── */
+/* ─── Forms ──────────────────────────────────────────────── */
 
 .login-form {
   display: flex;
@@ -227,9 +228,7 @@
   margin-top: 8px;
 }
 
-.login-label:first-child {
-  margin-top: 0;
-}
+.login-label:first-child { margin-top: 0; }
 
 .login-input {
   padding: 12px 14px;

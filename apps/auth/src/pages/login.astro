@@ -1,15 +1,20 @@
 ---
 /**
- * apps/auth/src/pages/login.astro — v2
+ * apps/auth/src/pages/login.astro — v2.1
  *
- * Asymmetrisches 40/60 Split-Layout (Anthrazit-Hero links, White-Form rechts).
- * Magic-Link Primaer, Passwort hinter Toggle.
- * Bauhaus-Stempel als Marken-Maskottchen im Hero-Footer.
- *
- * Refs: Sprint-I-Findings-Fix-Run Phase 1 (Prototyp v2)
+ * Sprint-I-Findings-Fix-Run Round 2 (8-Bug-Fix):
+ * - Bug 1: Layout 100vh ohne Scroll (Desktop)
+ * - Bug 2: "Anmeldung." Grossschreibung
+ * - Bug 3: H1 Editorial-Magazine-Groesse (32/48/56px)
+ * - Bug 4: Eyebrow Pink-Shock auch auf dunklem BG
+ * - Bug 5: Meta UPPERCASE via CSS
+ * - Bug 6: Form-Toggle via Alpine x-data (exklusiv)
+ * - Bug 7: Footer-Legal auf app.retaha.de
+ * - Bug 8: Logo via <Logo /> Komponente aus @retaha/ui
  */
 
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+import Logo from '@retaha/ui/components/brand/Logo.astro';
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/components/login.css';
 import '@retaha/ui/styles/components/bauhaus-stamp.css';
@@ -31,19 +36,18 @@ const flashError = url.searchParams.get('error');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex,nofollow" />
-    <title>anmeldung · retaha</title>
+    <title>Anmeldung · retaha</title>
   </head>
   <body class="login-page">
     <!-- ═══════════ HERO 40% (links, Anthrazit) ═══════════ -->
     <aside class="login-hero">
-      <a href="https://retaha.de" class="login-hero-brand-link" aria-label="retaha · zur startseite">
-        <span class="login-hero-logo" aria-hidden="true">
-          <svg viewBox="326 177 121 176" xmlns="http://www.w3.org/2000/svg">
-            <path transform="matrix(1,0,0,-1,437.2943,193.7768)" fill="currentColor" fill-rule="evenodd" d="M0 0C-9.489-.492-18.979-.934-28.419-1.377-28.419-1.377-46.021 8.949-60.722 4.819-75.423 .738-83.339 1.819-83.339 1.819-79.068-1.627-74.784-5.072-70.501-8.518-66.2-5.463-56.165-.825-35.647-1.967-35.647-1.967-58.593-4.806-66.425-11.798-63.144-14.438-59.865-17.077-56.592-19.717-56.592-19.717-15.193-54.677-68.687-83.884-68.687-83.884-30.533-47.646-59.985-30.141-70.162-53.939-80.291-77.688-90.469-101.487-88.01-100.798-85.503-100.061-83.044-99.372-88.748-116.434-94.5-133.496-100.204-150.558-100.204-150.558-74.489-146.92-68.245-97.848-68.245-97.848 2.213-66.527-34.86-20.307-41.055-12.883-23.846-5.36 0 0"/>
-          </svg>
-        </span>
-        <span class="login-hero-brand">retaha</span>
-      </a>
+      <Logo
+        variant="light"
+        size="md"
+        href="https://retaha.de"
+        ariaLabel="retaha · zur startseite"
+        class="login-hero-brand"
+      />
 
       <div class="login-hero-stack">
         <p class="login-hero-eyebrow">— manufaktur —</p>
@@ -60,96 +64,125 @@ const flashError = url.searchParams.get('error');
     </aside>
 
     <!-- ═══════════ FORM-SIDE 60% (rechts, weiß) ═══════════ -->
-    <section class="login-form-side">
+    <section class="login-form-side" x-data="{ mode: 'magic' }">
       <div class="login-form-container">
-        <header class="login-form-header">
-          <h2 class="login-form-title">
-            {flashSent ? 'check deine mailbox' : 'anmeldung'}<span class="h-dot">.</span>
-          </h2>
-          {flashSent ? (
+
+        {flashSent ? (
+          <header class="login-form-header">
+            <h2 class="login-form-title">
+              Check deine Mailbox<span class="h-dot">.</span>
+            </h2>
             <p class="login-form-sub">
               Wir haben dir einen Magic-Link an deine E-Mail-Adresse gesendet.
               Öffne ihn auf diesem Gerät — dann bist du eingeloggt.
             </p>
-          ) : (
-            <p class="login-form-sub">
-              Gib deine E-Mail ein. Wir senden dir einen Einmal-Link für die Anmeldung.
-            </p>
-          )}
-        </header>
-
-        {flashError && (
-          <p class="login-error">{flashError}</p>
-        )}
-
-        {!flashSent && (
+          </header>
+        ) : (
           <>
-            <!-- Magic-Link Form (default) -->
-            <form
-              class="login-form"
-              method="POST"
-              action="/api/auth/send-magic-link"
-              autocomplete="off"
-              data-form="magic-link"
-            >
-              <input type="hidden" name="return_to" value={returnTo} />
-              <label class="login-label" for="email">E-Mail</label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                required
-                autocomplete="email"
-                inputmode="email"
-                placeholder="hotelier@example.com"
-                class="login-input"
-              />
-              <button type="submit" class="login-submit">
-                magic-link senden
-              </button>
-            </form>
+            <!-- MAGIC-LINK STATE (default) -->
+            <div x-show="mode === 'magic'" x-cloak>
+              <header class="login-form-header">
+                <h2 class="login-form-title">
+                  Anmeldung<span class="h-dot">.</span>
+                </h2>
+                <p class="login-form-sub">
+                  Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.
+                </p>
+              </header>
 
-            <!-- Password Form (hinter Toggle) -->
-            <form
-              class="login-form"
-              method="POST"
-              action="/api/auth/login-password"
-              autocomplete="on"
-              data-form="password"
-              hidden
-            >
-              <input type="hidden" name="return_to" value={returnTo} />
-              <label class="login-label" for="email-pw">E-Mail</label>
-              <input
-                id="email-pw"
-                type="email"
-                name="email"
-                required
-                autocomplete="email"
-                inputmode="email"
-                placeholder="hotelier@example.com"
-                class="login-input"
-              />
-              <label class="login-label" for="password">Passwort</label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                required
-                autocomplete="current-password"
-                minlength="8"
-                placeholder="dein passwort"
-                class="login-input"
-              />
-              <button type="submit" class="login-submit">
-                anmelden
-              </button>
-            </form>
+              {flashError && (
+                <p class="login-error">{flashError}</p>
+              )}
 
-            <button type="button" class="login-toggle" data-toggle="auth-method">
-              <span data-show="magic-link">→ stattdessen mit passwort anmelden</span>
-              <span data-show="password" hidden>→ stattdessen magic-link senden</span>
-            </button>
+              <form
+                class="login-form"
+                method="POST"
+                action="/api/auth/send-magic-link"
+                autocomplete="off"
+              >
+                <input type="hidden" name="return_to" value={returnTo} />
+                <label class="login-label" for="ml-email">E-Mail</label>
+                <input
+                  id="ml-email"
+                  type="email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="hotelier@example.com"
+                  class="login-input"
+                />
+                <button type="submit" class="login-submit">
+                  magic-link senden
+                </button>
+              </form>
+
+              <button
+                type="button"
+                class="login-toggle"
+                @click="mode = 'password'"
+              >
+                → stattdessen mit passwort anmelden
+              </button>
+            </div>
+
+            <!-- PASSWORD STATE (hinter Toggle) -->
+            <div x-show="mode === 'password'" x-cloak>
+              <header class="login-form-header">
+                <h2 class="login-form-title">
+                  Mit Passwort anmelden<span class="h-dot">.</span>
+                </h2>
+                <p class="login-form-sub">
+                  Wenn du lieber dein Passwort verwendest.
+                </p>
+              </header>
+
+              {flashError && (
+                <p class="login-error">{flashError}</p>
+              )}
+
+              <form
+                class="login-form"
+                method="POST"
+                action="/api/auth/login-password"
+                autocomplete="on"
+              >
+                <input type="hidden" name="return_to" value={returnTo} />
+                <label class="login-label" for="pw-email">E-Mail</label>
+                <input
+                  id="pw-email"
+                  type="email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="hotelier@example.com"
+                  class="login-input"
+                />
+                <label class="login-label" for="pw-pass">Passwort</label>
+                <input
+                  id="pw-pass"
+                  type="password"
+                  name="password"
+                  required
+                  autocomplete="current-password"
+                  minlength="8"
+                  placeholder="dein passwort"
+                  class="login-input"
+                />
+                <button type="submit" class="login-submit">
+                  anmelden
+                </button>
+              </form>
+
+              <button
+                type="button"
+                class="login-toggle"
+                @click="mode = 'magic'"
+              >
+                ← stattdessen magic-link senden
+              </button>
+            </div>
           </>
         )}
 
@@ -160,38 +193,20 @@ const flashError = url.searchParams.get('error');
         </p>
 
         <footer class="login-form-footer">
-          <a href="/impressum">impressum</a>
+          <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
           <span class="login-form-footer-sep" aria-hidden="true">·</span>
-          <a href="/datenschutz">datenschutz</a>
+          <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
           <span class="login-form-footer-sep" aria-hidden="true">·</span>
-          <a href="/agb">agb</a>
+          <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
         </footer>
       </div>
     </section>
 
-    <script is:inline>
-      document.addEventListener('DOMContentLoaded', () => {
-        const toggleBtn = document.querySelector('[data-toggle="auth-method"]');
-        const magicForm = document.querySelector('[data-form="magic-link"]');
-        const passwordForm = document.querySelector('[data-form="password"]');
-        const labelMagic = document.querySelector('[data-show="magic-link"]');
-        const labelPassword = document.querySelector('[data-show="password"]');
-
-        if (!toggleBtn || !magicForm || !passwordForm) return;
-
-        let usingPassword = false;
-        toggleBtn.addEventListener('click', () => {
-          usingPassword = !usingPassword;
-          magicForm.hidden = usingPassword;
-          passwordForm.hidden = !usingPassword;
-          if (labelMagic) labelMagic.hidden = usingPassword;
-          if (labelPassword) labelPassword.hidden = !usingPassword;
-          // Fokus auf erstes Input der nun sichtbaren Form
-          const activeForm = usingPassword ? passwordForm : magicForm;
-          const firstInput = activeForm.querySelector('input:not([type="hidden"])');
-          if (firstInput) firstInput.focus();
-        });
-      });
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error - Alpine types
+      window.Alpine = Alpine;
+      Alpine.start();
     </script>
   </body>
 </html>
