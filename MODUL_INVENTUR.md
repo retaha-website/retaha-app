@@ -1,345 +1,348 @@
-# Modul-Inventur (Stand: 2026-05-28, Patch 2026-06-02)
+# Modul-Inventur (Stand: 2026-06-03)
 
-> Discovery-Bericht: was existiert, was ist Mock, was nutzt echte DB.
-> Rein dokumentarisch, kein Code geändert.
-
-> **Patch 2026-06-02 (Sprint H Group 4c):**
-> - 19 Stub-Pages haben jetzt `ComingSoonModal` mit Feature-Beschreibung
->   + geplantem Quartal statt leerem Lorem-ipsum-Body
-> - Theme-System ist auf **3 Themes** ausgeweitet via `data-theme`:
->   `bauhaus_manufaktur` (default), `premium_anthrazit`, `warmes_burgund`
-> - **Alle Surfaces theme-aware:** Gast-Frontend (Hub + 8 Sheets +
->   Eve-Chat + Legal-Pages), Hotelier-Admin (32 Pages + 9 Components),
->   Operations-Dashboard (`/app/`), Cookie-Banner, Onboarding-Wizard
-> - **Marken-Signaturen einheitlich:** Pink-Punkt-Span an Statement-h1
->   (theme-aware via `--theme-h-dot-color`), Bauhaus-Status-Vokabular
->   ●/■/─/▲ geometrisch erhalten, Border-Radius 3px konstant (6px Modals)
-> - Showcase-Mode (Group 2) + NFC-Tag-Routing (Group 3) produktiv
-> - **Sed-Codemod `scripts/migrate-theme-tokens.mjs`** als wiederverwendbares
->   Werkzeug für zukünftige Hex→Token-Migrationen
+> Architektur- und Status-Übersicht aller produktiven Module nach Sprint I (Marken-Manifest UI/UX-Refresh) und Sprint G Phase 1-2 (Production-Migration Phase 1 + ENVs).
+>
+> Vorgängerstand: 2026-05-28 (Sprint H Group 4c Tag 5). Komplett neu geschrieben weil Sprint F (Monorepo-Split) alle Pfade geändert hat.
 
 ---
 
 ## TL;DR
 
-- **Gast-Frontend ist zu ~95% funktional** (4 Sheets buchen echt über `/api/bookings/create` → `bookings`-Tabelle, alle mit `stay_id`-Bindung)
-- **Backoffice hat 32 Pages — davon 20 reine Stubs** (30 Zeilen, Placeholder-Text) für die Roadmap-Module aus dem Bell-Maskottchen-Nav (concierge, wallet, spa, restaurant, microsite, seo, etc.)
-- **12 Backoffice-Pages sind funktional** (dashboard, bookings, settings, breakfast, conference, service, recommendations, features, menu, login, subscription)
-- **Mews-Anbindung ist ein-direktional:** Sync zieht stays/guests/rooms aus Mews ✓ — aber Bookings (Frühstück/Service/Konferenz) bleiben in unserer DB, **werden NICHT zurück nach Mews gepusht** (kein "Charge to Room")
-- **Mews-Backoffice-UI fehlt komplett** — Token-Eingabe + Sync-Trigger sind nur als API-Endpoint (`/api/admin/mews/sync`) verfügbar, keine Astro-Page
-- **Auth: nur dev-login** (DEV-mode-only), Produktiv-Login fehlt
-- **i18n: zwei separate Stacks** — Gast (DE/EN/FR/ES, ~50 inline strings) vs. Admin (10 JSON-Locales, aber nur DE/EN voll, andere 8 teilweise)
+- **4 Apps live** in Production (auth.retaha.de, app.retaha.de, dashboard.retaha.de, backoffice.retaha.de)
+- **Build-Status:** 4/4 grün, alle Marken-konform (Sprint I)
+- **Production-Supabase:** `twmzhrcadixzcdlupisd` (Frankfurt eu-central-1) — **noch leer, Schema-Migration steht aus**
+- **Vercel-ENVs:** 58 ENVs gesetzt (Sprint G Phase 2)
+- **Pilot-Hotel:** The Gate Garden Hotel Berlin (Kristin Riewe) — `1f30ac02-17e1-47b6-9bda-487e14b07627`
+- **Mews-Production-Token:** noch nicht vom Hotel erhalten
 
 ---
 
-## Bereich 1 · Gast-Frontend Module
+## Architektur (Monorepo)
 
-Alle Module leben in [src/pages/g/[token].astro](src/pages/g/[token].astro) (1082 Zeilen, voll dynamisch).
-
-### 1a · Frühstück-Sheet ([src/components/sheets/BreakfastSheet.astro](src/components/sheets/BreakfastSheet.astro))
-
-| Aspekt | Status | Quelle |
-|---|---|---|
-| Daten-Quelle | ✓ echt | `loadActiveBreakfastItems(hotel.id)` → `breakfast_items`-Tabelle |
-| Zeit-Slots | ✓ echt | aus `hotel_settings.breakfast_start_time/end_time/slot_minutes` |
-| Booking-Submit | ✓ echt | POST `/api/bookings/create` mit `type='breakfast'`, `stay_id` aus Token-Resolution |
-| Status-Handling | ✓ echt | pending/confirmed/cancelled aus DB; sheet zeigt entweder Form ODER Status-View |
-| Stay-Bindung | ✓ echt | `access_token` → `stay.id` → `bookings.stay_id` (FK) |
-| Status-Updates | ✓ echt | Backoffice POST `/api/bookings/update-status` |
-| EU-14-Allergene | ✓ echt | im breakfast_items-Schema als 14 Boolean-Spalten (`contains_*`) |
-| Lücke | — | Keine echte UI-Lücke; minor: Submit ist nicht idempotent (kein Duplicate-Check beim Re-Submit derselben Slot) |
-
-### 1b · Service-Sheet ([src/components/sheets/ServiceSheet.astro](src/components/sheets/ServiceSheet.astro))
-
-| Aspekt | Status | Quelle |
-|---|---|---|
-| Service-Items | ✓ echt | aus `hotel_settings.service_items` (JSONB) |
-| Item-Schema | ✓ | `{id, name_de/en/fr/es, description_*, icon?}` — Multi-Sprache built-in |
-| Booking-Submit | ✓ echt | POST `/api/bookings/create` mit `type='service'`, `details={item_id, item_name, timing, time, notes}` |
-| Status-Handling | ✓ echt | pending/confirmed/cancelled |
-| Stay-Bindung | ✓ echt | FK über `stay_id` |
-| Lücke | — | Items sind hotelier-konfiguriert in [admin/service.astro](src/pages/admin/service.astro) (322 Zeilen, funktional) |
-
-### 1c · Konferenz-Sheet ([src/components/sheets/ConferenceSheet.astro](src/components/sheets/ConferenceSheet.astro))
-
-| Aspekt | Status | Quelle |
-|---|---|---|
-| Rooms-Daten | ✓ echt | aus `hotel_settings.conference_rooms` (JSONB) |
-| Room-Schema | ✓ | `{id, name_de/en/fr/es, capacity, description_*}` |
-| Zeit-Slots | ✓ echt | aus `hotel_settings.conference_start_time/end_time/slot_minutes` |
-| Booking-Submit | ✓ echt | POST `/api/bookings/create` mit `type='conference'`, `details={room_id, room_name, date, time, duration_hours, people, occasion, notes}` |
-| Hotelier-Confirm-Flow | ✓ echt | Default Status = 'pending', Hotelier confirms via `/api/bookings/update-status` |
-| Stay-Bindung | ✓ echt | über `stay_id` |
-| Lücke | — | Hotelier-First-Flow läuft, keine Mews-Order-Sync nach Bestätigung |
-
-### 1d · Wifi-Sheet ([src/components/sheets/WifiSheet.astro](src/components/sheets/WifiSheet.astro))
-
-| Aspekt | Status | Quelle |
-|---|---|---|
-| WLAN-Daten | ✓ echt | aus `hotel_settings.wifi_ssid/wifi_password/wifi_speed_mbits` |
-| QR-Code | ✓ echt | server-side generiert über `/api/qr/wifi/[hotelId]` |
-| Copy-to-Clipboard | ✓ echt | client-side Clipboard-API + iOS-Fallback |
-| Lücke | — | — |
-
-### 1e · Weitere im Hero/Tiles ([src/pages/g/[token].astro](src/pages/g/[token].astro))
-
-| Modul | Status | Bemerkung |
-|---|---|---|
-| **Empfehlungs-Slider** | 🟡 | Liest `settings.recommendations` (JSONB im DB) — Hotelier-kuratiert. **KEIN Google Places**, kein Local-Guide. Items sind Karten, kein interaktiver Click-Through |
-| **Concierge-Card** | 🟡 | UI da (Name + Wetter), aber Wetter ist **hardcoded** (`temperature: 21, partly`) — kein Wetter-API |
-| **Eve (KI-Concierge)** | ❌ | nicht implementiert. Concierge-Tile öffnet kein Sheet (nur visuell präsent) |
-| **Wallet (Apple/Google Pass)** | ❌ | nicht implementiert. Keine Pass-Generation, kein Wallet-Trigger nach Check-out |
-| **Berlin-Tipps Tile** | ❌ | Tile-Button da (mit Feature-Flag `f.berlin_tips`), aber kein Sheet/Logik dahinter |
-| **Check-out Tile** | ❌ | Tile da, aber keine Self-Check-out-Logik |
-| **Sprach-Switcher** | ✓ | 4 Sprachen via URL-Param `?lang=de/en/fr/es` |
+```
+retaha-app/                                      (Repo-Root, pnpm-workspace + turbo)
+├── apps/                                        (4 deployed Apps)
+│   ├── auth/                                    → auth.retaha.de       (Magic-Link-SSO)
+│   ├── guest/                                   → app.retaha.de        (Gast-Frontend, 3 Themes)
+│   ├── dashboard/                               → dashboard.retaha.de  (Operations-Dashboard)
+│   └── backoffice/                              → backoffice.retaha.de (Hotelier-Config)
+├── packages/                                    (Shared Workspace-Libs)
+│   ├── ui/                                      (Astro-Components + Theme-System + CSS)
+│   ├── auth/                                    (Supabase-Auth-Helpers, Cookie, Encryption)
+│   ├── db/                                      (Supabase-Client, Queries)
+│   ├── i18n/                                    (Multi-Lang Strings für Gast)
+│   ├── eve/                                     (Eve KI-Concierge, Anthropic + Google Places)
+│   ├── wallet/                                  (Google Wallet Pass-Generator)
+│   ├── marketing/                               (Marketing-Campaign-Logic)
+│   └── mews/                                    (Mews-PMS-Client — Sprint F Backlog Extract)
+├── src/                                         (Pre-Sprint-F Monolith — DEAD CODE)
+│   └── pages/, components/, lib/                (79 Pages, NICHT deployed, Sprint-G-Cleanup-Backlog)
+├── supabase/migrations/                         (Schema-Migrations)
+├── scripts/                                     (Codemods, Test-Scripts)
+└── docs/                                        (Sprint-Closings, Backlog-Docs)
+```
 
 ---
 
-## Bereich 2 · Backoffice — alle 32 Pages
+## App 1 · auth.retaha.de (Magic-Link-SSO)
 
-### Funktional (12 Pages, ≥70 Zeilen)
+**Status:** ✅ Production-deployed, Marken-konform (Sprint I Phase 3)
 
-| Page | LOC | Status | Liest | Schreibt | Mews-Bezug |
-|---|---|---|---|---|---|
-| `dashboard.astro` | 83 | ✓ funktional | `hotel_settings.features/recommendations` + `stays.count` | — | indirekt (stay-count nutzt Mews-stays) |
-| `bookings.astro` | 433 | ✓ funktional | `loadBookingsForHotel(hotel.id, type)` | — (Status-Updates via Sheets/API) | bookings.stay_id → Mews-stays |
-| `settings.astro` | 432 | ✓ funktional | `hotel_settings` | hotel_settings (Bulk-Update) | nein |
-| `breakfast.astro` | 391 | ✓ funktional | `breakfast_items` + `hotel_settings` | beide | nein |
-| `conference.astro` | 348 | ✓ funktional | `hotel_settings.conference_*` | hotel_settings | nein |
-| `service.astro` | 322 | ✓ funktional | `hotel_settings.service_items` | hotel_settings | nein |
-| `recommendations.astro` | 347 | ✓ funktional | `hotel_settings.recommendations` (JSONB) | hotel_settings | nein |
-| `features.astro` | 124 | ✓ funktional | `hotel_settings.features` (JSONB) | hotel_settings | nein |
-| `menu/index.astro` | 132 | ✓ funktional | `breakfast_items`-Liste | — | nein |
-| `menu/[id].astro` | 459 | ✓ funktional | `breakfast_items.single` | breakfast_items (Item-Edit) | nein |
-| `login.astro` | 174 | 🟡 dev-only | — | — | nein |
-| `subscription.astro` | 71 | 🟡 Placeholder | `hotels.subscription_status/trial_started_at` | — | nein |
+### Pages
 
-### Stubs (20 Pages, alle 30 Zeilen — Editorial-Header + Placeholder-Text)
-
-`best-price`, `booking-engine`, `booking-recovery`, `concierge`, `email-campaigns`, `gmb`, `guests`, `loyalty`, `microsite`, `pms`, `pre-stay`, `referrals`, `restaurant`, `reviews`, `self-checkout`, `seo`, `spa`, `wallet`, `wallet-keys`, `whatsapp`
-
-→ **Roadmap-Pages aus dem AdminLayout-Nav-Menu**, alle haben das Editorial-Header-Pattern + 1 Absatz Placeholder-Text. Keine Daten, keine Logik. Stand-by für künftige Sprints.
-
-### Auth-Status
-
-- [admin/login.astro](src/pages/admin/login.astro): zeigt das Email-Login-Form, aber im Hintergrund nutzt es `/api/admin/auth/dev-login` (DEV-Mode-Hard-Guard: `if (!import.meta.env.DEV) return 403`)
-- Produktiver Magic-Link-Send-Flow ist **nicht implementiert**
-- Logout via [admin/auth/logout.ts](src/pages/admin/auth/logout.ts) — funktional
-
-### Mews-Integration-UI im Backoffice
-
-**Existiert nicht.** Nur ein POST-Endpoint [api/admin/mews/sync.ts](src/pages/api/admin/mews/sync.ts) (Sprint 5). Kein:
-- Astro-Page für Token-Eingabe
-- Sync-Trigger-Button im UI
-- Sync-Status/letzter-Sync-Anzeige
-- `mews_integrations`-Row-Setup-Flow
-
-→ Neuer Hotelier (nicht das Demo-Hotel mit ENV-Credentials) hätte aktuell **keine UI**, um seine Mews-Integration einzurichten.
-
----
-
-## Bereich 3 · Datenfluss-Check
+| Page | Status | Funktion |
+|---|---|---|
+| `/login` | ✅ | Magic-Link-Email-Eingabe |
+| `/callback` | ✅ | Supabase verify + setSessionCookie + Redirect |
+| `/logout` | ✅ | clearSessionCookie + Redirect |
+| `/error` | ✅ | Magic-Link-Fehler-Anzeige |
+| `/dev-login` | ✅ | DEV-only, 404 in Production |
+| `/index` | ✅ | Redirect → /login |
 
 ### API-Endpoints
 
-| Endpoint | Auth | Was | DB-Op |
-|---|---|---|---|
-| POST `/api/bookings/create` | Token (Gast-Flow) | Validate `access_token` → `stay`, INSERT in `bookings` | Service-Role, schreibt `bookings(hotel_id, stay_id, type, status='pending', details)` |
-| POST `/api/bookings/update-status` | Session (Hotelier) | UPDATE `bookings.status` (RLS-protected) | SSR-Client |
-| GET `/api/qr/wifi/[hotelId]` | URL-Param (unklar gesichert?) | Generiert QR-Code | nur Lesen aus hotel_settings |
-| POST `/api/admin/mews/sync` | Session (Hotelier) | Triggert `syncHotelFromMews` | Service-Role, schreibt rooms/guests/stays |
-| POST `/api/admin/auth/dev-login` | DEV-only | Generates magic-link, verifies OTP | Service-Role für admin-listUsers |
-| POST `/api/admin/auth/logout` | Session | Sign out | SSR-Client |
-| GET `/api/admin/auth/callback` | URL-Token | Magic-link verifyOtp | SSR-Client |
-| POST `/api/translate` | Session | DeepL-Proxy | nur extern |
-
-### Datenfluss-Befund: Bookings-Flow ist round-trip OK
-
-```
-Gast (im Sheet)
-  → POST /api/bookings/create { access_token, type, details }
-    → Service-Role-Client validiert access_token → findet stay → INSERT bookings
-       mit hotel_id + stay_id + type + status='pending' + details
-  → bookings sind in [admin/bookings.astro] (loadBookingsForHotel) sichtbar
-  → Hotelier sieht & confirmt via POST /api/bookings/update-status (RLS-protected)
-  → bookings.status → 'confirmed' (oder 'cancelled')
-  → Gast sieht beim nächsten Aufruf den Status-View statt Form
-```
-
-### Mews-Datenfluss-Befund
-
-```
-Mews PMS
-  → POST /api/admin/mews/sync (Hotelier-getriggert — aber NUR API, kein UI)
-    → syncHotelFromMews → rooms/guests/stays UPSERT
-  → stays.access_token wird bei neuem Stay generiert (random 32 chars base64url)
-  → URL /g/<token> ist der NFC/QR-Link für den Gast
-  → Gast bucht → bookings (unsere DB)
-  → ❌ NICHT zurück nach Mews als "Charge to Room"-Order (out of scope Sprint 0+1)
-```
-
-**Wichtigster Befund:** Bookings bleiben in unserer DB. Mews weiß nichts von den Frühstück/Service/Konferenz-Buchungen die der Gast über uns macht. Das war als Sprint 5 (Bookings→Mews) im ursprünglichen Briefing geplant, ist aber nicht implementiert.
-
----
-
-## Bereich 4 · Datenbank-Nutzung
-
-### Tabellen-Inventory
-
-| Tabelle | Migration | Schreibt rein | Liest daraus | Genutzt? |
-|---|---|---|---|---|
-| `hotels` | ✓ Phase 8 | onboarding-wizard (RPC) + mews_sync (subscription_status?) | überall | ✓ aktiv |
-| `hotel_users` | ✓ | onboarding-wizard (RPC) | getUserHotels | ✓ aktiv |
-| `hotel_settings` | ✓ | onboarding-wizard + admin/* (bulk-update) | überall | ✓ aktiv |
-| `stays` | ✗ Mock-Schema, Sprint-1-Migration extended | mews_sync (UPSERT) | loadStayByToken, bookings | ✓ aktiv |
-| `guests` | ✗ Mock-Schema | mews_sync | loadStayByToken | ✓ aktiv |
-| `rooms` | ✗ Mock-Schema | mews_sync | loadStayByToken | ✓ aktiv |
-| `bookings` | ✗ Mock-Schema | bookings/create (Gast) | bookings.astro, sheets | ✓ aktiv |
-| `breakfast_items` | ✗ Mock-Schema | admin/breakfast + menu/[id] | BreakfastSheet, admin/breakfast, menu/index | ✓ aktiv |
-| `mews_integrations` | ✓ Sprint 1 | — (Onboarding-UI fehlt) | factory.ts (getMewsClientForHotel) | 🟡 **angelegt aber ungenutzt** |
-
-### `bookings.details` JSONB-Schema (de-facto)
-
-Wird unterschiedlich befüllt je `type`:
-
-```jsonc
-// type = 'breakfast'
-{ "date": "2026-05-29", "time": "08:00", "people": 2, "table_preference": "any", "notes": null }
-
-// type = 'service'
-{ "item_id": "...", "item_name": "Frische Handtücher", "timing": "scheduled", "time": "14:00", "notes": null }
-
-// type = 'conference'
-{ "room_id": "...", "room_name": "Salon Goethe", "date": "2026-05-30", "time": "09:00",
-  "duration_hours": 3, "people": 6, "occasion": "Team-Meeting", "notes": null }
-```
-
-→ Kein Schema-Constraint, nur Application-Layer-Konvention. JSONB-Validation fehlt.
-
-### Tabellen-Lücken (Module brauchen X)
-
-| Modul (Backoffice-Stub) | Bräuchte | Fehlt |
+| Endpoint | Auth | Funktion |
 |---|---|---|
-| `wallet.astro` | `wallet_passes`-Tabelle | ❌ existiert nicht |
-| `eve` (Tile, kein Page) | `eve_conversations`-Tabelle (per MVP_ARCHITEKTUR) | ❌ existiert nicht |
-| `pms.astro` (PMS-Setup-UI) | nutzt vorhandene `mews_integrations` | UI fehlt, Tabelle ist da |
-| `loyalty.astro` | Stammgäste-Tabelle, Visit-History | `guests.visit_count` existiert minimal — voll fehlt |
-| `reviews.astro` (Funnel) | Reviews-Tabelle + GMB-Sync | ❌ |
-| `nfc_tags` (per MVP_ARCH) | NFC-Tag-Mapping pro Zimmer | ❌ existiert nicht |
+| POST `/api/auth/send-magic-link` | Public | Supabase signInWithOtp |
+| GET `/api/auth/callback` | URL-Token | PKCE/Implicit-Flow verify |
+| POST `/api/auth/logout` | Cookie | clearSessionCookie |
+| POST `/api/auth/dev-login` | DEV-only | Direct-Login für lokale Tests |
+
+### Dependencies
+`@retaha/auth`, `@retaha/db`, `@retaha/ui`. Plus Supabase + Resend (über Supabase-Email-Magic-Link).
 
 ---
 
-## Bereich 5 · i18n
+## App 2 · app.retaha.de (Gast-Frontend, 3 Themes)
 
-### Zwei separate Stacks (wichtige Erkenntnis)
+**Status:** ✅ Production-deployed, Multi-Theme refresh (Sprint I Phase 6)
 
-| Bereich | Datei | Format | Sprachen | Status |
-|---|---|---|---|---|
-| **Gast-Frontend** | [src/lib/i18n.ts](src/lib/i18n.ts) | Inline `UI_STRINGS` const | DE / EN / FR / ES | Vollständig (~50 keys) |
-| **Sheet-spezifisch** | jeweils inline `labels` in WifiSheet/BreakfastSheet/etc. | Inline-Const | DE / EN / FR / ES | Vollständig pro Sheet |
-| **Backoffice** | [src/i18n/locales/admin/*.json](src/i18n/locales/admin/) (10 Files) + [src/i18n/helpers.ts](src/i18n/helpers.ts) | JSON-Files | DE / EN / FR / ES / IT / NL / PT / PL / TR / AR | DE+EN vollständig; 8 andere nur `trial_banner` + `subscription` + `nav` (sehr selektiv aus Phase 8.F) |
+### Pages-Struktur
 
-### Lücken für 6-Sprachen-Vision (DE/EN/TR/AR/FR/ES) + RTL
+```
+/                                  Root-Dev-Page
+/n/welcome                         NFC-Welcome (Notification-Flow)
+/g/[token]                         Gast-Hub (1853 LOC, alle 8 Sheets)
+/g/[token]/datenschutz             Legal
+/g/[token]/impressum               Legal
+/g/datenschutz-geloescht           DSGVO Art.17 Erledigt-Page
+/g/r/[room_code]                   Room-Redirect zu /g/[stay-token]
+```
 
-| Aspekt | Status |
+### Sheet-Components (8 Sheets in `components/sheets/`)
+
+| Sheet | LOC | Status | Funktion |
+|---|---|---|---|
+| BreakfastSheet | ~300 | ✅ funktional | Frühstück bestellen (Slot-Picker, Allergene, Multi-Item) |
+| ServiceSheet | ~250 | ✅ funktional | Service-Items (Handtücher, etc.) |
+| ConferenceSheet | ~200 | ✅ funktional | Konferenzraum-Booking (Hotelier-Confirm-Flow) |
+| WifiSheet | ~150 | ✅ funktional | WLAN-Info + QR-Code |
+| PlacesSheet | ~200 | ✅ funktional | Empfehlungen (Hotel-curated + Google Places) |
+| PlaceDetailSheet | ~400 | ✅ funktional | Place-Detail (Hours, Address, Hotel-Notiz) |
+| WalletAddSheet | ~260 | ✅ funktional | Google Wallet-Pass-Generator |
+| PostStaySheet | ~330 | ✅ funktional | Feedback (1-5 Stars + Kommentar) |
+
+### Eve KI-Concierge (in `components/eve/`)
+
+| Component | Status |
 |---|---|
-| Gast TR | ❌ — `Lang`-Type nur 'de'/'en'/'fr'/'es', muss erweitert werden |
-| Gast AR | ❌ — fehlt, plus RTL nicht implementiert |
-| Admin TR | 🟡 — Locale-File teilbefüllt (trial_banner + subscription + nav), Rest (auth, onboarding, settings, pages.*) fehlt |
-| Admin AR | 🟡 — gleiche Lage wie TR |
-| RTL-Support (CSS) | ❌ — `dir="rtl"`-Logik nirgendwo |
-| Sheets-Sprachen-Inline | ❌ — bei Erweiterung der Gast-Sprachen muss in jedem der 4 Sheets das `labels`-Object ergänzt werden (verstreute Maintenance-Stellen) |
-| Translation-Konsolidierung | ❌ — Gast vs. Admin sind zwei getrennte Helper-APIs; ein gemeinsamer Stack wäre wartbarer |
+| EveChatSheet | ✅ Anthropic Claude API + Tool-Use |
+| EveFloatingBubble | ✅ Eve-Trigger |
+| EveMessage | ✅ Chat-Bubble |
+| EveSuggestionChips | ✅ Suggested Replies |
+| EveTypingIndicator | ✅ Loading-Animation |
+| EveActionConfirmCard | ✅ Confirmation-Card |
 
-### `/api/translate` (DeepL-Proxy)
+### API-Endpoints
 
-Existiert ([Z. 28](src/pages/api/translate.ts#L28)). Funktional unklar (wo wird's vom UI aufgerufen?). Wahrscheinlich für Backoffice-Bulk-Übersetzungs-Pipeline (z. B. Hotel-Strings auf alle Sprachen mappen).
+| Endpoint | Funktion |
+|---|---|
+| POST `/api/bookings/create` | Booking-Insert (Sheets → bookings table) |
+| POST `/api/eve/chat` | Eve Chat (Anthropic + Tool-Use) |
+| POST `/api/eve/welcome` | Eve Welcome-Message |
+| GET `/api/places/picks` | Google Places + Hotel-Picks |
+| POST `/api/pair` | Stay-Cookie-Pair |
+| GET `/api/g/data-export` | DSGVO Art.15 Export |
+| POST `/api/g/data-delete` | DSGVO Art.17 Erase |
+| GET `/api/qr/hotel/[hotelId]` | Hotel-QR-Code SVG |
+| GET `/api/qr/room/[roomCode]` | Room-QR-Code SVG |
+| POST `/api/webhooks/google-wallet` | Wallet-Opt-Out Webhook |
 
----
+### Themes
 
-## Übersichts-Matrix
+3 Themes via `data-theme` + `resolveTheme({hotelTheme})`:
+- `bauhaus_manufaktur` (default) — Pink-Shock-Akzent
+- `premium_anthrazit` — Gold-Akzent
+- `warmes_burgund` — Burgund + Cormorant Garamond
 
-### Gast-Frontend Module
+Sprint I Phase 6 hat alle Pages + Sheets theme-aware gemacht (sheet-eyebrow → themed-flank, Status-Colors → tokens, Sage/Pink konsistent).
 
-| Modul | Status | Liest | Schreibt | Mews-angebunden | Lücke |
-|---|---|---|---|---|---|
-| Frühstück-Sheet | ✓ | breakfast_items + hotel_settings | bookings (type=breakfast) | indirekt (stay_id) | — |
-| Service-Sheet | ✓ | hotel_settings.service_items | bookings (type=service) | indirekt | — |
-| Konferenz-Sheet | ✓ | hotel_settings.conference_rooms | bookings (type=conference) | indirekt | — |
-| Wifi-Sheet | ✓ | hotel_settings.wifi_* | — | nein | — |
-| Empfehlungen-Slider | 🟡 | hotel_settings.recommendations | — | nein | kein interaktiver Click-Through, kein Google-Places |
-| Concierge-Card | 🟡 | hotel_settings.concierge_* | — | nein | Wetter hardcoded, Eve fehlt |
-| Eve KI-Concierge | ❌ | — | — | — | komplett offen |
-| Wallet/Apple-Pass | ❌ | — | — | — | komplett offen |
-| Berlin-Tipps | ❌ | — | — | — | Tile da, Inhalt fehlt |
-| Check-out | ❌ | — | — | — | Tile da, Self-Check-out fehlt |
-| Sprach-Switcher | ✓ | URL-Param | — | nein | TR/AR fehlen |
-
-### Backoffice-Pages
-
-| Page | Status | Liest | Schreibt | Mews-angebunden | Lücke |
-|---|---|---|---|---|---|
-| dashboard | ✓ | hotel_settings + stays-count | — | indirekt | aggregierte Anfragen-Cockpit fehlt |
-| bookings | ✓ | bookings via loadBookingsForHotel | bookings.status (via API) | indirekt | OK |
-| breakfast/service/conference | ✓ | hotel_settings | hotel_settings (Bulk-Update) | nein | OK |
-| settings | ✓ | hotel_settings + hotels | beide | nein | OK |
-| recommendations | ✓ | hotel_settings.recommendations | hotel_settings | nein | OK |
-| features | ✓ | hotel_settings.features | hotel_settings | nein | OK |
-| menu/index + menu/[id] | ✓ | breakfast_items | breakfast_items | nein | OK |
-| login | 🟡 | — | — | — | nur DEV-mode, prod fehlt |
-| subscription | 🟡 | hotels.subscription_status | — | nein | Stripe fehlt (geplant für Phase 8.H) |
-| **mews-integration** | ❌ | — | — | — | **komplett fehlt** (nur API existiert) |
-| **eve-prompt-config** | ❌ | — | — | — | komplett offen |
-| 20× andere Stubs | ❌ | — | — | — | Roadmap-Module |
+### Dependencies
+`@retaha/auth`, `@retaha/db`, `@retaha/eve`, `@retaha/i18n`, `@retaha/ui`, `@retaha/wallet`. Plus Anthropic + Google Places + Resend.
 
 ---
 
-## Empfehlung — sinnvollster nächster Sprint
+## App 3 · dashboard.retaha.de (Operations-Dashboard)
 
-### Primary: **Sprint B — Mews-Backoffice-Integration-UI** (~4-6h)
+**Status:** ✅ Production-deployed, Marken-konform (Sprint I Phase 5)
 
-Das größte foundation-blockierende Loch. Aktuell:
-- Sync funktioniert technisch ✓
-- ABER: nur das **Demo-Hotel** wird via ENV-Credentials geprüft (`useEnvCredentials: true`)
-- Jedes andere Hotel hätte keine Möglichkeit, seine Mews-Integration einzurichten
+### Pages
 
-Was zu bauen wäre:
-1. Neue Page `src/pages/admin/integrations/mews.astro` mit:
-   - Token-Eingabe-Form (ClientToken + AccessToken)
-   - Encryption + INSERT in `mews_integrations`
-   - "Sync jetzt"-Button → ruft `/api/admin/mews/sync` (ohne useEnvCredentials)
-   - Anzeige: letzter Sync-Zeitpunkt, Status (idle/syncing/error), letzte Fehler-Message
-2. Nav-Link in [AdminLayout.astro](src/components/AdminLayout.astro) — vermutlich im `pms.astro`-Stub integrieren (der ja als Platzhalter da ist)
+| Page | LOC | Funktion |
+|---|---|---|
+| `/` (Cockpit) | 430 | Übersicht: Belegung, Frühstück, Service-Pending, Onboarding-Checkliste |
+| `/bookings` | 549 | Booking-Liste mit Status-Pills + UX-017 Mews-Charge-Retry-Banner |
+| `/service` | 397 | Service-Anfragen mit Confirm/Reject + Mews-Push-Status |
+| `/qr` | 241 | QR-Code-Übersicht (Hotel-weit + Zimmer-Bogen-Printables) |
+| `/qr/print` | 209 | Druckansicht für Tischaufsteller + Zimmer-Bogen |
 
-Foundation-Wert: schließt Sprint 0+1 Schritt 6 ab, macht das System Multi-Hotel-fähig.
+### Cron-Jobs (`vercel.json`)
 
-### Secondary: **Sprint C — Bookings → Mews Charge-to-Room** (~6-10h)
+| Cron | Schedule | Funktion |
+|---|---|---|
+| `/api/cron/mews-sync-all` | `*/15 * * * *` | Mews-Sync alle 15min |
+| `/api/cron/stay-push-scheduler` | `*/15 * * * *` | Stay-Push-Trigger-Sequence |
+| `/api/cron/pre-arrival-invites` | `0 8 * * *` | Tägliche Pre-Arrival-Mails |
 
-Wenn ein Gast Frühstück bucht, schreiben wir's in unsere `bookings`-Tabelle. **Mews weiß nichts davon.** Production-Show-Stopper: Hotelier muss die Charge manuell in Mews nachtragen.
+### Layout-Disziplin
 
-Was zu bauen wäre:
-1. Nach `bookings.status = 'confirmed'` → POST an Mews `orderItems/add` mit Stay-ID + Service + Charge
-2. `bookings.mews_order_id` befüllen (Spalte existiert schon!)
-3. Reverse: wenn Mews die Order cancelt → unsere `bookings.status = 'cancelled'` (Webhook? oder polling-Sync?)
+`AppLayout.astro` hat explizit dokumentierte **KAPSELUNGS-DISZIPLIN** (Sprint F):
+- KEINE AdminLayout-Internals (NotificationBell, AdminFooter)
+- Minimal Top-Bar: Hotel-Name + Operations-Eyebrow + Config-Link zu /admin
+- Mobile-first Tab-Nav
 
-User-Impact: macht das Demo "vollständig" — von Gast-Buchung bis Mews-Charge in einem Round-Trip.
+Sprint I Phase 1 hat NotificationBell in packages/ui bereit, aber NICHT in Dashboard eingebunden (Trial-Status ist Owner-Konzern, Dashboard ist Mitarbeiter-Tool).
 
-### Tertiary: **Sprint D — Design-Sprint Gast-Frontend** (~8-12h)
+### UX-017 Mews-Charge-to-Room
 
-Das Sprint-A-Briefing hat das explizit als "separater Design-Sprint" markiert. Welcome-Screen, gestaltetes Showcase (mit Hotelier-Toggle Q11), Layout-Politur. User-Impact für Käufer-Vorführung hoch — aber keine neue Foundation.
+Bookings/Service-Buchungen werden bei `status=confirmed` automatisch nach Mews gepusht. Bei Push-Failure: Pink-Banner in `/bookings` mit Retry-Button (`POST /api/bookings/[id]/retry-mews-push`).
 
-### Plus persistente Backlog-Items (für später)
-
-- **Produktiver Login-Flow** (Magic-Link send, Vercel-prod-fähig) — vor erstem Käufer-Pilot Pflicht
-- **i18n-Konsolidierung** (Gast + Admin in einem Stack, TR + AR + RTL)
-- **Eve KI-Concierge** (Anthropic API, tool-use) — separater Sprint
-- **Wallet Apple/Google Pass** — separater Sprint
-- **Google Places für Empfehlungen** — kein neues Sprint-MUST, aber UX-relevant
+### Dependencies
+`@retaha/auth`, `@retaha/db`, `@retaha/i18n`, `@retaha/ui`. Plus Mews-Connector (eingebettet, packages/mews extract ist Sprint-J-Backlog).
 
 ---
 
-## Status
+## App 4 · backoffice.retaha.de (Hotelier-Config)
 
-**STOP** — keine Code-Änderung. Sobald du den nächsten Sprint wählst, los.
+**Status:** ✅ Production-deployed, 59 Pages Marken-refresht (Sprint I Phase 4a-e)
 
-Sprint A hat gezeigt: bevor wir bauen, gucken — und vorm Discovery dachten wir auch das Gast-Frontend wäre quasi leer. Diese Inventur zeigt dasselbe Pattern: **viel mehr funktional als gedacht, aber 20 Backoffice-Stubs warten auf Implementation, und Mews-UI ist die größte unmittelbare Lücke.**
+### Page-Kategorien
+
+**Funktional (39 Pages)**
+
+| Kategorie | Pages |
+|---|---|
+| Setup/Auth | `setup`, `login`, `dashboard` |
+| Hotel-Config | `settings`, `features`, `pms`, `email-domain` |
+| Daten-Editoren | `breakfast`, `menu/index`, `menu/[id]`, `service`, `conference`, `recommendations` (308 zu action-cards), `action-cards` |
+| Operations | `bookings` (zu /app/bookings), `checkins`, `feedback`, `nfc-tags`, `showcase`, `team`, `places/index` |
+| Eve | `eve/knowledge`, `eve/settings`, `eve/feedback` |
+| Marketing (10 Pages) | `marketing/{index,campaigns/{index,new,[id]},drips/{index,new,[id]},templates/{index,new,[id]/edit}}` |
+| Wallet | `wallet`, `wallet-keys` (ComingSoon) |
+| Stay-Pushes | `stay-pushes/index`, `stay-pushes/[trigger_type]` |
+| Legal | `agb`, `datenschutz`, `impressum` |
+| Subscription | `subscription` (Stripe-Backlog) |
+
+**ComingSoonModal-Stubs (19 Pages)**
+
+`best-price`, `booking-engine`, `booking-recovery`, `concierge`, `email-campaigns`, `gmb`, `guests`, `loyalty`, `microsite`, `pre-stay`, `referrals`, `restaurant`, `reviews`, `self-checkout`, `seo`, `spa`, `wallet`, `wallet-keys`, `whatsapp`
+
+→ Auto-generiert via `scripts/generate-coming-soon-stubs.mjs`. Alle erben den `@retaha/ui/components/admin/ComingSoonModal.astro` (Sprint I Phase 4e DRY-Refresh + Phase 7 Konsolidierung).
+
+### Cron-Jobs (`vercel.json`)
+
+| Cron | Schedule | Funktion |
+|---|---|---|
+| `/api/cron/marketing-scheduler` | `*/30 * * * *` | Marketing-Campaign-Scheduler |
+| `/api/cron/marketing-drips` | `0 9 * * *` | Tägliche Drip-Sequence |
+| `/api/cron/auto-delete-stays` | `0 3 * * *` | DSGVO Auto-Delete (KILL-SWITCH `AUTO_DELETE_ENABLED=false`) |
+| `/api/cron/eve-chat-cleanup` | `0 4 * * *` | Eve-Chat-Retention |
+| `/api/cron/places-refresh` | `0 5 * * 0` | Wöchentlicher Google-Places-Refresh |
+| `/api/cron/places-nearby-refresh` | `0 6 * * 0` | Nearby-Places-Refresh |
+
+### Mews-Integration-UI
+
+`/admin/pms` — Charge-Toggles + Mews-Token-Eingabe + Sync-Trigger. UX-017 P3 Konfiguration.
+
+### Dependencies
+`@retaha/auth`, `@retaha/db`, `@retaha/eve`, `@retaha/i18n`, `@retaha/marketing`, `@retaha/ui`, `@retaha/wallet`.
+
+---
+
+## packages/ui (Shared UI-Library)
+
+**Komponenten** (alle theme-aware via `var(--theme-*)`)
+
+| Component | Path | Usage |
+|---|---|---|
+| **BauhausToggle** | `components/admin/` | Sage-Toggle (3 Pages: breakfast, features, menu/[id]) |
+| **ComingSoonModal** | `components/admin/` | Stub-Modal (19 Pages erben) |
+| **EditorialPageHeader** | `components/admin/` | Page-Header (14 Pages mit `sectionNumber + sectionLabel`) |
+| **NotificationBell** | `components/admin/` | Trial-Status-Bell mit Popover (1 Page: AdminLayout) |
+| **ThemePicker** | `components/admin/` | 3-Theme-Cards (1 Page: settings) |
+
+**Styles**
+
+| File | Funktion |
+|---|---|
+| `themes.css` | 3 Themes via `data-theme` (default `:root`) |
+| `tokens.css` | Layout-Tokens (Spacing/Container/Icon-Vars aus APP_STYLEGUIDE) |
+| `global.css` | Tailwind v4 `@theme` Aliases auf Theme-Vars |
+| `retaha.css` | Legacy `--color-*` Aliases auf `--theme-*` |
+| `icons.css` | Tabler-Icons-Webfont (outline + filled) |
+| `components/buttons.css` | `.bauhaus-button` Familie (primary mit Pink-Bullet) |
+| `components/inputs.css` | `.bauhaus-input` mit Pink-Focus-Glow |
+| `components/pills.css` | `.bauhaus-pill`, `.bauhaus-field-eyebrow` |
+| `components/menu.css` | AdminLayout-Menu |
+| `components/settings.css` | Settings-Page-Layout |
+| `components/login.css` | Backoffice-Login-Hero |
+| `components/legal.css` | Legal-Pages (theme-aware) |
+| `components/onboarding.css` | Onboarding-Wizard |
+| `components/status-markers.css` | Bauhaus-Status-Shapes (●/■/─/▲) mit Pulse-5s-Stop |
+
+**Theme-Lib**
+
+| Export | Funktion |
+|---|---|
+| `resolveTheme({hotelTheme, requestUrl})` | Theme-Resolver mit Preview-Query-Override |
+| `THEME_DESCRIPTORS` | Theme-Metadata |
+| `THEMES` | Theme-ID-Konstanten |
+| `isThemeId(x)` | Type-Guard |
+
+---
+
+## Datenbank
+
+### Production-Supabase
+
+`twmzhrcadixzcdlupisd` (eu-central-1 Frankfurt) — **noch leer, 0 public tables.**
+
+**Sprint G Phase 3 Aufgabe:** alle Migrations aus `supabase/migrations/` ausführen, AUSSER:
+- `20260602_dev_test_users.sql` — Dev-Test-User auf Dev-Test-Hotel, NICHT für Production
+
+### Tabellen (aus Migration-Files erwartete Struktur)
+
+| Tabelle | Funktion |
+|---|---|
+| `hotels` | Hotel-Stamm-Daten + subscription_status + theme |
+| `hotel_users` | Multi-User-Membership (Owner/Manager/Staff) |
+| `hotel_settings` | JSONB-Konfiguration (features, recommendations, eve, etc.) |
+| `mews_integrations` | Mews-Token (encrypted) + Charge-Toggles + Hotel-FK |
+| `stays`, `guests`, `rooms` | Mews-Sync-Target (composite UNIQUE auf rooms via BRAND-003) |
+| `bookings` | Gast-Buchungen (breakfast/service/conference) + mews_order_id + mews_push_error |
+| `breakfast_items` | Frühstück-Menu mit EU-14-Allergenen |
+| `nfc_tags` | NFC-Tag-Mapping (Sprint E4) |
+| `marketing_templates`, `campaigns`, `drips`, `drip_steps`, `passes` | Marketing-System |
+| `places`, `place_picks`, `place_nearby` | Empfehlungen + Google Places-Cache |
+| `eve_conversations`, `eve_messages`, `eve_feedback` | Eve-Chat-History |
+| `wallet_passes`, `wallet_pass_classes` | Google Wallet-Pass-Tracking |
+| `feedback` | Post-Stay-Feedback (1-5 Stars + Kommentar) |
+| `stay_pushes`, `stay_push_sends` | Push-Notification-System (UX-016) |
+| `consent_log` | DSGVO-Consent-Tracking (IP-Hash + Salt) |
+
+### Migrations (Top 5 letzte)
+
+```
+20260604_ux017_charge_enabled_toggles.sql  — UX-017 P3 Charge-Toggles
+20260603_brand003_room_hotel_isolation.sql — Composite FK Rooms→Hotel
+20260602_dev_test_users.sql                — Dev-Test-User (NICHT Prod!)
+20260601_*                                  — Pre-Sprint-G-Sammelung
+20260530_*                                  — Sprint H Group 4c Migrations
+```
+
+---
+
+## Dev-Environment
+
+- **Node:** 24.x
+- **Package-Manager:** pnpm 9.15.9
+- **Monorepo:** turbo 2.x + pnpm workspaces
+- **Astro:** 6.x SSR via Vercel-Adapter
+- **Region:** fra1 (Frankfurt, DSGVO)
+- **CI/CD:** Vercel auto-deploy via GitHub-Webhook (Sprint G Phase 1)
+- **Test-Suite:** ⚠️ FEHLT (Sprint J Backlog, siehe docs/BACKLOG_SPRINT_J_TESTS.md)
+
+### Ports (lokal)
+
+| App | Port |
+|---|---|
+| auth | 4321 |
+| guest | 4322 |
+| dashboard | 4323 |
+| backoffice | 4324 |
+
+---
+
+## Status für Sprint G Phase 3-7
+
+✅ **Sprint G Phase 1-2 abgeschlossen** (Vercel-Projekte + 58 ENVs)
+🟡 **Phase 3** — Production-Supabase Schema-Migration (USER-ACTION oder MCP)
+🟡 **Phase 4** — Cron-Jobs auf Vercel testen
+🟡 **Phase 5** — Webhook-URLs Google Wallet konfigurieren
+🟡 **Phase 6** — Initial Production-Deploy + Smoke-Tests
+🟡 **Phase 7** — Post-Deploy-Cleanup (root `src/` löschen)
+
+---
+
+**Stand:** 2026-06-03 nach Sprint I (Marken-Manifest) + Sprint G Phase 1-2 (Production-Migration).
+**Letzte komplette Neufassung:** 2026-06-03 (alte 2026-05-28-Version war Sprint-F-verlust pfad-veraltet).
