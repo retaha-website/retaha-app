@@ -1,0 +1,386 @@
+---
+/**
+ * packages/ui/src/components/showcase/DashboardShowcase.astro
+ *
+ * Sprint-I-Findings-Fix-Run Round 3 (Login v4g):
+ * Cyclische 4-Card Animation, eine Card sichtbar, cross-fade alle X Sekunden.
+ *
+ * Cards (hardcoded, lokalisierbar in Sprint J):
+ *   1. Cockpit       — Belegung jetzt / Frühstück heute / Service offen
+ *   2. Bookings      — Frühstück morgen (Liste + Zeitfenster)
+ *   3. Service       — Service-Anfragen pending
+ *   4. QR / Tags     — NFC + QR-Tag-Management
+ *
+ * Implementation: Alpine.js x-data state mit setInterval, opacity-Cross-Fade.
+ * Timing-Tokens via tokens.css (--duration-slow, --ease-out-expo).
+ *
+ * Props:
+ *   autoplaySeconds (default 4) — Zeit zwischen Card-Wechseln
+ */
+
+interface Props {
+  autoplaySeconds?: number;
+}
+const { autoplaySeconds = 4 } = Astro.props;
+const intervalMs = autoplaySeconds * 1000;
+---
+
+<div
+  class="dashboard-showcase"
+  x-data={`{
+    active: 0,
+    total: 4,
+    _interval: null,
+    init() {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      this._interval = setInterval(() => {
+        this.active = (this.active + 1) % this.total;
+      }, ${intervalMs});
+    },
+    destroy() {
+      if (this._interval) clearInterval(this._interval);
+    },
+  }`}
+  x-init="init()"
+>
+  <!-- ─── Card 1: Cockpit ─── -->
+  <article class="ds-card" :class="active === 0 ? 'is-active' : ''">
+    <header class="ds-card-head">
+      <p class="ds-card-eyebrow">Cockpit · Mittwoch, 4. Juni</p>
+      <h3 class="ds-card-title">Guten Morgen, retaha Manufaktur<span class="ds-card-dot">.</span></h3>
+    </header>
+    <div class="ds-stats">
+      <div class="ds-stat">
+        <p class="ds-stat-label">Belegung jetzt</p>
+        <p class="ds-stat-value">18/24</p>
+        <p class="ds-stat-sub">75% belegt</p>
+      </div>
+      <div class="ds-stat">
+        <p class="ds-stat-label">Frühstück heute</p>
+        <p class="ds-stat-value">14</p>
+        <p class="ds-stat-sub">Buchungen</p>
+      </div>
+      <div class="ds-stat ds-stat--alert">
+        <p class="ds-stat-label">Service offen</p>
+        <p class="ds-stat-value">3</p>
+        <p class="ds-stat-sub">wartet auf Bestätigung →</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── Card 2: Bookings ─── -->
+  <article class="ds-card" :class="active === 1 ? 'is-active' : ''">
+    <header class="ds-card-head">
+      <p class="ds-card-eyebrow">Buchungen · Morgen</p>
+      <h3 class="ds-card-title">Frühstück morgen<span class="ds-card-dot">.</span></h3>
+    </header>
+    <div class="ds-list">
+      <div class="ds-list-row">
+        <span class="ds-list-time">07:30</span>
+        <span class="ds-list-name">A. Schmid · Zimmer 12</span>
+        <span class="ds-list-count">2 Personen</span>
+      </div>
+      <div class="ds-list-row">
+        <span class="ds-list-time">08:00</span>
+        <span class="ds-list-name">F. Köhler · Zimmer 8</span>
+        <span class="ds-list-count">1 Person</span>
+      </div>
+      <div class="ds-list-row">
+        <span class="ds-list-time">08:30</span>
+        <span class="ds-list-name">M. Berger · Zimmer 20</span>
+        <span class="ds-list-count">3 Personen</span>
+      </div>
+      <div class="ds-list-row">
+        <span class="ds-list-time">09:00</span>
+        <span class="ds-list-name">+ 8 weitere</span>
+        <span class="ds-list-count"></span>
+      </div>
+    </div>
+    <p class="ds-list-foot">Zeitfenster 07:30–10:30 · 18 Personen gesamt</p>
+  </article>
+
+  <!-- ─── Card 3: Service ─── -->
+  <article class="ds-card" :class="active === 2 ? 'is-active' : ''">
+    <header class="ds-card-head">
+      <p class="ds-card-eyebrow">Service · Pending</p>
+      <h3 class="ds-card-title">Brauchen Aktion<span class="ds-card-dot">.</span></h3>
+    </header>
+    <div class="ds-services">
+      <div class="ds-service">
+        <p class="ds-service-summary">Zusätzliches Handtuch</p>
+        <p class="ds-service-meta">L. Hofer · Zimmer 14 · vor 12 Min</p>
+        <div class="ds-service-actions">
+          <span class="ds-service-btn ds-service-btn--ok">Bestätigen</span>
+          <span class="ds-service-btn">Ablehnen</span>
+        </div>
+      </div>
+      <div class="ds-service">
+        <p class="ds-service-summary">Späterer Check-out (13:00)</p>
+        <p class="ds-service-meta">K. Stein · Zimmer 7 · vor 28 Min</p>
+        <div class="ds-service-actions">
+          <span class="ds-service-btn ds-service-btn--ok">Bestätigen</span>
+          <span class="ds-service-btn">Ablehnen</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── Card 4: QR / NFC Tags ─── -->
+  <article class="ds-card" :class="active === 3 ? 'is-active' : ''">
+    <header class="ds-card-head">
+      <p class="ds-card-eyebrow">QR · NFC · Tags</p>
+      <h3 class="ds-card-title">Alle Touchpoints im Blick<span class="ds-card-dot">.</span></h3>
+    </header>
+    <div class="ds-tags">
+      <div class="ds-tag">
+        <span class="ds-tag-icon" aria-hidden="true">●</span>
+        <div class="ds-tag-body">
+          <p class="ds-tag-name">Lobby-NFC</p>
+          <p class="ds-tag-meta">241 Scans · letzter vor 4 Min</p>
+        </div>
+      </div>
+      <div class="ds-tag">
+        <span class="ds-tag-icon" aria-hidden="true">■</span>
+        <div class="ds-tag-body">
+          <p class="ds-tag-name">Zimmer 12 · QR</p>
+          <p class="ds-tag-meta">42 Scans · aktiv seit Mai</p>
+        </div>
+      </div>
+      <div class="ds-tag">
+        <span class="ds-tag-icon" aria-hidden="true">▲</span>
+        <div class="ds-tag-body">
+          <p class="ds-tag-name">Frühstücks-Karte</p>
+          <p class="ds-tag-meta">89 Scans · sehr aktiv</p>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── Indicator-Dots ─── -->
+  <div class="ds-indicators" aria-hidden="true">
+    <button type="button" class="ds-indicator" :class="active === 0 ? 'is-active' : ''" @click="active = 0"></button>
+    <button type="button" class="ds-indicator" :class="active === 1 ? 'is-active' : ''" @click="active = 1"></button>
+    <button type="button" class="ds-indicator" :class="active === 2 ? 'is-active' : ''" @click="active = 2"></button>
+    <button type="button" class="ds-indicator" :class="active === 3 ? 'is-active' : ''" @click="active = 3"></button>
+  </div>
+</div>
+
+<style>
+  .dashboard-showcase {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    max-height: 320px;
+    background: var(--color-anthrazit-card, #242424);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .ds-card {
+    position: absolute;
+    inset: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform 800ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+    pointer-events: none;
+  }
+
+  .ds-card.is-active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .ds-card-head { display: flex; flex-direction: column; gap: 4px; }
+
+  .ds-card-eyebrow {
+    margin: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .ds-card-title {
+    margin: 0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+  }
+
+  .ds-card-dot { color: #FF4A82; }
+
+  /* ─── Card 1: Stats ─── */
+  .ds-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: auto;
+  }
+  .ds-stat {
+    padding: 12px;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ds-stat--alert {
+    background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
+    border: 1px solid rgba(255, 74, 130, 0.3);
+  }
+  .ds-stat-label {
+    margin: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+  .ds-stat-value {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.95);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .ds-stat-sub {
+    margin: 0;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .ds-stat--alert .ds-stat-sub { color: #FF4A82; font-weight: 500; }
+
+  /* ─── Card 2: List (Bookings) ─── */
+  .ds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .ds-list-row {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 12px;
+    padding: 8px 10px;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-radius: 4px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .ds-list-time { font-family: 'JetBrains Mono', monospace; color: rgba(255, 255, 255, 0.7); }
+  .ds-list-name { color: rgba(255, 255, 255, 0.85); }
+  .ds-list-count { font-family: 'JetBrains Mono', monospace; color: rgba(255, 255, 255, 0.5); font-size: 10px; }
+  .ds-list-foot {
+    margin: 8px 0 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  /* ─── Card 3: Services ─── */
+  .ds-services { display: flex; flex-direction: column; gap: 10px; }
+  .ds-service {
+    padding: 12px;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-left: 2px solid #FF4A82;
+    border-radius: 4px;
+  }
+  .ds-service-summary {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .ds-service-meta {
+    margin: 0 0 8px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .ds-service-actions { display: flex; gap: 6px; }
+  .ds-service-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: 3px;
+  }
+  .ds-service-btn--ok {
+    background: #FF4A82;
+    color: #1A1A1A;
+    border-color: #FF4A82;
+  }
+
+  /* ─── Card 4: Tags ─── */
+  .ds-tags { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .ds-tag {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-radius: 4px;
+  }
+  .ds-tag-icon {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    color: #FF4A82;
+    font-size: 14px;
+  }
+  .ds-tag-body { flex: 1; min-width: 0; }
+  .ds-tag-name { margin: 0; font-size: 12px; color: rgba(255, 255, 255, 0.88); font-weight: 500; }
+  .ds-tag-meta { margin: 0; font-size: 10px; color: rgba(255, 255, 255, 0.5); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.06em; }
+
+  /* ─── Indicators ─── */
+  .ds-indicators {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 2;
+  }
+  .ds-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+                width 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+  .ds-indicator.is-active {
+    background: #FF4A82;
+    width: 18px;
+    border-radius: 3px;
+  }
+
+  /* Reduced-Motion respektieren */
+  @media (prefers-reduced-motion: reduce) {
+    .ds-card { transition: none; }
+    .ds-indicator { transition: none; }
+  }
+</style>
