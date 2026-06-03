@@ -1,29 +1,13 @@
 ---
 /**
- * apps/auth/src/pages/login.astro — v4g FINAL (Round 4)
+ * apps/auth/src/pages/login.astro — v4g Round 5
  *
- * 1:1 nach login_v4g_insertion.html + login_success_state.html
- * Sprint-I-Findings-Fix-Run · 8 Bug-Fixes + Inline-Validation + Loading + Success-State.
- *
- * Bug-Fixes aus User-Visual-Review Round 3:
- *   1. Primary-Button Hover: bleibt Anthrazit + Pink-Glow-SHADOW (kein Pink-BG)
- *   2. "— manufaktur —" Eyebrow ENTFERNT (Hero startet direkt mit <h1>)
- *   3. Password-Section Animation smooth (ease-out-expo, 900ms)
- *   4. Password-Section KEIN Pink-Background (weiss wie Email-Field)
- *   5. Support-Link: Anthrazit-Text + dunne Underline, Pink nur on Hover
- *   6. DashboardShowcase mittig via flex:1 + justify-center
- *   7. Trademark + Copyright im Hero-Bottom ergaenzt
- *   8. Spacing-Buffer am Hero-Unterrand (padding: 56px 64px symmetrisch)
- *
- * Neu in Round 4:
- *   - Inline-Validation (kein Browser-Tooltip)
- *   - Loading-State auf Submit-Button (Spinner + Text)
- *   - Success-State mit pulsierendem Dreieck + Stagger-Animation
- *   - Resend-Cooldown (60s)
- *
- * API-Binding (existierende Endpoints):
- *   POST /api/auth/send-magic-link
- *   POST /api/auth/login-password
+ * Aenderungen ggue. Round 4:
+ *   - "Anmeldung" -> "Anmelden" (Verb-Form, matched Button-Lowercase)
+ *   - Sprachwechsler (4 Sprachen: de/en/fr/es) mit localStorage
+ *   - Alle UI-Texte i18n via t(key) Funktion
+ *   - Pink-Dot Button-Fix: Dot wandert INNERHALB jeden btn-text-Span
+ *     statt globalen ::before (so bleibt Dot+Text immer mittig zusammen)
  */
 
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
@@ -39,6 +23,148 @@ import '@fontsource/jetbrains-mono/400.css';
 const url = new URL(Astro.request.url);
 const rawReturnTo = url.searchParams.get('return_to');
 const returnTo = sanitizeReturnTo(rawReturnTo);
+
+/* i18n Dictionary — kompakt am Server inline.
+   Auf 4 Sprachen aus hotel.enabled_languages-Spec (de, en, fr, es).
+   Sprint-J-Option: nach @retaha/i18n migrieren wenn Pattern stabil ist. */
+const t = {
+  de: {
+    title: 'Anmelden',
+    sub_magic: 'Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.',
+    sub_password: 'Gib deine E-Mail und dein Passwort ein.',
+    label_email: 'E-Mail',
+    label_password: 'Passwort',
+    placeholder_email: 'hotelier@example.com',
+    placeholder_password: 'dein passwort',
+    btn_magic: 'magic-link senden',
+    btn_password: 'anmelden',
+    btn_loading_magic: 'wird gesendet...',
+    btn_loading_password: 'anmelden...',
+    toggle_to_password: '→ stattdessen mit passwort anmelden',
+    aria_close_password: 'Passwort-Eingabe schliessen',
+    err_email_empty: 'Bitte E-Mail-Adresse eingeben.',
+    err_email_invalid: 'Ungültige E-Mail-Adresse.',
+    err_password_empty: 'Bitte Passwort eingeben.',
+    err_password_short: 'Passwort zu kurz (mindestens 8 Zeichen).',
+    err_credentials: 'E-Mail oder Passwort falsch.',
+    err_unknown_email: 'Diese E-Mail ist nicht hinterlegt. Frag deinen Admin um eine Einladung.',
+    err_rate_limit: 'Zu viele Anfragen. Versuche es in einer Stunde erneut.',
+    err_send_failed: 'Fehler beim Senden. Versuche es erneut.',
+    err_network: 'Netzwerk-Fehler. Versuche es erneut.',
+    support_text_1: 'Kein Zugang? Kontaktiere den retaha-Support unter',
+    support_text_2: 'oder bitte deinen Admin um eine Einladung.',
+    success_eyebrow: '— gesendet —',
+    success_title: 'Check dein Postfach',
+    success_message: 'Wir haben dir einen Einmal-Link an',
+    success_validity: 'Der Link ist 60 Minuten gültig.',
+    success_back: '← zurück zur Anmeldung',
+    resend_q: 'Keine E-Mail erhalten?',
+    resend_btn: 'erneut senden',
+    resend_cooldown: 'erneut senden ({s}s)',
+  },
+  en: {
+    title: 'Sign in',
+    sub_magic: 'Enter your email address. We will send you a one-time link.',
+    sub_password: 'Enter your email and password.',
+    label_email: 'Email',
+    label_password: 'Password',
+    placeholder_email: 'hotelier@example.com',
+    placeholder_password: 'your password',
+    btn_magic: 'send magic link',
+    btn_password: 'sign in',
+    btn_loading_magic: 'sending...',
+    btn_loading_password: 'signing in...',
+    toggle_to_password: '→ use password instead',
+    aria_close_password: 'Close password input',
+    err_email_empty: 'Please enter your email address.',
+    err_email_invalid: 'Invalid email address.',
+    err_password_empty: 'Please enter your password.',
+    err_password_short: 'Password too short (minimum 8 characters).',
+    err_credentials: 'Wrong email or password.',
+    err_unknown_email: 'This email is not registered. Ask your admin for an invitation.',
+    err_rate_limit: 'Too many requests. Try again in an hour.',
+    err_send_failed: 'Sending failed. Please try again.',
+    err_network: 'Network error. Please try again.',
+    support_text_1: 'No access? Contact retaha support at',
+    support_text_2: 'or ask your admin for an invitation.',
+    success_eyebrow: '— sent —',
+    success_title: 'Check your inbox',
+    success_message: 'We sent a one-time link to',
+    success_validity: 'The link is valid for 60 minutes.',
+    success_back: '← back to login',
+    resend_q: 'Did not receive the email?',
+    resend_btn: 'send again',
+    resend_cooldown: 'send again ({s}s)',
+  },
+  fr: {
+    title: 'Connexion',
+    sub_magic: 'Saisis ton adresse e-mail. Nous t\'enverrons un lien unique.',
+    sub_password: 'Saisis ton e-mail et ton mot de passe.',
+    label_email: 'E-mail',
+    label_password: 'Mot de passe',
+    placeholder_email: 'hotelier@example.com',
+    placeholder_password: 'ton mot de passe',
+    btn_magic: 'envoyer le lien magique',
+    btn_password: 'se connecter',
+    btn_loading_magic: 'envoi...',
+    btn_loading_password: 'connexion...',
+    toggle_to_password: '→ utiliser un mot de passe',
+    aria_close_password: 'Fermer la saisie du mot de passe',
+    err_email_empty: 'Saisis ton adresse e-mail.',
+    err_email_invalid: 'Adresse e-mail invalide.',
+    err_password_empty: 'Saisis ton mot de passe.',
+    err_password_short: 'Mot de passe trop court (8 caractères minimum).',
+    err_credentials: 'E-mail ou mot de passe incorrect.',
+    err_unknown_email: 'Cet e-mail n\'est pas enregistré. Demande une invitation à ton admin.',
+    err_rate_limit: 'Trop de tentatives. Réessaie dans une heure.',
+    err_send_failed: 'Envoi échoué. Réessaie.',
+    err_network: 'Erreur réseau. Réessaie.',
+    support_text_1: 'Pas d\'accès ? Contacte le support retaha à',
+    support_text_2: 'ou demande une invitation à ton admin.',
+    success_eyebrow: '— envoyé —',
+    success_title: 'Vérifie ta boîte mail',
+    success_message: 'Nous avons envoyé un lien unique à',
+    success_validity: 'Le lien est valable 60 minutes.',
+    success_back: '← retour à la connexion',
+    resend_q: 'Pas reçu l\'e-mail ?',
+    resend_btn: 'renvoyer',
+    resend_cooldown: 'renvoyer ({s}s)',
+  },
+  es: {
+    title: 'Iniciar sesión',
+    sub_magic: 'Introduce tu correo. Te enviaremos un enlace único.',
+    sub_password: 'Introduce tu correo y contraseña.',
+    label_email: 'Correo',
+    label_password: 'Contraseña',
+    placeholder_email: 'hotelier@example.com',
+    placeholder_password: 'tu contraseña',
+    btn_magic: 'enviar enlace mágico',
+    btn_password: 'iniciar sesión',
+    btn_loading_magic: 'enviando...',
+    btn_loading_password: 'iniciando sesión...',
+    toggle_to_password: '→ usar contraseña',
+    aria_close_password: 'Cerrar entrada de contraseña',
+    err_email_empty: 'Introduce tu correo.',
+    err_email_invalid: 'Correo no válido.',
+    err_password_empty: 'Introduce la contraseña.',
+    err_password_short: 'Contraseña muy corta (mín. 8 caracteres).',
+    err_credentials: 'Correo o contraseña incorrectos.',
+    err_unknown_email: 'Este correo no está registrado. Pide una invitación a tu admin.',
+    err_rate_limit: 'Demasiados intentos. Intenta en una hora.',
+    err_send_failed: 'Error al enviar. Intenta de nuevo.',
+    err_network: 'Error de red. Intenta de nuevo.',
+    support_text_1: '¿Sin acceso? Contacta a soporte retaha en',
+    support_text_2: 'o pide a tu admin una invitación.',
+    success_eyebrow: '— enviado —',
+    success_title: 'Revisa tu bandeja',
+    success_message: 'Te enviamos un enlace único a',
+    success_validity: 'El enlace es válido 60 minutos.',
+    success_back: '← volver al inicio',
+    resend_q: '¿No recibiste el correo?',
+    resend_btn: 'reenviar',
+    resend_cooldown: 'reenviar ({s}s)',
+  },
+};
 ---
 
 <!DOCTYPE html>
@@ -47,7 +173,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex,nofollow" />
-    <title>Anmeldung · retaha</title>
+    <title>Anmelden · retaha</title>
   </head>
   <body>
 
@@ -101,6 +227,33 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
           resendCooldown: 0,
           _resendTimer: null,
           returnTo: ${JSON.stringify(returnTo)},
+          currentLang: 'de',
+          translations: ${JSON.stringify(t)},
+
+          init() {
+            const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('retaha_lang')) || '';
+            const allowed = ['de', 'en', 'fr', 'es'];
+            if (allowed.indexOf(stored) >= 0) {
+              this.currentLang = stored;
+            } else if (typeof navigator !== 'undefined') {
+              const browser = (navigator.language || 'de').slice(0, 2).toLowerCase();
+              if (allowed.indexOf(browser) >= 0) this.currentLang = browser;
+            }
+            document.documentElement.lang = this.currentLang;
+          },
+
+          t(key, vars) {
+            const dict = this.translations[this.currentLang] || this.translations.de;
+            let s = dict[key] || key;
+            if (vars) Object.keys(vars).forEach(k => { s = s.replace('{' + k + '}', vars[k]); });
+            return s;
+          },
+
+          setLang(lang) {
+            this.currentLang = lang;
+            try { localStorage.setItem('retaha_lang', lang); } catch (e) {}
+            document.documentElement.lang = lang;
+          },
 
           togglePassword() {
             this.passwordExpanded = !this.passwordExpanded;
@@ -116,10 +269,10 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
           },
 
           validateEmail() {
-            if (!this.email) { this.emailError = 'Bitte E-Mail-Adresse eingeben.'; return false; }
+            if (!this.email) { this.emailError = this.t('err_email_empty'); return false; }
             const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
             if (!re.test(this.email)) {
-              this.emailError = 'Ungültige E-Mail-Adresse.';
+              this.emailError = this.t('err_email_invalid');
               return false;
             }
             this.emailError = '';
@@ -127,9 +280,9 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
           },
 
           validatePassword() {
-            if (!this.password) { this.passwordError = 'Bitte Passwort eingeben.'; return false; }
+            if (!this.password) { this.passwordError = this.t('err_password_empty'); return false; }
             if (this.password.length < 8) {
-              this.passwordError = 'Passwort zu kurz (mindestens 8 Zeichen).';
+              this.passwordError = this.t('err_password_short');
               return false;
             }
             this.passwordError = '';
@@ -141,24 +294,15 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
             if (this._resendTimer) clearInterval(this._resendTimer);
             this._resendTimer = setInterval(() => {
               this.resendCooldown--;
-              if (this.resendCooldown <= 0) {
-                clearInterval(this._resendTimer);
-                this._resendTimer = null;
-              }
+              if (this.resendCooldown <= 0) { clearInterval(this._resendTimer); this._resendTimer = null; }
             }, 1000);
           },
 
           async submit(e) {
             e?.preventDefault?.();
             this.errorMessage = '';
-            if (!this.validateEmail()) {
-              this.$refs.emailInput?.focus();
-              return;
-            }
-            if (this.passwordExpanded && !this.validatePassword()) {
-              this.$refs.passwordInput?.focus();
-              return;
-            }
+            if (!this.validateEmail()) { this.$refs.emailInput?.focus(); return; }
+            if (this.passwordExpanded && !this.validatePassword()) { this.$refs.passwordInput?.focus(); return; }
             this.isSubmitting = true;
             try {
               if (this.passwordExpanded) {
@@ -168,11 +312,8 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                   body: JSON.stringify({ email: this.email, password: this.password, return_to: this.returnTo }),
                 });
                 const data = await res.json().catch(() => ({}));
-                if (data.ok && data.redirect) {
-                  window.location.href = data.redirect;
-                  return;
-                }
-                this.errorMessage = 'E-Mail oder Passwort falsch.';
+                if (data.ok && data.redirect) { window.location.href = data.redirect; return; }
+                this.errorMessage = this.t('err_credentials');
               } else {
                 const res = await fetch('/api/auth/send-magic-link', {
                   method: 'POST',
@@ -187,13 +328,13 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                   return;
                 }
                 this.errorMessage = data.error === 'unknown-email'
-                  ? 'Diese E-Mail ist nicht hinterlegt. Frag deinen Admin um eine Einladung.'
+                  ? this.t('err_unknown_email')
                   : data.error === 'rate-limited'
-                  ? 'Zu viele Anfragen. Versuche es in einer Stunde erneut.'
-                  : 'Fehler beim Senden. Versuche es erneut.';
+                  ? this.t('err_rate_limit')
+                  : this.t('err_send_failed');
               }
             } catch (err) {
-              this.errorMessage = 'Netzwerk-Fehler. Versuche es erneut.';
+              this.errorMessage = this.t('err_network');
             } finally {
               this.isSubmitting = false;
             }
@@ -209,14 +350,8 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                 body: JSON.stringify({ email: this.sentEmail, return_to: this.returnTo }),
               });
               const data = await res.json().catch(() => ({}));
-              if (data.ok) {
-                this.startResendCooldown();
-              }
-            } catch (err) {
-              /* still show success — link already sent */
-            } finally {
-              this.isSubmitting = false;
-            }
+              if (data.ok) this.startResendCooldown();
+            } catch (err) { /* silent */ } finally { this.isSubmitting = false; }
           },
 
           resetToForm() {
@@ -228,39 +363,46 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
             this.passwordExpanded = false;
           },
         }`}
+        x-init="init()"
       >
+
+        <!-- Language-Switcher: oben rechts in der Form-Side -->
+        <div class="lang-switcher" aria-label="Sprache" x-cloak>
+          <button type="button" :class="{ 'is-active': currentLang === 'de' }" @click="setLang('de')">DE</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" :class="{ 'is-active': currentLang === 'en' }" @click="setLang('en')">EN</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" :class="{ 'is-active': currentLang === 'fr' }" @click="setLang('fr')">FR</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" :class="{ 'is-active': currentLang === 'es' }" @click="setLang('es')">ES</button>
+        </div>
+
         <div class="form-container">
 
           <!-- ═══════ STANDARD-FORM ═══════ -->
           <div x-show="!successShown">
             <header>
-              <h2 class="form-state-title">Anmeldung<span class="h-dot">.</span></h2>
+              <h2 class="form-state-title"><span x-text="t('title')"></span><span class="h-dot">.</span></h2>
 
               <div class="form-state-sub-wrap">
-                <p class="form-state-sub" :class="{ 'is-visible': !passwordExpanded }">
-                  Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.
-                </p>
-                <p class="form-state-sub" :class="{ 'is-visible': passwordExpanded }">
-                  Gib deine E-Mail und dein Passwort ein.
-                </p>
+                <p class="form-state-sub" :class="{ 'is-visible': !passwordExpanded }" x-text="t('sub_magic')"></p>
+                <p class="form-state-sub" :class="{ 'is-visible': passwordExpanded }" x-text="t('sub_password')"></p>
               </div>
             </header>
 
-            <!-- API-Error-Banner (oberhalb Form) -->
             <div class="form-error" x-show="errorMessage" x-cloak x-text="errorMessage"></div>
 
             <form @submit="submit($event)" novalidate>
 
-              <!-- Email-Field (immer sichtbar) -->
               <div class="field">
-                <label class="field-label" for="email-input">E-Mail</label>
+                <label class="field-label" for="email-input" x-text="t('label_email')"></label>
                 <input
                   id="email-input"
                   x-ref="emailInput"
                   type="email"
                   inputmode="email"
                   autocomplete="email"
-                  placeholder="hotelier@example.com"
+                  :placeholder="t('placeholder_email')"
                   class="field-input"
                   :class="emailError ? 'is-error' : ''"
                   x-model="email"
@@ -269,16 +411,15 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                 <div class="field-error" :class="emailError ? 'is-visible' : ''" x-text="emailError"></div>
               </div>
 
-              <!-- Password-Section (Progressive Disclosure) -->
               <div class="password-section" :data-visible="passwordExpanded">
                 <div class="field">
                   <div class="field-header">
-                    <label class="field-label" for="password-input">Passwort</label>
+                    <label class="field-label" for="password-input" x-text="t('label_password')"></label>
                     <button
                       type="button"
                       class="field-close"
                       @click="togglePassword()"
-                      aria-label="Passwort-Eingabe schliessen"
+                      :aria-label="t('aria_close_password')"
                     >
                       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                         <path d="M3 3 L11 11 M11 3 L3 11" />
@@ -290,7 +431,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                     x-ref="passwordInput"
                     type="password"
                     autocomplete="current-password"
-                    placeholder="dein passwort"
+                    :placeholder="t('placeholder_password')"
                     class="field-input"
                     :class="passwordError ? 'is-error' : ''"
                     x-model="password"
@@ -300,7 +441,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                 </div>
               </div>
 
-              <!-- Primary-Button (Text + Loading via Cross-Fade) -->
+              <!-- Primary-Button: Dot innerhalb jeden btn-text Span (zentriert mit Text) -->
               <button
                 class="btn-primary"
                 :class="isSubmitting ? 'is-loading' : ''"
@@ -308,28 +449,31 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                 type="submit"
               >
                 <span class="btn-text-wrap">
-                  <span class="btn-text" :class="{ 'is-visible': !passwordExpanded && !isSubmitting }">magic-link senden</span>
-                  <span class="btn-text" :class="{ 'is-visible': passwordExpanded && !isSubmitting }">anmelden</span>
+                  <span class="btn-text" :class="{ 'is-visible': !passwordExpanded && !isSubmitting }">
+                    <span class="btn-dot" aria-hidden="true"></span>
+                    <span x-text="t('btn_magic')"></span>
+                  </span>
+                  <span class="btn-text" :class="{ 'is-visible': passwordExpanded && !isSubmitting }">
+                    <span class="btn-dot" aria-hidden="true"></span>
+                    <span x-text="t('btn_password')"></span>
+                  </span>
                   <span class="btn-text" :class="{ 'is-visible': isSubmitting }">
-                    <span class="btn-spinner"></span>
-                    <span x-text="passwordExpanded ? 'anmelden...' : 'wird gesendet...'"></span>
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                    <span x-text="passwordExpanded ? t('btn_loading_password') : t('btn_loading_magic')"></span>
                   </span>
                 </span>
               </button>
 
-              <!-- Toggle-Link (fade-out beim Expand) -->
               <div class="form-toggle" :data-hidden="passwordExpanded">
-                <button type="button" class="toggle-link" @click="togglePassword()">
-                  → stattdessen mit passwort anmelden
-                </button>
+                <button type="button" class="toggle-link" @click="togglePassword()" x-text="t('toggle_to_password')"></button>
               </div>
             </form>
 
             <div class="form-footer">
               <p class="footer-support">
-                Kein Zugang? Kontaktiere den retaha-Support unter
+                <span x-text="t('support_text_1')"></span>
                 <a href="mailto:support@retaha.de">support@retaha.de</a>
-                oder bitte deinen Admin um eine Einladung.
+                <span x-text="t('support_text_2')"></span>
               </p>
             </div>
           </div>
@@ -337,27 +481,21 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
           <!-- ═══════ SUCCESS-STATE ═══════ -->
           <div x-show="successShown" x-cloak class="success-wrap">
             <div class="success-triangle"></div>
-            <p class="success-eyebrow">— gesendet —</p>
-            <h1 class="success-title">Check dein Postfach<span class="h-dot">.</span></h1>
-            <p class="success-message">Wir haben dir einen Einmal-Link an</p>
+            <p class="success-eyebrow" x-text="t('success_eyebrow')"></p>
+            <h1 class="success-title"><span x-text="t('success_title')"></span><span class="h-dot">.</span></h1>
+            <p class="success-message" x-text="t('success_message')"></p>
             <div class="success-email" x-text="sentEmail"></div>
-            <p class="success-validity">Der Link ist 60 Minuten gültig.</p>
+            <p class="success-validity" x-text="t('success_validity')"></p>
 
             <div class="success-actions">
-              <button type="button" class="btn-secondary" @click="resetToForm()">
-                ← zurück zur Anmeldung
-              </button>
+              <button type="button" class="btn-secondary" @click="resetToForm()" x-text="t('success_back')"></button>
             </div>
 
             <div class="resend-link">
-              Keine E-Mail erhalten?
-              <button
-                type="button"
-                @click="resend()"
-                :disabled="resendCooldown > 0 || isSubmitting"
-              >
-                <span x-show="resendCooldown <= 0">erneut senden</span>
-                <span x-show="resendCooldown > 0" x-cloak>erneut senden (<span x-text="resendCooldown"></span>s)</span>
+              <span x-text="t('resend_q')"></span>
+              <button type="button" @click="resend()" :disabled="resendCooldown > 0 || isSubmitting">
+                <span x-show="resendCooldown <= 0" x-text="t('resend_btn')"></span>
+                <span x-show="resendCooldown > 0" x-cloak x-text="t('resend_cooldown', { s: resendCooldown })"></span>
               </button>
             </div>
           </div>
@@ -375,10 +513,6 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
     </script>
 
     <style>
-      /* ============================================================
-         1:1 aus login_v4g_insertion.html + login_success_state.html
-         ============================================================ */
-
       :root {
         --color-pink-shock: #FF4A82;
         --color-pink-glow: rgba(255, 74, 130, 0.18);
@@ -409,7 +543,6 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       [x-cloak] { display: none !important; }
 
-      /* LAYOUT */
       .auth-layout { display: grid; grid-template-columns: 1fr; height: 100vh; }
       @media (min-width: 768px) { .auth-layout { grid-template-columns: 45% 55%; } }
       @media (max-width: 767px) {
@@ -425,16 +558,11 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       @media (min-width: 768px) { .auth-hero { padding: 56px 64px; } }
 
-      /* Brand-Logo (von <Logo> Komponente — :global mit class hier ueberschrieben) */
-      .auth-hero :global(.brand-logo) {
-        margin-bottom: 40px;
-      }
+      .auth-hero :global(.brand-logo) { margin-bottom: 40px; }
       .auth-hero :global(.brand-logo svg) {
         transition: transform 600ms var(--ease-in-out-back);
       }
-      .auth-hero :global(.brand-logo:hover svg) {
-        transform: rotate(8deg) scale(1.05);
-      }
+      .auth-hero :global(.brand-logo:hover svg) { transform: rotate(8deg) scale(1.05); }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
       .hero-headline {
@@ -443,10 +571,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       @media (min-width: 1280px) { .hero-headline { font-size: 48px; } }
       .hero-headline .h-dot { color: var(--color-pink-shock); }
-      .hero-tagline {
-        font-size: 15px; line-height: 1.5;
-        color: rgba(255, 255, 255, 0.7); max-width: 380px;
-      }
+      .hero-tagline { font-size: 15px; line-height: 1.5; color: rgba(255,255,255,0.7); max-width: 380px; }
 
       .hero-bottom {
         margin-top: auto; padding-top: 24px;
@@ -478,6 +603,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
 
       /* FORM-SIDE */
       .auth-form-side {
+        position: relative;
         background: var(--color-white); padding: 48px 32px;
         display: flex; flex-direction: column;
         justify-content: center; align-items: center;
@@ -485,40 +611,65 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       @media (min-width: 768px) { .auth-form-side { padding: 64px; } }
       @media (max-width: 767px) { .auth-form-side { height: auto; min-height: 60vh; } }
+
+      /* Language-Switcher: oben rechts */
+      .lang-switcher {
+        position: absolute;
+        top: 24px;
+        right: 32px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: rgba(26, 26, 26, 0.3);
+        z-index: 2;
+      }
+      @media (min-width: 768px) { .lang-switcher { top: 32px; right: 40px; } }
+      .lang-switcher button {
+        background: transparent;
+        border: none;
+        padding: 4px 4px;
+        font-family: inherit;
+        font-size: inherit;
+        letter-spacing: inherit;
+        color: rgba(26, 26, 26, 0.4);
+        cursor: pointer;
+        transition: color var(--duration-fast) ease;
+      }
+      .lang-switcher button:hover,
+      .lang-switcher button:focus-visible {
+        color: var(--color-anthrazit);
+        outline: none;
+      }
+      .lang-switcher button.is-active {
+        color: var(--color-pink-shock);
+      }
+      .lang-switcher span {
+        user-select: none;
+        opacity: 0.6;
+      }
+
       .form-container { max-width: 400px; width: 100%; }
 
-      /* h2 = APP_STYLEGUIDE.md Sektion 2.2: 28px / 500 / -0.018em / 1.2 */
+      /* h2 = Styleguide Sektion 2.2: 28/500/-0.018em/1.2 */
       .form-state-title {
-        font-size: 28px;
-        font-weight: 500;
-        letter-spacing: -0.018em;
-        line-height: 1.2;
-        color: var(--color-anthrazit);
-        margin-bottom: 10px;
+        font-size: 28px; font-weight: 500;
+        letter-spacing: -0.018em; line-height: 1.2;
+        color: var(--color-anthrazit); margin-bottom: 10px;
       }
       .form-state-title .h-dot { color: var(--color-pink-shock); }
 
-      /* Sub-Text Cross-Fade: alle IMMER absolute, container hat explizite Höhe */
-      .form-state-sub-wrap {
-        position: relative;
-        min-height: 44px;
-        margin-bottom: 32px;
-      }
+      .form-state-sub-wrap { position: relative; min-height: 44px; margin-bottom: 32px; }
       .form-state-sub {
-        position: absolute;
-        inset: 0;
-        font-size: 14px;
-        color: rgba(26, 26, 26, 0.6);
-        line-height: 1.55;
-        opacity: 0;
-        pointer-events: none;
+        position: absolute; inset: 0;
+        font-size: 14px; color: rgba(26, 26, 26, 0.6); line-height: 1.55;
+        opacity: 0; pointer-events: none;
         transition: opacity var(--duration-slow) var(--ease-out-expo);
         margin: 0;
       }
-      .form-state-sub.is-visible {
-        opacity: 1;
-        pointer-events: auto;
-      }
+      .form-state-sub.is-visible { opacity: 1; pointer-events: auto; }
 
       .field { margin-bottom: 16px; position: relative; }
       .field-label {
@@ -541,9 +692,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         outline: none; border-color: var(--color-pink-shock);
         box-shadow: 0 0 0 4px var(--color-pink-soft);
       }
-      .field-input.is-error {
-        border-color: var(--color-pink-shock);
-      }
+      .field-input.is-error { border-color: var(--color-pink-shock); }
 
       .field-header {
         display: flex; align-items: center; justify-content: space-between;
@@ -564,51 +713,34 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       .field-close svg { width: 14px; height: 14px; }
 
-      /* Inline-Field-Error (mit ▲ Indicator) */
       .field-error {
-        margin-top: 6px;
-        font-size: 12px;
-        color: var(--color-pink-shock);
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        opacity: 0;
-        transform: translateY(-4px);
+        margin-top: 6px; font-size: 12px; color: var(--color-pink-shock);
+        display: flex; align-items: center; gap: 6px;
+        opacity: 0; transform: translateY(-4px);
         transition: opacity 250ms ease, transform 250ms ease;
       }
       .field-error.is-visible { opacity: 1; transform: translateY(0); }
       .field-error:not(:empty)::before {
-        content: "▲";
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 8px;
+        content: "▲"; font-family: 'JetBrains Mono', monospace; font-size: 8px;
       }
 
-      /* Form-Error (API-Banner) */
       .form-error {
-        margin-bottom: 16px;
-        padding: 10px 14px;
+        margin-bottom: 16px; padding: 10px 14px;
         background: rgba(255, 74, 130, 0.08);
         border-left: 3px solid var(--color-pink-shock);
-        border-radius: 3px;
-        font-size: 13px;
-        color: var(--color-anthrazit);
+        border-radius: 3px; font-size: 13px; color: var(--color-anthrazit);
       }
 
-      /* Primary-Button — Bug 1: bleibt Anthrazit, Pink-Glow als SHADOW */
+      /* Primary-Button: KEIN globales ::before mehr — Dot wandert in jeden btn-text */
       .btn-primary {
         display: flex; align-items: center; justify-content: center;
-        gap: 10px; width: 100%; padding: 14px 24px;
+        width: 100%; padding: 14px 24px;
         border: none; border-radius: var(--radius);
         background: var(--color-anthrazit); color: var(--color-white);
         font-family: 'Space Grotesk', sans-serif;
         font-size: 14px; font-weight: 500; cursor: pointer;
         transition: all 280ms var(--ease-out-quint);
         min-height: 48px; position: relative;
-      }
-      .btn-primary::before {
-        content: ''; width: 5px; height: 5px;
-        background: var(--color-pink-shock);
-        border-radius: 50%; flex-shrink: 0;
       }
       .btn-primary:hover:not(:disabled) {
         background: var(--color-anthrazit-soft);
@@ -619,23 +751,21 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       .btn-primary.is-loading { pointer-events: none; opacity: 0.85; }
       .btn-primary:disabled { cursor: wait; }
 
-      /* Button-Text Cross-Fade: alle IMMER absolute, container hat explizite Höhe */
+      /* Container fuer Cross-Fade (alle btn-text immer absolute zentriert) */
       .btn-text-wrap {
         position: relative;
         display: inline-block;
-        min-width: 140px;
+        min-width: 160px;
         height: 20px;
         line-height: 20px;
       }
       .btn-text {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: 0; left: 0; right: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 10px;
         white-space: nowrap;
         opacity: 0;
         pointer-events: none;
@@ -646,24 +776,27 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         pointer-events: auto;
       }
 
-      /* Loading-Spinner */
+      /* Pink-Dot INSIDE jeden btn-text — bleibt zentriert mit Text */
+      .btn-dot {
+        width: 5px; height: 5px;
+        background: var(--color-pink-shock);
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
       .btn-spinner {
         display: inline-block;
-        width: 12px;
-        height: 12px;
+        width: 12px; height: 12px;
         border: 2px solid rgba(255, 255, 255, 0.25);
         border-top-color: var(--color-pink-shock);
         border-radius: 50%;
         animation: spin 700ms linear infinite;
-        margin-right: 8px;
-        vertical-align: middle;
+        flex-shrink: 0;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
 
-      /* Toggle-Link */
       .form-toggle {
-        margin-top: 24px;
-        text-align: center;
+        margin-top: 24px; text-align: center;
         transition:
           opacity var(--duration-base) var(--ease-out-expo),
           max-height var(--duration-slow) var(--ease-out-expo),
@@ -672,10 +805,7 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         max-height: 60px;
       }
       .form-toggle[data-hidden="true"] {
-        opacity: 0;
-        max-height: 0;
-        margin-top: 0;
-        pointer-events: none;
+        opacity: 0; max-height: 0; margin-top: 0; pointer-events: none;
       }
       .toggle-link {
         background: transparent; border: none; font-family: inherit;
@@ -685,39 +815,24 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       }
       .toggle-link:hover { background: var(--color-pink-soft); }
 
-      /* Password-Section — Bug 3+4: smooth animation, KEIN Pink-BG */
       .password-section {
         overflow: hidden;
-        max-height: 0;
-        opacity: 0;
+        max-height: 0; opacity: 0;
         transition:
           max-height var(--duration-very-slow) var(--ease-out-expo),
           opacity var(--duration-slow) var(--ease-out-expo);
       }
-      .password-section[data-visible="true"] {
-        max-height: 240px;
-        opacity: 1;
-      }
+      .password-section[data-visible="true"] { max-height: 240px; opacity: 1; }
       .password-section .field {
-        transform: translateY(12px);
-        opacity: 0;
+        transform: translateY(12px); opacity: 0;
         transition:
           transform var(--duration-slow) var(--ease-out-expo) 350ms,
           opacity var(--duration-slow) var(--ease-out-expo) 350ms;
       }
-      .password-section[data-visible="true"] .field {
-        transform: translateY(0);
-        opacity: 1;
-      }
+      .password-section[data-visible="true"] .field { transform: translateY(0); opacity: 1; }
 
-      /* Footer — Bug 5: Support-Link Anthrazit + Underline, Pink on Hover */
-      .form-footer {
-        margin-top: 48px; padding-top: 24px;
-        border-top: 1px solid rgba(26, 26, 26, 0.08);
-      }
-      .footer-support {
-        font-size: 12px; color: rgba(26, 26, 26, 0.5); line-height: 1.6;
-      }
+      .form-footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(26, 26, 26, 0.08); }
+      .footer-support { font-size: 12px; color: rgba(26, 26, 26, 0.5); line-height: 1.6; }
       .footer-support a {
         color: var(--color-anthrazit);
         border-bottom: 1px solid rgba(26, 26, 26, 0.2);
@@ -729,75 +844,54 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         border-bottom-color: var(--color-pink-shock);
       }
 
-      /* ═══════════ SUCCESS-STATE (1:1 aus login_success_state.html) ═══════════ */
-
-      .success-wrap {
-        text-align: center;
-        animation: successEnter 800ms var(--ease-out-expo);
-      }
+      /* SUCCESS-STATE */
+      .success-wrap { text-align: center; animation: successEnter 800ms var(--ease-out-expo); }
       @keyframes successEnter {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
       }
-
       .success-triangle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 32px;
-        width: 72px;
-        height: 72px;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 32px; width: 72px; height: 72px;
         animation: triangleEntrance 1000ms var(--ease-in-out-back);
       }
       .success-triangle::before {
         content: "▲";
         font-family: 'JetBrains Mono', monospace;
-        font-size: 64px;
-        color: var(--color-pink-shock);
-        line-height: 1;
-        display: block;
+        font-size: 64px; color: var(--color-pink-shock);
+        line-height: 1; display: block;
         animation: trianglePulse 2400ms var(--ease-out-expo) 1000ms infinite;
       }
       @keyframes triangleEntrance {
-        0%   { opacity: 0; transform: scale(0.4) rotate(-15deg); }
-        60%  { opacity: 1; transform: scale(1.15) rotate(0deg); }
+        0% { opacity: 0; transform: scale(0.4) rotate(-15deg); }
+        60% { opacity: 1; transform: scale(1.15) rotate(0deg); }
         100% { opacity: 1; transform: scale(1) rotate(0deg); }
       }
       @keyframes trianglePulse {
         0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
-        50%      { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--color-pink-glow)); }
+        50% { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--color-pink-glow)); }
       }
-
       .success-eyebrow {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--color-pink-shock);
-        margin-bottom: 16px;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--color-pink-shock); margin-bottom: 16px;
         animation: fadeUp 600ms var(--ease-out-expo) 300ms backwards;
       }
-      /* h1 = APP_STYLEGUIDE.md Sektion 2.2: 36px / 500 / -0.02em / 1.15 */
+      /* h1 = Styleguide Sektion 2.2: 36/500/-0.02em/1.15 */
       .success-title {
-        font-size: 36px;
-        font-weight: 500;
-        letter-spacing: -0.02em;
-        line-height: 1.15;
-        color: var(--color-anthrazit);
-        margin-bottom: 16px;
+        font-size: 36px; font-weight: 500;
+        letter-spacing: -0.02em; line-height: 1.15;
+        color: var(--color-anthrazit); margin-bottom: 16px;
         animation: fadeUp 700ms var(--ease-out-expo) 450ms backwards;
       }
       .success-title .h-dot { color: var(--color-pink-shock); }
       .success-message {
-        font-size: 15px;
-        color: rgba(26, 26, 26, 0.65);
-        line-height: 1.6;
+        font-size: 15px; color: rgba(26, 26, 26, 0.65); line-height: 1.6;
         margin-bottom: 8px;
         animation: fadeUp 700ms var(--ease-out-expo) 600ms backwards;
       }
       .success-email {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace; font-size: 13px;
         color: var(--color-anthrazit);
         padding: 8px 14px;
         background: rgba(26, 26, 26, 0.04);
@@ -808,26 +902,19 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         animation: fadeUp 700ms var(--ease-out-expo) 750ms backwards;
       }
       .success-validity {
-        font-size: 13px;
-        color: rgba(26, 26, 26, 0.5);
-        margin-bottom: 40px;
+        font-size: 13px; color: rgba(26, 26, 26, 0.5); margin-bottom: 40px;
         animation: fadeUp 700ms var(--ease-out-expo) 900ms backwards;
       }
       .success-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+        display: flex; flex-direction: column; gap: 12px;
         animation: fadeUp 700ms var(--ease-out-expo) 1050ms backwards;
       }
       .btn-secondary {
         background: transparent;
         border: 1px solid rgba(26, 26, 26, 0.2);
         color: var(--color-anthrazit);
-        padding: 12px 24px;
-        border-radius: var(--radius);
-        font-family: inherit;
-        font-size: 13px;
-        cursor: pointer;
+        padding: 12px 24px; border-radius: var(--radius);
+        font-family: inherit; font-size: 13px; cursor: pointer;
         transition: all 250ms var(--ease-out-expo);
       }
       .btn-secondary:hover {
@@ -836,30 +923,23 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         background: var(--color-pink-soft);
       }
       .resend-link {
-        font-size: 12px;
-        color: rgba(26, 26, 26, 0.5);
-        margin-top: 16px;
+        font-size: 12px; color: rgba(26, 26, 26, 0.5); margin-top: 16px;
         animation: fadeUp 700ms var(--ease-out-expo) 1200ms backwards;
       }
       .resend-link button {
-        background: transparent;
-        border: none;
-        color: var(--color-pink-shock);
-        cursor: pointer;
-        font-family: inherit;
-        font-size: 12px;
-        padding: 4px 8px;
-        border-radius: var(--radius);
+        background: transparent; border: none;
+        color: var(--color-pink-shock); cursor: pointer;
+        font-family: inherit; font-size: 12px;
+        padding: 4px 8px; border-radius: var(--radius);
         transition: background 200ms ease;
       }
       .resend-link button:hover:not(:disabled) { background: var(--color-pink-soft); }
       .resend-link button:disabled {
-        color: rgba(26, 26, 26, 0.3);
-        cursor: not-allowed;
+        color: rgba(26, 26, 26, 0.3); cursor: not-allowed;
       }
       @keyframes fadeUp {
         from { opacity: 0; transform: translateY(12px); }
-        to   { opacity: 1; transform: translateY(0); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       @media (prefers-reduced-motion: reduce) {
