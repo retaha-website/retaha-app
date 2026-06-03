@@ -24,11 +24,22 @@ const url = new URL(Astro.request.url);
 const rawReturnTo = url.searchParams.get('return_to');
 const returnTo = sanitizeReturnTo(rawReturnTo);
 
+/* Server-side: Cookie lesen fuer initiales <html lang>-Attribut (SEO + Anti-Flash) */
+const ALLOWED_LANGS = ['de', 'en', 'fr', 'es', 'tr'] as const;
+const cookieLang = Astro.cookies.get('retaha_lang')?.value ?? '';
+const initialLang: typeof ALLOWED_LANGS[number] =
+  (ALLOWED_LANGS as readonly string[]).includes(cookieLang)
+    ? (cookieLang as typeof ALLOWED_LANGS[number])
+    : 'de';
+
 /* i18n Dictionary — kompakt am Server inline.
-   Auf 4 Sprachen aus hotel.enabled_languages-Spec (de, en, fr, es).
+   5 Sprachen: de, en, fr, es, tr.
    Sprint-J-Option: nach @retaha/i18n migrieren wenn Pattern stabil ist. */
 const t = {
   de: {
+    hero_line1: 'Willkommen',
+    hero_line2: 'zurück',
+    hero_tagline: 'Manufaktur-Handwerk für Premium-Hotels.',
     title: 'Anmelden',
     sub_magic: 'Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.',
     sub_password: 'Gib deine E-Mail und dein Passwort ein.',
@@ -63,6 +74,9 @@ const t = {
     resend_cooldown: 'erneut senden ({s}s)',
   },
   en: {
+    hero_line1: 'Welcome',
+    hero_line2: 'back',
+    hero_tagline: 'Manufacture-grade craft for premium hotels.',
     title: 'Sign in',
     sub_magic: 'Enter your email address. We will send you a one-time link.',
     sub_password: 'Enter your email and password.',
@@ -97,6 +111,9 @@ const t = {
     resend_cooldown: 'send again ({s}s)',
   },
   fr: {
+    hero_line1: 'Bon',
+    hero_line2: 'retour',
+    hero_tagline: 'Savoir-faire artisanal pour hôtels premium.',
     title: 'Connexion',
     sub_magic: 'Saisis ton adresse e-mail. Nous t\'enverrons un lien unique.',
     sub_password: 'Saisis ton e-mail et ton mot de passe.',
@@ -131,6 +148,9 @@ const t = {
     resend_cooldown: 'renvoyer ({s}s)',
   },
   es: {
+    hero_line1: 'Bienvenido',
+    hero_line2: 'de nuevo',
+    hero_tagline: 'Artesanía de manufactura para hoteles premium.',
     title: 'Iniciar sesión',
     sub_magic: 'Introduce tu correo. Te enviaremos un enlace único.',
     sub_password: 'Introduce tu correo y contraseña.',
@@ -164,11 +184,48 @@ const t = {
     resend_btn: 'reenviar',
     resend_cooldown: 'reenviar ({s}s)',
   },
+  tr: {
+    hero_line1: 'Tekrar',
+    hero_line2: 'hoş geldin',
+    hero_tagline: 'Premium oteller için manifaktür zanaatkârlığı.',
+    title: 'Giriş yap',
+    sub_magic: 'E-posta adresini gir. Sana tek kullanımlık bir bağlantı göndereceğiz.',
+    sub_password: 'E-posta ve şifreni gir.',
+    label_email: 'E-posta',
+    label_password: 'Şifre',
+    placeholder_email: 'hotelier@example.com',
+    placeholder_password: 'şifren',
+    btn_magic: 'sihirli bağlantı gönder',
+    btn_password: 'giriş yap',
+    btn_loading_magic: 'gönderiliyor...',
+    btn_loading_password: 'giriş yapılıyor...',
+    toggle_to_password: '→ bunun yerine şifreyle giriş yap',
+    aria_close_password: 'Şifre girişini kapat',
+    err_email_empty: 'Lütfen e-posta adresini gir.',
+    err_email_invalid: 'Geçersiz e-posta adresi.',
+    err_password_empty: 'Lütfen şifreni gir.',
+    err_password_short: 'Şifre çok kısa (en az 8 karakter).',
+    err_credentials: 'E-posta veya şifre yanlış.',
+    err_unknown_email: 'Bu e-posta kayıtlı değil. Yöneticinden davet iste.',
+    err_rate_limit: 'Çok fazla deneme. Bir saat sonra tekrar dene.',
+    err_send_failed: 'Gönderme başarısız. Tekrar dene.',
+    err_network: 'Ağ hatası. Tekrar dene.',
+    support_text_1: 'Erişimin yok mu? retaha desteğine yaz:',
+    support_text_2: 'veya yöneticinden davet iste.',
+    success_eyebrow: '— gönderildi —',
+    success_title: 'Gelen kutunu kontrol et',
+    success_message: 'Tek kullanımlık bir bağlantı gönderdik:',
+    success_validity: 'Bağlantı 60 dakika geçerli.',
+    success_back: '← girişe geri dön',
+    resend_q: 'E-postayı almadın mı?',
+    resend_btn: 'tekrar gönder',
+    resend_cooldown: 'tekrar gönder ({s}s)',
+  },
 };
 ---
 
 <!DOCTYPE html>
-<html lang="de" data-theme="bauhaus_manufaktur">
+<html lang={initialLang} data-theme="bauhaus_manufaktur">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -177,83 +234,66 @@ const t = {
   </head>
   <body>
 
-    <main class="auth-layout">
+    <main
+      class="auth-layout"
+      x-data={`{
+        passwordExpanded: false,
+        email: '',
+        password: '',
+        emailError: '',
+        passwordError: '',
+        errorMessage: '',
+        isSubmitting: false,
+        successShown: false,
+        sentEmail: '',
+        resendCooldown: 0,
+        _resendTimer: null,
+        returnTo: ${JSON.stringify(returnTo)},
+        currentLang: ${JSON.stringify(initialLang)},
+        translations: ${JSON.stringify(t)},
 
-      <!-- ═══════════ HERO LINKS 45% ═══════════ -->
-      <aside class="auth-hero">
-        <Logo
-          variant="light"
-          size="md"
-          href="https://retaha.de"
-          ariaLabel="retaha · zur Startseite"
-          class="brand-logo"
-        />
+        init() {
+          const allowed = ['de', 'en', 'fr', 'es', 'tr'];
+          // Cookie (cross-subdomain) hat Vorrang vor localStorage,
+          // localStorage faellt zurueck auf Browser-Sprache.
+          const cookieMatch = document.cookie.match(/(?:^|;\\s*)retaha_lang=([^;]+)/);
+          const fromCookie = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+          const fromStorage = (typeof localStorage !== 'undefined' && localStorage.getItem('retaha_lang')) || '';
+          const stored = fromCookie || fromStorage;
+          if (allowed.indexOf(stored) >= 0) {
+            this.currentLang = stored;
+          } else if (typeof navigator !== 'undefined') {
+            const browser = (navigator.language || 'de').slice(0, 2).toLowerCase();
+            if (allowed.indexOf(browser) >= 0) this.currentLang = browser;
+          }
+          document.documentElement.lang = this.currentLang;
+          // Cookie sync: falls Sprache aus localStorage/Browser kommt aber Cookie fehlt,
+          // jetzt Cookie setzen damit Folge-Apps (dashboard, backoffice) gleiche Sprache haben.
+          if (!fromCookie) this._writeLangCookie(this.currentLang);
+        },
 
-        <DashboardShowcase autoplaySeconds={4} />
+        _writeLangCookie(lang) {
+          // Cross-Subdomain Cookie: gilt fuer alle *.retaha.de Apps.
+          const host = window.location.hostname;
+          const isProd = host.endsWith('.retaha.de') || host === 'retaha.de';
+          const domain = isProd ? '; domain=.retaha.de' : '';
+          const maxAge = 365 * 24 * 3600; // 1 Jahr
+          document.cookie = 'retaha_lang=' + encodeURIComponent(lang) + '; path=/' + domain + '; max-age=' + maxAge + '; SameSite=Lax';
+        },
 
-        <div class="hero-center">
-          <h1 class="hero-headline">Willkommen<br />zurück<span class="h-dot">.</span></h1>
-          <p class="hero-tagline">Manufaktur-Handwerk für Premium-Hotels.</p>
-        </div>
+        t(key, vars) {
+          const dict = this.translations[this.currentLang] || this.translations.de;
+          let s = dict[key] || key;
+          if (vars) Object.keys(vars).forEach(k => { s = s.replace('{' + k + '}', vars[k]); });
+          return s;
+        },
 
-        <div class="hero-bottom">
-          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
-          <p class="hero-meta">retaha hospitality · niedernhall</p>
-          <nav class="hero-legal" aria-label="Rechtliches">
-            <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
-            <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
-            <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
-          </nav>
-          <p class="hero-trademark">
-            retaha&reg; ist eine eingetragene Marke der retaha GmbH.<br />
-            &copy; 2026 retaha GmbH. Alle Rechte vorbehalten.
-          </p>
-        </div>
-      </aside>
-
-      <!-- ═══════════ FORM-SIDE RECHTS 55% ═══════════ -->
-      <section
-        class="auth-form-side"
-        x-data={`{
-          passwordExpanded: false,
-          email: '',
-          password: '',
-          emailError: '',
-          passwordError: '',
-          errorMessage: '',
-          isSubmitting: false,
-          successShown: false,
-          sentEmail: '',
-          resendCooldown: 0,
-          _resendTimer: null,
-          returnTo: ${JSON.stringify(returnTo)},
-          currentLang: 'de',
-          translations: ${JSON.stringify(t)},
-
-          init() {
-            const stored = (typeof localStorage !== 'undefined' && localStorage.getItem('retaha_lang')) || '';
-            const allowed = ['de', 'en', 'fr', 'es'];
-            if (allowed.indexOf(stored) >= 0) {
-              this.currentLang = stored;
-            } else if (typeof navigator !== 'undefined') {
-              const browser = (navigator.language || 'de').slice(0, 2).toLowerCase();
-              if (allowed.indexOf(browser) >= 0) this.currentLang = browser;
-            }
-            document.documentElement.lang = this.currentLang;
-          },
-
-          t(key, vars) {
-            const dict = this.translations[this.currentLang] || this.translations.de;
-            let s = dict[key] || key;
-            if (vars) Object.keys(vars).forEach(k => { s = s.replace('{' + k + '}', vars[k]); });
-            return s;
-          },
-
-          setLang(lang) {
-            this.currentLang = lang;
-            try { localStorage.setItem('retaha_lang', lang); } catch (e) {}
-            document.documentElement.lang = lang;
-          },
+        setLang(lang) {
+          this.currentLang = lang;
+          try { localStorage.setItem('retaha_lang', lang); } catch (e) {}
+          this._writeLangCookie(lang);
+          document.documentElement.lang = lang;
+        },
 
           togglePassword() {
             this.passwordExpanded = !this.passwordExpanded;
@@ -366,6 +406,43 @@ const t = {
         x-init="init()"
       >
 
+      <!-- ═══════════ HERO LINKS 45% ═══════════ -->
+      <aside class="auth-hero">
+        <Logo
+          variant="light"
+          size="md"
+          href="https://retaha.de"
+          ariaLabel="retaha · zur Startseite"
+          class="brand-logo"
+        />
+
+        <DashboardShowcase autoplaySeconds={4} />
+
+        <div class="hero-center">
+          <h1 class="hero-headline">
+            <span x-text="t('hero_line1')"></span><br /><span x-text="t('hero_line2')"></span><span class="h-dot">.</span>
+          </h1>
+          <p class="hero-tagline" x-text="t('hero_tagline')"></p>
+        </div>
+
+        <div class="hero-bottom">
+          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+          <p class="hero-meta">retaha hospitality · niedernhall</p>
+          <nav class="hero-legal" aria-label="Rechtliches">
+            <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
+            <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
+            <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
+          </nav>
+          <p class="hero-trademark">
+            retaha&reg; ist eine eingetragene Marke der retaha GmbH.<br />
+            &copy; 2026 retaha GmbH. Alle Rechte vorbehalten.
+          </p>
+        </div>
+      </aside>
+
+      <!-- ═══════════ FORM-SIDE RECHTS 55% ═══════════ -->
+      <section class="auth-form-side">
+
         <!-- Language-Switcher: oben rechts in der Form-Side -->
         <div class="lang-switcher" aria-label="Sprache" x-cloak>
           <button type="button" :class="{ 'is-active': currentLang === 'de' }" @click="setLang('de')">DE</button>
@@ -375,6 +452,8 @@ const t = {
           <button type="button" :class="{ 'is-active': currentLang === 'fr' }" @click="setLang('fr')">FR</button>
           <span aria-hidden="true">·</span>
           <button type="button" :class="{ 'is-active': currentLang === 'es' }" @click="setLang('es')">ES</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" :class="{ 'is-active': currentLang === 'tr' }" @click="setLang('tr')">TR</button>
         </div>
 
         <div class="form-container">
