@@ -2,20 +2,14 @@
 /**
  * packages/ui/src/components/showcase/DashboardShowcase.astro
  *
- * Sprint-I-Findings-Fix-Run Round 3 (Login v4g):
- * Cyclische 4-Card Animation, eine Card sichtbar, cross-fade alle X Sekunden.
+ * 1:1 nach Prototyp v4g (login_v4g_insertion.html).
+ * Cyclische 4-Card Animation, 4000ms interval, 700ms cross-fade.
  *
- * Cards (hardcoded, lokalisierbar in Sprint J):
- *   1. Cockpit       — Belegung jetzt / Frühstück heute / Service offen
- *   2. Bookings      — Frühstück morgen (Liste + Zeitfenster)
- *   3. Service       — Service-Anfragen pending
- *   4. QR / Tags     — NFC + QR-Tag-Management
- *
- * Implementation: Alpine.js x-data state mit setInterval, opacity-Cross-Fade.
- * Timing-Tokens via tokens.css (--duration-slow, --ease-out-expo).
- *
- * Props:
- *   autoplaySeconds (default 4) — Zeit zwischen Card-Wechseln
+ * Cards (Inhalte exakt aus v4g):
+ *   1. Cockpit  — 3 Stats (Belegung 87% / Frühstück 42 sage / Service 3 pink)
+ *   2. Bookings — 4 Rows mit confirmed/pending-Markern
+ *   3. Service  — 3 Rows mit Pink-Border-Left + ▲ Icons
+ *   4. QR-Grid  — 12 Cells (Zimmer 204..306), Pink-Dot auf .is-printed
  */
 
 interface Props {
@@ -28,359 +22,267 @@ const intervalMs = autoplaySeconds * 1000;
 <div
   class="dashboard-showcase"
   x-data={`{
-    active: 0,
-    total: 4,
+    activeCard: 0,
+    cards: 4,
     _interval: null,
     init() {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       this._interval = setInterval(() => {
-        this.active = (this.active + 1) % this.total;
+        this.activeCard = (this.activeCard + 1) % this.cards;
       }, ${intervalMs});
     },
-    destroy() {
-      if (this._interval) clearInterval(this._interval);
-    },
+    destroy() { if (this._interval) clearInterval(this._interval); },
   }`}
   x-init="init()"
 >
-  <!-- ─── Card 1: Cockpit ─── -->
-  <article class="ds-card" :class="active === 0 ? 'is-active' : ''">
-    <header class="ds-card-head">
-      <p class="ds-card-eyebrow">Cockpit · Mittwoch, 4. Juni</p>
-      <h3 class="ds-card-title">Guten Morgen, retaha Manufaktur<span class="ds-card-dot">.</span></h3>
-    </header>
-    <div class="ds-stats">
-      <div class="ds-stat">
-        <p class="ds-stat-label">Belegung jetzt</p>
-        <p class="ds-stat-value">18/24</p>
-        <p class="ds-stat-sub">75% belegt</p>
-      </div>
-      <div class="ds-stat">
-        <p class="ds-stat-label">Frühstück heute</p>
-        <p class="ds-stat-value">14</p>
-        <p class="ds-stat-sub">Buchungen</p>
-      </div>
-      <div class="ds-stat ds-stat--alert">
-        <p class="ds-stat-label">Service offen</p>
-        <p class="ds-stat-value">3</p>
-        <p class="ds-stat-sub">wartet auf Bestätigung →</p>
-      </div>
+  <!-- Card 1: Cockpit -->
+  <div class="showcase-card" :class="{ 'is-active': activeCard === 0 }">
+    <div class="card-header">
+      <span class="card-eyebrow">— cockpit · heute —</span>
+      <span class="card-time">14:32</span>
     </div>
-  </article>
-
-  <!-- ─── Card 2: Bookings ─── -->
-  <article class="ds-card" :class="active === 1 ? 'is-active' : ''">
-    <header class="ds-card-head">
-      <p class="ds-card-eyebrow">Buchungen · Morgen</p>
-      <h3 class="ds-card-title">Frühstück morgen<span class="ds-card-dot">.</span></h3>
-    </header>
-    <div class="ds-list">
-      <div class="ds-list-row">
-        <span class="ds-list-time">07:30</span>
-        <span class="ds-list-name">A. Schmid · Zimmer 12</span>
-        <span class="ds-list-count">2 Personen</span>
-      </div>
-      <div class="ds-list-row">
-        <span class="ds-list-time">08:00</span>
-        <span class="ds-list-name">F. Köhler · Zimmer 8</span>
-        <span class="ds-list-count">1 Person</span>
-      </div>
-      <div class="ds-list-row">
-        <span class="ds-list-time">08:30</span>
-        <span class="ds-list-name">M. Berger · Zimmer 20</span>
-        <span class="ds-list-count">3 Personen</span>
-      </div>
-      <div class="ds-list-row">
-        <span class="ds-list-time">09:00</span>
-        <span class="ds-list-name">+ 8 weitere</span>
-        <span class="ds-list-count"></span>
-      </div>
+    <div class="stats-grid">
+      <div class="stat-cell"><div class="stat-value">87%</div><div class="stat-label">Belegung</div></div>
+      <div class="stat-cell"><div class="stat-value is-sage">42</div><div class="stat-label">Frühstück</div></div>
+      <div class="stat-cell"><div class="stat-value is-accent">3</div><div class="stat-label">Service</div></div>
     </div>
-    <p class="ds-list-foot">Zeitfenster 07:30–10:30 · 18 Personen gesamt</p>
-  </article>
+  </div>
 
-  <!-- ─── Card 3: Service ─── -->
-  <article class="ds-card" :class="active === 2 ? 'is-active' : ''">
-    <header class="ds-card-head">
-      <p class="ds-card-eyebrow">Service · Pending</p>
-      <h3 class="ds-card-title">Brauchen Aktion<span class="ds-card-dot">.</span></h3>
-    </header>
-    <div class="ds-services">
-      <div class="ds-service">
-        <p class="ds-service-summary">Zusätzliches Handtuch</p>
-        <p class="ds-service-meta">L. Hofer · Zimmer 14 · vor 12 Min</p>
-        <div class="ds-service-actions">
-          <span class="ds-service-btn ds-service-btn--ok">Bestätigen</span>
-          <span class="ds-service-btn">Ablehnen</span>
-        </div>
-      </div>
-      <div class="ds-service">
-        <p class="ds-service-summary">Späterer Check-out (13:00)</p>
-        <p class="ds-service-meta">K. Stein · Zimmer 7 · vor 28 Min</p>
-        <div class="ds-service-actions">
-          <span class="ds-service-btn ds-service-btn--ok">Bestätigen</span>
-          <span class="ds-service-btn">Ablehnen</span>
-        </div>
-      </div>
+  <!-- Card 2: Bookings -->
+  <div class="showcase-card" :class="{ 'is-active': activeCard === 1 }">
+    <div class="card-header">
+      <span class="card-eyebrow">— bookings · live —</span>
+      <span class="card-time">heute</span>
     </div>
-  </article>
-
-  <!-- ─── Card 4: QR / NFC Tags ─── -->
-  <article class="ds-card" :class="active === 3 ? 'is-active' : ''">
-    <header class="ds-card-head">
-      <p class="ds-card-eyebrow">QR · NFC · Tags</p>
-      <h3 class="ds-card-title">Alle Touchpoints im Blick<span class="ds-card-dot">.</span></h3>
-    </header>
-    <div class="ds-tags">
-      <div class="ds-tag">
-        <span class="ds-tag-icon" aria-hidden="true">●</span>
-        <div class="ds-tag-body">
-          <p class="ds-tag-name">Lobby-NFC</p>
-          <p class="ds-tag-meta">241 Scans · letzter vor 4 Min</p>
-        </div>
-      </div>
-      <div class="ds-tag">
-        <span class="ds-tag-icon" aria-hidden="true">■</span>
-        <div class="ds-tag-body">
-          <p class="ds-tag-name">Zimmer 12 · QR</p>
-          <p class="ds-tag-meta">42 Scans · aktiv seit Mai</p>
-        </div>
-      </div>
-      <div class="ds-tag">
-        <span class="ds-tag-icon" aria-hidden="true">▲</span>
-        <div class="ds-tag-body">
-          <p class="ds-tag-name">Frühstücks-Karte</p>
-          <p class="ds-tag-meta">89 Scans · sehr aktiv</p>
-        </div>
-      </div>
+    <div class="bookings-list">
+      <div class="booking-row"><span class="booking-marker is-confirmed"></span><span class="booking-name">M. Schäfer</span><span class="booking-room">204 · 3N</span></div>
+      <div class="booking-row"><span class="booking-marker is-confirmed"></span><span class="booking-name">J. Riewe</span><span class="booking-room">301 · 2N</span></div>
+      <div class="booking-row"><span class="booking-marker is-pending"></span><span class="booking-name">A. Müller</span><span class="booking-room">112 · 1N</span></div>
+      <div class="booking-row"><span class="booking-marker is-confirmed"></span><span class="booking-name">T. Becker</span><span class="booking-room">405 · 4N</span></div>
     </div>
-  </article>
+  </div>
 
-  <!-- ─── Indicator-Dots ─── -->
-  <div class="ds-indicators" aria-hidden="true">
-    <button type="button" class="ds-indicator" :class="active === 0 ? 'is-active' : ''" @click="active = 0"></button>
-    <button type="button" class="ds-indicator" :class="active === 1 ? 'is-active' : ''" @click="active = 1"></button>
-    <button type="button" class="ds-indicator" :class="active === 2 ? 'is-active' : ''" @click="active = 2"></button>
-    <button type="button" class="ds-indicator" :class="active === 3 ? 'is-active' : ''" @click="active = 3"></button>
+  <!-- Card 3: Service -->
+  <div class="showcase-card" :class="{ 'is-active': activeCard === 2 }">
+    <div class="card-header">
+      <span class="card-eyebrow">— service · offen —</span>
+      <span class="card-time">3 anfragen</span>
+    </div>
+    <div class="service-grid">
+      <div class="service-row"><span class="service-icon">▲</span><span class="service-text">Zimmer 204 — Extra-Handtücher</span><span class="service-time">14:02</span></div>
+      <div class="service-row"><span class="service-icon">▲</span><span class="service-text">Zimmer 301 — Late Check-out</span><span class="service-time">13:48</span></div>
+      <div class="service-row"><span class="service-icon">▲</span><span class="service-text">Zimmer 112 — Wifi-Hilfe</span><span class="service-time">13:21</span></div>
+    </div>
+  </div>
+
+  <!-- Card 4: QR-Grid -->
+  <div class="showcase-card" :class="{ 'is-active': activeCard === 3 }">
+    <div class="card-header">
+      <span class="card-eyebrow">— qr · zimmer-übersicht —</span>
+      <span class="card-time">42/48</span>
+    </div>
+    <div class="qr-grid">
+      <div class="qr-cell is-printed">204</div><div class="qr-cell is-printed">205</div>
+      <div class="qr-cell is-printed">206</div><div class="qr-cell is-printed">207</div>
+      <div class="qr-cell">208</div><div class="qr-cell">209</div>
+      <div class="qr-cell is-printed">301</div><div class="qr-cell is-printed">302</div>
+      <div class="qr-cell is-printed">303</div><div class="qr-cell is-printed">304</div>
+      <div class="qr-cell is-printed">305</div><div class="qr-cell is-printed">306</div>
+    </div>
+  </div>
+
+  <div class="showcase-indicators">
+    <span class="indicator-dot" :class="{ 'is-active': activeCard === 0 }"></span>
+    <span class="indicator-dot" :class="{ 'is-active': activeCard === 1 }"></span>
+    <span class="indicator-dot" :class="{ 'is-active': activeCard === 2 }"></span>
+    <span class="indicator-dot" :class="{ 'is-active': activeCard === 3 }"></span>
   </div>
 </div>
 
 <style>
-  .dashboard-showcase {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    max-height: 320px;
-    background: var(--color-anthrazit-card, #242424);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  }
+  /* 1:1 aus v4g — Dashboard-Showcase */
 
-  .ds-card {
-    position: absolute;
-    inset: 0;
-    padding: 24px;
+  .dashboard-showcase {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    justify-content: center;
+    margin: 24px 0;
+    position: relative;
+    min-height: 240px;
+  }
+  @media (min-width: 1280px) { .dashboard-showcase { min-height: 280px; } }
+
+  .showcase-card {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background: var(--color-anthrazit-card, #242424);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
     opacity: 0;
     transform: translateY(8px);
     transition:
-      opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity 700ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
       transform 800ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
     pointer-events: none;
   }
-
-  .ds-card.is-active {
+  .showcase-card.is-active {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
   }
 
-  .ds-card-head { display: flex; flex-direction: column; gap: 4px; }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
 
-  .ds-card-eyebrow {
-    margin: 0;
+  .card-eyebrow {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.16em;
+    font-size: 9px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
+    color: var(--color-pink-shock, #FF4A82);
+  }
+
+  .card-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
     color: rgba(255, 255, 255, 0.4);
   }
 
-  .ds-card-title {
-    margin: 0;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px;
-    font-weight: 400;
-    color: rgba(255, 255, 255, 0.92);
-    line-height: 1.2;
-    letter-spacing: -0.005em;
-  }
-
-  .ds-card-dot { color: #FF4A82; }
-
-  /* ─── Card 1: Stats ─── */
-  .ds-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: auto;
-  }
-  .ds-stat {
+  /* Card 1: Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-cell {
     padding: 12px;
     background: var(--color-anthrazit-card-soft, #1E1E1E);
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .ds-stat--alert {
-    background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
-    border: 1px solid rgba(255, 74, 130, 0.3);
-  }
-  .ds-stat-label {
-    margin: 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.45);
-  }
-  .ds-stat-value {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 300;
-    color: rgba(255, 255, 255, 0.95);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-  .ds-stat-sub {
-    margin: 0;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.5);
-  }
-  .ds-stat--alert .ds-stat-sub { color: #FF4A82; font-weight: 500; }
-
-  /* ─── Card 2: List (Bookings) ─── */
-  .ds-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 4px;
-  }
-  .ds-list-row {
-    display: grid;
-    grid-template-columns: 56px 1fr auto;
-    gap: 12px;
-    padding: 8px 10px;
-    background: var(--color-anthrazit-card-soft, #1E1E1E);
-    border-radius: 4px;
-    align-items: center;
-    font-size: 12px;
-  }
-  .ds-list-time { font-family: 'JetBrains Mono', monospace; color: rgba(255, 255, 255, 0.7); }
-  .ds-list-name { color: rgba(255, 255, 255, 0.85); }
-  .ds-list-count { font-family: 'JetBrains Mono', monospace; color: rgba(255, 255, 255, 0.5); font-size: 10px; }
-  .ds-list-foot {
-    margin: 8px 0 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  /* ─── Card 3: Services ─── */
-  .ds-services { display: flex; flex-direction: column; gap: 10px; }
-  .ds-service {
-    padding: 12px;
-    background: var(--color-anthrazit-card-soft, #1E1E1E);
-    border-left: 2px solid #FF4A82;
-    border-radius: 4px;
-  }
-  .ds-service-summary {
-    margin: 0 0 2px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.92);
-  }
-  .ds-service-meta {
-    margin: 0 0 8px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.5);
-  }
-  .ds-service-actions { display: flex; gap: 6px; }
-  .ds-service-btn {
-    padding: 4px 10px;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.7);
     border-radius: 3px;
   }
-  .ds-service-btn--ok {
-    background: #FF4A82;
-    color: #1A1A1A;
-    border-color: #FF4A82;
+  .stat-value {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: #FFFFFF;
+  }
+  .stat-value.is-accent { color: var(--color-pink-shock, #FF4A82); }
+  .stat-value.is-sage   { color: var(--theme-sage, #5C9070); }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
   }
 
-  /* ─── Card 4: Tags ─── */
-  .ds-tags { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-  .ds-tag {
+  /* Card 2: Bookings */
+  .bookings-list { display: flex; flex-direction: column; gap: 8px; }
+  .booking-row {
     display: flex;
-    gap: 12px;
     align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .booking-marker { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .booking-marker.is-confirmed { background: var(--theme-sage, #5C9070); }
+  .booking-marker.is-pending   { background: var(--color-pink-shock, #FF4A82); }
+  .booking-name { flex: 1; color: rgba(255, 255, 255, 0.85); font-size: 12px; }
+  .booking-room {
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Card 3: Service */
+  .service-grid { display: flex; flex-direction: column; gap: 8px; }
+  .service-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     padding: 10px 12px;
     background: var(--color-anthrazit-card-soft, #1E1E1E);
-    border-radius: 4px;
+    border-radius: 3px;
+    border-left: 2px solid var(--color-pink-shock, #FF4A82);
   }
-  .ds-tag-icon {
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
+  .service-icon {
+    font-size: 12px;
+    color: var(--color-pink-shock, #FF4A82);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .service-text { flex: 1; font-size: 11px; color: rgba(255, 255, 255, 0.85); }
+  .service-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Card 4: QR-Grid */
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    flex: 1;
+    align-content: center;
+  }
+  .qr-cell {
+    aspect-ratio: 1;
+    background: var(--color-anthrazit-card-soft, #1E1E1E);
+    border-radius: 2px;
+    display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'JetBrains Mono', monospace;
-    color: #FF4A82;
-    font-size: 14px;
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    position: relative;
   }
-  .ds-tag-body { flex: 1; min-width: 0; }
-  .ds-tag-name { margin: 0; font-size: 12px; color: rgba(255, 255, 255, 0.88); font-weight: 500; }
-  .ds-tag-meta { margin: 0; font-size: 10px; color: rgba(255, 255, 255, 0.5); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.06em; }
-
-  /* ─── Indicators ─── */
-  .ds-indicators {
+  .qr-cell.is-printed::after {
+    content: '';
     position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 2px;
+    right: 2px;
+    width: 4px;
+    height: 4px;
+    background: var(--color-pink-shock, #FF4A82);
+    border-radius: 50%;
+  }
+
+  /* Indicators (position aus v4g: bottom: -28px absolut) */
+  .showcase-indicators {
     display: flex;
     gap: 6px;
-    z-index: 2;
+    justify-content: center;
+    margin-top: 12px;
+    position: absolute;
+    bottom: -28px;
+    left: 0;
+    right: 0;
   }
-  .ds-indicator {
+  .indicator-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.2);
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    transition: background 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-                width 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+    transition: background 400ms ease, transform 400ms ease;
   }
-  .ds-indicator.is-active {
-    background: #FF4A82;
-    width: 18px;
-    border-radius: 3px;
+  .indicator-dot.is-active {
+    background: var(--color-pink-shock, #FF4A82);
+    transform: scale(1.3);
   }
 
-  /* Reduced-Motion respektieren */
   @media (prefers-reduced-motion: reduce) {
-    .ds-card { transition: none; }
-    .ds-indicator { transition: none; }
+    .showcase-card, .indicator-dot { transition: none; }
   }
 </style>

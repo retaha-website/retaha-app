@@ -1,22 +1,29 @@
 ---
 /**
- * apps/auth/src/pages/login.astro — v4g (Final-Implementation)
+ * apps/auth/src/pages/login.astro — v4g FINAL (Round 4)
  *
- * Sprint-I-Findings-Fix-Run Round 3 nach 7 Iterationen mit User.
+ * 1:1 nach login_v4g_insertion.html + login_success_state.html
+ * Sprint-I-Findings-Fix-Run · 8 Bug-Fixes + Inline-Validation + Loading + Success-State.
  *
- * Layout:
- *   45% Anthrazit-Hero (Logo + DashboardShowcase + Headline + Hero-Bottom)
- *   55% White-Form (Anmeldung mit Progressive-Disclosure-Password)
- *   Mobile: Stack vertikal, scrollbar
+ * Bug-Fixes aus User-Visual-Review Round 3:
+ *   1. Primary-Button Hover: bleibt Anthrazit + Pink-Glow-SHADOW (kein Pink-BG)
+ *   2. "— manufaktur —" Eyebrow ENTFERNT (Hero startet direkt mit <h1>)
+ *   3. Password-Section Animation smooth (ease-out-expo, 900ms)
+ *   4. Password-Section KEIN Pink-Background (weiss wie Email-Field)
+ *   5. Support-Link: Anthrazit-Text + dunne Underline, Pink nur on Hover
+ *   6. DashboardShowcase mittig via flex:1 + justify-center
+ *   7. Trademark + Copyright im Hero-Bottom ergaenzt
+ *   8. Spacing-Buffer am Hero-Unterrand (padding: 56px 64px symmetrisch)
  *
- * Animationen aus Prototyp v4g (alle Timings exakt):
- *   - DashboardShowcase: 4s interval, 700ms cross-fade
- *   - Password-Section Expand: 900ms max-height + 700ms opacity (ease-out-expo)
- *   - Password-Field Stagger: 350ms delay
- *   - Button-Text Cross-Fade: 450ms
- *   - Toggle-Link Fade + Collapse: 700ms
- *   - Auto-Focus Password: 700ms timeout
- *   - Logo Hover Rotate: 600ms ease-in-out-back
+ * Neu in Round 4:
+ *   - Inline-Validation (kein Browser-Tooltip)
+ *   - Loading-State auf Submit-Button (Spinner + Text)
+ *   - Success-State mit pulsierendem Dreieck + Stagger-Animation
+ *   - Resend-Cooldown (60s)
+ *
+ * API-Binding (existierende Endpoints):
+ *   POST /api/auth/send-magic-link
+ *   POST /api/auth/login-password
  */
 
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
@@ -24,7 +31,6 @@ import Logo from '@retaha/ui/components/brand/Logo.astro';
 import DashboardShowcase from '@retaha/ui/components/showcase/DashboardShowcase.astro';
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/tokens.css';
-import '@retaha/ui/styles/components/bauhaus-stamp.css';
 import '@fontsource/space-grotesk/300.css';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
@@ -33,8 +39,6 @@ import '@fontsource/jetbrains-mono/400.css';
 const url = new URL(Astro.request.url);
 const rawReturnTo = url.searchParams.get('return_to');
 const returnTo = sanitizeReturnTo(rawReturnTo);
-const flashSent = url.searchParams.get('sent') === '1';
-const flashError = url.searchParams.get('error');
 ---
 
 <!DOCTYPE html>
@@ -45,258 +49,323 @@ const flashError = url.searchParams.get('error');
     <meta name="robots" content="noindex,nofollow" />
     <title>Anmeldung · retaha</title>
   </head>
-  <body class="lv-body">
+  <body>
 
-    <!-- ═══════════ HERO 45% (links, Anthrazit) ═══════════ -->
-    <aside class="lv-hero">
-      <!-- Top: Logo -->
-      <div class="lv-hero-top">
+    <main class="auth-layout">
+
+      <!-- ═══════════ HERO LINKS 45% ═══════════ -->
+      <aside class="auth-hero">
         <Logo
           variant="light"
           size="md"
           href="https://retaha.de"
           ariaLabel="retaha · zur Startseite"
-          class="lv-hero-logo-link"
+          class="brand-logo"
         />
-      </div>
 
-      <!-- Middle: Dashboard-Showcase + Headline -->
-      <div class="lv-hero-middle">
         <DashboardShowcase autoplaySeconds={4} />
 
-        <div class="lv-hero-text">
-          <p class="lv-hero-eyebrow">— Manufaktur —</p>
-          <h1 class="lv-hero-headline">
-            Willkommen<br />
-            zurück<span class="lv-hero-dot">.</span>
-          </h1>
-          <p class="lv-hero-tagline">Manufaktur-Handwerk für Premium-Hotels.</p>
-        </div>
-      </div>
-
-      <!-- Bottom: Marker + Meta + Legal + Trademark -->
-      <footer class="lv-hero-bottom">
-        <span class="bauhaus-stamp bauhaus-stamp--sm bauhaus-stamp--on-dark" aria-hidden="true">●  ■  ▲</span>
-
-        <div class="lv-hero-meta">
-          <span>retaha hospitality · niedernhall</span>
+        <div class="hero-center">
+          <h1 class="hero-headline">Willkommen<br />zurück<span class="h-dot">.</span></h1>
+          <p class="hero-tagline">Manufaktur-Handwerk für Premium-Hotels.</p>
         </div>
 
-        <nav class="lv-hero-legal" aria-label="Rechtliches">
-          <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
-          <span aria-hidden="true">·</span>
-          <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
-          <span aria-hidden="true">·</span>
-          <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
-        </nav>
+        <div class="hero-bottom">
+          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+          <p class="hero-meta">retaha hospitality · niedernhall</p>
+          <nav class="hero-legal" aria-label="Rechtliches">
+            <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
+            <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
+            <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
+          </nav>
+          <p class="hero-trademark">
+            retaha&reg; ist eine eingetragene Marke der retaha GmbH.<br />
+            &copy; 2026 retaha GmbH. Alle Rechte vorbehalten.
+          </p>
+        </div>
+      </aside>
 
-        <p class="lv-hero-trademark">
-          retaha&reg; ist eine eingetragene Marke der retaha GmbH.<br />
-          &copy; 2026 retaha GmbH. Alle Rechte vorbehalten.
-        </p>
-      </footer>
-    </aside>
+      <!-- ═══════════ FORM-SIDE RECHTS 55% ═══════════ -->
+      <section
+        class="auth-form-side"
+        x-data={`{
+          passwordExpanded: false,
+          email: '',
+          password: '',
+          emailError: '',
+          passwordError: '',
+          errorMessage: '',
+          isSubmitting: false,
+          successShown: false,
+          sentEmail: '',
+          resendCooldown: 0,
+          _resendTimer: null,
+          returnTo: ${JSON.stringify(returnTo)},
 
-    <!-- ═══════════ FORM-SIDE 55% (rechts, weiß) ═══════════ -->
-    <section
-      class="lv-form-side"
-      x-data={`{
-        passwordExpanded: false,
-        email: '',
-        password: '',
-        isSubmitting: false,
-        errorMessage: ${JSON.stringify(flashError ?? '')},
-        flashSent: ${flashSent ? 'true' : 'false'},
-        returnTo: ${JSON.stringify(returnTo)},
-
-        togglePassword() {
-          this.passwordExpanded = !this.passwordExpanded;
-          this.errorMessage = '';
-          if (this.passwordExpanded) {
-            this.$nextTick(() => {
-              setTimeout(() => this.$refs.passwordInput?.focus(), 700);
-            });
-          } else {
-            this.password = '';
-          }
-        },
-
-        async submit(e) {
-          e?.preventDefault?.();
-          this.errorMessage = '';
-          if (!this.email) {
-            this.$refs.emailInput?.focus();
-            return;
-          }
-          this.isSubmitting = true;
-          try {
+          togglePassword() {
+            this.passwordExpanded = !this.passwordExpanded;
+            this.errorMessage = '';
+            this.passwordError = '';
             if (this.passwordExpanded) {
-              if (!this.password || this.password.length < 8) {
-                this.$refs.passwordInput?.focus();
-                this.errorMessage = 'Passwort muss mindestens 8 Zeichen haben.';
-                this.isSubmitting = false;
-                return;
-              }
-              const res = await fetch('/api/auth/login-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.email, password: this.password, return_to: this.returnTo }),
+              this.$nextTick(() => {
+                setTimeout(() => this.$refs.passwordInput?.focus(), 700);
               });
-              const data = await res.json().catch(() => ({}));
-              if (data.ok && data.redirect) {
-                window.location.href = data.redirect;
-                return;
-              }
-              this.errorMessage = data.ok === false ? 'E-Mail oder Passwort falsch.' : 'Anmeldung fehlgeschlagen.';
             } else {
+              this.password = '';
+            }
+          },
+
+          validateEmail() {
+            if (!this.email) { this.emailError = 'Bitte E-Mail-Adresse eingeben.'; return false; }
+            const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+            if (!re.test(this.email)) {
+              this.emailError = 'Ungültige E-Mail-Adresse.';
+              return false;
+            }
+            this.emailError = '';
+            return true;
+          },
+
+          validatePassword() {
+            if (!this.password) { this.passwordError = 'Bitte Passwort eingeben.'; return false; }
+            if (this.password.length < 8) {
+              this.passwordError = 'Passwort zu kurz (mindestens 8 Zeichen).';
+              return false;
+            }
+            this.passwordError = '';
+            return true;
+          },
+
+          startResendCooldown() {
+            this.resendCooldown = 60;
+            if (this._resendTimer) clearInterval(this._resendTimer);
+            this._resendTimer = setInterval(() => {
+              this.resendCooldown--;
+              if (this.resendCooldown <= 0) {
+                clearInterval(this._resendTimer);
+                this._resendTimer = null;
+              }
+            }, 1000);
+          },
+
+          async submit(e) {
+            e?.preventDefault?.();
+            this.errorMessage = '';
+            if (!this.validateEmail()) {
+              this.$refs.emailInput?.focus();
+              return;
+            }
+            if (this.passwordExpanded && !this.validatePassword()) {
+              this.$refs.passwordInput?.focus();
+              return;
+            }
+            this.isSubmitting = true;
+            try {
+              if (this.passwordExpanded) {
+                const res = await fetch('/api/auth/login-password', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: this.email, password: this.password, return_to: this.returnTo }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.ok && data.redirect) {
+                  window.location.href = data.redirect;
+                  return;
+                }
+                this.errorMessage = 'E-Mail oder Passwort falsch.';
+              } else {
+                const res = await fetch('/api/auth/send-magic-link', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: this.email, return_to: this.returnTo }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.ok) {
+                  this.sentEmail = this.email;
+                  this.successShown = true;
+                  this.startResendCooldown();
+                  return;
+                }
+                this.errorMessage = data.error === 'unknown-email'
+                  ? 'Diese E-Mail ist nicht hinterlegt. Frag deinen Admin um eine Einladung.'
+                  : data.error === 'rate-limited'
+                  ? 'Zu viele Anfragen. Versuche es in einer Stunde erneut.'
+                  : 'Fehler beim Senden. Versuche es erneut.';
+              }
+            } catch (err) {
+              this.errorMessage = 'Netzwerk-Fehler. Versuche es erneut.';
+            } finally {
+              this.isSubmitting = false;
+            }
+          },
+
+          async resend() {
+            if (this.resendCooldown > 0 || this.isSubmitting) return;
+            this.isSubmitting = true;
+            try {
               const res = await fetch('/api/auth/send-magic-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.email, return_to: this.returnTo }),
+                body: JSON.stringify({ email: this.sentEmail, return_to: this.returnTo }),
               });
               const data = await res.json().catch(() => ({}));
               if (data.ok) {
-                this.flashSent = true;
-                return;
+                this.startResendCooldown();
               }
-              this.errorMessage = data.error === 'unknown-email'
-                ? 'Diese E-Mail ist nicht hinterlegt. Frag deinen Admin um eine Einladung.'
-                : data.error === 'rate-limited'
-                ? 'Zu viele Anfragen. Versuche es in einer Stunde erneut.'
-                : 'Fehler beim Senden. Versuche es erneut.';
+            } catch (err) {
+              /* still show success — link already sent */
+            } finally {
+              this.isSubmitting = false;
             }
-          } catch (err) {
-            this.errorMessage = 'Netzwerk-Fehler. Versuche es erneut.';
-          } finally {
-            this.isSubmitting = false;
-          }
-        },
-      }`}
-    >
-      <div class="lv-form-container">
+          },
 
-        <!-- Success-State: Magic-Link gesendet -->
-        <template x-if="flashSent">
-          <div class="lv-form-state">
-            <header class="lv-form-header">
-              <h2 class="lv-form-title">Check deine Mailbox<span class="h-dot">.</span></h2>
-              <p class="lv-form-sub">
-                Wir haben dir einen Magic-Link gesendet. Öffne ihn auf diesem Gerät —
-                dann bist du eingeloggt.
-              </p>
-            </header>
-          </div>
-        </template>
+          resetToForm() {
+            this.successShown = false;
+            this.email = '';
+            this.sentEmail = '';
+            this.errorMessage = '';
+            this.emailError = '';
+            this.passwordExpanded = false;
+          },
+        }`}
+      >
+        <div class="form-container">
 
-        <!-- Default: Anmelde-Form -->
-        <template x-if="!flashSent">
-          <div class="lv-form-state">
-            <header class="lv-form-header">
-              <h2 class="lv-form-title">Anmeldung<span class="h-dot">.</span></h2>
-              <p class="lv-form-sub" x-show="!passwordExpanded" x-transition.opacity.duration.450ms>
-                Gib deine E-Mail ein. Wir senden dir einen Einmal-Link.
-              </p>
-              <p class="lv-form-sub" x-show="passwordExpanded" x-cloak x-transition.opacity.duration.450ms>
-                Melde dich mit deinem Passwort an.
-              </p>
+          <!-- ═══════ STANDARD-FORM ═══════ -->
+          <div x-show="!successShown">
+            <header>
+              <h2 class="form-state-title">Anmeldung<span class="h-dot">.</span></h2>
+
+              <div class="form-state-sub-wrap">
+                <p class="form-state-sub" :data-visible="!passwordExpanded">
+                  Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.
+                </p>
+                <p class="form-state-sub" :data-visible="passwordExpanded">
+                  Gib deine E-Mail und dein Passwort ein.
+                </p>
+              </div>
             </header>
 
-            <form @submit="submit($event)" novalidate class="lv-form">
-              <!-- E-Mail (immer sichtbar) -->
-              <div class="lv-field">
-                <label class="lv-label" for="email-input">E-Mail</label>
+            <!-- API-Error-Banner (oberhalb Form) -->
+            <div class="form-error" x-show="errorMessage" x-cloak x-text="errorMessage"></div>
+
+            <form @submit="submit($event)" novalidate>
+
+              <!-- Email-Field (immer sichtbar) -->
+              <div class="field">
+                <label class="field-label" for="email-input">E-Mail</label>
                 <input
                   id="email-input"
                   x-ref="emailInput"
                   type="email"
                   inputmode="email"
                   autocomplete="email"
-                  required
                   placeholder="hotelier@example.com"
-                  class="lv-input"
+                  class="field-input"
+                  :class="emailError ? 'is-error' : ''"
                   x-model="email"
+                  @input="emailError = ''"
                 />
+                <div class="field-error" :class="emailError ? 'is-visible' : ''" x-text="emailError"></div>
               </div>
 
               <!-- Password-Section (Progressive Disclosure) -->
-              <div
-                class="lv-expandable"
-                :class="passwordExpanded ? 'is-expanded' : ''"
-                x-cloak
-              >
-                <div class="lv-expandable-inner">
-                  <div class="lv-password-section">
-                    <div class="lv-password-head">
-                      <span class="lv-password-eyebrow">— mit Passwort —</span>
-                      <button
-                        type="button"
-                        class="lv-password-close"
-                        @click="togglePassword()"
-                        aria-label="Zurück zu Magic-Link"
-                      >&times;</button>
-                    </div>
-                    <div class="lv-field">
-                      <label class="lv-label" for="password-input">Passwort</label>
-                      <input
-                        id="password-input"
-                        x-ref="passwordInput"
-                        type="password"
-                        autocomplete="current-password"
-                        minlength="8"
-                        placeholder="dein passwort"
-                        class="lv-input"
-                        x-model="password"
-                      />
-                    </div>
+              <div class="password-section" :data-visible="passwordExpanded">
+                <div class="field">
+                  <div class="field-header">
+                    <label class="field-label" for="password-input">Passwort</label>
+                    <button
+                      type="button"
+                      class="field-close"
+                      @click="togglePassword()"
+                      aria-label="Passwort-Eingabe schliessen"
+                    >
+                      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                        <path d="M3 3 L11 11 M11 3 L3 11" />
+                      </svg>
+                    </button>
                   </div>
+                  <input
+                    id="password-input"
+                    x-ref="passwordInput"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="dein passwort"
+                    class="field-input"
+                    :class="passwordError ? 'is-error' : ''"
+                    x-model="password"
+                    @input="passwordError = ''"
+                  />
+                  <div class="field-error" :class="passwordError ? 'is-visible' : ''" x-text="passwordError"></div>
                 </div>
               </div>
 
-              <!-- Submit-Button (Text wechselt mit Cross-Fade) -->
+              <!-- Primary-Button (Text + Loading via Cross-Fade) -->
               <button
-                type="submit"
-                class="lv-submit"
+                class="btn-primary"
+                :class="isSubmitting ? 'is-loading' : ''"
                 :disabled="isSubmitting"
+                type="submit"
               >
-                <span class="lv-submit-text">
-                  <span x-show="!passwordExpanded && !isSubmitting" x-transition.opacity.duration.450ms>magic-link senden</span>
-                  <span x-show="passwordExpanded && !isSubmitting" x-cloak x-transition.opacity.duration.450ms>anmelden</span>
-                  <span x-show="isSubmitting" x-cloak x-transition.opacity.duration.250ms>einen moment ...</span>
+                <span class="btn-text-wrap">
+                  <span class="btn-text" :data-visible="!passwordExpanded && !isSubmitting">magic-link senden</span>
+                  <span class="btn-text" :data-visible="passwordExpanded && !isSubmitting">anmelden</span>
+                  <span class="btn-text" :data-visible="isSubmitting">
+                    <span class="btn-spinner"></span>
+                    <span x-text="passwordExpanded ? 'anmelden...' : 'wird gesendet...'"></span>
+                  </span>
                 </span>
               </button>
 
-              <!-- Toggle-Link (zeigt nur wenn Password NICHT expanded) -->
-              <button
-                type="button"
-                class="lv-toggle"
-                @click="togglePassword()"
-                x-show="!passwordExpanded"
-                x-transition:leave="lv-toggle-leave"
-                x-transition:leave-start="lv-toggle-leave-start"
-                x-transition:leave-end="lv-toggle-leave-end"
-              >
-                → stattdessen mit Passwort anmelden
-              </button>
-
-              <!-- Error-Message -->
-              <p
-                class="lv-error"
-                x-show="errorMessage"
-                x-cloak
-                x-text="errorMessage"
-                x-transition.opacity.duration.450ms
-              ></p>
+              <!-- Toggle-Link (fade-out beim Expand) -->
+              <div class="form-toggle" :data-hidden="passwordExpanded">
+                <button type="button" class="toggle-link" @click="togglePassword()">
+                  → stattdessen mit passwort anmelden
+                </button>
+              </div>
             </form>
 
-            <p class="lv-support">
-              Kein Zugang? Schreib uns an
-              <a href="mailto:support@retaha.de">support@retaha.de</a>
-              oder bitte deinen Admin um eine Einladung.
-            </p>
+            <div class="form-footer">
+              <p class="footer-support">
+                Kein Zugang? Kontaktiere den retaha-Support unter
+                <a href="mailto:support@retaha.de">support@retaha.de</a>
+                oder bitte deinen Admin um eine Einladung.
+              </p>
+            </div>
           </div>
-        </template>
-      </div>
-    </section>
+
+          <!-- ═══════ SUCCESS-STATE ═══════ -->
+          <div x-show="successShown" x-cloak class="success-wrap">
+            <div class="success-triangle"></div>
+            <p class="success-eyebrow">— gesendet —</p>
+            <h1 class="success-title">Check dein Postfach<span class="h-dot">.</span></h1>
+            <p class="success-message">Wir haben dir einen Einmal-Link an</p>
+            <div class="success-email" x-text="sentEmail"></div>
+            <p class="success-validity">Der Link ist 60 Minuten gültig.</p>
+
+            <div class="success-actions">
+              <button type="button" class="btn-secondary" @click="resetToForm()">
+                ← zurück zur Anmeldung
+              </button>
+            </div>
+
+            <div class="resend-link">
+              Keine E-Mail erhalten?
+              <button
+                type="button"
+                @click="resend()"
+                :disabled="resendCooldown > 0 || isSubmitting"
+              >
+                <span x-show="resendCooldown <= 0">erneut senden</span>
+                <span x-show="resendCooldown > 0" x-cloak>erneut senden (<span x-text="resendCooldown"></span>s)</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
 
     <script>
       import Alpine from 'alpinejs';
@@ -306,374 +375,474 @@ const flashError = url.searchParams.get('error');
     </script>
 
     <style>
+      /* ============================================================
+         1:1 aus login_v4g_insertion.html + login_success_state.html
+         ============================================================ */
+
+      :root {
+        --color-pink-shock: #FF4A82;
+        --color-pink-glow: rgba(255, 74, 130, 0.18);
+        --color-pink-soft: rgba(255, 74, 130, 0.08);
+        --color-anthrazit: #1A1A1A;
+        --color-anthrazit-soft: #2A2A2A;
+        --color-anthrazit-card: #242424;
+        --color-anthrazit-card-soft: #1E1E1E;
+        --color-sage: #5C9070;
+        --color-white: #FFFFFF;
+        --radius: 3px;
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        --duration-fast: 250ms;
+        --duration-base: 450ms;
+        --duration-slow: 700ms;
+        --duration-very-slow: 900ms;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px; line-height: 1.5;
+        color: var(--color-anthrazit); background: var(--color-white);
+        -webkit-font-smoothing: antialiased; overflow: hidden;
+      }
       [x-cloak] { display: none !important; }
 
-      .lv-body {
-        margin: 0;
-        font-family: var(--theme-font-sans);
-        background: var(--theme-bg-primary);
-        color: var(--theme-text-primary);
-        display: grid;
-        grid-template-columns: 45% 55%;
-        min-height: 100vh;
-      }
-      @media (min-width: 768px) {
-        .lv-body { height: 100vh; min-height: 100vh; overflow: hidden; }
-      }
+      /* LAYOUT */
+      .auth-layout { display: grid; grid-template-columns: 1fr; height: 100vh; }
+      @media (min-width: 768px) { .auth-layout { grid-template-columns: 45% 55%; } }
       @media (max-width: 767px) {
-        .lv-body { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+        body { overflow: auto; }
+        .auth-layout { height: auto; min-height: 100vh; }
       }
 
-      /* ─── HERO ─── */
-      .lv-hero {
-        background: var(--theme-bg-anthrazit);
-        color: var(--theme-text-on-dark);
-        padding: 36px 40px 28px;
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-        min-height: 100vh;
+      /* HERO */
+      .auth-hero {
+        background: var(--color-anthrazit); color: var(--color-white);
+        padding: 48px 32px; display: flex; flex-direction: column;
+        min-height: 380px; position: relative; overflow: hidden;
       }
-      @media (min-width: 768px) { .lv-hero { height: 100vh; overflow: hidden; } }
-      @media (max-width: 1023px) { .lv-hero { padding: 32px 28px 24px; } }
-      @media (max-width: 767px) {
-        .lv-hero { min-height: auto; padding: 24px 20px; gap: 18px; }
-      }
+      @media (min-width: 768px) { .auth-hero { padding: 56px 64px; } }
 
-      .lv-hero-top { flex-shrink: 0; }
-      .lv-hero-logo-link { color: rgba(255, 255, 255, 0.94); }
-      .lv-hero-logo-link :global(svg) {
-        transition: transform var(--duration-slow, 600ms) var(--ease-in-out-back, cubic-bezier(0.68, -0.55, 0.265, 1.55));
+      /* Brand-Logo (von <Logo> Komponente — :global mit class hier ueberschrieben) */
+      .auth-hero :global(.brand-logo) {
+        margin-bottom: 40px;
       }
-      .lv-hero-logo-link:hover :global(svg) { transform: rotate(-8deg); }
-
-      .lv-hero-middle {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 28px;
-        justify-content: center;
-        min-height: 0;
+      .auth-hero :global(.brand-logo svg) {
+        transition: transform 600ms var(--ease-in-out-back);
+      }
+      .auth-hero :global(.brand-logo:hover svg) {
+        transform: rotate(8deg) scale(1.05);
       }
 
-      .lv-hero-text { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
-
-      .lv-hero-eyebrow {
-        margin: 0;
-        font-family: var(--theme-font-mono);
-        font-size: 11px;
-        letter-spacing: 0.18em;
-        text-transform: lowercase;
-        color: var(--theme-accent);
+      .hero-center { margin-top: 48px; margin-bottom: 32px; }
+      .hero-headline {
+        font-size: 40px; font-weight: 500; line-height: 1.05;
+        letter-spacing: -0.025em; color: var(--color-white); margin-bottom: 14px;
+      }
+      @media (min-width: 1280px) { .hero-headline { font-size: 48px; } }
+      .hero-headline .h-dot { color: var(--color-pink-shock); }
+      .hero-tagline {
+        font-size: 15px; line-height: 1.5;
+        color: rgba(255, 255, 255, 0.7); max-width: 380px;
       }
 
-      .lv-hero-headline {
-        margin: 0;
-        font-family: var(--theme-font-sans);
-        font-size: 44px;
-        font-weight: 300;
-        line-height: 1.02;
-        letter-spacing: -0.025em;
-        color: var(--theme-text-on-dark);
-      }
-      @media (min-width: 1280px) { .lv-hero-headline { font-size: 54px; } }
-      @media (max-width: 1023px) { .lv-hero-headline { font-size: 36px; } }
-      @media (max-width: 767px)  { .lv-hero-headline { font-size: 30px; } }
-
-      .lv-hero-dot { color: var(--theme-accent); }
-
-      .lv-hero-tagline {
-        margin: 0;
-        font-size: 14px;
-        line-height: 1.5;
-        color: rgba(255, 255, 255, 0.6);
-        font-style: italic;
-      }
-
-      /* ─── HERO-BOTTOM ─── */
-      .lv-hero-bottom {
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding-top: 16px;
+      .hero-bottom {
+        margin-top: auto; padding-top: 24px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
+      .hero-bauhaus {
+        font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5em;
+        font-size: 12px; color: rgba(255, 255, 255, 0.35); margin-bottom: 12px;
+      }
+      .hero-meta {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.55); margin-bottom: 12px;
+      }
+      .hero-legal {
+        display: flex; gap: 16px; margin-bottom: 16px;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.12em; text-transform: uppercase;
+      }
+      .hero-legal a {
+        color: rgba(255, 255, 255, 0.45); text-decoration: none;
+        transition: color 200ms ease;
+      }
+      .hero-legal a:hover { color: var(--color-pink-shock); }
+      .hero-trademark {
+        font-family: 'Space Grotesk', sans-serif; font-size: 10px;
+        line-height: 1.5; color: rgba(255, 255, 255, 0.3);
+      }
 
-      .lv-hero-meta,
-      .lv-hero-legal {
-        font-family: var(--theme-font-mono);
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.4);
+      /* FORM-SIDE */
+      .auth-form-side {
+        background: var(--color-white); padding: 48px 32px;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        height: 100vh; overflow-y: auto;
+      }
+      @media (min-width: 768px) { .auth-form-side { padding: 64px; } }
+      @media (max-width: 767px) { .auth-form-side { height: auto; min-height: 60vh; } }
+      .form-container { max-width: 400px; width: 100%; }
+
+      .form-state-title {
+        font-size: 28px; font-weight: 500; letter-spacing: -0.015em;
+        color: var(--color-anthrazit); margin-bottom: 10px;
+      }
+      .form-state-title .h-dot { color: var(--color-pink-shock); }
+
+      .form-state-sub-wrap {
+        position: relative;
+        min-height: 44px;
+        margin-bottom: 32px;
+      }
+      .form-state-sub {
+        font-size: 14px; color: rgba(26, 26, 26, 0.6); line-height: 1.55;
+        position: absolute; inset: 0;
+        transition: opacity var(--duration-slow) var(--ease-out-expo);
+      }
+      .form-state-sub[data-visible="false"] { opacity: 0; pointer-events: none; }
+      .form-state-sub[data-visible="true"]  { opacity: 1; }
+
+      .field { margin-bottom: 16px; position: relative; }
+      .field-label {
+        display: block; font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(26, 26, 26, 0.55); margin-bottom: 6px;
+        transition: color 250ms ease;
+      }
+      .field:focus-within .field-label { color: var(--color-pink-shock); }
+      .field-input {
+        width: 100%; padding: 12px 14px;
+        border: 1px solid rgba(26, 26, 26, 0.2); border-radius: var(--radius);
+        font-family: inherit; font-size: 14px;
+        color: var(--color-anthrazit); background: var(--color-white);
+        transition: border-color 250ms var(--ease-out-expo), box-shadow 250ms var(--ease-out-expo);
+        min-height: 44px;
+      }
+      .field-input::placeholder { color: rgba(26, 26, 26, 0.3); }
+      .field-input:focus {
+        outline: none; border-color: var(--color-pink-shock);
+        box-shadow: 0 0 0 4px var(--color-pink-soft);
+      }
+      .field-input.is-error {
+        border-color: var(--color-pink-shock);
+      }
+
+      .field-header {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      .field-header .field-label { margin-bottom: 0; }
+      .field-close {
+        background: transparent; border: none; cursor: pointer;
+        padding: 4px; border-radius: 50%;
+        color: rgba(26, 26, 26, 0.4);
+        transition: all 350ms var(--ease-out-expo);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .field-close:hover {
+        color: var(--color-pink-shock);
+        background: var(--color-pink-soft);
+        transform: rotate(90deg);
+      }
+      .field-close svg { width: 14px; height: 14px; }
+
+      /* Inline-Field-Error (mit ▲ Indicator) */
+      .field-error {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--color-pink-shock);
         display: flex;
-        gap: 10px;
         align-items: center;
-        flex-wrap: wrap;
+        gap: 6px;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 250ms ease, transform 250ms ease;
       }
-      .lv-hero-legal a {
-        color: rgba(255, 255, 255, 0.55);
-        text-decoration: none;
-        transition: color var(--duration-fast, 250ms) ease;
-      }
-      .lv-hero-legal a:hover,
-      .lv-hero-legal a:focus-visible {
-        color: var(--theme-accent);
-        outline: none;
+      .field-error.is-visible { opacity: 1; transform: translateY(0); }
+      .field-error:not(:empty)::before {
+        content: "▲";
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 8px;
       }
 
-      .lv-hero-trademark {
-        margin: 6px 0 0;
-        font-family: var(--theme-font-mono);
-        font-size: 9px;
-        line-height: 1.6;
-        letter-spacing: 0.06em;
-        color: rgba(255, 255, 255, 0.32);
+      /* Form-Error (API-Banner) */
+      .form-error {
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        background: rgba(255, 74, 130, 0.08);
+        border-left: 3px solid var(--color-pink-shock);
+        border-radius: 3px;
+        font-size: 13px;
+        color: var(--color-anthrazit);
       }
 
-      /* ─── FORM-SIDE ─── */
-      .lv-form-side {
-        display: flex;
+      /* Primary-Button — Bug 1: bleibt Anthrazit, Pink-Glow als SHADOW */
+      .btn-primary {
+        display: flex; align-items: center; justify-content: center;
+        gap: 10px; width: 100%; padding: 14px 24px;
+        border: none; border-radius: var(--radius);
+        background: var(--color-anthrazit); color: var(--color-white);
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 14px; font-weight: 500; cursor: pointer;
+        transition: all 280ms var(--ease-out-quint);
+        min-height: 48px; position: relative;
+      }
+      .btn-primary::before {
+        content: ''; width: 5px; height: 5px;
+        background: var(--color-pink-shock);
+        border-radius: 50%; flex-shrink: 0;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--color-anthrazit-soft);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px var(--color-pink-glow);
+      }
+      .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+      .btn-primary.is-loading { pointer-events: none; opacity: 0.85; }
+      .btn-primary:disabled { cursor: wait; }
+
+      /* Button-Text Cross-Fade Container */
+      .btn-text-wrap {
+        position: relative;
+        display: inline-flex;
         align-items: center;
+        min-width: 130px;
         justify-content: center;
-        padding: 40px 48px;
-        background: var(--theme-bg-primary);
       }
-      @media (min-width: 768px) { .lv-form-side { height: 100vh; overflow-y: auto; } }
-      @media (max-width: 767px) {
-        .lv-form-side { padding: 32px 24px 48px; align-items: flex-start; }
+      .btn-text {
+        transition: opacity var(--duration-base) var(--ease-out-expo);
+        display: inline-flex;
+        align-items: center;
       }
-
-      .lv-form-container { width: 100%; max-width: 420px; }
-      .lv-form-state { display: flex; flex-direction: column; gap: 28px; }
-      .lv-form-header { display: flex; flex-direction: column; gap: 10px; }
-
-      .lv-form-title {
-        margin: 0;
-        font-family: var(--theme-font-sans);
-        font-size: 32px;
-        font-weight: 300;
-        letter-spacing: -0.02em;
-        line-height: 1.15;
-        color: var(--theme-text-primary);
+      .btn-text[data-visible="false"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
       }
-      .lv-form-title .h-dot { color: var(--theme-accent); }
+      .btn-text[data-visible="true"] { opacity: 1; }
 
-      .lv-form-sub {
-        margin: 0;
-        font-size: 14px;
-        line-height: 1.55;
-        color: var(--theme-text-secondary);
+      /* Loading-Spinner */
+      .btn-spinner {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        border-top-color: var(--color-pink-shock);
+        border-radius: 50%;
+        animation: spin 700ms linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
       }
+      @keyframes spin { to { transform: rotate(360deg); } }
 
-      .lv-form { display: flex; flex-direction: column; gap: 18px; }
-      .lv-field { display: flex; flex-direction: column; gap: 6px; }
-
-      .lv-label {
-        font-family: var(--theme-font-mono);
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--theme-text-tertiary);
-      }
-
-      .lv-input {
-        padding: 13px 14px;
-        font-family: var(--theme-font-sans);
-        font-size: 15px;
-        border: 1px solid var(--theme-border);
-        background: var(--theme-bg-primary);
-        color: var(--theme-text-primary);
-        border-radius: var(--theme-radius-input);
+      /* Toggle-Link */
+      .form-toggle {
+        margin-top: 24px;
+        text-align: center;
         transition:
-          border-color var(--duration-fast, 250ms) ease,
-          box-shadow var(--duration-fast, 250ms) ease;
+          opacity var(--duration-base) var(--ease-out-expo),
+          max-height var(--duration-slow) var(--ease-out-expo),
+          margin-top var(--duration-slow) var(--ease-out-expo);
+        overflow: hidden;
+        max-height: 60px;
       }
-      .lv-input:focus {
-        outline: none;
-        border-color: var(--theme-accent);
-        box-shadow: 0 0 0 3px var(--color-pink-glow, rgba(255, 74, 130, 0.18));
+      .form-toggle[data-hidden="true"] {
+        opacity: 0;
+        max-height: 0;
+        margin-top: 0;
+        pointer-events: none;
       }
+      .toggle-link {
+        background: transparent; border: none; font-family: inherit;
+        font-size: 13px; color: var(--color-pink-shock); cursor: pointer;
+        padding: 6px 12px; border-radius: var(--radius);
+        transition: background 250ms ease;
+      }
+      .toggle-link:hover { background: var(--color-pink-soft); }
 
-      /* Progressive-Disclosure */
-      .lv-expandable {
+      /* Password-Section — Bug 3+4: smooth animation, KEIN Pink-BG */
+      .password-section {
+        overflow: hidden;
         max-height: 0;
         opacity: 0;
-        overflow: hidden;
         transition:
-          max-height var(--duration-very-slow, 900ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-          opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+          max-height var(--duration-very-slow) var(--ease-out-expo),
+          opacity var(--duration-slow) var(--ease-out-expo);
       }
-      .lv-expandable.is-expanded {
+      .password-section[data-visible="true"] {
         max-height: 240px;
         opacity: 1;
       }
-      .lv-expandable-inner {
-        padding-top: 8px;
-        transform: translateY(-6px);
-        transition: transform var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) 350ms;
+      .password-section .field {
+        transform: translateY(12px);
+        opacity: 0;
+        transition:
+          transform var(--duration-slow) var(--ease-out-expo) 350ms,
+          opacity var(--duration-slow) var(--ease-out-expo) 350ms;
       }
-      .lv-expandable.is-expanded .lv-expandable-inner {
+      .password-section[data-visible="true"] .field {
         transform: translateY(0);
+        opacity: 1;
       }
 
-      .lv-password-section {
-        padding: 16px;
-        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
-        border: 1px solid rgba(255, 74, 130, 0.18);
-        border-radius: var(--theme-radius);
+      /* Footer — Bug 5: Support-Link Anthrazit + Underline, Pink on Hover */
+      .form-footer {
+        margin-top: 48px; padding-top: 24px;
+        border-top: 1px solid rgba(26, 26, 26, 0.08);
+      }
+      .footer-support {
+        font-size: 12px; color: rgba(26, 26, 26, 0.5); line-height: 1.6;
+      }
+      .footer-support a {
+        color: var(--color-anthrazit);
+        border-bottom: 1px solid rgba(26, 26, 26, 0.2);
+        text-decoration: none;
+        transition: all 200ms ease;
+      }
+      .footer-support a:hover {
+        color: var(--color-pink-shock);
+        border-bottom-color: var(--color-pink-shock);
+      }
+
+      /* ═══════════ SUCCESS-STATE (1:1 aus login_success_state.html) ═══════════ */
+
+      .success-wrap {
+        text-align: center;
+        animation: successEnter 800ms var(--ease-out-expo);
+      }
+      @keyframes successEnter {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .success-triangle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 32px;
+        width: 72px;
+        height: 72px;
+        animation: triangleEntrance 1000ms var(--ease-in-out-back);
+      }
+      .success-triangle::before {
+        content: "▲";
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 64px;
+        color: var(--color-pink-shock);
+        line-height: 1;
+        display: block;
+        animation: trianglePulse 2400ms var(--ease-out-expo) 1000ms infinite;
+      }
+      @keyframes triangleEntrance {
+        0%   { opacity: 0; transform: scale(0.4) rotate(-15deg); }
+        60%  { opacity: 1; transform: scale(1.15) rotate(0deg); }
+        100% { opacity: 1; transform: scale(1) rotate(0deg); }
+      }
+      @keyframes trianglePulse {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+        50%      { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--color-pink-glow)); }
+      }
+
+      .success-eyebrow {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--color-pink-shock);
+        margin-bottom: 16px;
+        animation: fadeUp 600ms var(--ease-out-expo) 300ms backwards;
+      }
+      .success-title {
+        font-size: 28px;
+        font-weight: 500;
+        letter-spacing: -0.015em;
+        color: var(--color-anthrazit);
+        margin-bottom: 16px;
+        animation: fadeUp 700ms var(--ease-out-expo) 450ms backwards;
+      }
+      .success-title .h-dot { color: var(--color-pink-shock); }
+      .success-message {
+        font-size: 15px;
+        color: rgba(26, 26, 26, 0.65);
+        line-height: 1.6;
+        margin-bottom: 8px;
+        animation: fadeUp 700ms var(--ease-out-expo) 600ms backwards;
+      }
+      .success-email {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--color-anthrazit);
+        padding: 8px 14px;
+        background: rgba(26, 26, 26, 0.04);
+        border-radius: var(--radius);
+        display: inline-block;
+        margin: 8px 0 24px;
+        letter-spacing: 0.02em;
+        animation: fadeUp 700ms var(--ease-out-expo) 750ms backwards;
+      }
+      .success-validity {
+        font-size: 13px;
+        color: rgba(26, 26, 26, 0.5);
+        margin-bottom: 40px;
+        animation: fadeUp 700ms var(--ease-out-expo) 900ms backwards;
+      }
+      .success-actions {
         display: flex;
         flex-direction: column;
         gap: 12px;
+        animation: fadeUp 700ms var(--ease-out-expo) 1050ms backwards;
       }
-
-      .lv-password-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid rgba(26, 26, 26, 0.2);
+        color: var(--color-anthrazit);
+        padding: 12px 24px;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 250ms var(--ease-out-expo);
       }
-
-      .lv-password-eyebrow {
-        font-family: var(--theme-font-mono);
-        font-size: 10px;
-        letter-spacing: 0.16em;
-        text-transform: lowercase;
-        color: var(--theme-accent);
+      .btn-secondary:hover {
+        border-color: var(--color-pink-shock);
+        color: var(--color-pink-shock);
+        background: var(--color-pink-soft);
       }
-
-      .lv-password-close {
+      .resend-link {
+        font-size: 12px;
+        color: rgba(26, 26, 26, 0.5);
+        margin-top: 16px;
+        animation: fadeUp 700ms var(--ease-out-expo) 1200ms backwards;
+      }
+      .resend-link button {
         background: transparent;
         border: none;
-        padding: 0;
-        width: 24px;
-        height: 24px;
-        font-size: 20px;
-        line-height: 1;
-        color: var(--theme-text-tertiary);
+        color: var(--color-pink-shock);
         cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        transition:
-          transform 350ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-          background var(--duration-fast, 250ms) ease,
-          color var(--duration-fast, 250ms) ease;
+        font-family: inherit;
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: var(--radius);
+        transition: background 200ms ease;
       }
-      .lv-password-close:hover,
-      .lv-password-close:focus-visible {
-        transform: rotate(90deg);
-        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
-        color: var(--theme-accent);
-        outline: none;
+      .resend-link button:hover:not(:disabled) { background: var(--color-pink-soft); }
+      .resend-link button:disabled {
+        color: rgba(26, 26, 26, 0.3);
+        cursor: not-allowed;
       }
-
-      /* Submit-Button */
-      .lv-submit {
-        position: relative;
-        margin-top: 6px;
-        padding: 14px 22px;
-        background: var(--theme-text-primary);
-        color: var(--theme-bg-primary);
-        border: none;
-        border-radius: var(--theme-radius-button);
-        font-family: var(--theme-font-sans);
-        font-size: 14px;
-        font-weight: 500;
-        letter-spacing: 0.02em;
-        text-transform: lowercase;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        transition:
-          background var(--duration-fast, 250ms) ease,
-          color var(--duration-fast, 250ms) ease,
-          opacity var(--duration-fast, 250ms) ease;
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
-      .lv-submit::before {
-        content: '';
-        display: block;
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: var(--theme-accent);
-        flex-shrink: 0;
-      }
-      .lv-submit:hover:not(:disabled),
-      .lv-submit:focus-visible:not(:disabled) {
-        background: var(--theme-accent);
-        color: var(--theme-text-on-accent);
-        outline: none;
-      }
-      .lv-submit:disabled { opacity: 0.6; cursor: wait; }
-
-      .lv-submit-text {
-        position: relative;
-        display: inline-grid;
-        place-items: center;
-      }
-      .lv-submit-text > * { grid-area: 1 / 1; }
-
-      /* Toggle-Link */
-      .lv-toggle {
-        background: transparent;
-        border: none;
-        padding: 0;
-        margin: 4px 0 0;
-        font-family: var(--theme-font-sans);
-        font-size: 13px;
-        color: var(--theme-accent);
-        cursor: pointer;
-        text-align: left;
-        text-transform: lowercase;
-        letter-spacing: 0.02em;
-        align-self: flex-start;
-        transition: color var(--duration-fast, 250ms) ease;
-      }
-      .lv-toggle:hover, .lv-toggle:focus-visible {
-        color: var(--theme-text-primary);
-        outline: none;
-      }
-      .lv-toggle-leave {
-        transition:
-          opacity var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-          max-height var(--duration-slow, 700ms) var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-        max-height: 40px;
-        overflow: hidden;
-      }
-      .lv-toggle-leave-start { opacity: 1; max-height: 40px; }
-      .lv-toggle-leave-end   { opacity: 0; max-height: 0; }
-
-      /* Error */
-      .lv-error {
-        margin: 4px 0 0;
-        padding: 10px 12px;
-        background: var(--color-pink-soft, rgba(255, 74, 130, 0.08));
-        border-left: 3px solid var(--theme-accent);
-        font-size: 13px;
-        color: var(--theme-accent);
-        border-radius: var(--theme-radius);
-      }
-
-      /* Support */
-      .lv-support {
-        padding-top: 16px;
-        margin: 0;
-        font-size: 13px;
-        line-height: 1.55;
-        color: var(--theme-text-secondary);
-        border-top: 1px solid var(--theme-border-subtle);
-      }
-      .lv-support a { color: var(--theme-accent); text-decoration: none; }
-      .lv-support a:hover { text-decoration: underline; }
 
       @media (prefers-reduced-motion: reduce) {
-        .lv-expandable, .lv-expandable-inner, .lv-submit, .lv-toggle, .lv-password-close, .lv-hero-logo-link :global(svg) {
-          transition: none;
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
