@@ -237,10 +237,10 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
               <h2 class="form-state-title">Anmeldung<span class="h-dot">.</span></h2>
 
               <div class="form-state-sub-wrap">
-                <p class="form-state-sub" :data-visible="!passwordExpanded">
+                <p class="form-state-sub" :class="{ 'is-visible': !passwordExpanded }">
                   Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.
                 </p>
-                <p class="form-state-sub" :data-visible="passwordExpanded">
+                <p class="form-state-sub" :class="{ 'is-visible': passwordExpanded }">
                   Gib deine E-Mail und dein Passwort ein.
                 </p>
               </div>
@@ -308,9 +308,9 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
                 type="submit"
               >
                 <span class="btn-text-wrap">
-                  <span class="btn-text" :data-visible="!passwordExpanded && !isSubmitting">magic-link senden</span>
-                  <span class="btn-text" :data-visible="passwordExpanded && !isSubmitting">anmelden</span>
-                  <span class="btn-text" :data-visible="isSubmitting">
+                  <span class="btn-text" :class="{ 'is-visible': !passwordExpanded && !isSubmitting }">magic-link senden</span>
+                  <span class="btn-text" :class="{ 'is-visible': passwordExpanded && !isSubmitting }">anmelden</span>
+                  <span class="btn-text" :class="{ 'is-visible': isSubmitting }">
                     <span class="btn-spinner"></span>
                     <span x-text="passwordExpanded ? 'anmelden...' : 'wird gesendet...'"></span>
                   </span>
@@ -487,24 +487,38 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       @media (max-width: 767px) { .auth-form-side { height: auto; min-height: 60vh; } }
       .form-container { max-width: 400px; width: 100%; }
 
+      /* h2 = APP_STYLEGUIDE.md Sektion 2.2: 28px / 500 / -0.018em / 1.2 */
       .form-state-title {
-        font-size: 28px; font-weight: 500; letter-spacing: -0.015em;
-        color: var(--color-anthrazit); margin-bottom: 10px;
+        font-size: 28px;
+        font-weight: 500;
+        letter-spacing: -0.018em;
+        line-height: 1.2;
+        color: var(--color-anthrazit);
+        margin-bottom: 10px;
       }
       .form-state-title .h-dot { color: var(--color-pink-shock); }
 
+      /* Sub-Text Cross-Fade: alle IMMER absolute, container hat explizite Höhe */
       .form-state-sub-wrap {
         position: relative;
         min-height: 44px;
         margin-bottom: 32px;
       }
       .form-state-sub {
-        font-size: 14px; color: rgba(26, 26, 26, 0.6); line-height: 1.55;
-        position: absolute; inset: 0;
+        position: absolute;
+        inset: 0;
+        font-size: 14px;
+        color: rgba(26, 26, 26, 0.6);
+        line-height: 1.55;
+        opacity: 0;
+        pointer-events: none;
         transition: opacity var(--duration-slow) var(--ease-out-expo);
+        margin: 0;
       }
-      .form-state-sub[data-visible="false"] { opacity: 0; pointer-events: none; }
-      .form-state-sub[data-visible="true"]  { opacity: 1; }
+      .form-state-sub.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
 
       .field { margin-bottom: 16px; position: relative; }
       .field-label {
@@ -605,25 +619,32 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
       .btn-primary.is-loading { pointer-events: none; opacity: 0.85; }
       .btn-primary:disabled { cursor: wait; }
 
-      /* Button-Text Cross-Fade Container */
+      /* Button-Text Cross-Fade: alle IMMER absolute, container hat explizite Höhe */
       .btn-text-wrap {
         position: relative;
-        display: inline-flex;
-        align-items: center;
-        min-width: 130px;
-        justify-content: center;
+        display: inline-block;
+        min-width: 140px;
+        height: 20px;
+        line-height: 20px;
       }
       .btn-text {
-        transition: opacity var(--duration-base) var(--ease-out-expo);
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
         display: inline-flex;
         align-items: center;
-      }
-      .btn-text[data-visible="false"] {
-        position: absolute;
+        justify-content: center;
+        gap: 6px;
+        white-space: nowrap;
         opacity: 0;
         pointer-events: none;
+        transition: opacity var(--duration-base) var(--ease-out-expo);
       }
-      .btn-text[data-visible="true"] { opacity: 1; }
+      .btn-text.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
 
       /* Loading-Spinner */
       .btn-spinner {
@@ -756,10 +777,12 @@ const returnTo = sanitizeReturnTo(rawReturnTo);
         margin-bottom: 16px;
         animation: fadeUp 600ms var(--ease-out-expo) 300ms backwards;
       }
+      /* h1 = APP_STYLEGUIDE.md Sektion 2.2: 36px / 500 / -0.02em / 1.15 */
       .success-title {
-        font-size: 28px;
+        font-size: 36px;
         font-weight: 500;
-        letter-spacing: -0.015em;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
         color: var(--color-anthrazit);
         margin-bottom: 16px;
         animation: fadeUp 700ms var(--ease-out-expo) 450ms backwards;
