@@ -188,6 +188,42 @@ bauhaus-vokabular (●/■/─/▲) die eigenständige marken-identität:
 **bell ist KEIN maskottchen mehr** — siehe BELL_STYLEGUIDE.md (deprecated).
 bell wird zum reinen notification-icon umgebaut.
 
+### implementierung — bauhaus-stempel (3-symbol-signatur)
+
+zentrale komponente: `packages/ui/src/styles/components/bauhaus-stamp.css`
+
+import in seite/layout:
+```ts
+import '@retaha/ui/styles/components/bauhaus-stamp.css';
+```
+
+html-pattern (immer gleich, 2 normale spaces zwischen den symbolen):
+```html
+<span class="bauhaus-stamp bauhaus-stamp--md bauhaus-stamp--on-light" aria-hidden="true">●  ■  ▲</span>
+```
+
+**groessen-modifier:**
+- `bauhaus-stamp--xs` → 10px (footer-meta)
+- `bauhaus-stamp--sm` → 12px (eyebrows)
+- `bauhaus-stamp--md` → 14px (default, hero-sub, branding)
+- `bauhaus-stamp--lg` → 18px (login-hero, landing)
+- `bauhaus-stamp--xl` → 24px (print, marketing)
+
+**farb-modifier:**
+- `bauhaus-stamp--on-dark` → weisz auf anthrazit (40% opacity)
+- `bauhaus-stamp--on-light` → anthrazit auf weisz (35% opacity)
+- `bauhaus-stamp--pink` → marken-akzent (`--theme-accent`)
+
+**regeln:**
+- ZWEI normale spaces zwischen den symbolen, kein `&nbsp;`, kein einzelner space
+- `aria-hidden="true"` wenn rein dekorativ (default)
+- `font-family` ist mono (jetbrains mono via theme-token) — nicht aus surrounding context
+- nicht in body-text inline einsetzen — nur als signatur-block
+
+**unterschied zu status-markers.css** (im gleichen ordner):
+- status-markers: einzelne css-shapes fuer loading/done/live-states (`.shape-circle` etc.)
+- bauhaus-stamp:  3 text-symbole zusammen als marken-signatur
+
 ---
 
 # 2. foundation
