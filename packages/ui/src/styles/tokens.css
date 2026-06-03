@@ -1,0 +1,87 @@
+/* Sprint I · Phase 2 Foundation — Layout-Tokens als CSS-Variablen.
+ *
+ * Werte 1:1 aus APP_STYLEGUIDE.md Sektion 2.1 (Spacing), 2.3 (Icons),
+ * + Container/Grid-Spec. Ergänzung zu Tailwind v4 Utility-Klassen —
+ * für Stellen wo Custom-CSS schreibt und semantisch benannte Tokens
+ * lesbarer sind als `padding: 32px` ("warum 32?").
+ *
+ * Tailwind bleibt primäre Lösung für Layout. Diese Tokens kommen zum
+ * Einsatz wenn:
+ *   - Custom CSS in Component-Files (z.B. <style> in .astro)
+ *   - Semantische Klarheit gewünscht (`gap: var(--section)` statt `gap: 32px`)
+ *   - Style-Doc ↔ Code 1:1 verifizierbar machen
+ *
+ * @import-Reihenfolge in <head>:
+ *   themes.css → tokens.css → global.css → retaha.css → components/*.css
+ *
+ * Sprint J Backlog (optional): in tailwind.config Spacing/Container/Icon
+ * Theme-Sektionen auf diese Vars referenzieren — dann Tailwind-Utility und
+ * Custom-CSS aus einer Quelle. Aktuell separat, Drift-Risk akzeptiert.
+ */
+
+:root {
+  /* ═══════════════════════════════════════════════════════════════════
+   * Spacing (4px-Grid)  —  APP_STYLEGUIDE.md Sektion 2.1
+   * ═══════════════════════════════════════════════════════════════════ */
+  --space-2xs:  4px;    /* 0.25rem */
+  --space-xs:   8px;    /* 0.5rem  */
+  --space-sm:  12px;    /* 0.75rem */
+  --space-md:  16px;    /* 1rem    — DEFAULT */
+  --space-lg:  24px;    /* 1.5rem  */
+  --space-xl:  32px;    /* 2rem    */
+  --space-2xl: 48px;    /* 3rem    */
+  --space-3xl: 64px;    /* 4rem    */
+  --space-4xl: 96px;    /* 6rem    */
+  --space-5xl: 128px;   /* 8rem    — max */
+
+  /* ═══════════════════════════════════════════════════════════════════
+   * Semantische Spacing-Wrapper  —  Sektion 2.1 "semantic spacing wrapper"
+   * ═══════════════════════════════════════════════════════════════════ */
+  --inline-tight:  4px;   /* icon + label (sehr eng)                       */
+  --inline:        8px;   /* buttons, tags, inline-elemente                */
+  --stack-tight:   8px;   /* label + input, eyebrow + title                */
+  --stack:        16px;   /* default zwischen listen-items                 */
+  --section:      32px;   /* zwischen sektionen einer page                 */
+  --section-loose: 48px;  /* zwischen großen sektionen                     */
+  --page:         64px;   /* page-padding top + bottom (Styleguide: 64-96) */
+
+  /* ═══════════════════════════════════════════════════════════════════
+   * Grid + Container  —  Sektion 2.1 "grid" + "container widths"
+   * ═══════════════════════════════════════════════════════════════════ */
+  --grid-gap:        16px;   /* standard zwischen grid-cells               */
+  --grid-gap-loose:  24px;   /* mehr Atmung                                */
+  --grid-gap-dense:   8px;   /* dichte Tabellen                            */
+  --container-max:  1280px;  /* hard max (auch bei 4k)                     */
+
+  --c-narrow:   640px;       /* reading (blog, docs)                       */
+  --c-default:  960px;       /* content-pages                              */
+  --c-wide:    1280px;       /* dashboards, backoffice                     */
+  --c-full:     100%;        /* admin-tables (full-bleed)                  */
+
+  /* ═══════════════════════════════════════════════════════════════════
+   * Breakpoints (mobile-first)  —  Sektion 2.1 "breakpoints"
+   * ═══════════════════════════════════════════════════════════════════
+   * Diese Werte sind Referenz — CSS-@media kann sie nicht via var() nutzen.
+   * Tailwind-Breakpoints (sm: 640, md: 768, lg: 1024, xl: 1280) decken das
+   * ab. Hier nur als Doku-Token, NICHT als CSS-Media-Query-Source.        */
+  --bp-mobile-max:   767px;   /* 0–767:    tab-bar unten, single-column   */
+  --bp-tablet-max:  1023px;   /* 768–1023: sidebar collapsed (icons)      */
+  --bp-desktop-max: 1439px;   /* 1024–1439: full sidebar 240px            */
+  --bp-wide-min:    1440px;   /* 1440+:    mehr whitespace                */
+
+  /* ═══════════════════════════════════════════════════════════════════
+   * Icons  —  APP_STYLEGUIDE.md Sektion 2.3
+   * ═══════════════════════════════════════════════════════════════════ */
+  --icon-2xs:  12px;    /* inline in mono-labels, badges                  */
+  --icon-xs:   14px;    /* small buttons                                  */
+  --icon-sm:   16px;    /* DEFAULT — buttons, inputs, forms               */
+  --icon-md:   20px;    /* tab-bar, toolbar                               */
+  --icon-lg:   24px;    /* icon-only-buttons, empty-states                */
+  --icon-xl:   32px;    /* empty-state-illustrations                      */
+
+  /* Stroke-Weight: 1.75px default (dünner als Tabler-default 2px),
+   * bei sehr kleinen Icons 12–14px ausnahmsweise 2px. Tabler-Webfont
+   * liefert feste Stroke-Varianten — dieser Token dient als Doku-Anker.   */
+  --icon-stroke:      1.75px;
+  --icon-stroke-tiny: 2px;
+}
