@@ -63,7 +63,7 @@ const initial = {
   <div x-data={`setupWizard(${JSON.stringify(initial)})`} class="wizard-page">
 
     <header class="wizard-header">
-      <p class="wizard-eyebrow">— Setup-Wizard —</p>
+      <p class="wizard-eyebrow themed-eyebrow-flank">Setup-Wizard</p>
       <h1 class="wizard-title">Lass uns dein Hotel<br/>einrichten<span class="wizard-dot">.</span></h1>
       <div class="wizard-progress">
         <template x-for="n in [1,2,3,4,5]" :key="n">
@@ -328,7 +328,7 @@ const initial = {
     .wizard-page { max-width: 680px; margin: 0 auto; padding: 24px 24px 60px; }
 
     .wizard-header { margin-bottom: 32px; text-align: center; }
-    .wizard-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 12px; }
+    .wizard-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent); margin: 0 0 12px; }
     .wizard-title { font-size: 32px; font-weight: 300; letter-spacing: -0.015em; color: var(--theme-text-primary); margin: 0 0 24px; line-height: 1.1; }
     .wizard-dot { color: var(--theme-accent); }
 
@@ -350,8 +350,8 @@ const initial = {
     .wizard-field-row > .wizard-field { margin-bottom: 0; }
     .wizard-field-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
     .wizard-field-hint { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin: 4px 0 0; font-style: italic; }
-    .wizard-input { padding: 10px 12px; border: 1px solid var(--theme-border); font-size: 14px; font-family: inherit; background: var(--theme-bg-primary); }
-    .wizard-input:focus { outline: none; border-color: var(--theme-accent); }
+    .wizard-input { padding: 10px 12px; border: 1px solid var(--theme-border); font-size: 14px; font-family: inherit; background: var(--theme-bg-primary); transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+    .wizard-input:focus { outline: none; border-color: var(--theme-accent); box-shadow: 0 0 0 3px rgba(var(--theme-accent-rgb), 0.1); }
 
     .wizard-lang-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
     @media (min-width: 640px) { .wizard-lang-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -386,11 +386,20 @@ const initial = {
     .wizard-btn--ghost:hover:not(:disabled) { color: var(--theme-text-primary); }
 
     .wizard-error, .wizard-status { padding: 10px 14px; margin: 12px 0; font-size: 13px; }
-    .wizard-error, .wizard-status.err { background: #fdeaea; color: #7a1515; border-left: 3px solid #aa1f1f; }
-    .wizard-status.ok { background: #e8f5ec; color: #145c2a; border-left: 3px solid #1f7a3a; }
+    /* Marken-DNA: error = pink (NICHT rot), success = sage */
+    .wizard-error, .wizard-status.err {
+      background: rgba(var(--theme-accent-rgb), 0.08);
+      color: var(--theme-accent);
+      border-left: 3px solid var(--theme-accent);
+    }
+    .wizard-status.ok {
+      background: color-mix(in srgb, var(--theme-success) 10%, transparent);
+      color: var(--theme-text-primary);
+      border-left: 3px solid var(--theme-success);
+    }
 
     .wizard-toast { position: fixed; top: 16px; right: 16px; padding: 10px 16px; color: var(--theme-bg-primary); font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
-    .wizard-toast--success { background: #1f7a3a; }
-    .wizard-toast--error { background: #aa1f1f; }
+    .wizard-toast--success { background: var(--theme-success); }
+    .wizard-toast--error { background: var(--theme-accent); }
   </style>
 </AdminLayout>

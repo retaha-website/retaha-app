@@ -90,3 +90,20 @@ Empfehlung: **mindestens P1 Tests (push-guard + orders) vor Pilot**, Rest
 
 **Sprint J wird verfasst nachdem Sprint I (Marken-Refresh) komplett ist.
 Hier nur Notiz für Closing-Doc.**
+
+---
+
+## Sprint J Backlog — zusätzlich zu Tests
+
+### Mechanische i18n-Migration
+
+- **6 Pages mit hardcoded Section-Nummern auf i18n-Keys migrieren**
+  (`t('pages.X.section_number')` analog zu den 8 bereits-migrierten Pages).
+  Betroffen (Stand Sprint I Phase 4a):
+  - `apps/backoffice/src/pages/admin/checkins.astro` (`"40"`)
+  - `apps/backoffice/src/pages/admin/email-domain.astro` (`"41"`)
+  - `apps/backoffice/src/pages/admin/eve/knowledge.astro` (`"06"`)
+  - `apps/backoffice/src/pages/admin/eve/settings.astro` (`"06"`)
+  - `apps/backoffice/src/pages/admin/pms.astro` (`"30"`)
+  - `apps/backoffice/src/pages/admin/places/index.astro` (`"07"`)
+  Aufwand: ~30 min (mechanische Locale-Key-Ergänzung in 10 admin locales).
