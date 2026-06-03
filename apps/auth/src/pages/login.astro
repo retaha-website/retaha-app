@@ -31,33 +31,98 @@ const flashError = url.searchParams.get('error');
   )}
 
   {!flashSent && (
-    <form
-      class="login-form"
-      method="POST"
-      action="/api/auth/send-magic-link"
-      autocomplete="off"
-    >
-      <input type="hidden" name="return_to" value={returnTo} />
-      <label class="login-label" for="email">E-Mail</label>
-      <input
-        id="email"
-        type="email"
-        name="email"
-        required
-        autocomplete="email"
-        inputmode="email"
-        placeholder="hotelier@example.com"
-        class="login-input"
-      />
-      <button type="submit" class="login-submit">
-        magic-link senden
+    <>
+      <form
+        class="login-form"
+        method="POST"
+        action="/api/auth/send-magic-link"
+        autocomplete="off"
+        data-form="magic-link"
+      >
+        <input type="hidden" name="return_to" value={returnTo} />
+        <label class="login-label" for="email">E-Mail</label>
+        <input
+          id="email"
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          inputmode="email"
+          placeholder="hotelier@example.com"
+          class="login-input"
+        />
+        <button type="submit" class="login-submit">
+          magic-link senden
+        </button>
+      </form>
+
+      <form
+        class="login-form login-form--password"
+        method="POST"
+        action="/api/auth/login-password"
+        autocomplete="on"
+        data-form="password"
+        hidden
+      >
+        <input type="hidden" name="return_to" value={returnTo} />
+        <label class="login-label" for="email-pw">E-Mail</label>
+        <input
+          id="email-pw"
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          inputmode="email"
+          placeholder="hotelier@example.com"
+          class="login-input"
+        />
+        <label class="login-label" for="password">Passwort</label>
+        <input
+          id="password"
+          type="password"
+          name="password"
+          required
+          autocomplete="current-password"
+          minlength="8"
+          placeholder="dein passwort"
+          class="login-input"
+        />
+        <button type="submit" class="login-submit">
+          anmelden
+        </button>
+      </form>
+
+      <button type="button" class="login-toggle" data-toggle="auth-method">
+        <span data-show="magic-link">→ Mit Passwort anmelden</span>
+        <span data-show="password" hidden>→ Mit Magic-Link anmelden</span>
       </button>
-    </form>
+    </>
   )}
 
   <p class="login-foot">
     Kein Zugang? Frag deinen Team-Owner um eine Einladung.
   </p>
+
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleBtn = document.querySelector('[data-toggle="auth-method"]');
+      const magicForm = document.querySelector('[data-form="magic-link"]');
+      const passwordForm = document.querySelector('[data-form="password"]');
+      const labelMagic = document.querySelector('[data-show="magic-link"]');
+      const labelPassword = document.querySelector('[data-show="password"]');
+
+      if (!toggleBtn || !magicForm || !passwordForm) return;
+
+      let usingPassword = false;
+      toggleBtn.addEventListener('click', () => {
+        usingPassword = !usingPassword;
+        magicForm.hidden = usingPassword;
+        passwordForm.hidden = !usingPassword;
+        if (labelMagic) labelMagic.hidden = usingPassword;
+        if (labelPassword) labelPassword.hidden = !usingPassword;
+      });
+    });
+  </script>
 
   <style>
     .login-headline {
@@ -154,6 +219,27 @@ const flashError = url.searchParams.get('error');
       font-size: 12px;
       color: var(--theme-text-muted);
       margin: 16px 0 0;
+    }
+    .login-toggle {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      margin: 8px 0 0;
+      background: transparent;
+      border: none;
+      font-family: var(--theme-font-sans);
+      font-size: 13px;
+      color: var(--theme-accent);
+      cursor: pointer;
+      text-align: center;
+      text-transform: lowercase;
+      letter-spacing: 0.02em;
+      transition: color 0.15s ease;
+    }
+    .login-toggle:hover,
+    .login-toggle:focus-visible {
+      color: var(--theme-text-primary);
+      outline: none;
     }
   </style>
 </AuthLayout>
