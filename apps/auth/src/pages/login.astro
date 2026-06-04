@@ -764,21 +764,27 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
          nur in der Status-Bar-Area (mit viewport-fit=cover) + Rubber-Band. */
       html { background-color: var(--color-anthrazit); }
       html, body { min-height: 100%; }
-      body {
+      /* Diagnose Versuch #10: Konflikt mit packages/ui/src/styles/themes.css
+         gefunden. themes.css setzt globales body { background-color:
+         var(--theme-bg-primary) } = #FFFFFF und wird NACH login-CSS geladen
+         (Cascade gewinnt). Specificity beider Regeln: (0,0,1). Loesung:
+         hoehere Specificity via html[data-theme] body Selektor (0,1,2)
+         damit Login-Page deterministisch ueber themes.css gewinnt.
+         Body-Default-Style + iOS-Status-Bar-Strategie in einem Block. */
+      html[data-theme="bauhaus_manufaktur"] body {
         font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 14px; line-height: 1.5;
-        color: var(--color-anthrazit); background: var(--color-white);
+        color: var(--color-anthrazit);
+        background: var(--color-white);
         -webkit-font-smoothing: antialiased;
-        /* iOS-Safari: -webkit-overflow-scrolling fuer smooth-touch-scroll */
         -webkit-overflow-scrolling: touch;
-        /* KEIN overflow: hidden mehr — sonst kein Scroll auf iPad */
       }
-      /* iOS-Status-Bar Trick: Mobile-Body anthrazit damit die transparente
-         Status-Bar (via apple-mobile-web-app-status-bar-style=black-translucent
-         + viewport-fit=cover) anthrazite Page-Pixel sieht.
-         Form-side + brand-footer haben explizite weiss-Bg -> bleiben weiss. */
+      /* Mobile/Tablet: body-bg anthrazit damit Safari 26 das samplet.
+         Form-side + brand-footer haben explizite weiss-bg (eigene Layer). */
       @media (max-width: 1023px) {
-        body { background: var(--color-anthrazit); }
+        html[data-theme="bauhaus_manufaktur"] body {
+          background: var(--color-anthrazit);
+        }
       }
       [x-cloak] { display: none !important; }
 
