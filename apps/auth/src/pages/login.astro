@@ -325,13 +325,15 @@ const t = {
          nimmt die Farbe des darunter liegenden Page-Inhalts an. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <!-- Explizites color-scheme zwingt iOS zur theme-color-Anwendung -->
-    <meta name="color-scheme" content="light dark" />
-    <!-- theme-color media-getrennt fuer beide System-Modi (iOS 16+ Behandlung) -->
-    <meta name="theme-color" content="#1A1A1A" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#1A1A1A" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#1A1A1A" />
-    <!-- PWA-Standalone-Mode (Add to Home Screen): Status-Bar transparent over content -->
+    <!-- iOS-Strategie nach teenage.engineering-Vorbild:
+         KEIN theme-color Meta-Tag (sonst forciert iOS opaque Status-Bar
+         in dieser Farbe). Stattdessen Status-Bar transparent + Page-Content
+         scrollt darunter durch (echte "Seite scrollt mit"-Wirkung).
+
+         apple-mobile-web-app-status-bar-style="black-translucent" wirkt
+         im Safari-Tab + PWA: macht Status-Bar transparent over content.
+         viewport-fit=cover (oben) extendet Page-Viewport unter Status-Bar.
+         Body/html-bg liefert die anfangs sichtbare Farbe (anthrazit). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -735,54 +737,9 @@ const t = {
       Alpine.start();
     </script>
 
-    <!-- Dynamic Theme-Color (Status-Bar iOS/Android):
-         Hero sichtbar oben -> #1A1A1A anthrazit,
-         Form-Section gescrollt nach oben -> #FFFFFF weiss.
-         Desktop ignoriert (kein Status-Bar Effekt).
-         Uses rAF-throttled scroll listener — perf-OK.
-         iOS Safari 15+ + Android Chrome unterstuetzen dynamische Updates. -->
-    <script is:inline>
-      (function () {
-        var meta = document.querySelector('meta[name="theme-color"]');
-        if (!meta) return;
-
-        function update() {
-          // Desktop (>= 1024px): kein Mobile-Status-Bar, statisch anthrazit fuer Safari-Tab-Color
-          if (window.innerWidth >= 1024) {
-            meta.setAttribute('content', '#1A1A1A');
-            return;
-          }
-          var hero = document.querySelector('.auth-hero');
-          if (!hero) return;
-          // Wenn Hero-Bottom hoeher als 60px im Viewport -> User scrollt in weiss-Bereich -> Status-Bar weiss
-          var heroBottom = hero.getBoundingClientRect().bottom;
-          var newColor = heroBottom > 60 ? '#1A1A1A' : '#FFFFFF';
-          if (meta.getAttribute('content') !== newColor) {
-            meta.setAttribute('content', newColor);
-          }
-        }
-
-        // rAF-Throttle damit Scroll-Listener nicht jeden Pixel berechnet
-        var scheduled = false;
-        function onScroll() {
-          if (scheduled) return;
-          scheduled = true;
-          requestAnimationFrame(function () {
-            scheduled = false;
-            update();
-          });
-        }
-
-        // Initial + Listener
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', update);
-        } else {
-          update();
-        }
-        window.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', onScroll, { passive: true });
-      })();
-    </script>
+    <!-- Dynamic theme-color JS entfernt (Versuch #2 war wirkungslos).
+         Neue Strategie via viewport-fit=cover + black-translucent —
+         Status-Bar wird transparent, Page-Pixel sichtbar durch. -->
 
     <style>
       :root {
@@ -819,6 +776,13 @@ const t = {
         /* iOS-Safari: -webkit-overflow-scrolling fuer smooth-touch-scroll */
         -webkit-overflow-scrolling: touch;
         /* KEIN overflow: hidden mehr — sonst kein Scroll auf iPad */
+      }
+      /* iOS-Status-Bar Trick: Mobile-Body anthrazit damit die transparente
+         Status-Bar (via apple-mobile-web-app-status-bar-style=black-translucent
+         + viewport-fit=cover) anthrazite Page-Pixel sieht.
+         Form-side + brand-footer haben explizite weiss-Bg -> bleiben weiss. */
+      @media (max-width: 1023px) {
+        body { background: var(--color-anthrazit); }
       }
       [x-cloak] { display: none !important; }
 
