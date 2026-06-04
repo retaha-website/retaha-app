@@ -499,13 +499,29 @@ const t = {
 
       <!-- ═══════════ HERO LINKS 45% ═══════════ -->
       <aside class="auth-hero">
-        <Logo
-          variant="light"
-          size="md"
-          href="https://retaha.de"
-          ariaLabel="retaha · zur Startseite"
-          class="brand-logo"
-        />
+        <!-- hero-top: auf Desktop "display: contents" (transparent), auf Tablet/Mobile flex zwischen Logo + Mobile-Switcher -->
+        <div class="hero-top">
+          <Logo
+            variant="light"
+            size="md"
+            href="https://retaha.de"
+            ariaLabel="retaha · zur Startseite"
+            class="brand-logo"
+          />
+
+          <!-- Mobile/Tablet Switcher — auf Desktop ausgeblendet -->
+          <div class="lang-switcher lang-switcher--mobile" aria-label="Sprache" x-cloak>
+            <button type="button" :class="{ 'is-active': currentLang === 'de' }" @click="setLang('de')">DE</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" :class="{ 'is-active': currentLang === 'en' }" @click="setLang('en')">EN</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" :class="{ 'is-active': currentLang === 'fr' }" @click="setLang('fr')">FR</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" :class="{ 'is-active': currentLang === 'es' }" @click="setLang('es')">ES</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" :class="{ 'is-active': currentLang === 'tr' }" @click="setLang('tr')">TR</button>
+          </div>
+        </div>
 
         <DashboardShowcase autoplaySeconds={4} />
 
@@ -673,6 +689,23 @@ const t = {
         </div>
       </section>
 
+      <!-- ═══════════ BRAND-FOOTER (Mobile-only) ═══════════
+           Inhalte gespiegelt aus Hero-Bottom — auf Mobile wird hero-bottom
+           ausgeblendet und stattdessen dieser Brand-Footer angezeigt. -->
+      <footer class="brand-footer">
+        <p class="brand-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+        <p class="brand-meta">retaha hospitality · niedernhall</p>
+        <nav class="brand-legal" aria-label="Rechtliches">
+          <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener" x-text="t('legal_impressum')"></a>
+          <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener" x-text="t('legal_datenschutz')"></a>
+          <a href="https://app.retaha.de/agb" target="_blank" rel="noopener" x-text="t('legal_agb')"></a>
+        </nav>
+        <p class="brand-trademark">
+          <span x-text="t('trademark_line1')"></span><br />
+          <span x-text="t('trademark_line2')"></span>
+        </p>
+      </footer>
+
     </main>
 
     <script>
@@ -744,6 +777,10 @@ const t = {
       }
       @media (max-width: 767px) { .auth-hero { padding: 32px 24px; min-height: auto; } }
 
+      /* hero-top: Desktop "display: contents" -> wrapper unsichtbar im Layout.
+         Tablet/Mobile -> flex row mit Logo links + Switcher rechts. */
+      .hero-top { display: contents; }
+
       /* Logo Hover: leichte Transparenz wie auf retaha.de / hospitality.retaha.de */
       .auth-hero :global(.brand-logo) {
         margin-bottom: 40px;
@@ -753,6 +790,9 @@ const t = {
       .auth-hero :global(.brand-logo:focus-visible) {
         opacity: 0.7;
       }
+
+      /* Mobile-Switcher: default hidden, taucht auf bei < 1024px */
+      .lang-switcher--mobile { display: none; }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
       .hero-headline {
@@ -1146,6 +1186,155 @@ const t = {
         *, *::before, *::after {
           animation-duration: 0.01ms !important;
           transition-duration: 0.01ms !important;
+        }
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════
+         BRAND-FOOTER (mobile-only)  —  Default hidden, mobile <768 visible
+         Inhalte gespiegelt aus Hero-Bottom. Auf Mobile wird hero-bottom
+         versteckt und stattdessen dieser Brand-Footer angezeigt.
+         ═══════════════════════════════════════════════════════════════════ */
+      .brand-footer { display: none; }
+      .brand-bauhaus,
+      .brand-meta,
+      .brand-legal,
+      .brand-trademark { margin: 0; }
+
+      /* ═══════════════════════════════════════════════════════════════════
+         TABLET + MOBILE (<1024px) — Switcher wandert von Form-Side in Hero-Top
+         ═══════════════════════════════════════════════════════════════════ */
+      @media (max-width: 1023px) {
+        .hero-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+          gap: 16px;
+        }
+        .auth-hero :global(.brand-logo) { margin-bottom: 0; }
+
+        /* Mobile-Switcher zeigt; Form-Side-Switcher ausblenden */
+        .lang-switcher--mobile {
+          display: inline-flex;
+          color: rgba(255, 255, 255, 0.4);
+        }
+        .lang-switcher--mobile button { color: rgba(255, 255, 255, 0.55); }
+        .lang-switcher--mobile button:hover,
+        .lang-switcher--mobile button:focus-visible { color: var(--color-white); }
+        .lang-switcher--mobile button.is-active { color: var(--color-pink-shock); }
+
+        .auth-form-side > .lang-switcher:not(.lang-switcher--mobile) { display: none; }
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════
+         MOBILE (<768px)  —  v6a Layout (kompakt, Brand-Footer, iOS-Fixes)
+         ═══════════════════════════════════════════════════════════════════ */
+      @media (max-width: 767px) {
+        /* HERO: kompakter */
+        .auth-hero {
+          padding: 20px 24px 28px;
+          min-height: auto;
+        }
+
+        /* Hero-Bottom (Bauhaus + Meta + Legal + Trademark) auf Mobile ausblenden
+           — wird im Brand-Footer dupliziert. */
+        .hero-bottom { display: none; }
+
+        /* Showcase kompakt: 160px (statt 240px) */
+        :global(.dashboard-showcase) {
+          min-height: 160px !important;
+          margin: 0 0 20px;
+        }
+        :global(.showcase-card) { padding: 14px !important; }
+        :global(.stat-cell) { padding: 8px !important; }
+        :global(.stat-value) { font-size: 18px !important; }
+
+        /* Headline + Tagline kompakt */
+        .hero-center { margin-top: 0; margin-bottom: 0; }
+        .hero-headline {
+          font-size: 26px;
+          line-height: 1.1;
+          margin-top: 16px;
+          margin-bottom: 10px;
+        }
+        .hero-tagline { font-size: 14px; line-height: 1.5; }
+
+        /* FORM-SIDE: kompakter padding, iOS-fixes */
+        .auth-form-side {
+          min-height: auto;
+          padding: 32px 24px 24px;
+        }
+        .form-state-title { font-size: 26px; }
+
+        /* iOS-Auto-Zoom verhindern: Input mind. 16px Font */
+        .field-input {
+          font-size: 16px;
+          padding: 14px 16px;
+          min-height: 48px;
+        }
+
+        /* Touch-Targets ≥ 44px (Apple HIG) */
+        .btn-primary {
+          min-height: 52px;
+          padding: 16px 24px;
+          font-size: 15px;
+        }
+        .toggle-link { padding: 12px 16px; }
+        .field-close { width: 36px; height: 36px; }
+
+        /* BRAND-FOOTER zeigen — alle Marken-Infos in weiß-Sektion unten */
+        .brand-footer {
+          display: block;
+          background: var(--color-white);
+          padding: 36px 24px 32px;
+          border-top: 1px solid rgba(26, 26, 26, 0.08);
+        }
+        .brand-bauhaus {
+          font-family: 'JetBrains Mono', monospace;
+          letter-spacing: 0.5em;
+          font-size: 14px;
+          color: rgba(26, 26, 26, 0.35);
+          margin-bottom: 16px;
+        }
+        .brand-meta {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(26, 26, 26, 0.55);
+          margin-bottom: 16px;
+        }
+        .brand-legal {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin-bottom: 20px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .brand-legal a {
+          color: rgba(26, 26, 26, 0.5);
+          text-decoration: none;
+          transition: color 200ms ease;
+          padding: 6px 0;  /* groessere Touch-Targets */
+        }
+        .brand-legal a:hover,
+        .brand-legal a:focus-visible {
+          color: var(--color-pink-shock);
+        }
+        .brand-trademark {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 10px;
+          line-height: 1.5;
+          color: rgba(26, 26, 26, 0.4);
+        }
+
+        /* iOS Safe-Area respektieren (Notch + Home-Indicator) */
+        @supports (padding: max(0px)) {
+          .auth-hero { padding-top: max(20px, env(safe-area-inset-top)); }
+          .brand-footer { padding-bottom: max(32px, env(safe-area-inset-bottom)); }
         }
       }
     </style>
