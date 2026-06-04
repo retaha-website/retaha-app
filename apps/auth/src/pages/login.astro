@@ -704,29 +704,45 @@ const t = {
       }
 
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { height: 100%; }
+      html, body { min-height: 100%; }
       body {
         font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 14px; line-height: 1.5;
         color: var(--color-anthrazit); background: var(--color-white);
-        -webkit-font-smoothing: antialiased; overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        /* iOS-Safari: -webkit-overflow-scrolling fuer smooth-touch-scroll */
+        -webkit-overflow-scrolling: touch;
+        /* KEIN overflow: hidden mehr — sonst kein Scroll auf iPad */
       }
       [x-cloak] { display: none !important; }
 
-      .auth-layout { display: grid; grid-template-columns: 1fr; height: 100vh; }
-      @media (min-width: 768px) { .auth-layout { grid-template-columns: 45% 55%; } }
-      @media (max-width: 767px) {
-        body { overflow: auto; }
-        .auth-layout { height: auto; min-height: 100vh; }
+      .auth-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: 100vh;
+        /* dvh = dynamic viewport height (modern Safari/Chrome, iOS-fix fuer Address-Bar) */
+        min-height: 100dvh;
       }
+      /* Ab 1024px (echte Desktops) 45/55 split */
+      @media (min-width: 1024px) { .auth-layout { grid-template-columns: 45% 55%; } }
+      /* iPad-Tablet-Bereich (768-1023): Stack-Layout damit Inhalt scrollbar bleibt */
 
       /* HERO */
       .auth-hero {
         background: var(--color-anthrazit); color: var(--color-white);
         padding: 48px 32px; display: flex; flex-direction: column;
-        min-height: 380px; position: relative; overflow: hidden;
+        min-height: 380px; position: relative;
+        /* overflow: hidden entfernt — DashboardShowcase managed eigene Animation-Cards */
       }
-      @media (min-width: 768px) { .auth-hero { padding: 56px 64px; } }
+      @media (min-width: 1024px) {
+        .auth-hero {
+          padding: 56px 64px;
+          /* Auf echtem Desktop volle Viewport-Hoehe damit Logo+Headline+Hero-Bottom passen */
+          min-height: 100vh;
+          min-height: 100dvh;
+        }
+      }
+      @media (max-width: 767px) { .auth-hero { padding: 32px 24px; min-height: auto; } }
 
       .auth-hero :global(.brand-logo) { margin-bottom: 40px; }
       .auth-hero :global(.brand-logo svg) {
@@ -777,10 +793,20 @@ const t = {
         background: var(--color-white); padding: 48px 32px;
         display: flex; flex-direction: column;
         justify-content: center; align-items: center;
-        height: 100vh; overflow-y: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        /* Auf Tablet/Mobile waechst die Form ueber Viewport hinaus → Page-Scroll uebernimmt */
       }
       @media (min-width: 768px) { .auth-form-side { padding: 64px; } }
-      @media (max-width: 767px) { .auth-form-side { height: auto; min-height: 60vh; } }
+      @media (min-width: 1024px) {
+        .auth-form-side {
+          /* Auf echtem Desktop: form scrollt intern, Page selbst nicht */
+          height: 100vh;
+          height: 100dvh;
+          overflow-y: auto;
+        }
+      }
+      @media (max-width: 767px) { .auth-form-side { min-height: auto; padding-top: 64px; } }
 
       /* Language-Switcher: oben rechts */
       .lang-switcher {
