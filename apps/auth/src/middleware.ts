@@ -1,13 +1,22 @@
 /**
- * Astro Middleware — Sprach-Detection + Cross-Subdomain-Cookie-Sync
+ * Astro Middleware — Sprach-Detection + URL-Rewrite + Cross-Subdomain-Cookie-Sync
  *
- * Reihenfolge der Erkennung:
- *   1. URL-Prefix (z.B. /en/login) -> Astro.currentLocale wenn i18n.routing aktiv
+ * URL-Rewrite:
+ *   /en/login -> intern /login mit currentLang='en'
+ *   /tr/login -> intern /login mit currentLang='tr'
+ *   etc. (alle 11 Sprachen)
+ *
+ *   Astro i18n routing macht das in SSR-Mode (Vercel-Adapter) nicht
+ *   automatisch — wir machen es hier explizit via context.rewrite.
+ *
+ * Sprach-Cascade (fuer locals.currentLang):
+ *   1. URL-Prefix (/en/, /tr/, etc.)
  *   2. Cookie `retaha_lang` (cross-subdomain ueber .retaha.de gesetzt)
  *   3. Accept-Language Header (Browser-Default)
  *   4. Fallback: 'de'
  *
- * Liefert ergebnis in Astro.locals.currentLang (TS-deklariert in env.d.ts).
+ * Cookie-Sync: Bei URL-Lang-Prefix wird Cookie auf die URL-Sprache aktualisiert,
+ * damit Folge-Apps (dashboard, backoffice) dieselbe Sprache uebernehmen.
  */
 
 import type { MiddlewareHandler } from 'astro';
@@ -15,33 +24,52 @@ import type { MiddlewareHandler } from 'astro';
 const SUPPORTED = ['de', 'en', 'tr', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const;
 type Lang = (typeof SUPPORTED)[number];
 
+const LANG_PREFIX_REGEX = /^\/(de|en|tr|fr|es|it|pt|nl|ru|ar|zh)(?=\/|$)/;
+
 function isLang(value: string | undefined): value is Lang {
   return !!value && (SUPPORTED as readonly string[]).includes(value);
 }
 
 export const onRequest: MiddlewareHandler = async (context, next) => {
-  // 1. URL-Prefix via Astro i18n
-  const urlLocale = context.currentLocale;
+  const url = new URL(context.request.url);
 
-  // 2. Cookie
+  // 1. URL-Lang-Prefix extrahieren (z.B. /en/login -> 'en' + '/login')
+  const match = url.pathname.match(LANG_PREFIX_REGEX);
+  const urlLang = match ? (match[1] as Lang) : undefined;
+  const cleanPath = match
+    ? url.pathname.replace(LANG_PREFIX_REGEX, '') || '/'
+    : url.pathname;
+
+  // 2. Cookie + Accept-Language fallbacks
   const cookieLang = context.cookies.get('retaha_lang')?.value;
-
-  // 3. Accept-Language
   const acceptLanguage = context.request.headers.get('accept-language');
   const browserLang = acceptLanguage?.split(',')[0]?.split('-')[0]?.toLowerCase();
 
-  // Priority-Cascade: URL > Cookie > Browser > Default
+  // Cascade: URL > Cookie > Browser > Default
   let finalLang: Lang = 'de';
-  if (isLang(urlLocale)) {
-    finalLang = urlLocale;
-  } else if (isLang(cookieLang)) {
-    finalLang = cookieLang;
-  } else if (isLang(browserLang)) {
-    finalLang = browserLang;
+  if (urlLang) finalLang = urlLang;
+  else if (isLang(cookieLang)) finalLang = cookieLang;
+  else if (isLang(browserLang)) finalLang = browserLang;
+
+  context.locals.currentLang = finalLang;
+
+  // 3. Cookie sync: wenn URL-Sprache != Cookie, Cookie aktualisieren
+  if (urlLang && urlLang !== cookieLang) {
+    const host = url.hostname;
+    const isProd = host.endsWith('.retaha.de') || host === 'retaha.de';
+    context.cookies.set('retaha_lang', urlLang, {
+      path: '/',
+      domain: isProd ? '.retaha.de' : undefined,
+      maxAge: 60 * 60 * 24 * 365, // 1 Jahr
+      sameSite: 'lax',
+    });
   }
 
-  // Inject in locals fuer Pages
-  context.locals.currentLang = finalLang;
+  // 4. URL-Rewrite: /en/login -> intern /login
+  //    Astro routet dann zu src/pages/login.astro, currentLang via locals verfuegbar
+  if (urlLang) {
+    return context.rewrite(cleanPath + url.search);
+  }
 
   return next();
 };
