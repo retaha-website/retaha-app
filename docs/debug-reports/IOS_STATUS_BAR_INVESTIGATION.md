@@ -3,7 +3,7 @@
 **Datum:** 2026-06-04
 **Kontext:** Login-Page `auth.retaha.de/login`, Mobile v6a Layout
 **Ziel:** System-Status-Bar oben (mit WiFi/Akku/Uhr) soll im iOS Safari Browser-Tab anthrazit erscheinen (analog zur Hero-Section unten drunter) — bei dynamischem Scrollen wie auf teenage.engineering
-**Status:** **Ungelöst nach 8 Versuchen.** Teilerfolg ab Versuch #6 (Page scrollt jetzt unter Status-Bar durch). Bar-Color selbst bleibt weiß.
+**Status:** **GELÖST in Versuch #9 (User-Recherche).** iOS 26 (Liquid Glass) hat das Toolbar/Status-Bar-Rendering komplett geändert — alle 8 vorherigen Versuche basierten auf Safari ≤25 Spec. Lösung: position:fixed Sampler-Element am Viewport-Rand. Siehe Versuch #9 unten.
 
 ---
 
@@ -96,6 +96,51 @@ html { background-color: var(--color-anthrazit); }
 **Hypothese:** Manifest aktiviert durchscroll-Effekt. theme-color Meta-Tag setzt zusätzlich die initiale Bar-Color für den Bereich wo kein Page-Content durchschimmert.
 **Änderung:** `<meta name="theme-color" content="#1A1A1A" />` wieder hinzugefügt zusätzlich zum Manifest.
 **Ergebnis:** Keine Änderung gegenüber #6. Bar weiß, Page scrollt durch.
+
+---
+
+### Versuch #9 (✓ LÖSUNG) — iOS 26 Toolbar-Tint via fixed Sampler-Element
+**Quelle:** User-Recherche nach Versuch #8.
+**Erkenntnis:** Apple hat in **iOS 26 (Liquid Glass)** das gesamte Status-Bar-System überarbeitet:
+- `<meta name="theme-color">` wird **KOMPLETT IGNORIERT** in Safari 26
+- Webmanifest `theme_color` wird **IGNORIERT** für Tab-Mode
+- Safari 26 sampelt body-background **NICHT mehr** direkt
+- Safari 26 **scant** nach `position:fixed`/sticky Elementen am Viewport-Rand und nimmt deren `background-color` für die Bar
+
+**Lösung:** Unsichtbares `position:fixed` Element bei `top: -8px` mit anthrazit-bg. Safari samplet es, User sieht es nicht.
+
+```html
+<!-- in <body> als erstes Element -->
+<div class="safari-toolbar-tint safari-toolbar-tint--top" aria-hidden="true"></div>
+```
+
+```css
+.safari-toolbar-tint {
+  position: fixed; left: 0; right: 0; width: 100%;
+  min-height: 12px; z-index: 5; pointer-events: none;
+  display: none;
+}
+.safari-toolbar-tint--top {
+  top: -8px;
+  background-color: var(--color-anthrazit);
+}
+@supports (-webkit-text-size-adjust: none) and (-webkit-touch-callout: none) {
+  @media (max-width: 767px) { .safari-toolbar-tint { display: block; } }
+}
+```
+
+**Constraints:**
+1. Element MUSS `position:fixed` sein (nicht sticky/absolute)
+2. Element MUSS am echten Viewport-Rand sein
+3. Element MUSS bei initial paint da sein (kein JS-Inject)
+4. background-color-Änderungen via JS wirken NICHT (Safari samplet nur initial)
+
+**Quellen:**
+- https://1ar.io/updates/safari-26-liquid-glass-web/
+- https://jahir.dev/blog/safari-toolbar
+- https://nasedk.in/blog/ios26-safari-toolbar-colors/
+
+**Commit:** `445bcc2`
 
 ---
 
