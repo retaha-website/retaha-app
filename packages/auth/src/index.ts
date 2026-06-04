@@ -35,3 +35,7 @@ export {
   buildLoginRedirect,
   type SessionCookieOptions,
 } from './cross-subdomain-cookie';
+
+// MFA (Sprint-I Findings-Fix) — Server-side only
+// Importpfad: import { ... } from '@retaha/auth/mfa'
+// (NICHT vom root '@retaha/auth' damit Client-Bundles bcrypt nicht ziehen)
