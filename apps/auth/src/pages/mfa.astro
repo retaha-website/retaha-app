@@ -1,0 +1,465 @@
+---
+/**
+ * /mfa — 2FA Login-Step
+ *
+ * 1:1 CSS aus Prototyp mfa_v1_login_step.html (User-finalisiert).
+ * Logic:
+ *   - Erreicht nur wenn user_mfa.enabled = true UND mfa_verified Cookie nicht da
+ *   - 6-Box Code-Input mit Auto-Advance, Paste, Backspace-Navigation
+ *   - Auto-Submit wenn alle 6 Ziffern eingegeben
+ *   - Auf Erfolg: Cookie mfa_verified=true (12h) + Redirect return_to
+ *   - Auf 3x Fehler: 30s Cooldown (rate-limit via /api/mfa/verify)
+ *   - Link "recovery-code stattdessen" -> /mfa-recovery
+ *   - Link "zurueck zur anmeldung" -> /logout
+ */
+
+import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+import Logo from '@retaha/ui/components/brand/Logo.astro';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/tokens.css';
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const supabase = createSupabaseServerInstance(Astro.cookies);
+const { data: userRes } = await supabase.auth.getUser();
+
+// Nicht eingeloggt -> /login
+if (!userRes?.user) {
+  return Astro.redirect('/login');
+}
+
+// MFA-Verified-Cookie schon da? -> direkt return_to / dashboard
+const mfaVerified = Astro.cookies.get('mfa_verified')?.value === 'true';
+const url = new URL(Astro.request.url);
+const rawReturnTo = url.searchParams.get('return_to');
+const errorParam = url.searchParams.get('error') ?? '';
+const returnTo = sanitizeReturnTo(rawReturnTo);
+
+if (mfaVerified) {
+  return Astro.redirect(returnTo);
+}
+
+// User-MFA-Status pruefen — wenn nicht enabled, keine MFA-Pflicht
+const service = createSupabaseServiceRoleInstance();
+const { data: mfa } = await service
+  .from('user_mfa')
+  .select('enabled')
+  .eq('user_id', userRes.user.id)
+  .maybeSingle();
+
+if (!mfa?.enabled) {
+  // Kein MFA eingerichtet -> direkt weiter
+  return Astro.redirect(returnTo);
+}
+
+const userEmail = userRes.user.email ?? '';
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme="bauhaus_manufaktur">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Sicherheits-Code · retaha</title>
+  </head>
+  <body>
+
+    <main class="auth-layout" x-data={`{
+      code: ['', '', '', '', '', ''],
+      hasError: false,
+      isSubmitting: false,
+      errorMessage: ${JSON.stringify(errorParam)},
+      email: ${JSON.stringify(userEmail)},
+      returnTo: ${JSON.stringify(returnTo)},
+
+      init() {
+        setTimeout(() => this.$refs.input0?.focus(), 200);
+      },
+
+      onInput(index, event) {
+        const value = event.target.value.replace(/\\D/g, '').slice(-1);
+        this.code[index] = value;
+        this.hasError = false;
+        this.errorMessage = '';
+
+        if (value && index < 5) {
+          this.$refs['input' + (index + 1)]?.focus();
+        }
+
+        if (this.code.every(d => d !== '')) {
+          setTimeout(() => this.submit(), 200);
+        }
+      },
+
+      onKeydown(index, event) {
+        if (event.key === 'Backspace' && !this.code[index] && index > 0) {
+          this.code[index - 1] = '';
+          this.$refs['input' + (index - 1)]?.focus();
+        }
+        if (event.key === 'ArrowLeft' && index > 0) {
+          this.$refs['input' + (index - 1)]?.focus();
+        }
+        if (event.key === 'ArrowRight' && index < 5) {
+          this.$refs['input' + (index + 1)]?.focus();
+        }
+      },
+
+      onPaste(event) {
+        event.preventDefault();
+        const pasted = (event.clipboardData?.getData('text') || '').replace(/\\D/g, '').slice(0, 6);
+        for (let i = 0; i < 6; i++) this.code[i] = pasted[i] || '';
+        const lastIdx = Math.min(pasted.length, 5);
+        this.$refs['input' + lastIdx]?.focus();
+        if (this.code.every(d => d !== '')) {
+          setTimeout(() => this.submit(), 200);
+        }
+      },
+
+      isComplete() { return this.code.every(d => d !== ''); },
+
+      async submit() {
+        const fullCode = this.code.join('');
+        if (fullCode.length !== 6) return;
+
+        this.isSubmitting = true;
+        this.errorMessage = '';
+
+        try {
+          const res = await fetch('/api/mfa/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: fullCode, return_to: this.returnTo })
+          });
+          const data = await res.json();
+
+          if (res.ok && data.ok) {
+            window.location.href = data.redirect || this.returnTo;
+            return;
+          }
+
+          this.hasError = true;
+          this.errorMessage = data.message || 'code ungueltig. bitte erneut versuchen.';
+          this.isSubmitting = false;
+          setTimeout(() => {
+            this.code = ['', '', '', '', '', ''];
+            this.$refs.input0?.focus();
+            this.hasError = false;
+          }, 600);
+        } catch (e) {
+          this.hasError = true;
+          this.errorMessage = 'netzwerk-fehler. erneut versuchen.';
+          this.isSubmitting = false;
+        }
+      }
+    }`}>
+
+      <!-- HERO -->
+      <aside class="auth-hero">
+        <Logo variant="light" size="md" href="https://retaha.de" ariaLabel="retaha · zur Startseite" class="brand-logo" />
+
+        <div class="hero-center">
+          <h1 class="hero-headline">Letzter<br />Schritt<span class="h-dot">.</span></h1>
+          <p class="hero-tagline">
+            Wir schützen dein Hotel mit einem zweiten Sicherheits-Schlüssel.
+            Öffne deine Authenticator-App.
+          </p>
+        </div>
+
+        <div class="hero-bottom">
+          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+          <p class="hero-meta">retaha hospitality · niedernhall</p>
+        </div>
+      </aside>
+
+      <!-- FORM -->
+      <section class="auth-form-side">
+        <div class="form-container">
+
+          <header>
+            <h2 class="form-state-title">Sicherheits-Code<span class="h-dot">.</span></h2>
+            <p class="form-state-sub">
+              Öffne deine Authenticator-App und gib den 6-stelligen Code für
+              <span class="email-mono" x-text="email"></span> ein.
+            </p>
+          </header>
+
+          <div x-show="errorMessage" x-cloak class="form-error" x-text="errorMessage"></div>
+
+          <!-- 6-Box Code Input -->
+          <div class="code-input-group" @paste="onPaste">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <input
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="1"
+                class="code-input"
+                x-bind:class={`{ 'is-filled': code[${index}] !== '', 'is-error': hasError }`}
+                x-ref={`input${index}`}
+                x-bind:value={`code[${index}]`}
+                x-on:input={`onInput(${index}, $event)`}
+                x-on:keydown={`onKeydown(${index}, $event)`}
+                x-bind:disabled="isSubmitting"
+                aria-label={`Ziffer ${index + 1} von 6`}
+              />
+            ))}
+          </div>
+
+          <button class="btn-primary" type="button"
+                  x-bind:disabled="!isComplete() || isSubmitting"
+                  x-on:click="submit()">
+            <span x-show="!isSubmitting">verifizieren</span>
+            <span x-show="isSubmitting" x-cloak>wird geprüft...</span>
+          </button>
+
+          <div class="form-help-links">
+            <a class="help-link" href="/mfa-recovery">→ recovery-code stattdessen verwenden</a>
+            <a class="help-link is-secondary" href="/logout">← zurück zur anmeldung</a>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+
+    <style>
+      /* CSS 1:1 aus Prototyp mfa_v1_login_step.html */
+      :root {
+        --color-pink-shock: #FF4A82;
+        --color-pink-glow: rgba(255, 74, 130, 0.18);
+        --color-pink-soft: rgba(255, 74, 130, 0.08);
+        --color-anthrazit: #1A1A1A;
+        --color-anthrazit-soft: #2A2A2A;
+        --color-white: #FFFFFF;
+        --radius: 3px;
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { background-color: var(--color-anthrazit); }
+      html, body { min-height: 100%; }
+      html[data-theme="bauhaus_manufaktur"] body {
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px; line-height: 1.5;
+        color: var(--color-anthrazit);
+        background: var(--color-white);
+        -webkit-font-smoothing: antialiased;
+        -webkit-overflow-scrolling: touch;
+      }
+      @media (max-width: 1023px) {
+        html[data-theme="bauhaus_manufaktur"] body { background: var(--color-anthrazit); }
+      }
+      [x-cloak] { display: none !important; }
+
+      .auth-layout {
+        display: grid; grid-template-columns: 1fr;
+        min-height: 100vh; min-height: 100dvh;
+      }
+      @media (min-width: 1024px) {
+        .auth-layout { grid-template-columns: 45% 55%; }
+      }
+
+      .auth-hero {
+        background: var(--color-anthrazit); color: var(--color-white);
+        padding: 48px 32px; display: flex; flex-direction: column;
+        min-height: 280px; position: relative;
+      }
+      @media (min-width: 1024px) {
+        .auth-hero { padding: 56px 64px; min-height: 100vh; min-height: 100dvh; }
+      }
+      .auth-hero :global(.brand-logo) { margin-bottom: 48px; transition: opacity 200ms ease; }
+      .auth-hero :global(.brand-logo:hover) { opacity: 0.7; }
+
+      .hero-center {
+        flex: 1; display: flex; flex-direction: column;
+        justify-content: center; margin: 32px 0;
+      }
+      .hero-headline {
+        font-size: 36px; font-weight: 500; line-height: 1.15;
+        letter-spacing: -0.02em; color: var(--color-white); margin-bottom: 16px;
+      }
+      .hero-headline .h-dot { color: var(--color-pink-shock); }
+      .hero-tagline {
+        font-size: 14px; line-height: 1.55;
+        color: rgba(255, 255, 255, 0.7); max-width: 380px;
+      }
+
+      .hero-bottom { margin-top: auto; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      .hero-bauhaus {
+        font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5em;
+        font-size: 12px; color: rgba(255, 255, 255, 0.35); margin-bottom: 12px;
+      }
+      .hero-meta {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .auth-form-side {
+        background: var(--color-white); padding: 48px 32px;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        position: relative;
+      }
+      @media (min-width: 1024px) { .auth-form-side { padding: 64px; } }
+      @media (max-width: 767px) { .auth-form-side { padding: 32px 24px 48px; } }
+
+      .form-container { max-width: 440px; width: 100%; }
+
+      /* h2 = Styleguide 2.2: 28/500/-0.018em/1.2 */
+      .form-state-title {
+        font-size: 28px; font-weight: 500;
+        letter-spacing: -0.018em; line-height: 1.2;
+        color: var(--color-anthrazit); margin-bottom: 12px;
+      }
+      .form-state-title .h-dot { color: var(--color-pink-shock); }
+
+      .form-state-sub {
+        font-size: 14px; color: rgba(26, 26, 26, 0.6);
+        line-height: 1.55; margin-bottom: 32px;
+      }
+      .form-state-sub .email-mono {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: var(--color-anthrazit);
+        background: rgba(26, 26, 26, 0.04);
+        padding: 2px 8px;
+        border-radius: var(--radius);
+      }
+
+      /* 6-Box Code-Input */
+      .code-input-group {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      @media (min-width: 380px) {
+        .code-input-group { gap: 12px; }
+      }
+      .code-input {
+        width: 100%;
+        aspect-ratio: 1;
+        max-height: 64px;
+        border: 1.5px solid rgba(26, 26, 26, 0.15);
+        border-radius: var(--radius);
+        background: var(--color-white);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 24px;
+        font-weight: 500;
+        text-align: center;
+        color: var(--color-anthrazit);
+        transition: all 250ms var(--ease-out-expo);
+        caret-color: var(--color-pink-shock);
+      }
+      .code-input:focus {
+        outline: none;
+        border-color: var(--color-pink-shock);
+        box-shadow: 0 0 0 4px var(--color-pink-soft);
+        transform: translateY(-1px);
+      }
+      .code-input.is-filled {
+        border-color: rgba(26, 26, 26, 0.4);
+        background: rgba(26, 26, 26, 0.02);
+      }
+      .code-input.is-error {
+        border-color: var(--color-pink-shock);
+        background: rgba(255, 74, 130, 0.04);
+        animation: shake 400ms var(--ease-out-quint);
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .code-input.is-error { animation: none; }
+      }
+
+      /* Primary Button */
+      .btn-primary {
+        display: flex; align-items: center; justify-content: center;
+        gap: 12px; width: 100%; padding: 16px 24px;
+        border: none; border-radius: var(--radius);
+        background: var(--color-anthrazit); color: var(--color-white);
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 14px; font-weight: 500; cursor: pointer;
+        transition: all 280ms var(--ease-out-quint);
+        min-height: 48px; position: relative;
+      }
+      .btn-primary::before {
+        content: ''; width: 5px; height: 5px;
+        background: var(--color-pink-shock);
+        border-radius: 50%; flex-shrink: 0;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--color-anthrazit-soft);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px var(--color-pink-glow);
+      }
+      .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Error-Banner */
+      .form-error {
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        background: rgba(255, 74, 130, 0.08);
+        border-left: 3px solid var(--color-pink-shock);
+        border-radius: var(--radius);
+        font-size: 13px;
+        color: var(--color-anthrazit);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .form-error::before {
+        content: "▲";
+        color: var(--color-pink-shock);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+      }
+
+      /* Help-Links */
+      .form-help-links {
+        margin-top: 24px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .help-link {
+        background: transparent; border: none; font-family: inherit;
+        font-size: 13px; color: var(--color-pink-shock); cursor: pointer;
+        padding: 8px 12px; border-radius: var(--radius);
+        transition: background 200ms ease;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .help-link:hover { background: var(--color-pink-soft); }
+      .help-link.is-secondary { color: rgba(26, 26, 26, 0.55); }
+      .help-link.is-secondary:hover {
+        background: rgba(26, 26, 26, 0.04);
+        color: var(--color-anthrazit);
+      }
+    </style>
+  </body>
+</html>

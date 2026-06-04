@@ -1,15 +1,32 @@
 ---
+/**
+ * BauhausToggle — Styleguide 3.11
+ *
+ * Anatomie (alle dimensions aus Styleguide):
+ *   - Track  : 56x28 weiss, border anthrazit/20, border-radius 6
+ *   - Strich : 34x2 mittig — DAS ist der eigentliche Indikator
+ *              inaktiv: anthrazit/25, aktiv: sage (#5C9070)
+ *   - Knob   : 14px anthrazit, slidet 34px nach rechts
+ *
+ * Disabled: opacity 0.5 + cursor not-allowed (Styleguide 3.11).
+ * Wird in 2FA "Magic-Link MFA"-Toggle gebraucht (disabled bis personal_mfa=true).
+ */
+
 interface Props {
-  name: string;
-  checked: boolean;
   id: string;
+  name: string;
+  checked?: boolean;
+  disabled?: boolean;
   label?: string;
 }
 
-const { name, checked, id, label } = Astro.props;
+const { id, name, checked = false, disabled = false, label } = Astro.props;
 ---
 
-<div class="relative w-14 h-7 rounded-md bg-white border border-anthrazit/20">
+<div class:list={[
+  'relative w-14 h-7 rounded-md bg-white border border-anthrazit/20',
+  disabled && 'opacity-50 cursor-not-allowed'
+]}>
   <input type="hidden" name={name} value="off" />
   {checked ? (
     <input
@@ -18,6 +35,7 @@ const { name, checked, id, label } = Astro.props;
       name={name}
       value="on"
       checked
+      disabled={disabled}
       class="peer sr-only"
       aria-label={label}
     />
@@ -27,6 +45,7 @@ const { name, checked, id, label } = Astro.props;
       id={id}
       name={name}
       value="on"
+      disabled={disabled}
       class="peer sr-only"
       aria-label={label}
     />

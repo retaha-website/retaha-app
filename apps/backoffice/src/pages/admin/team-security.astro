@@ -1,0 +1,554 @@
+---
+/**
+ * /admin/team-security — Hotel-Owner-Enforcement-Settings
+ *
+ * 1:1 Layout aus Prototyp mfa_v4_enforcement.html.
+ * Owner-only. Andere Rollen werden zu /admin redirected.
+ *
+ * 3 Toggles:
+ *   - personal_mfa (jeder User selbst)
+ *   - magic_link_mfa (Voraussetzung: personal aktiv)
+ *   - team_required (Owner-Policy fuer Hotel)
+ *
+ * Team-Liste mit MFA-Status pro Mitglied + Enforcement-Banner.
+ */
+
+import {
+  createSupabaseServerInstance,
+  createSupabaseServiceRoleInstance,
+  getUserHotels,
+} from '@retaha/auth';
+import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
+import AdminLayout from '../../components/AdminLayout.astro';
+import BauhausToggle from '@retaha/ui/components/admin/BauhausToggle.astro';
+
+const supabase = createSupabaseServerInstance(Astro.cookies);
+const { data: userRes } = await supabase.auth.getUser();
+if (!userRes?.user) return Astro.redirect('/admin/login');
+
+const user = userRes.user;
+const hotels = await getUserHotels(supabase, user.id);
+const ownerHotel = hotels.find(
+  (h: { id: string; role?: string }) => h.role === 'owner',
+);
+if (!ownerHotel) {
+  // Nicht-Owner -> zu eigenem Sicherheits-Setup
+  return Astro.redirect('/admin/sicherheit');
+}
+
+const service = createSupabaseServiceRoleInstance();
+const [userMfa, hotelPolicy] = await Promise.all([
+  getUserMfaStatus(service, user.id),
+  getHotelMfaPolicy(service, ownerHotel.id),
+]);
+
+// Team-Mitglieder + ihre MFA-Status
+const { data: members } = await service
+  .from('hotel_users')
+  .select('user_id, role, users:user_id(email)')
+  .eq('hotel_id', ownerHotel.id);
+
+const memberIds: string[] = (members ?? []).map((m: { user_id: string }) => m.user_id);
+const { data: mfaStatuses } = await service
+  .from('user_mfa')
+  .select('user_id, enabled, verified_at')
+  .in('user_id', memberIds);
+
+const mfaByUser = new Map(
+  (mfaStatuses ?? []).map((m: { user_id: string; enabled: boolean; verified_at: string | null }) => [
+    m.user_id,
+    m,
+  ]),
+);
+
+type MfaStatus = 'active' | 'pending' | 'inactive';
+function statusFor(uid: string): MfaStatus {
+  const m = mfaByUser.get(uid);
+  if (m?.enabled && m.verified_at) return 'active';
+  if (m && !m.enabled) return 'pending';
+  return 'inactive';
+}
+
+interface TeamMember { id: string; email: string; role: string; mfaStatus: MfaStatus }
+const team: TeamMember[] = (members ?? []).map((m: { user_id: string; role: string; users: { email: string } | { email: string }[] | null }) => ({
+  id: m.user_id,
+  email: Array.isArray(m.users) ? m.users[0]?.email ?? '' : m.users?.email ?? '',
+  role: m.role,
+  mfaStatus: statusFor(m.user_id),
+}));
+
+const pendingCount = team.filter((m) => m.mfaStatus !== 'active').length;
+const activeCount = team.length - pendingCount;
+const personalMfa = userMfa?.enabled ?? false;
+const magicLinkMfa = userMfa?.requireOnMagicLink ?? false;
+const teamRequired = hotelPolicy?.required ?? false;
+---
+
+<AdminLayout title="Sicherheit · Zwei-Faktor" user={user}>
+
+  <main class="admin-shell" x-data={`{
+    hotelId: ${JSON.stringify(ownerHotel.id)},
+    personalMfa: ${JSON.stringify(personalMfa)},
+    magicLinkMfa: ${JSON.stringify(magicLinkMfa)},
+    teamRequired: ${JSON.stringify(teamRequired)},
+    pendingCount: ${pendingCount},
+    teamCount: ${team.length},
+    isLoading: false,
+    errorMessage: '',
+
+    async toggle(setting, value, extra = {}) {
+      this.isLoading = true;
+      this.errorMessage = '';
+      try {
+        const res = await fetch('/api/mfa/policy/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setting, value, ...extra })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          this.errorMessage = data.message || 'aenderung fehlgeschlagen.';
+          // Rollback local state
+          if (setting === 'personal') this.personalMfa = !value;
+          if (setting === 'magic_link') this.magicLinkMfa = !value;
+          if (setting === 'team_required') this.teamRequired = !value;
+        }
+      } catch {
+        this.errorMessage = 'netzwerk-fehler.';
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async sendReminder() {
+      this.isLoading = true;
+      try {
+        const res = await fetch('/api/mfa/send-reminder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hotelId: this.hotelId })
+        });
+        const data = await res.json();
+        alert(data.ok
+          ? 'Erinnerung gesendet (Email-Versand kommt in Sprint-J).'
+          : (data.message || 'fehler.'));
+      } catch {
+        alert('netzwerk-fehler.');
+      } finally {
+        this.isLoading = false;
+      }
+    }
+  }`}>
+
+    <p class="section-eyebrow">— sicherheit · zwei-faktor —</p>
+    <h1 class="section-title">Authentifizierung<span class="h-dot">.</span></h1>
+    <p class="section-sub">
+      Verwalte 2FA für dein Konto und für dein Hotel-Team.
+      Als Inhaber kannst du 2FA für alle Team-Mitglieder verpflichtend machen.
+    </p>
+
+    <div x-show="errorMessage" x-cloak class="ts-error" x-text="errorMessage"></div>
+
+    <!-- PERSOENLICHE 2FA -->
+    <article class="setting-card" x-bind:class="{ 'is-enabled': personalMfa }">
+      <div class="setting-card__header">
+        <div class="setting-card__content">
+          <h2 class="setting-card__title">
+            <span class="setting-card__title-marker">●</span>
+            2FA für mein Konto
+          </h2>
+          <p class="setting-card__desc">
+            Sichere dein Konto mit einem zweiten Faktor (TOTP via Authenticator-App).
+            Bei jeder Anmeldung wirst du nach einem 6-stelligen Code gefragt.
+          </p>
+          <span class="status-pill" x-bind:class="personalMfa ? 'is-active' : 'is-inactive'">
+            <span x-text="personalMfa ? 'aktiv' : 'nicht aktiv'"></span>
+          </span>
+        </div>
+        <!-- Personal-Toggle: aktivieren = redirect zu setup-wizard. deaktivieren = direkter API-Call -->
+        {personalMfa ? (
+          <label class="bauhaus-toggle-wrapper">
+            <input
+              type="checkbox"
+              checked
+              x-bind:disabled="isLoading"
+              x-on:change="personalMfa = false; toggle('personal', false)"
+            />
+            <span class="bauhaus-toggle-visual is-checked"><span class="knob"></span></span>
+          </label>
+        ) : (
+          <a href="/admin/sicherheit" class="setup-link">→ einrichten</a>
+        )}
+      </div>
+      <div class="enabled-info" x-show="personalMfa" x-cloak>
+        2FA ist aktiv. Recovery-Codes verbleiben in deiner Verwaltung.
+        <a href="/admin/sicherheit" class="info-link">neu einrichten</a>
+      </div>
+    </article>
+
+    <!-- MAGIC-LINK MFA -->
+    <article class="setting-card" x-bind:class="{ 'is-enabled': magicLinkMfa }">
+      <div class="setting-card__header">
+        <div class="setting-card__content">
+          <h2 class="setting-card__title">
+            <span class="setting-card__title-marker">■</span>
+            2FA auch beim Magic-Link
+          </h2>
+          <p class="setting-card__desc">
+            Selbst bei Anmeldung via E-Mail-Link wirst du zusätzlich nach deinem
+            6-stelligen Code gefragt. <strong>Empfohlen für maximale Sicherheit</strong>,
+            aber etwas umständlicher.
+          </p>
+          <span class="status-pill" x-bind:class="magicLinkMfa ? 'is-active' : 'is-inactive'">
+            <span x-text="magicLinkMfa ? 'aktiv' : 'nicht aktiv'"></span>
+          </span>
+        </div>
+        <label class="bauhaus-toggle-wrapper" x-bind:class="{ 'is-disabled': !personalMfa }">
+          <input type="checkbox"
+                 x-bind:checked="magicLinkMfa"
+                 x-bind:disabled="!personalMfa || isLoading"
+                 x-on:change="magicLinkMfa = $event.target.checked; toggle('magic_link', $event.target.checked)" />
+          <span class="bauhaus-toggle-visual" x-bind:class="{ 'is-checked': magicLinkMfa }"><span class="knob"></span></span>
+        </label>
+      </div>
+    </article>
+
+    <!-- TEAM-PFLICHT -->
+    <article class="setting-card" x-bind:class="{ 'is-enabled': teamRequired }">
+      <div class="setting-card__header">
+        <div class="setting-card__content">
+          <h2 class="setting-card__title">
+            <span class="setting-card__title-marker">▲</span>
+            2FA für gesamtes Team verpflichten
+          </h2>
+          <p class="setting-card__desc">
+            Als Inhaber kannst du verlangen, dass <strong>alle Team-Mitglieder</strong>
+            (Manager und Staff) 2FA aktivieren. Wer es noch nicht hat, wird beim
+            nächsten Login dazu aufgefordert.
+          </p>
+          <span class="status-pill" x-bind:class="teamRequired ? 'is-active' : 'is-inactive'">
+            <span x-text="teamRequired ? 'verpflichtend' : 'optional'"></span>
+          </span>
+        </div>
+        <label class="bauhaus-toggle-wrapper">
+          <input type="checkbox"
+                 x-bind:checked="teamRequired"
+                 x-bind:disabled="isLoading"
+                 x-on:change="teamRequired = $event.target.checked; toggle('team_required', $event.target.checked, { hotelId })" />
+          <span class="bauhaus-toggle-visual" x-bind:class="{ 'is-checked': teamRequired }"><span class="knob"></span></span>
+        </label>
+      </div>
+    </article>
+
+    <!-- TEAM-LISTE -->
+    <section class="team-section">
+      <h3 class="team-section-title">Team-Übersicht<span class="h-dot">.</span></h3>
+      <p class="team-section-sub">{team.length} Mitglieder · {activeCount} mit 2FA aktiv</p>
+
+      <ul class="team-list">
+        {team.map((member) => (
+          <li class="team-row">
+            <div>
+              <p class="team-member__email">{member.email}</p>
+              <span class={`team-member__role ${member.role === 'owner' ? 'is-owner' : ''}`}>
+                {member.role === 'owner' ? 'inhaber' : member.role === 'manager' ? 'manager' : 'team'}
+              </span>
+            </div>
+            <span class={`mfa-status is-${member.mfaStatus}`}>
+              {member.mfaStatus === 'active'
+                ? '2fa aktiv'
+                : member.mfaStatus === 'pending'
+                ? 'eingerichtet · nicht bestätigt'
+                : 'noch nicht eingerichtet'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <!-- ENFORCEMENT-BANNER -->
+    <aside class="enforcement-banner" x-show="teamRequired && pendingCount > 0" x-cloak>
+      <span class="enforcement-banner__triangle" aria-hidden="true"></span>
+      <div class="enforcement-banner__content">
+        <p class="enforcement-banner__title">— hinweis · team-pflicht aktiv —</p>
+        <p class="enforcement-banner__text">
+          Du hast 2FA für dein Team verpflichtend gemacht.
+          <strong><span x-text="pendingCount"></span> von <span x-text="teamCount"></span> Mitgliedern</strong>
+          haben es noch nicht aktiviert und werden beim nächsten Login dazu aufgefordert.
+        </p>
+        <button class="enforcement-banner__action" type="button" x-on:click="sendReminder()" x-bind:disabled="isLoading">
+          erinnerung senden
+        </button>
+      </div>
+    </aside>
+
+  </main>
+
+  <style>
+    :root {
+      --color-pink-shock: #FF4A82;
+      --color-pink-glow: rgba(255, 74, 130, 0.18);
+      --color-anthrazit: #1A1A1A;
+      --color-anthrazit-soft: #2A2A2A;
+      --color-sage: #5C9070;
+      --color-sage-soft: rgba(92,144,112,0.08);
+      --color-white: #FFFFFF;
+      --radius: 3px;
+    }
+    [x-cloak] { display: none !important; }
+
+    .admin-shell { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .section-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-pink-shock); margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 36px; font-weight: 500; line-height: 1.15;
+      letter-spacing: -0.02em; color: var(--color-anthrazit); margin-bottom: 12px;
+    }
+    .section-title .h-dot { color: var(--color-pink-shock); }
+    .section-sub {
+      font-size: 15px; color: rgba(26,26,26,0.6);
+      line-height: 1.55; max-width: 580px; margin-bottom: 48px;
+    }
+
+    .ts-error {
+      padding: 12px 16px;
+      background: rgba(255,74,130,0.08);
+      border-left: 3px solid var(--color-pink-shock);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+
+    /* Setting-Card */
+    .setting-card {
+      padding: 24px;
+      background: var(--color-white);
+      border: 1px solid rgba(26,26,26,0.08);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      transition: border-color 250ms ease;
+    }
+    .setting-card.is-enabled {
+      border-color: rgba(92,144,112,0.3);
+      background: rgba(92,144,112,0.02);
+    }
+    .setting-card__header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 24px; margin-bottom: 16px;
+    }
+    .setting-card__content { flex: 1; }
+    .setting-card__title {
+      font-size: 16px; font-weight: 500; color: var(--color-anthrazit);
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .setting-card__title-marker {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--color-pink-shock);
+    }
+    .setting-card__desc {
+      font-size: 13px; color: rgba(26,26,26,0.6); line-height: 1.6;
+    }
+    .setting-card__desc strong { color: var(--color-anthrazit); font-weight: 500; }
+
+    /* Status-Pill */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 12px; border-radius: 99px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+      margin-top: 12px;
+    }
+    .status-pill.is-active { background: var(--color-sage-soft); color: var(--color-sage); }
+    .status-pill.is-inactive { background: rgba(26,26,26,0.06); color: rgba(26,26,26,0.5); }
+    .status-pill::before {
+      content: ''; width: 5px; height: 5px;
+      border-radius: 50%; background: currentColor;
+    }
+
+    /* Bauhaus-Toggle inline (CSS aus Prototyp v4) */
+    .bauhaus-toggle-wrapper {
+      position: relative; display: inline-block; cursor: pointer; flex-shrink: 0;
+    }
+    .bauhaus-toggle-wrapper.is-disabled { cursor: not-allowed; opacity: 0.5; }
+    .bauhaus-toggle-wrapper input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .bauhaus-toggle-visual {
+      position: relative; display: inline-block;
+      width: 56px; height: 28px;
+      background: var(--color-white);
+      border: 1px solid rgba(26,26,26,0.2);
+      border-radius: 6px;
+      transition: border-color 200ms ease-in-out;
+    }
+    .bauhaus-toggle-visual::before {
+      content: ''; position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px; height: 2px;
+      background: rgba(26,26,26,0.25);
+      transition: background 200ms ease-in-out;
+    }
+    .bauhaus-toggle-visual.is-checked::before { background: var(--color-sage); }
+    .knob {
+      position: absolute; top: 50%;
+      left: 4px; transform: translateY(-50%);
+      width: 14px; height: 14px;
+      background: var(--color-anthrazit);
+      border-radius: 50%;
+      transition: left 200ms ease-in-out;
+    }
+    .bauhaus-toggle-visual.is-checked .knob { left: 38px; }
+
+    /* Setup-Link statt Toggle wenn nicht aktiv */
+    .setup-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--color-pink-shock);
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid var(--color-pink-shock);
+      border-radius: var(--radius);
+      transition: all 200ms ease;
+      flex-shrink: 0;
+    }
+    .setup-link:hover { background: var(--color-pink-shock); color: var(--color-white); }
+
+    /* Enabled-Info */
+    .enabled-info {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: rgba(92,144,112,0.06);
+      border-left: 3px solid var(--color-sage);
+      border-radius: var(--radius);
+      font-size: 13px; color: rgba(26,26,26,0.75); line-height: 1.5;
+    }
+    .enabled-info::before {
+      content: '✓ '; color: var(--color-sage); font-weight: 500;
+    }
+    .info-link {
+      color: var(--color-pink-shock);
+      text-decoration: none;
+      margin-left: 8px;
+      border-bottom: 1px solid rgba(255,74,130,0.3);
+    }
+
+    /* Team-Liste */
+    .team-section { margin-top: 48px; }
+    .team-section-title {
+      font-size: 18px; font-weight: 500;
+      letter-spacing: -0.01em; margin-bottom: 8px;
+    }
+    .team-section-title .h-dot { color: var(--color-pink-shock); }
+    .team-section-sub {
+      font-size: 13px; color: rgba(26,26,26,0.55); margin-bottom: 24px;
+    }
+    .team-list {
+      border: 1px solid rgba(26,26,26,0.08);
+      border-radius: var(--radius);
+      overflow: hidden;
+      list-style: none;
+      padding: 0;
+    }
+    .team-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px; align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(26,26,26,0.06);
+      transition: background 200ms ease;
+    }
+    .team-row:last-child { border-bottom: none; }
+    .team-row:hover { background: rgba(26,26,26,0.015); }
+    .team-member__email {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--color-anthrazit);
+      margin-bottom: 4px;
+    }
+    .team-member__role {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(26,26,26,0.06);
+      border-radius: 99px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(26,26,26,0.55);
+    }
+    .team-member__role.is-owner {
+      background: rgba(255,74,130,0.1);
+      color: var(--color-pink-shock);
+    }
+    .mfa-status {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 8px 16px; border-radius: 99px;
+    }
+    .mfa-status.is-active { background: var(--color-sage-soft); color: var(--color-sage); }
+    .mfa-status.is-pending { background: rgba(255,74,130,0.08); color: var(--color-pink-shock); }
+    .mfa-status.is-inactive { background: rgba(26,26,26,0.05); color: rgba(26,26,26,0.5); }
+    .mfa-status::before {
+      content: ''; width: 5px; height: 5px;
+      border-radius: 50%; background: currentColor;
+    }
+
+    /* Enforcement-Banner */
+    .enforcement-banner {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 24px;
+      background: var(--color-anthrazit); color: var(--color-white);
+      border-radius: var(--radius);
+      margin-top: 48px;
+    }
+    .enforcement-banner__triangle {
+      flex-shrink: 0;
+      width: 0; height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 12px solid var(--color-pink-shock);
+      margin-top: 8px;
+      animation: bannerTrianglePulse 2s ease-in-out;
+      animation-iteration-count: 3;
+    }
+    @keyframes bannerTrianglePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.15); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .enforcement-banner__triangle { animation: none; }
+    }
+    .enforcement-banner__content { flex: 1; }
+    .enforcement-banner__title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-pink-shock); margin-bottom: 8px;
+    }
+    .enforcement-banner__text {
+      font-size: 14px; line-height: 1.55;
+      color: rgba(255,255,255,0.85); margin-bottom: 12px;
+    }
+    .enforcement-banner__text strong { color: var(--color-white); font-weight: 500; }
+    .enforcement-banner__action {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px;
+      background: var(--color-white); color: var(--color-anthrazit);
+      border: none; border-radius: var(--radius);
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: all 200ms ease;
+    }
+    .enforcement-banner__action::before {
+      content: ''; width: 5px; height: 5px;
+      background: var(--color-pink-shock);
+      border-radius: 50%; flex-shrink: 0;
+    }
+    .enforcement-banner__action:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(255,74,130,0.3);
+    }
+    .enforcement-banner__action:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</AdminLayout>
