@@ -723,6 +723,55 @@ const t = {
       Alpine.start();
     </script>
 
+    <!-- Dynamic Theme-Color (Status-Bar iOS/Android):
+         Hero sichtbar oben -> #1A1A1A anthrazit,
+         Form-Section gescrollt nach oben -> #FFFFFF weiss.
+         Desktop ignoriert (kein Status-Bar Effekt).
+         Uses rAF-throttled scroll listener — perf-OK.
+         iOS Safari 15+ + Android Chrome unterstuetzen dynamische Updates. -->
+    <script is:inline>
+      (function () {
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) return;
+
+        function update() {
+          // Desktop (>= 1024px): kein Mobile-Status-Bar, statisch anthrazit fuer Safari-Tab-Color
+          if (window.innerWidth >= 1024) {
+            meta.setAttribute('content', '#1A1A1A');
+            return;
+          }
+          var hero = document.querySelector('.auth-hero');
+          if (!hero) return;
+          // Wenn Hero-Bottom hoeher als 60px im Viewport -> User scrollt in weiss-Bereich -> Status-Bar weiss
+          var heroBottom = hero.getBoundingClientRect().bottom;
+          var newColor = heroBottom > 60 ? '#1A1A1A' : '#FFFFFF';
+          if (meta.getAttribute('content') !== newColor) {
+            meta.setAttribute('content', newColor);
+          }
+        }
+
+        // rAF-Throttle damit Scroll-Listener nicht jeden Pixel berechnet
+        var scheduled = false;
+        function onScroll() {
+          if (scheduled) return;
+          scheduled = true;
+          requestAnimationFrame(function () {
+            scheduled = false;
+            update();
+          });
+        }
+
+        // Initial + Listener
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', update);
+        } else {
+          update();
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+      })();
+    </script>
+
     <style>
       :root {
         --color-pink-shock: #FF4A82;
@@ -842,13 +891,22 @@ const t = {
       }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
+      /* h1 = APP_STYLEGUIDE.md Sektion 2.2: 36px / 500 / -0.02em / 1.15 */
       .hero-headline {
-        font-size: 40px; font-weight: 500; line-height: 1.05;
-        letter-spacing: -0.025em; color: var(--color-white); margin-bottom: 14px;
+        font-size: 36px;
+        font-weight: 500;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        color: var(--color-white);
+        margin-bottom: 14px;
       }
-      @media (min-width: 1280px) { .hero-headline { font-size: 48px; } }
       .hero-headline .h-dot { color: var(--color-pink-shock); }
-      .hero-tagline { font-size: 15px; line-height: 1.5; color: rgba(255,255,255,0.7); max-width: 380px; }
+      .hero-tagline {
+        font-size: 14px;
+        line-height: 1.55;
+        color: rgba(255,255,255,0.7);
+        max-width: 380px;
+      }
 
       .hero-bottom {
         margin-top: auto; padding-top: 24px;
@@ -1288,22 +1346,26 @@ const t = {
         :global(.stat-cell) { padding: 8px !important; }
         :global(.stat-value) { font-size: 18px !important; }
 
-        /* Headline + Tagline kompakt */
+        /* Headline + Tagline mobile-kompakt — h1 bleibt semantisch,
+           Size reduziert auf 28px (= Styleguide-h2-Skala) damit Hero auf
+           375px-iPhones nicht doppelt umbricht. line-height/letter-spacing
+           bleiben Styleguide-h1. */
         .hero-center { margin-top: 0; margin-bottom: 0; }
         .hero-headline {
-          font-size: 26px;
-          line-height: 1.1;
+          font-size: 28px;
+          line-height: 1.15;
+          letter-spacing: -0.02em;
           margin-top: 16px;
           margin-bottom: 10px;
         }
-        .hero-tagline { font-size: 14px; line-height: 1.5; }
+        .hero-tagline { font-size: 14px; line-height: 1.55; }
 
         /* FORM-SIDE: kompakter padding, iOS-fixes */
         .auth-form-side {
           min-height: auto;
           padding: 32px 24px 24px;
         }
-        .form-state-title { font-size: 26px; }
+        /* form-state-title = Styleguide-h2 28px — kein Mobile-Override mehr */
 
         /* iOS-Auto-Zoom verhindern: Input mind. 16px Font */
         .field-input {
