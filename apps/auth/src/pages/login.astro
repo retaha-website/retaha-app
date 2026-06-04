@@ -13,6 +13,7 @@
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
 import Logo from '@retaha/ui/components/brand/Logo.astro';
 import DashboardShowcase from '@retaha/ui/components/showcase/DashboardShowcase.astro';
+import LangSwitcher from '@retaha/ui/components/lang/LangSwitcher.astro';
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/tokens.css';
 import '@fontsource/space-grotesk/300.css';
@@ -24,13 +25,15 @@ const url = new URL(Astro.request.url);
 const rawReturnTo = url.searchParams.get('return_to');
 const returnTo = sanitizeReturnTo(rawReturnTo);
 
-/* Server-side: Cookie lesen fuer initiales <html lang>-Attribut (SEO + Anti-Flash) */
-const ALLOWED_LANGS = ['de', 'en', 'fr', 'es', 'tr'] as const;
-const cookieLang = Astro.cookies.get('retaha_lang')?.value ?? '';
+/* 11 Sprachen (Sprint-I final). Middleware liefert initiale Sprache via
+   Astro.locals.currentLang (URL > Cookie > Browser > 'de'). */
+const ALLOWED_LANGS = ['de', 'en', 'tr', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const;
+const middlewareLang = Astro.locals.currentLang;
 const initialLang: typeof ALLOWED_LANGS[number] =
-  (ALLOWED_LANGS as readonly string[]).includes(cookieLang)
-    ? (cookieLang as typeof ALLOWED_LANGS[number])
+  middlewareLang && (ALLOWED_LANGS as readonly string[]).includes(middlewareLang)
+    ? (middlewareLang as typeof ALLOWED_LANGS[number])
     : 'de';
+const isRTL = initialLang === 'ar';
 
 /* i18n Dictionary — kompakt am Server inline.
    5 Sprachen: de, en, fr, es, tr.
@@ -311,11 +314,25 @@ const t = {
     card_item_checkout: 'Geç çıkış',
     card_item_wifi: 'Wifi yardımı',
   },
+  /* Sprachen IT/PT/NL/RU/AR/ZH: aktuell Fallback auf EN-Text
+     (Native UI-Labels werden Sprint-J ergaenzt sobald Translation-Files
+     pro Sprache befuellt sind). Switcher zeigt sie aber bereits — UX-Wechsel
+     funktioniert, Inhalt kommt schrittweise. */
+  it: {} as any,
+  pt: {} as any,
+  nl: {} as any,
+  ru: {} as any,
+  ar: {} as any,
+  zh: {} as any,
 };
+/* Fallback-Merge: leere Sprachen erben EN-Inhalt */
+for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
+  Object.assign(t[lang], t.en);
+}
 ---
 
 <!DOCTYPE html>
-<html lang={initialLang} data-theme="bauhaus_manufaktur">
+<html lang={initialLang} dir={isRTL ? 'rtl' : 'ltr'} data-theme="bauhaus_manufaktur">
   <head>
     <meta charset="utf-8" />
     <!-- viewport-fit=cover = KRITISCH fuer iOS-Status-Bar:
@@ -360,25 +377,17 @@ const t = {
         returnTo: ${JSON.stringify(returnTo)},
         currentLang: ${JSON.stringify(initialLang)},
         translations: ${JSON.stringify(t)},
+        langOverlayOpen: false,
 
         init() {
-          const allowed = ['de', 'en', 'fr', 'es', 'tr'];
-          // Cookie (cross-subdomain) hat Vorrang vor localStorage,
-          // localStorage faellt zurueck auf Browser-Sprache.
+          // Middleware liefert Sprache via Astro.locals.currentLang als initialLang.
+          // Hier nur Cookie sync falls noch nicht gesetzt + dir-Attribut fuer RTL.
+          const allowed = ['de', 'en', 'tr', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'ar', 'zh'];
           const cookieMatch = document.cookie.match(/(?:^|;\\s*)retaha_lang=([^;]+)/);
           const fromCookie = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
-          const fromStorage = (typeof localStorage !== 'undefined' && localStorage.getItem('retaha_lang')) || '';
-          const stored = fromCookie || fromStorage;
-          if (allowed.indexOf(stored) >= 0) {
-            this.currentLang = stored;
-          } else if (typeof navigator !== 'undefined') {
-            const browser = (navigator.language || 'de').slice(0, 2).toLowerCase();
-            if (allowed.indexOf(browser) >= 0) this.currentLang = browser;
-          }
-          document.documentElement.lang = this.currentLang;
-          // Cookie sync: falls Sprache aus localStorage/Browser kommt aber Cookie fehlt,
-          // jetzt Cookie setzen damit Folge-Apps (dashboard, backoffice) gleiche Sprache haben.
           if (!fromCookie) this._writeLangCookie(this.currentLang);
+          document.documentElement.lang = this.currentLang;
+          document.documentElement.dir = this.currentLang === 'ar' ? 'rtl' : 'ltr';
         },
 
         _writeLangCookie(lang) {
@@ -398,10 +407,15 @@ const t = {
         },
 
         setLang(lang) {
-          this.currentLang = lang;
+          // 1. Cookie + localStorage persistieren (cross-subdomain fuer Dashboard/Backoffice)
           try { localStorage.setItem('retaha_lang', lang); } catch (e) {}
           this._writeLangCookie(lang);
-          document.documentElement.lang = lang;
+          // 2. URL umbauen + reload damit Astro i18n routing greift (z.B. /en/login).
+          //    DE bleibt ohne Prefix (prefixDefaultLocale: false).
+          const langPrefixRegex = /^\\/(de|en|tr|fr|es|it|pt|nl|ru|ar|zh)(?=\\/|$)/;
+          const cleanPath = window.location.pathname.replace(langPrefixRegex, '') || '/';
+          const newPath = lang === 'de' ? cleanPath : '/' + lang + (cleanPath === '/' ? '' : cleanPath);
+          window.location.href = newPath + window.location.search;
         },
 
           togglePassword() {
@@ -527,23 +541,9 @@ const t = {
             class="brand-logo"
           />
 
-          <!-- Mobile/Tablet Switcher — native <select>, zeigt System-Picker auf iOS/Android -->
+          <!-- Mobile/Tablet Switcher — Globe-Trigger oeffnet Full-Screen Grid-Overlay -->
           <div class="lang-switcher-mobile-wrap" x-cloak>
-            <select
-              class="lang-select-mobile"
-              aria-label="Sprache"
-              :value="currentLang"
-              @change="setLang($event.target.value)"
-            >
-              <option value="de">DE · Deutsch</option>
-              <option value="en">EN · English</option>
-              <option value="fr">FR · Français</option>
-              <option value="es">ES · Español</option>
-              <option value="tr">TR · Türkçe</option>
-            </select>
-            <svg class="lang-select-chevron" viewBox="0 0 10 6" aria-hidden="true">
-              <path d="M1 1 L5 5 L9 1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <LangSwitcher position="header-mobile" variant="light" />
           </div>
         </div>
 
@@ -574,17 +574,9 @@ const t = {
       <!-- ═══════════ FORM-SIDE RECHTS 55% ═══════════ -->
       <section class="auth-form-side">
 
-        <!-- Language-Switcher: oben rechts in der Form-Side -->
+        <!-- Language-Switcher: oben rechts in der Form-Side (Desktop) -->
         <div class="lang-switcher" aria-label="Sprache" x-cloak>
-          <button type="button" :class="{ 'is-active': currentLang === 'de' }" @click="setLang('de')">DE</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" :class="{ 'is-active': currentLang === 'en' }" @click="setLang('en')">EN</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" :class="{ 'is-active': currentLang === 'fr' }" @click="setLang('fr')">FR</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" :class="{ 'is-active': currentLang === 'es' }" @click="setLang('es')">ES</button>
-          <span aria-hidden="true">·</span>
-          <button type="button" :class="{ 'is-active': currentLang === 'tr' }" @click="setLang('tr')">TR</button>
+          <LangSwitcher position="header-desktop" variant="dark" />
         </div>
 
         <div class="form-container">
