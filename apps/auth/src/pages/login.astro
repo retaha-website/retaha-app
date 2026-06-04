@@ -320,6 +320,8 @@ const t = {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex,nofollow" />
+    <!-- Status-Bar Farbe (iOS Safari + Android Chrome) — Anthrazit weil Hero oben dunkel -->
+    <meta name="theme-color" content="#1A1A1A" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Anmelden · retaha</title>
   </head>
@@ -509,17 +511,23 @@ const t = {
             class="brand-logo"
           />
 
-          <!-- Mobile/Tablet Switcher — auf Desktop ausgeblendet -->
-          <div class="lang-switcher lang-switcher--mobile" aria-label="Sprache" x-cloak>
-            <button type="button" :class="{ 'is-active': currentLang === 'de' }" @click="setLang('de')">DE</button>
-            <span aria-hidden="true">·</span>
-            <button type="button" :class="{ 'is-active': currentLang === 'en' }" @click="setLang('en')">EN</button>
-            <span aria-hidden="true">·</span>
-            <button type="button" :class="{ 'is-active': currentLang === 'fr' }" @click="setLang('fr')">FR</button>
-            <span aria-hidden="true">·</span>
-            <button type="button" :class="{ 'is-active': currentLang === 'es' }" @click="setLang('es')">ES</button>
-            <span aria-hidden="true">·</span>
-            <button type="button" :class="{ 'is-active': currentLang === 'tr' }" @click="setLang('tr')">TR</button>
+          <!-- Mobile/Tablet Switcher — native <select>, zeigt System-Picker auf iOS/Android -->
+          <div class="lang-switcher-mobile-wrap" x-cloak>
+            <select
+              class="lang-select-mobile"
+              aria-label="Sprache"
+              :value="currentLang"
+              @change="setLang($event.target.value)"
+            >
+              <option value="de">DE · Deutsch</option>
+              <option value="en">EN · English</option>
+              <option value="fr">FR · Français</option>
+              <option value="es">ES · Español</option>
+              <option value="tr">TR · Türkçe</option>
+            </select>
+            <svg class="lang-select-chevron" viewBox="0 0 10 6" aria-hidden="true">
+              <path d="M1 1 L5 5 L9 1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
         </div>
 
@@ -791,8 +799,47 @@ const t = {
         opacity: 0.7;
       }
 
-      /* Mobile-Switcher: default hidden, taucht auf bei < 1024px */
-      .lang-switcher--mobile { display: none; }
+      /* Mobile-Switcher (native <select>): default hidden, taucht auf bei < 1024px */
+      .lang-switcher-mobile-wrap { display: none; position: relative; }
+      .lang-select-mobile {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius);
+        color: rgba(255, 255, 255, 0.85);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 8px 30px 8px 12px;
+        cursor: pointer;
+        min-height: 36px;
+        transition: border-color 200ms ease, background-color 200ms ease;
+      }
+      .lang-select-mobile:focus-visible,
+      .lang-select-mobile:hover {
+        outline: none;
+        border-color: var(--color-pink-shock);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      /* Options-Liste vom Browser/OS gerendert — Anthrazit-BG als Hint */
+      .lang-select-mobile option {
+        background: var(--color-anthrazit);
+        color: var(--color-white);
+      }
+      /* Custom Chevron rechts im Select (CSS-Pfeil unterdrueckt via appearance:none) */
+      .lang-select-chevron {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 10px;
+        height: 6px;
+        color: rgba(255, 255, 255, 0.55);
+        pointer-events: none;
+      }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
       .hero-headline {
@@ -1213,17 +1260,9 @@ const t = {
         }
         .auth-hero :global(.brand-logo) { margin-bottom: 0; }
 
-        /* Mobile-Switcher zeigt; Form-Side-Switcher ausblenden */
-        .lang-switcher--mobile {
-          display: inline-flex;
-          color: rgba(255, 255, 255, 0.4);
-        }
-        .lang-switcher--mobile button { color: rgba(255, 255, 255, 0.55); }
-        .lang-switcher--mobile button:hover,
-        .lang-switcher--mobile button:focus-visible { color: var(--color-white); }
-        .lang-switcher--mobile button.is-active { color: var(--color-pink-shock); }
-
-        .auth-form-side > .lang-switcher:not(.lang-switcher--mobile) { display: none; }
+        /* Mobile-Select-Dropdown zeigen; Form-Side-Switcher ausblenden */
+        .lang-switcher-mobile-wrap { display: inline-block; }
+        .auth-form-side > .lang-switcher { display: none; }
       }
 
       /* ═══════════════════════════════════════════════════════════════════
