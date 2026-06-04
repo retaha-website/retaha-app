@@ -359,6 +359,17 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
     <title>Anmelden · retaha</title>
   </head>
   <body>
+    <!-- Safari 26 (Liquid Glass) Toolbar-Tint-Sampler
+         iOS 26 Safari ignoriert <meta name="theme-color"> komplett und
+         sampelt stattdessen position:fixed Elemente am Viewport-Rand fuer
+         die Status-Bar Color. Unsichtbares fixed-Element bei top:-8px mit
+         anthrazit-bg liefert die Color. Initial-Paint, kein JS-Update
+         (Safari samplet nur einmal beim Render).
+         Refs:
+         - https://1ar.io/updates/safari-26-liquid-glass-web/
+         - https://nasedk.in/blog/ios26-safari-toolbar-colors/
+         - docs/debug-reports/IOS_STATUS_BAR_INVESTIGATION.md (8 Versuche) -->
+    <div class="safari-toolbar-tint safari-toolbar-tint--top" aria-hidden="true"></div>
 
     <main
       class="auth-layout"
@@ -781,6 +792,35 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         body { background: var(--color-anthrazit); }
       }
       [x-cloak] { display: none !important; }
+
+      /* ═══════════════════════════════════════════════════════════════════
+         Safari 26 (Liquid Glass) Toolbar-Tint-Sampler
+         iOS 26 Safari hat das Toolbar/Status-Bar-Rendering komplett
+         geaendert. theme-color Meta-Tag wird ignoriert. Stattdessen scannt
+         Safari beim Initial-Paint nach position:fixed Elementen am
+         Viewport-Rand und nimmt deren background-color fuer die Bar.
+         ═══════════════════════════════════════════════════════════════════ */
+      .safari-toolbar-tint {
+        position: fixed;
+        left: 0;
+        right: 0;
+        width: 100%;
+        min-height: 12px;
+        z-index: 5;
+        pointer-events: none;
+        display: none; /* default off — feature-query unten aktiviert */
+      }
+      .safari-toolbar-tint--top {
+        top: -8px; /* knapp ausserhalb des sichtbaren Viewports */
+        background-color: var(--color-anthrazit); /* #1A1A1A */
+      }
+      /* Nur auf Safari Mobile aktivieren — feature-query kombiniert
+         Apple-spezifische CSS-Features (filtert Android Chrome aus) */
+      @supports (-webkit-text-size-adjust: none) and (-webkit-touch-callout: none) {
+        @media (max-width: 767px) {
+          .safari-toolbar-tint { display: block; }
+        }
+      }
 
       .auth-layout {
         display: grid;
