@@ -335,25 +335,14 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
 <html lang={initialLang} dir={isRTL ? 'rtl' : 'ltr'} data-theme="bauhaus_manufaktur">
   <head>
     <meta charset="utf-8" />
-    <!-- viewport-fit=cover = KRITISCH fuer iOS-Status-Bar:
-         ohne diesen Flag rendert Safari die Status-Bar-Area AUSSERHALB
-         des Page-Viewports -> Status-Bar zeigt Default-Weiss.
-         Mit cover: Page extendet UNTER die Status-Bar -> Status-Bar
-         nimmt die Farbe des darunter liegenden Page-Inhalts an. -->
+    <!-- iOS Safari Status-Bar Setup (Versuche #1-11 dokumentiert in
+         docs/debug-reports/IOS_STATUS_BAR_INVESTIGATION.md).
+         Finale Strategie: viewport-fit=cover + black-translucent + manifest
+         + body-bg anthrazit (Safari 26 Live-Observer samplet body). -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <!-- iOS-Strategie nach teenage.engineering-Vorbild:
-         KEIN theme-color Meta-Tag (sonst forciert iOS opaque Status-Bar
-         in dieser Farbe). Stattdessen Status-Bar transparent + Page-Content
-         scrollt darunter durch (echte "Seite scrollt mit"-Wirkung).
-
-         apple-mobile-web-app-status-bar-style="black-translucent" wirkt
-         im Safari-Tab + PWA: macht Status-Bar transparent over content.
-         viewport-fit=cover (oben) extendet Page-Viewport unter Status-Bar.
-         Body/html-bg liefert die anfangs sichtbare Farbe (anthrazit). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Webmanifest exakt wie teenage.engineering — Manifest steuert Status-Bar -->
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Anmelden · retaha</title>
@@ -733,10 +722,6 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       Alpine.start();
     </script>
 
-    <!-- Dynamic theme-color JS entfernt (Versuch #2 war wirkungslos).
-         Neue Strategie via viewport-fit=cover + black-translucent —
-         Status-Bar wird transparent, Page-Pixel sichtbar durch. -->
-
     <style>
       :root {
         --color-pink-shock: #FF4A82;
@@ -759,18 +744,14 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       }
 
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      /* html-bg anthrazit = iOS-Safari Status-Bar samplet diese Farbe
-         beim Initial-Render. Body-white deckt drueber, html-bg sichtbar
-         nur in der Status-Bar-Area (mit viewport-fit=cover) + Rubber-Band. */
       html { background-color: var(--color-anthrazit); }
       html, body { min-height: 100%; }
-      /* Diagnose Versuch #10: Konflikt mit packages/ui/src/styles/themes.css
-         gefunden. themes.css setzt globales body { background-color:
-         var(--theme-bg-primary) } = #FFFFFF und wird NACH login-CSS geladen
-         (Cascade gewinnt). Specificity beider Regeln: (0,0,1). Loesung:
-         hoehere Specificity via html[data-theme] body Selektor (0,1,2)
-         damit Login-Page deterministisch ueber themes.css gewinnt.
-         Body-Default-Style + iOS-Status-Bar-Strategie in einem Block. */
+      /* Body-Default-Style mit erhoehter Specificity (0,1,2) via html[data-theme] body
+         um packages/ui/src/styles/themes.css globalen body{background} Override
+         (Specificity 0,0,1) deterministisch zu schlagen. themes.css wird im
+         Astro-Build NACH login-CSS geladen, sonst gewinnt es per Cascade.
+         Sprint-J-Folge: themes.css selbst auf [data-theme] body umstellen — dann
+         koennte hier wieder einfaches body{} reichen. */
       html[data-theme="bauhaus_manufaktur"] body {
         font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 14px; line-height: 1.5;
@@ -779,26 +760,15 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         -webkit-font-smoothing: antialiased;
         -webkit-overflow-scrolling: touch;
       }
-      /* Mobile/Tablet: body-bg anthrazit damit Safari 26 das samplet.
-         Form-side + brand-footer haben explizite weiss-bg (eigene Layer). */
+      /* Mobile/Tablet: body-bg anthrazit damit Safari 26 WebKit-Live-Observer
+         body.background-color samplet -> Status-Bar wird anthrazit.
+         Refs: https://github.com/andesco/safari-color-tinting */
       @media (max-width: 1023px) {
         html[data-theme="bauhaus_manufaktur"] body {
           background: var(--color-anthrazit);
         }
       }
       [x-cloak] { display: none !important; }
-
-      /* ═══════════════════════════════════════════════════════════════════
-         iOS 26 Safari Toolbar-Tint via body-bg (Versuch #10)
-         Safari 26 hat WebKit Live-Observer auf body { background-color }.
-         Default-Source fuer Toolbar/Status-Bar = body-bg.
-         Fixed/sticky Elemente mit bg-color haetten Prioritaet — aber wir
-         haben keine ueber dem Viewport-Top.
-         Loesung: body durchgehend anthrazit auf Mobile/Tablet.
-         Form-side + brand-footer haben weiss-bg + position:relative —
-         erzeugen keinen "obscured inset" am Top-Edge.
-         Refs: https://github.com/andesco/safari-color-tinting
-         ═══════════════════════════════════════════════════════════════════ */
 
       .auth-layout {
         display: grid;
@@ -850,47 +820,9 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         opacity: 0.7;
       }
 
-      /* Mobile-Switcher (native <select>): default hidden, taucht auf bei < 1024px */
-      .lang-switcher-mobile-wrap { display: none; position: relative; }
-      .lang-select-mobile {
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: var(--radius);
-        color: rgba(255, 255, 255, 0.85);
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        padding: 8px 30px 8px 12px;
-        cursor: pointer;
-        min-height: 36px;
-        transition: border-color 200ms ease, background-color 200ms ease;
-      }
-      .lang-select-mobile:focus-visible,
-      .lang-select-mobile:hover {
-        outline: none;
-        border-color: var(--color-pink-shock);
-        background: rgba(255, 255, 255, 0.04);
-      }
-      /* Options-Liste vom Browser/OS gerendert — Anthrazit-BG als Hint */
-      .lang-select-mobile option {
-        background: var(--color-anthrazit);
-        color: var(--color-white);
-      }
-      /* Custom Chevron rechts im Select (CSS-Pfeil unterdrueckt via appearance:none) */
-      .lang-select-chevron {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 10px;
-        height: 6px;
-        color: rgba(255, 255, 255, 0.55);
-        pointer-events: none;
-      }
+      /* Mobile-Switcher-Wrapper: default hidden, taucht auf bei < 1024px
+         (responsive Toggle via Media-Query unten — Komponente: LangSwitcher) */
+      .lang-switcher-mobile-wrap { display: none; }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
       /* h1 = APP_STYLEGUIDE.md Sektion 2.2: 36px / 500 / -0.02em / 1.15 */
@@ -959,44 +891,15 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       }
       @media (max-width: 767px) { .auth-form-side { min-height: auto; padding-top: 64px; } }
 
-      /* Language-Switcher: oben rechts */
+      /* Language-Switcher-Wrapper Form-Side (Desktop): positioniert oben rechts.
+         Komponente: LangSwitcher (Globe-Trigger + Overlay) */
       .lang-switcher {
         position: absolute;
         top: 24px;
         right: 32px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        color: rgba(26, 26, 26, 0.3);
         z-index: 2;
       }
       @media (min-width: 768px) { .lang-switcher { top: 32px; right: 40px; } }
-      .lang-switcher button {
-        background: transparent;
-        border: none;
-        padding: 4px 4px;
-        font-family: inherit;
-        font-size: inherit;
-        letter-spacing: inherit;
-        color: rgba(26, 26, 26, 0.4);
-        cursor: pointer;
-        transition: color var(--duration-fast) ease;
-      }
-      .lang-switcher button:hover,
-      .lang-switcher button:focus-visible {
-        color: var(--color-anthrazit);
-        outline: none;
-      }
-      .lang-switcher button.is-active {
-        color: var(--color-pink-shock);
-      }
-      .lang-switcher span {
-        user-select: none;
-        opacity: 0.6;
-      }
 
       .form-container { max-width: 400px; width: 100%; }
 
@@ -1320,7 +1223,8 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         }
         .auth-hero :global(.brand-logo) { margin-bottom: 0; }
 
-        /* Mobile-Select-Dropdown zeigen; Form-Side-Switcher ausblenden */
+        /* Mobile-Switcher (LangSwitcher Globe-Trigger) zeigen,
+           Desktop-Form-Side-Switcher ausblenden */
         .lang-switcher-mobile-wrap { display: inline-block; }
         .auth-form-side > .lang-switcher { display: none; }
       }
