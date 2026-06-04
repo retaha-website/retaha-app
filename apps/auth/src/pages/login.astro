@@ -339,7 +339,6 @@ const t = {
         sentEmail: '',
         resendCooldown: 0,
         _resendTimer: null,
-        peckActive: false,
         returnTo: ${JSON.stringify(returnTo)},
         currentLang: ${JSON.stringify(initialLang)},
         translations: ${JSON.stringify(t)},
@@ -494,55 +493,19 @@ const t = {
             this.emailError = '';
             this.passwordExpanded = false;
           },
-
-          handleLogoClick(e) {
-            // Easter-Egg: Klick auf den Specht zeigt einen Baum, an dem er
-            // kurz klopft — DANN Navigation zur retaha-Startseite.
-            if (this.peckActive) return;
-            // prefers-reduced-motion respektieren -> sofort navigieren
-            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-            e.preventDefault();
-            this.peckActive = true;
-            // Timing: 200ms Tree-Entrance + ~800ms Pecking + 200ms Tree-Exit = 1200ms
-            setTimeout(() => {
-              window.location.href = 'https://retaha.de';
-            }, 1300);
-          },
         }`}
         x-init="init()"
       >
 
       <!-- ═══════════ HERO LINKS 45% ═══════════ -->
       <aside class="auth-hero">
-        <div
-          class="logo-wrapper"
-          :class="{ 'is-pecking': peckActive }"
-          @click="handleLogoClick($event)"
-        >
-          <Logo
-            variant="light"
-            size="md"
-            href="https://retaha.de"
-            ariaLabel="retaha · zur Startseite"
-            class="brand-logo"
-          />
-          <!-- Easter-Egg: Baum erscheint kurz, Specht klopft daran -->
-          <svg
-            class="peck-tree"
-            :class="{ 'is-active': peckActive }"
-            aria-hidden="true"
-            viewBox="0 0 40 60"
-          >
-            <!-- Stamm -->
-            <rect x="17" y="32" width="6" height="26" rx="1" fill="#5C3A1E" />
-            <!-- Krone (3 Blob-Ellipsen fuer organischen Look) -->
-            <ellipse cx="20" cy="18" rx="13" ry="13" fill="#5C9070" />
-            <ellipse cx="11" cy="22" rx="7" ry="7" fill="#5C9070" />
-            <ellipse cx="29" cy="22" rx="7" ry="7" fill="#5C9070" />
-            <!-- Kleiner Hoehlen-Akzent wo der Specht klopft -->
-            <circle cx="22" cy="36" r="1.6" fill="#1A1A1A" opacity="0.4" />
-          </svg>
-        </div>
+        <Logo
+          variant="light"
+          size="md"
+          href="https://retaha.de"
+          ariaLabel="retaha · zur Startseite"
+          class="brand-logo"
+        />
 
         <DashboardShowcase autoplaySeconds={4} />
 
@@ -781,67 +744,14 @@ const t = {
       }
       @media (max-width: 767px) { .auth-hero { padding: 32px 24px; min-height: auto; } }
 
-      .auth-hero :global(.brand-logo) { margin-bottom: 40px; }
-      .auth-hero :global(.brand-logo svg) {
-        transition: transform 600ms var(--ease-in-out-back);
+      /* Logo Hover: leichte Transparenz wie auf retaha.de / hospitality.retaha.de */
+      .auth-hero :global(.brand-logo) {
+        margin-bottom: 40px;
+        transition: opacity 200ms ease;
       }
-      .auth-hero :global(.brand-logo:hover svg) { transform: rotate(8deg) scale(1.05); }
-
-      /* ═══════ Specht-Easter-Egg ═══════
-         Auf Klick: Baum erscheint rechts neben Logo, Specht klopft 4x kurz,
-         dann Tree-Exit + Navigation zur retaha-Startseite. */
-      .logo-wrapper {
-        position: relative;
-        display: inline-flex;
-        align-items: flex-start;
-        cursor: pointer;
-      }
-
-      .peck-tree {
-        position: absolute;
-        left: calc(100% + 14px);
-        top: -8px;
-        width: 36px;
-        height: auto;
-        opacity: 0;
-        transform: scale(0) translateY(8px) rotate(-12deg);
-        transform-origin: bottom center;
-        transition:
-          opacity 200ms var(--ease-out-expo),
-          transform 350ms var(--ease-in-out-back);
-        pointer-events: none;
-        filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
-      }
-      .peck-tree.is-active {
-        opacity: 1;
-        transform: scale(1) translateY(0) rotate(0deg);
-      }
-
-      /* Specht-Pecking: 4 schnelle Forward-Jabs Richtung Baum (rechts)
-         + leichte Vorwaerts-Neigung. Sieht aus wie ein echter Buntspecht. */
-      @keyframes peck-motion {
-        0%   { transform: translateX(0) rotate(0deg); }
-        8%   { transform: translateX(7px) rotate(-6deg); }
-        16%  { transform: translateX(0) rotate(0deg); }
-        24%  { transform: translateX(7px) rotate(-6deg); }
-        32%  { transform: translateX(0) rotate(0deg); }
-        40%  { transform: translateX(7px) rotate(-6deg); }
-        48%  { transform: translateX(0) rotate(0deg); }
-        56%  { transform: translateX(7px) rotate(-6deg); }
-        64%  { transform: translateX(0) rotate(0deg); }
-        100% { transform: translateX(0) rotate(0deg); }
-      }
-      /* :global() umgeht das page-scoped CSS-Hash, damit wir das innere SVG
-         der Logo-Komponente treffen koennen. */
-      .logo-wrapper.is-pecking :global(.brand-logo svg) {
-        animation: peck-motion 900ms ease-in-out;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .peck-tree, .logo-wrapper.is-pecking :global(.brand-logo svg) {
-          transition: none;
-          animation: none;
-        }
+      .auth-hero :global(.brand-logo:hover),
+      .auth-hero :global(.brand-logo:focus-visible) {
+        opacity: 0.7;
       }
 
       .hero-center { margin-top: 48px; margin-bottom: 32px; }
