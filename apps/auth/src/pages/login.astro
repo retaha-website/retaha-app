@@ -808,14 +808,17 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         min-height: 12px;
         z-index: 5;
         pointer-events: none;
-        display: none; /* default off — feature-query unten aktiviert */
+        display: none;
       }
       .safari-toolbar-tint--top {
-        top: -8px; /* knapp ausserhalb des sichtbaren Viewports */
-        background-color: var(--color-anthrazit); /* #1A1A1A */
+        top: -8px;
+        /* Hex direkt, da Safari ggf. CSS-Vars beim Sampling nicht aufloesen kann */
+        background-color: #1A1A1A;
+        /* opacity: 0 = unsichtbar fuer User, Safari samplet trotzdem
+           (laut nasedk.in iOS26-Recherche) — verhindert sichtbaren Strich
+           im Form-Section beim Scrollen */
+        opacity: 0;
       }
-      /* Nur auf Safari Mobile aktivieren — feature-query kombiniert
-         Apple-spezifische CSS-Features (filtert Android Chrome aus) */
       @supports (-webkit-text-size-adjust: none) and (-webkit-touch-callout: none) {
         @media (max-width: 767px) {
           .safari-toolbar-tint { display: block; }
