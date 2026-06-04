@@ -1,34 +1,33 @@
 /**
  * TOTP — Time-Based One-Time-Password (RFC 6238)
  *
- * Wrappt otplib mit retaha-spezifischen Defaults:
+ * Wrappt otplib v13 mit retaha-spezifischen Defaults:
  *   - Algorithmus: SHA-1 (Standard, fuer Google Authenticator + 1Password kompatibel)
  *   - Digits: 6 (Industry-Standard)
  *   - Period: 30 Sekunden
- *   - Window: 1 (akzeptiert vorigen + naechsten Code -> ±30s Clock-Skew-Toleranz)
+ *   - epochTolerance: 1 (±30s Clock-Skew-Toleranz, akzeptiert vorigen+naechsten Code)
  *
  * Secret-Storage: Klartext-Secret NIE in DB schreiben — vor INSERT immer ueber
  * `encryptSecret()` jagen. Bei Verifizierung: aus DB lesen, `decryptSecret()`,
  * dann `verifyToken()`.
  */
 
-import { authenticator } from 'otplib';
+import { generateSecret as genSecret, generateURI, verifySync, generateSync } from 'otplib';
 import qrcode from 'qrcode';
 
-authenticator.options = {
-  digits: 6,
-  step: 30,
-  window: 1,
-};
-
 const ISSUER = 'retaha';
+const STRATEGY = 'totp' as const;
+const ALGORITHM = 'sha1' as const;
+const DIGITS = 6;
+const PERIOD = 30;
+const EPOCH_TOLERANCE = 1; // ±30s Toleranz fuer Clock-Skew
 
 /**
  * Generiert ein neues Base32-Secret fuer ein User-Konto.
  * Klartext! Nur fuer Setup-Wizard, vor DB-Storage verschluesseln.
  */
 export function generateSecret(): string {
-  return authenticator.generateSecret();
+  return genSecret({ length: 20 });
 }
 
 /**
@@ -36,12 +35,19 @@ export function generateSecret(): string {
  * Wird vom Authenticator-App eingescannt -> User-Konto eingerichtet.
  */
 export function buildOtpAuthUrl(secret: string, accountEmail: string): string {
-  return authenticator.keyuri(accountEmail, ISSUER, secret);
+  return generateURI({
+    strategy: STRATEGY,
+    issuer: ISSUER,
+    label: accountEmail,
+    secret,
+    algorithm: ALGORITHM,
+    digits: DIGITS,
+    period: PERIOD,
+  });
 }
 
 /**
  * Server-seitige QR-Code-Generierung als data:image/png;base64 fuer <img src=...>.
- * SVG-Variante via qrcode.toString({type:'svg'}) auch verfuegbar.
  */
 export async function generateQrCodeDataUrl(otpauthUrl: string): Promise<string> {
   return qrcode.toDataURL(otpauthUrl, {
@@ -55,12 +61,20 @@ export async function generateQrCodeDataUrl(otpauthUrl: string): Promise<string>
 /**
  * Verifiziert einen 6-stelligen Token gegen das Secret.
  * Token darf nur Ziffern enthalten (sonst false).
- * window=1 erlaubt vorigen + aktuellen + naechsten 30s-Slot -> Clock-Skew-Toleranz.
+ * epochTolerance=1 erlaubt vorigen + aktuellen + naechsten 30s-Slot.
  */
 export function verifyToken(token: string, secret: string): boolean {
   if (!/^\d{6}$/.test(token)) return false;
   try {
-    return authenticator.verify({ token, secret });
+    return verifySync({
+      strategy: STRATEGY,
+      secret,
+      token,
+      algorithm: ALGORITHM,
+      digits: DIGITS,
+      period: PERIOD,
+      epochTolerance: EPOCH_TOLERANCE,
+    });
   } catch {
     return false;
   }
@@ -70,5 +84,11 @@ export function verifyToken(token: string, secret: string): boolean {
  * Aktuellen Token holen (fuer Tests / Debug; NIE im Production-Flow!)
  */
 export function currentTokenForDebug(secret: string): string {
-  return authenticator.generate(secret);
+  return generateSync({
+    strategy: STRATEGY,
+    secret,
+    algorithm: ALGORITHM,
+    digits: DIGITS,
+    period: PERIOD,
+  });
 }

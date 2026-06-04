@@ -1,0 +1,434 @@
+---
+/**
+ * /mfa-recovery — Recovery-Code-Input (Notfall, keine App verfuegbar)
+ *
+ * 1:1 CSS aus Prototyp mfa_v3_recovery.html (User-finalisiert).
+ * Logic:
+ *   - Erreicht nur wenn User eingeloggt + user_mfa.enabled = true
+ *   - Auto-Format: User-Input wird zu XXXX-XXXX
+ *   - on Submit: POST /api/mfa/recovery-verify
+ *   - Bei Erfolg: Cookie mfa_verified + Redirect
+ *   - Wenn nur 2 Codes uebrig: low_recovery_warning Email triggert (Sprint-J)
+ */
+
+import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+import Logo from '@retaha/ui/components/brand/Logo.astro';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/tokens.css';
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const supabase = createSupabaseServerInstance(Astro.cookies);
+const { data: userRes } = await supabase.auth.getUser();
+if (!userRes?.user) return Astro.redirect('/login');
+
+const mfaVerified = Astro.cookies.get('mfa_verified')?.value === 'true';
+const url = new URL(Astro.request.url);
+const rawReturnTo = url.searchParams.get('return_to');
+const returnTo = sanitizeReturnTo(rawReturnTo);
+if (mfaVerified) return Astro.redirect(returnTo);
+
+const service = createSupabaseServiceRoleInstance();
+const { data: mfa } = await service
+  .from('user_mfa')
+  .select('enabled')
+  .eq('user_id', userRes.user.id)
+  .maybeSingle();
+
+if (!mfa?.enabled) return Astro.redirect(returnTo);
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme="bauhaus_manufaktur">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Recovery-Code · retaha</title>
+  </head>
+  <body>
+
+    <main class="auth-layout" x-data={`{
+      code: '',
+      isSubmitting: false,
+      errorMessage: '',
+      returnTo: ${JSON.stringify(returnTo)},
+
+      formatCode(value) {
+        let clean = value.replace(/[^A-Z0-9]/g, '').slice(0, 8);
+        if (clean.length > 4) return clean.slice(0, 4) + '-' + clean.slice(4);
+        return clean;
+      },
+
+      onInput(event) {
+        const cursorPos = event.target.selectionStart;
+        this.code = this.formatCode(event.target.value.toUpperCase());
+        this.errorMessage = '';
+        this.$nextTick(() => {
+          let newPos = cursorPos;
+          if (cursorPos === 5 && this.code[4] === '-') newPos = 6;
+          event.target.setSelectionRange(newPos, newPos);
+        });
+      },
+
+      isComplete() {
+        return this.code.replace('-', '').length === 8;
+      },
+
+      async submit() {
+        if (!this.isComplete()) return;
+        this.isSubmitting = true;
+        this.errorMessage = '';
+
+        try {
+          const res = await fetch('/api/mfa/recovery-verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: this.code, return_to: this.returnTo })
+          });
+          const data = await res.json();
+          if (res.ok && data.ok) {
+            window.location.href = data.redirect || this.returnTo;
+            return;
+          }
+          this.errorMessage = data.message || 'code ungueltig.';
+          this.isSubmitting = false;
+        } catch {
+          this.errorMessage = 'netzwerk-fehler. erneut versuchen.';
+          this.isSubmitting = false;
+        }
+      }
+    }`}>
+
+      <aside class="auth-hero">
+        <Logo variant="light" size="md" href="https://retaha.de" ariaLabel="retaha · zur Startseite" class="brand-logo" />
+
+        <div class="hero-center">
+          <h1 class="hero-headline">Keinen Zugriff auf<br />deine App<span class="h-dot">?</span></h1>
+          <p class="hero-tagline">
+            Verwende einen deiner 8 Recovery-Codes vom Setup. Jeder Code
+            funktioniert nur einmal — sei dir sicher, dass du den richtigen wählst.
+          </p>
+        </div>
+
+        <div class="hero-bottom">
+          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+          <p class="hero-meta">retaha hospitality · niedernhall</p>
+        </div>
+      </aside>
+
+      <section class="auth-form-side">
+        <div class="form-container">
+
+          <header>
+            <h2 class="form-state-title">Recovery-Code<span class="h-dot">.</span></h2>
+            <p class="form-state-sub">
+              Gib einen deiner 8 Backup-Codes ein. Format: 4 Zeichen,
+              Bindestrich, 4 Zeichen.
+            </p>
+          </header>
+
+          <div x-show="errorMessage" x-cloak class="form-error" x-text="errorMessage"></div>
+
+          <form @submit.prevent="submit()" novalidate>
+            <div class="field">
+              <label class="field-label" for="recovery-code">Code</label>
+              <input class="field-input"
+                     type="text"
+                     id="recovery-code"
+                     x-model="code"
+                     @input="onInput($event)"
+                     placeholder="XXXX-XXXX"
+                     autocomplete="off"
+                     spellcheck="false"
+                     autocapitalize="characters"
+                     x-bind:disabled="isSubmitting"
+                     maxlength="9" />
+            </div>
+
+            <div class="info-card">
+              <h4>wichtig zu wissen</h4>
+              <p>
+                Jeder Recovery-Code funktioniert <strong>nur einmal</strong>. Nach erfolgreicher
+                Anmeldung empfehlen wir, dein 2FA neu einzurichten und neue Recovery-Codes
+                zu generieren.
+              </p>
+              <p>
+                Du hast keine Codes mehr? Kontaktiere uns über den Notfall-Support unten.
+              </p>
+            </div>
+
+            <button class="btn-primary" type="submit" x-bind:disabled="!isComplete() || isSubmitting">
+              <span x-show="!isSubmitting">code einlösen</span>
+              <span x-show="isSubmitting" x-cloak>wird geprüft...</span>
+            </button>
+          </form>
+
+          <div class="form-help-links">
+            <a class="help-link" href="/mfa">→ doch authenticator-app verwenden</a>
+            <a class="help-link is-secondary" href="/logout">← zurück zur anmeldung</a>
+          </div>
+
+          <div class="emergency-support">
+            <p class="emergency-support__title">letzte option</p>
+            <p class="emergency-support__text">
+              Du hast weder deine App noch deine Recovery-Codes? Kontaktiere unseren
+              Support: <a href="mailto:support@retaha.de">support@retaha.de</a>.
+              Wir verifizieren deine Identität und stellen den Zugang innerhalb von
+              24 Stunden wieder her.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+
+    <style>
+      /* CSS 1:1 aus Prototyp mfa_v3_recovery.html */
+      :root {
+        --color-pink-shock: #FF4A82;
+        --color-pink-glow: rgba(255, 74, 130, 0.18);
+        --color-pink-soft: rgba(255, 74, 130, 0.08);
+        --color-anthrazit: #1A1A1A;
+        --color-anthrazit-soft: #2A2A2A;
+        --color-white: #FFFFFF;
+        --radius: 3px;
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { background-color: var(--color-anthrazit); }
+      html, body { min-height: 100%; }
+      html[data-theme="bauhaus_manufaktur"] body {
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px; line-height: 1.5;
+        color: var(--color-anthrazit);
+        background: var(--color-white);
+        -webkit-font-smoothing: antialiased;
+      }
+      @media (max-width: 1023px) {
+        html[data-theme="bauhaus_manufaktur"] body { background: var(--color-anthrazit); }
+      }
+      [x-cloak] { display: none !important; }
+
+      .auth-layout {
+        display: grid; grid-template-columns: 1fr;
+        min-height: 100vh; min-height: 100dvh;
+      }
+      @media (min-width: 1024px) {
+        .auth-layout { grid-template-columns: 45% 55%; }
+      }
+
+      .auth-hero {
+        background: var(--color-anthrazit); color: var(--color-white);
+        padding: 48px 32px; display: flex; flex-direction: column;
+        min-height: 280px;
+      }
+      @media (min-width: 1024px) {
+        .auth-hero { padding: 56px 64px; min-height: 100vh; min-height: 100dvh; }
+      }
+      .auth-hero :global(.brand-logo) { margin-bottom: 48px; }
+
+      .hero-center {
+        flex: 1; display: flex; flex-direction: column;
+        justify-content: center; margin: 32px 0;
+      }
+      .hero-headline {
+        font-size: 36px; font-weight: 500; line-height: 1.15;
+        letter-spacing: -0.02em; color: var(--color-white); margin-bottom: 16px;
+      }
+      .hero-headline .h-dot { color: var(--color-pink-shock); }
+      .hero-tagline {
+        font-size: 14px; line-height: 1.55;
+        color: rgba(255, 255, 255, 0.7); max-width: 380px;
+      }
+
+      .hero-bottom { margin-top: auto; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      .hero-bauhaus {
+        font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5em;
+        font-size: 12px; color: rgba(255, 255, 255, 0.35); margin-bottom: 12px;
+      }
+      .hero-meta {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .auth-form-side {
+        background: var(--color-white); padding: 48px 32px;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+      }
+      @media (min-width: 1024px) { .auth-form-side { padding: 64px; } }
+      @media (max-width: 767px) { .auth-form-side { padding: 32px 24px 48px; } }
+
+      .form-container { max-width: 440px; width: 100%; }
+
+      .form-state-title {
+        font-size: 28px; font-weight: 500;
+        letter-spacing: -0.018em; line-height: 1.2;
+        color: var(--color-anthrazit); margin-bottom: 12px;
+      }
+      .form-state-title .h-dot { color: var(--color-pink-shock); }
+      .form-state-sub {
+        font-size: 14px; color: rgba(26, 26, 26, 0.6);
+        line-height: 1.6; margin-bottom: 32px;
+      }
+
+      .field { margin-bottom: 24px; }
+      .field-label {
+        display: block;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(26, 26, 26, 0.55);
+        margin-bottom: 8px;
+      }
+      .field-input {
+        width: 100%;
+        padding: 16px;
+        border: 1.5px solid rgba(26, 26, 26, 0.15);
+        border-radius: var(--radius);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 18px;
+        letter-spacing: 0.12em;
+        color: var(--color-anthrazit);
+        background: var(--color-white);
+        text-align: center;
+        transition: all 250ms var(--ease-out-expo);
+        min-height: 56px;
+        text-transform: uppercase;
+      }
+      .field-input::placeholder { color: rgba(26, 26, 26, 0.25); }
+      .field-input:focus {
+        outline: none;
+        border-color: var(--color-pink-shock);
+        box-shadow: 0 0 0 4px var(--color-pink-soft);
+      }
+
+      .info-card {
+        padding: 16px;
+        background: rgba(26, 26, 26, 0.02);
+        border-left: 3px solid var(--color-pink-shock);
+        border-radius: var(--radius);
+        margin-bottom: 32px;
+      }
+      .info-card h4 {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--color-pink-shock);
+        margin-bottom: 8px;
+      }
+      .info-card p {
+        font-size: 13px;
+        color: rgba(26, 26, 26, 0.7);
+        line-height: 1.55;
+      }
+      .info-card p + p { margin-top: 8px; }
+
+      .btn-primary {
+        display: flex; align-items: center; justify-content: center;
+        gap: 12px; width: 100%; padding: 16px 24px;
+        border: none; border-radius: var(--radius);
+        background: var(--color-anthrazit); color: var(--color-white);
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 14px; font-weight: 500; cursor: pointer;
+        transition: all 280ms var(--ease-out-quint);
+        min-height: 48px;
+      }
+      .btn-primary::before {
+        content: ''; width: 5px; height: 5px;
+        background: var(--color-pink-shock);
+        border-radius: 50%; flex-shrink: 0;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--color-anthrazit-soft);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px var(--color-pink-glow);
+      }
+      .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      .form-error {
+        margin-bottom: 16px; padding: 12px 16px;
+        background: rgba(255, 74, 130, 0.08);
+        border-left: 3px solid var(--color-pink-shock);
+        border-radius: var(--radius);
+        font-size: 13px; color: var(--color-anthrazit);
+      }
+      .form-error::before {
+        content: "▲ ";
+        color: var(--color-pink-shock);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+      }
+
+      .form-help-links {
+        margin-top: 24px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .help-link {
+        background: transparent; border: none; font-family: inherit;
+        font-size: 13px; color: var(--color-pink-shock); cursor: pointer;
+        padding: 8px 12px; border-radius: var(--radius);
+        transition: background 200ms ease;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .help-link:hover { background: var(--color-pink-soft); }
+      .help-link.is-secondary { color: rgba(26, 26, 26, 0.55); }
+      .help-link.is-secondary:hover {
+        background: rgba(26, 26, 26, 0.04);
+        color: var(--color-anthrazit);
+      }
+
+      .emergency-support {
+        margin-top: 32px;
+        padding: 20px;
+        background: rgba(255, 74, 130, 0.04);
+        border: 1px solid rgba(255, 74, 130, 0.15);
+        border-radius: var(--radius);
+      }
+      .emergency-support__title {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--color-pink-shock);
+        margin-bottom: 12px;
+      }
+      .emergency-support__text {
+        font-size: 12px;
+        color: rgba(26, 26, 26, 0.6);
+        line-height: 1.6;
+      }
+      .emergency-support__text a {
+        color: var(--color-anthrazit);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(26, 26, 26, 0.2);
+        font-weight: 500;
+      }
+      .emergency-support__text a:hover {
+        color: var(--color-pink-shock);
+        border-bottom-color: var(--color-pink-shock);
+      }
+    </style>
+  </body>
+</html>
