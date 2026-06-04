@@ -715,8 +715,10 @@ const t = {
 
       <!-- ═══════════ BRAND-FOOTER (Mobile-only) ═══════════
            Inhalte gespiegelt aus Hero-Bottom — auf Mobile wird hero-bottom
-           ausgeblendet und stattdessen dieser Brand-Footer angezeigt. -->
+           ausgeblendet und stattdessen dieser Brand-Footer angezeigt.
+           NEU: brand-claim ganz oben (Mobile-Hero zeigt keinen Claim mehr). -->
       <footer class="brand-footer">
+        <p class="brand-claim" x-text="t('hero_tagline')"></p>
         <p class="brand-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
         <p class="brand-meta">retaha hospitality · niedernhall</p>
         <nav class="brand-legal" aria-label="Rechtliches">
@@ -1319,28 +1321,29 @@ const t = {
            — wird im Brand-Footer dupliziert. */
         .hero-bottom { display: none; }
 
-        /* Showcase kompakt: 160px (statt 240px) */
+        /* Showcase auf Mobile GROSS (User-Spec v2):
+           min-height 240px, card-padding 20px, stat-value 22px, stat-cell 14px
+           -> Animation wird zum WOW-Effekt ohne Text-Geraeusch drumherum */
         :global(.dashboard-showcase) {
-          min-height: 160px !important;
-          margin: 0 0 20px;
+          min-height: 240px !important;
+          margin: 0 0 24px;
         }
-        :global(.showcase-card) { padding: 14px !important; }
-        :global(.stat-cell) { padding: 8px !important; }
-        :global(.stat-value) { font-size: 18px !important; }
+        :global(.showcase-card) { padding: 20px !important; }
+        :global(.card-header) {
+          margin-bottom: 16px !important;
+          padding-bottom: 12px !important;
+        }
+        :global(.stats-grid) { gap: 8px !important; }
+        :global(.stat-cell) { padding: 14px !important; }
+        :global(.stat-value) { font-size: 22px !important; }
+        :global(.stat-label) { font-size: 8px !important; }
 
-        /* Headline + Tagline mobile-kompakt — h1 bleibt semantisch,
-           Size reduziert auf 28px (= Styleguide-h2-Skala) damit Hero auf
-           375px-iPhones nicht doppelt umbricht. line-height/letter-spacing
-           bleiben Styleguide-h1. */
-        .hero-center { margin-top: 0; margin-bottom: 0; }
-        .hero-headline {
-          font-size: 28px;
-          line-height: 1.15;
-          letter-spacing: -0.02em;
-          margin-top: 16px;
-          margin-bottom: 10px;
-        }
-        .hero-tagline { font-size: 14px; line-height: 1.55; }
+        /* Headline + Tagline auf Mobile KOMPLETT VERSTECKT
+           — Hero zeigt nur Logo+Switcher+Showcase
+           — Claim wandert in brand-footer (siehe unten) */
+        .hero-headline { display: none; }
+        .hero-tagline { display: none; }
+        .hero-center { display: none; }
 
         /* FORM-SIDE: kompakter padding, iOS-fixes */
         .auth-form-side {
@@ -1371,6 +1374,17 @@ const t = {
           background: var(--color-white);
           padding: 36px 24px 32px;
           border-top: 1px solid rgba(26, 26, 26, 0.08);
+        }
+        /* Claim ganz oben im Footer (war vorher im Hero, jetzt in Brand-Footer
+           als ruhige Aussage statt Hero-Geraeusch) */
+        .brand-claim {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 16px;
+          line-height: 1.5;
+          color: var(--color-anthrazit);
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          margin-bottom: 24px;
         }
         .brand-bauhaus {
           font-family: 'JetBrains Mono', monospace;
