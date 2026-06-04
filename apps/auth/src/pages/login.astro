@@ -318,10 +318,17 @@ const t = {
 <html lang={initialLang} data-theme="bauhaus_manufaktur">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover = KRITISCH fuer iOS-Status-Bar:
+         ohne diesen Flag rendert Safari die Status-Bar-Area AUSSERHALB
+         des Page-Viewports -> Status-Bar zeigt Default-Weiss.
+         Mit cover: Page extendet UNTER die Status-Bar -> Status-Bar
+         nimmt die Farbe des darunter liegenden Page-Inhalts an. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <!-- Status-Bar Farbe (iOS Safari + Android Chrome) — Anthrazit weil Hero oben dunkel -->
+    <!-- Status-Bar Farbe: theme-color (URL-Bar) + html-bg (Status-Bar Pixel-Sampling) -->
     <meta name="theme-color" content="#1A1A1A" />
+    <!-- Legacy iOS (vor 16): apple-mobile-web-app-status-bar-style fuer PWA-Modus -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Anmelden · retaha</title>
   </head>
@@ -794,6 +801,10 @@ const t = {
       }
 
       * { box-sizing: border-box; margin: 0; padding: 0; }
+      /* html-bg anthrazit = iOS-Safari Status-Bar samplet diese Farbe
+         beim Initial-Render. Body-white deckt drueber, html-bg sichtbar
+         nur in der Status-Bar-Area (mit viewport-fit=cover) + Rubber-Band. */
+      html { background-color: var(--color-anthrazit); }
       html, body { min-height: 100%; }
       body {
         font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
