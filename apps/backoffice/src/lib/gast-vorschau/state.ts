@@ -4,6 +4,9 @@ export interface PreviewState {
   branding: { theme: 'coffee' | 'ocean' | 'forest' };
   modules: { eve: boolean; empfehlungen: boolean; service: boolean };
   welcomeText: string;
+  formality: 'du' | 'sie';
+  activeLanguages: string[];
+  defaultLanguage: string;
 }
 
 export const initialState: PreviewState = {
@@ -12,6 +15,9 @@ export const initialState: PreviewState = {
   branding: { theme: 'coffee' },
   modules: { eve: true, empfehlungen: true, service: true },
   welcomeText: 'willkommen im the gate garden hotel',
+  formality: 'du',
+  activeLanguages: ['de', 'en'],
+  defaultLanguage: 'de',
 };
 
 let _state: PreviewState = { ...initialState };

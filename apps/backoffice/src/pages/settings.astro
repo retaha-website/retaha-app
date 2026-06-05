@@ -1,0 +1,657 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+// ─── POST-HANDLER ──────────────────────────────────────────────────────────
+type SaveResult = { section: string; ok: boolean; msg: string };
+let saved: SaveResult | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString() ?? '';
+
+  if (action === 'hotel_identity') {
+    const name           = form.get('name')?.toString().trim() || null;
+    const classification = form.get('classification')?.toString() || null;
+    const hotel_type     = form.get('hotel_type')?.toString() || null;
+    if (!name) {
+      saved = { section: 'hotel_identity', ok: false, msg: 'Hotel-Name ist Pflichtfeld.' };
+    } else {
+      const { error } = await client.from('hotels')
+        .update({ name, classification, hotel_type })
+        .eq('id', hotel.id);
+      saved = error
+        ? { section: 'hotel_identity', ok: false, msg: error.message }
+        : { section: 'hotel_identity', ok: true,  msg: '✓ gespeichert' };
+    }
+
+  } else if (action === 'address_contact') {
+    const address_street = form.get('address_street')?.toString().trim() || null;
+    const address_zip    = form.get('address_zip')?.toString().trim()    || null;
+    const city           = form.get('city')?.toString().trim()           || null;
+    const country        = form.get('country')?.toString().trim()        || null;
+    const phone          = form.get('phone')?.toString().trim()          || null;
+    const email          = form.get('email')?.toString().trim()          || null;
+    const website        = form.get('website')?.toString().trim()        || null;
+
+    // Geocoding (non-fatal, wie in alter Settings-Seite)
+    let lat: number | null = null, lng: number | null = null;
+    if (address_street && city) {
+      try {
+        const { geocodeAddress, buildAddressQuery } = await import('../lib/places/geocoding');
+        const q = buildAddressQuery({ street: address_street, zip: address_zip, city, country });
+        const r = await geocodeAddress(q);
+        if (r) { lat = r.lat; lng = r.lng; }
+      } catch { /* geocoding non-fatal */ }
+    }
+
+    const updates: Record<string, unknown> = { address_street, address_zip, city, country, phone, email, website };
+    if (lat !== null && lng !== null) { updates.latitude = lat; updates.longitude = lng; }
+
+    const { error } = await client.from('hotels').update(updates).eq('id', hotel.id);
+    saved = error
+      ? { section: 'address_contact', ok: false, msg: error.message }
+      : { section: 'address_contact', ok: true,  msg: lat ? `✓ gespeichert · 📍 ${lat.toFixed(4)}, ${lng!.toFixed(4)}` : '✓ gespeichert' };
+
+  } else if (action === 'business_data') {
+    const { error } = await client.from('hotels').update({
+      legal_form:          form.get('legal_form')?.toString().trim()          || null,
+      company_name:        form.get('company_name')?.toString().trim()        || null,
+      commercial_register: form.get('commercial_register')?.toString().trim() || null,
+      vat_id:              form.get('vat_id')?.toString().trim()              || null,
+      tax_number:          form.get('tax_number')?.toString().trim()          || null,
+    }).eq('id', hotel.id);
+    saved = error
+      ? { section: 'business_data', ok: false, msg: error.message }
+      : { section: 'business_data', ok: true,  msg: '✓ gespeichert' };
+
+  } else if (action === 'billing_address') {
+    const sameAsHotel = form.get('billing_same_as_hotel') === 'on';
+    const { data: h } = await client.from('hotels')
+      .select('address_street,address_zip,city,country,company_name')
+      .eq('id', hotel.id).maybeSingle();
+    const updates = sameAsHotel && h ? {
+      billing_recipient: form.get('billing_recipient')?.toString().trim() || h.company_name || null,
+      billing_email:     form.get('billing_email')?.toString().trim()     || null,
+      billing_street:    h.address_street,
+      billing_zip:       h.address_zip,
+      billing_city:      h.city,
+      billing_country:   h.country,
+    } : {
+      billing_recipient: form.get('billing_recipient')?.toString().trim() || null,
+      billing_email:     form.get('billing_email')?.toString().trim()     || null,
+      billing_street:    form.get('billing_street')?.toString().trim()    || null,
+      billing_zip:       form.get('billing_zip')?.toString().trim()       || null,
+      billing_city:      form.get('billing_city')?.toString().trim()      || null,
+      billing_country:   form.get('billing_country')?.toString().trim()   || null,
+    };
+    const { error } = await client.from('hotels').update(updates).eq('id', hotel.id);
+    saved = error
+      ? { section: 'billing_address', ok: false, msg: error.message }
+      : { section: 'billing_address', ok: true,  msg: '✓ gespeichert' };
+
+  } else if (action === 'team_security') {
+    const mfa_required         = form.get('mfa_required') === 'on';
+    const session_timeout_hours = parseInt(form.get('session_timeout_hours')?.toString() || '4') || 4;
+    const { error } = await client.from('hotels').update({ mfa_required, session_timeout_hours }).eq('id', hotel.id);
+    saved = error
+      ? { section: 'team_security', ok: false, msg: error.message }
+      : { section: 'team_security', ok: true,  msg: '✓ gespeichert' };
+  }
+}
+
+// ─── DATEN LADEN ───────────────────────────────────────────────────────────
+const { data: h } = await client.from('hotels').select(`
+  name, classification, hotel_type,
+  address_street, address_zip, city, country,
+  phone, email, website,
+  legal_form, company_name, commercial_register, vat_id, tax_number,
+  billing_recipient, billing_email,
+  billing_street, billing_zip, billing_city, billing_country,
+  mfa_required, session_timeout_hours
+`).eq('id', hotel.id).maybeSingle();
+
+const d = (h ?? {}) as Record<string, unknown>;
+
+function val(key: string, fallback = '') { return (d[key] as string) ?? fallback; }
+function checked(key: string) { return d[key] === true; }
+---
+
+<Layout title="einstellungen" activeTab="backoffice" hotelName={String(d.name ?? '')} hotelLogoUrl={hotel.logo_url}>
+
+  <div class="settings-page">
+
+    <!-- BREADCRUMB -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">einstellungen</span>
+    </nav>
+
+    <!-- HERO -->
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">admin-einstellungen</span>
+      <h1 class="settings-hero__title">hotel-einstellungen<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">hier verwaltest du die daten und regeln deines hotels.</p>
+    </section>
+
+    <div class="settings-sections">
+
+      <!-- ── SECTION 1: HOTEL-IDENTITÄT ─────────────────────────────────── -->
+      <section class="s-card" id="hotel-identity">
+        <div class="s-card__head">
+          <h2 class="s-card__title">hotel-identität</h2>
+          <span class="s-card__num">01</span>
+        </div>
+
+        {saved?.section === 'hotel_identity' && (
+          <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+        )}
+
+        <form method="POST" class="s-card__body">
+          <input type="hidden" name="_action" value="hotel_identity" />
+
+          <div class="field field--row">
+            <label class="field__label field__label--req" for="hotel-name">hotel-name</label>
+            <div class="field__input-wrap">
+              <input type="text" id="hotel-name" name="name" class="s-input"
+                value={val('name')} placeholder="z.b. the gate garden" required />
+              <span class="field__hint">wird überall verwendet — header, emails, gäste-app</span>
+            </div>
+          </div>
+
+          <div class="field field--row">
+            <span class="field__label">klassifikation</span>
+            <div class="radio-cards" role="radiogroup">
+              {[['3','3 sterne'],['4','4 sterne'],['4s','4 superior'],['5','5 sterne'],['boutique','boutique']].map(([v, l]) => (
+                <label class={`radio-card ${val('classification') === v ? 'is-active' : ''}`}>
+                  <input type="radio" name="classification" value={v}
+                    checked={val('classification') === v} class="sr-only" />
+                  {l}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="hotel-type">hotel-typ</label>
+            <select id="hotel-type" name="hotel_type" class="s-select">
+              {[['city','stadt-hotel'],['resort','resort'],['wellness','wellness-hotel'],['business','business-hotel'],['boutique','boutique-hotel']].map(([v, l]) => (
+                <option value={v} selected={val('hotel_type') === v}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="s-card__footer">
+            <button type="submit" class="s-btn">speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── SECTION 2: ADRESSE & KONTAKT ──────────────────────────────── -->
+      <section class="s-card" id="address-contact">
+        <div class="s-card__head">
+          <h2 class="s-card__title">adresse & kontakt</h2>
+          <span class="s-card__num">02</span>
+        </div>
+
+        {saved?.section === 'address_contact' && (
+          <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+        )}
+
+        <form method="POST" class="s-card__body">
+          <input type="hidden" name="_action" value="address_contact" />
+
+          <div class="field field--row">
+            <label class="field__label" for="address-street">straße</label>
+            <input type="text" id="address-street" name="address_street" class="s-input"
+              value={val('address_street')} placeholder="invalidenstraße 122" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="address-zip">plz / stadt</label>
+            <div class="field__split">
+              <input type="text" id="address-zip" name="address_zip" class="s-input"
+                value={val('address_zip')} placeholder="10115" style="max-width:90px" />
+              <input type="text" name="city" class="s-input"
+                value={val('city')} placeholder="berlin" />
+            </div>
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="address-country">land</label>
+            <select id="address-country" name="country" class="s-select">
+              {[['DE','deutschland'],['AT','österreich'],['CH','schweiz'],['LU','luxemburg']].map(([v, l]) => (
+                <option value={v} selected={val('country', 'DE') === v}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="s-divider-label">— kontakt (gäste sehen) —</div>
+
+          <div class="field field--row">
+            <label class="field__label" for="hotel-phone">telefon</label>
+            <input type="tel" id="hotel-phone" name="phone" class="s-input"
+              value={val('phone')} placeholder="+49 30 123456" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="hotel-email">e-mail</label>
+            <input type="email" id="hotel-email" name="email" class="s-input"
+              value={val('email')} placeholder="info@hotel.de" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="hotel-website">website</label>
+            <input type="url" id="hotel-website" name="website" class="s-input"
+              value={val('website')} placeholder="https://hotel.de" />
+          </div>
+
+          <div class="s-card__footer">
+            <button type="submit" class="s-btn">speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── SECTION 3: GESCHÄFTSDATEN ─────────────────────────────────── -->
+      <section class="s-card" id="business-data">
+        <div class="s-card__head">
+          <h2 class="s-card__title">geschäftsdaten</h2>
+          <span class="s-card__num">03</span>
+        </div>
+
+        {saved?.section === 'business_data' && (
+          <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+        )}
+
+        <form method="POST" class="s-card__body">
+          <input type="hidden" name="_action" value="business_data" />
+
+          <div class="field field--row">
+            <label class="field__label" for="legal-form">rechtsform</label>
+            <select id="legal-form" name="legal_form" class="s-select">
+              <option value="">— bitte wählen —</option>
+              {[['GmbH','GmbH'],['GmbH & Co. KG','GmbH & Co. KG'],['UG','UG (haftungsbeschränkt)'],['AG','AG'],['KG','KG'],['OHG','OHG'],['GbR','GbR'],['Einzelunternehmen','Einzelunternehmen']].map(([v, l]) => (
+                <option value={v} selected={val('legal_form') === v}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="company-name">firmenname</label>
+            <input type="text" id="company-name" name="company_name" class="s-input"
+              value={val('company_name')} placeholder="the gate garden hotel gmbh" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="commercial-register">handelsregister-nr.</label>
+            <input type="text" id="commercial-register" name="commercial_register" class="s-input"
+              value={val('commercial_register')} placeholder="HRB 12345" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="vat-id">ust-id</label>
+            <input type="text" id="vat-id" name="vat_id" class="s-input"
+              value={val('vat_id')} placeholder="DE123456789" />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="tax-number">steuernummer</label>
+            <input type="text" id="tax-number" name="tax_number" class="s-input"
+              value={val('tax_number')} placeholder="12/345/67890" />
+          </div>
+
+          <div class="s-card__footer">
+            <button type="submit" class="s-btn">speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── SECTION 4: RECHNUNGSADRESSE ──────────────────────────────── -->
+      <section class="s-card" id="billing-address">
+        <div class="s-card__head">
+          <h2 class="s-card__title">rechnungsadresse</h2>
+          <span class="s-card__num">04</span>
+        </div>
+        <p class="s-card__sub">für das retaha-abo</p>
+
+        {saved?.section === 'billing_address' && (
+          <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+        )}
+
+        <form method="POST" class="s-card__body" id="billing-form">
+          <input type="hidden" name="_action" value="billing_address" />
+
+          <label class="toggle-row">
+            <input type="checkbox" name="billing_same_as_hotel" id="billing-same"
+              class="sr-only" onchange="toggleBillingFields(this)" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">wie hotel-adresse übernehmen</span>
+          </label>
+
+          <div id="billing-fields">
+            <div class="field field--row">
+              <label class="field__label" for="billing-recipient">empfänger</label>
+              <input type="text" id="billing-recipient" name="billing_recipient" class="s-input"
+                value={val('billing_recipient')} placeholder="the gate garden hotel gmbh" />
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="billing-email">rechnungs-e-mail</label>
+              <input type="email" id="billing-email" name="billing_email" class="s-input"
+                value={val('billing_email')} placeholder="buchhaltung@hotel.de" />
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="billing-street">straße</label>
+              <input type="text" id="billing-street" name="billing_street" class="s-input"
+                value={val('billing_street')} placeholder="invalidenstraße 122" />
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="billing-zip">plz / stadt</label>
+              <div class="field__split">
+                <input type="text" id="billing-zip" name="billing_zip" class="s-input"
+                  value={val('billing_zip')} placeholder="10115" style="max-width:90px" />
+                <input type="text" name="billing_city" class="s-input"
+                  value={val('billing_city')} placeholder="berlin" />
+              </div>
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="billing-country">land</label>
+              <select id="billing-country" name="billing_country" class="s-select">
+                {[['DE','deutschland'],['AT','österreich'],['CH','schweiz'],['LU','luxemburg']].map(([v, l]) => (
+                  <option value={v} selected={val('billing_country', 'DE') === v}>{l}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div class="s-card__footer">
+            <button type="submit" class="s-btn">speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── SECTION 5: TEAM-SICHERHEIT ────────────────────────────────── -->
+      <section class="s-card" id="team-security">
+        <div class="s-card__head">
+          <h2 class="s-card__title">team-sicherheit</h2>
+          <span class="s-card__num">05</span>
+        </div>
+
+        {saved?.section === 'team_security' && (
+          <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+        )}
+
+        <div class="s-warning-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+          </svg>
+          <span>deine persönliche 2FA findest du unter
+            <a href="/account/sicherheit">account → sicherheit</a>
+          </span>
+        </div>
+
+        <form method="POST" class="s-card__body">
+          <input type="hidden" name="_action" value="team_security" />
+
+          <div class="field field--row">
+            <span class="field__label">2FA für alle mitarbeiter</span>
+            <label class="toggle-row">
+              <input type="checkbox" name="mfa_required" class="sr-only"
+                checked={checked('mfa_required')} />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">mitarbeiter ohne 2fa können sich nicht anmelden</span>
+            </label>
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="session-timeout">session-timeout</label>
+            <select id="session-timeout" name="session_timeout_hours" class="s-select">
+              {[[1,'1 stunde'],[2,'2 stunden'],[4,'4 stunden'],[8,'8 stunden'],[24,'24 stunden'],[0,'kein timeout']].map(([v, l]) => (
+                <option value={String(v)} selected={String(d.session_timeout_hours ?? 4) === String(v)}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="s-card__footer">
+            <a href="/admin/team-security" class="s-btn-link">↗ audit-log & team-verwaltung</a>
+            <button type="submit" class="s-btn">speichern</button>
+          </div>
+        </form>
+      </section>
+
+    </div><!-- /settings-sections -->
+  </div><!-- /settings-page -->
+
+</Layout>
+
+<script>
+  // Radio-Cards — visuelles Active-State-Toggle
+  document.querySelectorAll('.radio-cards').forEach(group => {
+    group.querySelectorAll('.radio-card').forEach(card => {
+      const input = card.querySelector('input[type="radio"]') as HTMLInputElement;
+      input?.addEventListener('change', () => {
+        group.querySelectorAll('.radio-card').forEach(c => c.classList.remove('is-active'));
+        if (input.checked) card.classList.add('is-active');
+      });
+      card.addEventListener('click', () => {
+        if (input) { input.checked = true; input.dispatchEvent(new Event('change')); }
+      });
+    });
+  });
+
+  // Rechnungsadresse "wie Hotel übernehmen" Toggle
+  function toggleBillingFields(cb: HTMLInputElement) {
+    const fields = document.getElementById('billing-fields');
+    if (fields) fields.style.opacity = cb.checked ? '0.4' : '1';
+  }
+  (window as any).toggleBillingFields = toggleBillingFields;
+</script>
+
+<style>
+  .settings-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+  @media (max-width: 768px) { .settings-page { padding: 0 20px 64px; } }
+
+  /* BREADCRUMB */
+  .breadcrumb {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  .breadcrumb__sep { color: var(--ink-faint); }
+  .breadcrumb__crumb { color: var(--ink-muted); text-decoration: none; transition: color 150ms; }
+  .breadcrumb__crumb:hover { color: var(--ink); }
+  .breadcrumb__crumb--current { color: var(--ink); font-weight: 500; }
+
+  /* HERO */
+  .settings-hero {
+    padding: 40px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .settings-hero__eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; font-weight: 500;
+    color: #0A0A0A; background: var(--te-yellow);
+    padding: 5px 10px; display: inline-block;
+    margin-bottom: 20px; border-radius: var(--r-sm);
+  }
+  .settings-hero__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(32px, 5vw, 52px); font-weight: 400;
+    line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 10px;
+  }
+  .dot-pink { color: var(--pink); }
+  .settings-hero__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink-muted); letter-spacing: 0.04em;
+  }
+
+  /* SECTIONS */
+  .settings-sections { display: flex; flex-direction: column; gap: 20px; }
+
+  /* CARD */
+  .s-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 32px;
+  }
+  @media (max-width: 768px) { .s-card { padding: 24px 20px; } }
+
+  .s-card__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; margin-bottom: 24px;
+    padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .s-card__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px; font-weight: 500;
+    letter-spacing: -0.01em; color: var(--ink); text-transform: lowercase;
+  }
+  .s-card__num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.2em; color: var(--ink-muted); text-transform: uppercase;
+  }
+  .s-card__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.1em;
+    text-transform: uppercase; margin: -16px 0 20px;
+  }
+  .s-card__body { display: flex; flex-direction: column; gap: 18px; }
+  .s-card__footer {
+    margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; align-items: center; gap: 12px;
+  }
+
+  /* FLASH */
+  .s-flash {
+    margin-bottom: 16px; padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; border-radius: var(--r-sm);
+  }
+  .s-flash--ok { background: var(--sage-soft); color: var(--sage-strong); border: 1px solid var(--sage); }
+  .s-flash--err { background: var(--burgund-soft); color: var(--burgund); border: 1px solid var(--burgund); }
+
+  /* FIELDS */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field--row {
+    display: grid;
+    grid-template-columns: minmax(160px, 240px) 1fr;
+    gap: 20px; align-items: start;
+  }
+  @media (max-width: 600px) { .field--row { grid-template-columns: 1fr; gap: 6px; } }
+
+  .field__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; font-weight: 500;
+    color: var(--ink); text-transform: uppercase; padding-top: 10px;
+  }
+  .field__label--req::after { content: ' *'; color: var(--pink); }
+  .field__hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em; margin-top: 4px;
+  }
+  .field__input-wrap { display: flex; flex-direction: column; gap: 0; }
+  .field__split { display: flex; gap: 8px; }
+
+  /* INPUTS */
+  .s-input, .s-select {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--ink); transition: all 150ms ease; width: 100%;
+  }
+  .s-input:hover, .s-select:hover { border-color: var(--ink-faint); }
+  .s-input:focus, .s-select:focus { outline: none; border-color: var(--ink); background: var(--te-yellow-soft); }
+  .s-input::placeholder { color: var(--ink-faint); }
+
+  /* RADIO-CARDS */
+  .radio-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio-card {
+    padding: 8px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer; transition: all 150ms ease;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: lowercase; color: var(--ink-soft);
+  }
+  .radio-card:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .radio-card.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* TOGGLE */
+  .toggle-row {
+    display: inline-flex; align-items: center; gap: 12px; cursor: pointer;
+  }
+  .toggle-track {
+    width: 44px; height: 24px; background: var(--bg-deep);
+    border: 1px solid var(--border); border-radius: 99px;
+    position: relative; transition: all 200ms ease; flex-shrink: 0;
+  }
+  .toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; background: var(--ink-muted);
+    border-radius: 50%; transition: all 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .toggle-row input:checked ~ .toggle-track { background: var(--sage); border-color: var(--sage); }
+  .toggle-row input:checked ~ .toggle-track .toggle-thumb { background: white; left: 22px; }
+  .toggle-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.04em; color: var(--ink-soft);
+  }
+
+  /* DIVIDER-LABEL */
+  .s-divider-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-muted); text-align: center;
+    position: relative; margin: 4px 0;
+  }
+
+  /* WARNING ROW */
+  .s-warning-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; margin-bottom: 20px;
+    background: var(--te-yellow-soft); border: 1px solid var(--te-yellow);
+    border-radius: var(--r-sm);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink); letter-spacing: 0.04em;
+  }
+  .s-warning-row a { color: var(--ink); font-weight: 500; }
+
+  /* BUTTONS */
+  .s-btn {
+    background: var(--ink); color: var(--bg);
+    padding: 10px 20px; border: none; border-radius: var(--r-sm);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; transition: all 200ms ease;
+  }
+  .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
+  .s-btn-link {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; color: var(--ink-muted); text-decoration: none;
+    text-transform: uppercase; transition: color 150ms;
+  }
+  .s-btn-link:hover { color: var(--ink); }
+
+  /* UTIL */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+</style>

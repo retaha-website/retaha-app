@@ -1,0 +1,141 @@
+---
+const LANGUAGES = [
+  { code: 'de', label: 'deutsch',    flag: '🇩🇪' },
+  { code: 'en', label: 'english',    flag: '🇬🇧' },
+  { code: 'fr', label: 'français',   flag: '🇫🇷' },
+  { code: 'es', label: 'español',    flag: '🇪🇸' },
+  { code: 'it', label: 'italiano',   flag: '🇮🇹' },
+  { code: 'pt', label: 'português',  flag: '🇵🇹' },
+  { code: 'nl', label: 'nederlands', flag: '🇳🇱' },
+  { code: 'ru', label: 'русский',    flag: '🇷🇺' },
+  { code: 'ar', label: 'العربية',     flag: '🇸🇦' },
+  { code: 'zh', label: '中文',        flag: '🇨🇳' },
+];
+---
+
+<section class="settings-section">
+  <div class="settings-section__head">
+    <span class="settings-section__title">— sprachen für gäste —</span>
+  </div>
+
+  <div class="lang-grid" id="langGrid">
+    {LANGUAGES.map(lang => (
+      <label class={`lang-pill ${['de','en'].includes(lang.code) ? 'is-active' : ''}`}>
+        <input
+          type="checkbox"
+          value={lang.code}
+          checked={['de','en'].includes(lang.code)}
+          aria-label={lang.label}
+        />
+        <span class="lang-pill__flag">{lang.flag}</span>
+        <span class="lang-pill__label">{lang.label}</span>
+      </label>
+    ))}
+  </div>
+  <p class="lang-hint">gäste können in der app zwischen diesen sprachen wechseln.</p>
+
+  <div class="default-lang-row">
+    <label class="default-lang-label" for="defaultLang">standard</label>
+    <select id="defaultLang" class="default-lang-select">
+      {LANGUAGES.map(lang => (
+        <option value={lang.code} selected={lang.code === 'de'}>
+          {lang.flag} {lang.label}
+        </option>
+      ))}
+    </select>
+  </div>
+</section>
+
+<style>
+  .settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 24px 28px;
+  }
+  .settings-section__head { margin-bottom: 16px; }
+  .settings-section__title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase;
+  }
+
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .lang-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 12px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); transition: all 150ms ease;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.04em; text-transform: lowercase; color: var(--ink-muted);
+  }
+  .lang-pill input { display: none; }
+  .lang-pill:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .lang-pill.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .lang-pill__flag { font-size: 14px; }
+
+  .lang-hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--ink-muted); margin-top: 10px; letter-spacing: 0.04em;
+  }
+
+  .default-lang-row {
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .default-lang-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
+    white-space: nowrap;
+  }
+  .default-lang-select {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink); outline: none; cursor: pointer;
+    transition: border-color 150ms;
+  }
+  .default-lang-select:focus { border-color: var(--ink); }
+</style>
+
+<script>
+  import { updateState } from '../../../lib/gast-vorschau/state';
+
+  const pills = document.querySelectorAll<HTMLLabelElement>('#langGrid .lang-pill');
+  const defaultSelect = document.getElementById('defaultLang') as HTMLSelectElement;
+
+  function getActive(): string[] {
+    return Array.from(pills)
+      .filter(p => p.querySelector('input')?.checked)
+      .map(p => p.querySelector('input')!.value);
+  }
+
+  // Pill toggle
+  pills.forEach(pill => {
+    const input = pill.querySelector('input') as HTMLInputElement;
+    pill.addEventListener('click', () => {
+      input.checked = !input.checked;
+      pill.classList.toggle('is-active', input.checked);
+      const active = getActive();
+      updateState({ activeLanguages: active });
+      // Nur aktive Sprachen im Default-Select anzeigen
+      syncDefaultOptions(active);
+    });
+  });
+
+  function syncDefaultOptions(active: string[]) {
+    const current = defaultSelect.value;
+    Array.from(defaultSelect.options).forEach(opt => {
+      opt.disabled = !active.includes(opt.value);
+    });
+    if (!active.includes(current) && active.length > 0) {
+      defaultSelect.value = active[0];
+      updateState({ defaultLanguage: active[0] });
+    }
+  }
+
+  defaultSelect?.addEventListener('change', () => {
+    updateState({ defaultLanguage: defaultSelect.value });
+  });
+</script>
