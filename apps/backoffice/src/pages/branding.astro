@@ -217,26 +217,32 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 </style>
 
 <script>
-  const colRight = document.querySelector<HTMLElement>('.branding-col-right');
+  const sections = document.querySelector<HTMLElement>('.branding-sections');
   const sidebar  = document.querySelector<HTMLElement>('.branding-sidebar');
   const phoneEl  = document.querySelector<HTMLElement>('.brand-preview__phone');
 
-  if (colRight && sidebar) {
-    // Listener auf den vollen Wrapper (gesamte rechte Spalte, volle Seitenhöhe)
-    colRight.addEventListener('wheel', (e) => {
-      // Wenn der Cursor über dem Phone ist → Phone selbst scrollen lassen
-      if (phoneEl) {
-        const r = phoneEl.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right &&
-            e.clientY >= r.top  && e.clientY <= r.bottom) {
-          return;
-        }
+  // Document-Level: alles rechts von der linken Spalte → Sidebar scrollen
+  // (deckt Grid-Spalte UND Seiten-Rand rechts vom max-width Container ab)
+  document.addEventListener('wheel', (e) => {
+    if (!sections || !sidebar) return;
+
+    // Trennlinie = rechte Kante der linken Spalte
+    const sectionsRight = sections.getBoundingClientRect().right;
+    if (e.clientX <= sectionsRight) return; // linke Seite → normaler Page-Scroll
+
+    // Direkt auf dem Phone → Phone selbst scrollen lassen
+    if (phoneEl) {
+      const r = phoneEl.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top  && e.clientY <= r.bottom) {
+        return;
       }
-      // Sonst: Sidebar scrollen, Page-Scroll verhindern
-      const maxScroll = sidebar.scrollHeight - sidebar.clientHeight;
-      if (maxScroll <= 0) return;
-      e.preventDefault();
-      sidebar.scrollTop = Math.max(0, Math.min(maxScroll, sidebar.scrollTop + e.deltaY));
-    }, { capture: true, passive: false });
-  }
+    }
+
+    // Rechte Seite (inkl. Rand) → Sidebar scrollen
+    const maxScroll = sidebar.scrollHeight - sidebar.clientHeight;
+    if (maxScroll <= 0) return;
+    e.preventDefault();
+    sidebar.scrollTop = Math.max(0, Math.min(maxScroll, sidebar.scrollTop + e.deltaY));
+  }, { capture: true, passive: false });
 </script>
