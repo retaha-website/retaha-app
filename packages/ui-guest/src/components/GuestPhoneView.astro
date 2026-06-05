@@ -49,10 +49,12 @@ const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
 
   <!-- Screen Content (tabbed) -->
   <div class="gp-screens">
-    <div data-screen="home"         ><GuestHomeScreen    theme={theme} welcomeText={welcomeText} previewMode={previewMode} /></div>
-    <div data-screen="eve"   hidden ><GuestEveScreen     theme={theme} previewMode={previewMode} /></div>
-    <div data-screen="tipps" hidden ><GuestRecsScreen    theme={theme} previewMode={previewMode} /></div>
-    <div data-screen="service" hidden><GuestServiceScreen theme={theme} previewMode={previewMode} /></div>
+    <div class="gp-screens-scaler">
+      <div data-screen="home"         ><GuestHomeScreen    theme={theme} welcomeText={welcomeText} previewMode={previewMode} /></div>
+      <div data-screen="eve"   hidden ><GuestEveScreen     theme={theme} previewMode={previewMode} /></div>
+      <div data-screen="tipps" hidden ><GuestRecsScreen    theme={theme} previewMode={previewMode} /></div>
+      <div data-screen="service" hidden><GuestServiceScreen theme={theme} previewMode={previewMode} /></div>
+    </div>
   </div>
 
   <!-- Bottom Tabs -->
@@ -98,10 +100,19 @@ const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
 
   /* Screens */
   .gp-screens {
-    flex: 1; overflow-y: auto; overflow-x: hidden;
-    scrollbar-width: none;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
   }
-  .gp-screens::-webkit-scrollbar { display: none; }
+  /* Scaler: rendert Content in voller Mobilgröße, dann skaliert auf --preview-scale
+     Kein Effekt wenn --preview-scale nicht gesetzt (default: 1) */
+  .gp-screens-scaler {
+    position: absolute;
+    top: 0; left: 0;
+    width: calc(100% / var(--preview-scale, 1));
+    transform: scale(var(--preview-scale, 1));
+    transform-origin: top left;
+  }
 
   /* Tabs */
   .gp-tabs {
