@@ -6,11 +6,10 @@ interface Props { branding: BrandingData; }
 const { branding } = Astro.props;
 
 const slots = [
-  { key: 'logo_primary',  label: 'Primary',         hint: 'Wort + Symbol · Header, E-Mails', bg: 'light', required: true  },
-  { key: 'logo_icon',     label: 'Icon Only',        hint: 'Symbol · Favicon, App-Icon, Wallet', bg: 'light' },
-  { key: 'logo_wordmark', label: 'Wordmark Only',    hint: 'Nur Text · Footer, Briefkopf', bg: 'light' },
-  { key: 'logo_dark',     label: 'Dark Variant',     hint: 'Für dunkle Hintergründe', bg: 'dark' },
-  { key: 'logo_print',    label: 'Print Version',    hint: 'Hochauflösend · NFC-Karten, Drucksachen', bg: 'light', optional: true },
+  { key: 'logo_primary',  label: 'Primary',      hint: 'Wort + Symbol · Header, E-Mails',   required: true },
+  { key: 'logo_icon',     label: 'Icon Only',     hint: 'Symbol · Favicon, App-Icon, Wallet' },
+  { key: 'logo_wordmark', label: 'Wordmark Only', hint: 'Nur Text · Footer, Briefkopf'       },
+  { key: 'logo_dark',     label: 'Dark Variant',  hint: 'Für dunkle Hintergründe'            },
 ];
 ---
 
@@ -24,11 +23,10 @@ const slots = [
             <span class="logo-slot__label">
               {slot.label}
               {slot.required && <span class="req">*</span>}
-              {slot.optional && <span class="opt">opt.</span>}
             </span>
             <span class="logo-slot__hint">{slot.hint}</span>
           </div>
-          <div class={`logo-slot__drop ${url ? 'has-image' : ''}`} data-bg={slot.bg}>
+          <div class={`logo-slot__drop ${url ? 'has-image' : ''}`}>
             {url ? (
               <img src={url} alt={`Logo ${slot.label}`} class="logo-slot__img" />
             ) : (
@@ -51,17 +49,24 @@ const slots = [
     })}
   </div>
 
-  <div class="logo-spacing">
-    <span class="spacing-label">Logo-Mindestabstand</span>
-    <div class="radio-cards" id="spacingCards">
-      {(['tight','normal','loose'] as const).map(v => (
-        <button class={`radio-card ${branding.logo_spacing === v ? 'is-active' : ''}`}
-          data-value={v} type="button">
-          {v === 'tight' ? 'Eng (8px)' : v === 'normal' ? 'Normal (16px)' : 'Weit (24px)'}
-        </button>
-      ))}
+  <form method="POST" id="logoSpacingForm">
+    <input type="hidden" name="_action" value="spacing" />
+    <input type="hidden" name="logo_spacing" id="logoSpacingValue" value={branding.logo_spacing ?? 'normal'} />
+    <div class="logo-spacing">
+      <span class="spacing-label">Logo-Mindestabstand</span>
+      <div class="radio-cards" id="spacingCards">
+        {(['tight','normal','loose'] as const).map(v => (
+          <button class={`radio-card ${(branding.logo_spacing ?? 'normal') === v ? 'is-active' : ''}`}
+            data-value={v} type="button">
+            {v === 'tight' ? 'Eng (8px)' : v === 'normal' ? 'Normal (16px)' : 'Weit (24px)'}
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
+    <div class="s-card__footer">
+      <button type="submit" class="s-btn">Speichern</button>
+    </div>
+  </form>
 </BrandSection>
 
 <style>
@@ -78,7 +83,6 @@ const slots = [
     display: flex; align-items: center; gap: 4px;
   }
   .req { color: var(--pink); }
-  .opt { font-size: 9px; color: var(--ink-faint); }
   .logo-slot__hint {
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 0.06em; color: var(--ink-muted);
@@ -90,9 +94,7 @@ const slots = [
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: all 200ms ease; overflow: hidden;
   }
-  .logo-slot__drop[data-bg="dark"] { background: #0A0A0A; }
   .logo-slot__drop:hover { background: var(--te-yellow-soft); border-color: var(--ink); }
-  .logo-slot__drop[data-bg="dark"]:hover { background: #1A1A1A; border-color: var(--ink-muted); }
   .logo-slot__drop.has-image { border-style: solid; border-color: var(--sage); }
   .logo-slot__img { max-width: 80%; max-height: 80%; object-fit: contain; }
   .logo-slot__empty {
@@ -116,7 +118,7 @@ const slots = [
   .logo-slot__btn:hover { background: var(--te-yellow-soft); color: var(--ink); }
   .logo-slot__btn--del:hover { background: var(--burgund-soft); color: var(--burgund); border-color: var(--burgund); }
 
-  .logo-spacing { padding-top: 20px; border-top: 1px solid var(--border); }
+  .logo-spacing { }
   .spacing-label {
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     letter-spacing: 0.14em; text-transform: uppercase;
@@ -132,6 +134,15 @@ const slots = [
   }
   .radio-card:hover { background: var(--te-yellow-soft); color: var(--ink); }
   .radio-card.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .logo-spacing { padding-top: 0; }
+  .s-card__footer { display: flex; justify-content: flex-end; }
+  .s-btn {
+    background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
+    border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.14em; cursor: pointer; transition: all 200ms;
+  }
+  .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
 </style>
 
 <script>
@@ -209,16 +220,14 @@ const slots = [
   }
   document.querySelectorAll<HTMLElement>('.logo-slot__actions').forEach(bindActionButtons);
 
-  // Spacing Radio-Cards
+  // Spacing Radio-Cards — nur visuell; Speichern via Form-Submit
   const spacingCards = document.querySelectorAll<HTMLButtonElement>('#spacingCards .radio-card');
+  const spacingInput = document.getElementById('logoSpacingValue') as HTMLInputElement | null;
   spacingCards.forEach(card => {
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', () => {
       spacingCards.forEach(c => c.classList.remove('is-active'));
       card.classList.add('is-active');
-      const fd = new FormData();
-      fd.append('_action', 'spacing');
-      fd.append('logo_spacing', card.dataset.value!);
-      await fetch('/branding', { method: 'POST', body: fd });
+      if (spacingInput) spacingInput.value = card.dataset.value!;
     });
   });
 </script>
