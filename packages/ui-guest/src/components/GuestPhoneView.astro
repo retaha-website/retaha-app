@@ -136,18 +136,55 @@ const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
 </style>
 
 <script>
-  // Tab switching — pure JS, kein Alpine
   document.querySelectorAll<HTMLElement>('.guest-phone-view').forEach(view => {
     const tabs    = view.querySelectorAll<HTMLButtonElement>('.gp-tab');
     const screens = view.querySelectorAll<HTMLElement>('[data-screen]');
+    const screensEl = view.querySelector<HTMLElement>('.gp-screens');
+    const scaler    = view.querySelector<HTMLElement>('.gp-screens-scaler');
 
+    // Tab switching
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         const key = tab.dataset.tab;
         tabs.forEach(t => t.classList.remove('gp-tab--active'));
         tab.classList.add('gp-tab--active');
         screens.forEach(s => { s.hidden = s.dataset.screen !== key; });
+        // Scroll zurücksetzen beim Tab-Wechsel
+        if (scaler) scaler.style.top = '0px';
       });
     });
+
+    // Phone-Screen scrollbar via Wheel — nur wenn preview-scale gesetzt
+    if (!screensEl || !scaler) return;
+    const previewScale = parseFloat(
+      getComputedStyle(view).getPropertyValue('--preview-scale').trim() || '1'
+    );
+    if (previewScale >= 1) return; // Kein custom scroll in Vollansicht
+
+    let scrollTop = 0;
+
+    screensEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Maximaler Scroll: visuelle Content-Höhe minus sichtbare Screen-Höhe
+      const maxScroll = Math.max(0, scaler.offsetHeight * previewScale - screensEl.offsetHeight);
+      scrollTop = Math.max(0, Math.min(maxScroll, scrollTop + e.deltaY));
+      scaler.style.top = `-${scrollTop}px`;
+    }, { passive: false });
+
+    // Touch-Support für Touchscreen
+    let touchStartY = 0;
+    screensEl.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    screensEl.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const delta = touchStartY - e.touches[0].clientY;
+      touchStartY = e.touches[0].clientY;
+      const maxScroll = Math.max(0, scaler.offsetHeight * previewScale - screensEl.offsetHeight);
+      scrollTop = Math.max(0, Math.min(maxScroll, scrollTop + delta));
+      scaler.style.top = `-${scrollTop}px`;
+    }, { passive: false });
   });
 </script>
