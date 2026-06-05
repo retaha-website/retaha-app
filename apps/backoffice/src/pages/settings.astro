@@ -26,8 +26,19 @@ if (Astro.request.method === 'POST') {
     if (!name) {
       saved = { section: 'hotel_identity', ok: false, msg: 'Hotel-Name ist ein Pflichtfeld.' };
     } else {
+      // Aktuellen setup_progress lesen um nicht zurückzusetzen
+      const { data: current } = await client.from('hotels')
+        .select('setup_progress').eq('id', hotel.id).maybeSingle();
+      const currentProgress = (current as any)?.setup_progress ?? 0;
+
       const { error } = await client.from('hotels')
-        .update({ name, classification, hotel_type })
+        .update({
+          name,
+          classification,
+          hotel_type,
+          // Setup-Fortschritt auf min. 30 setzen (Hotel-Daten gilt als erledigt)
+          setup_progress: Math.max(currentProgress, 30),
+        })
         .eq('id', hotel.id);
       saved = error
         ? { section: 'hotel_identity', ok: false, msg: error.message }
@@ -148,7 +159,7 @@ function isSelected(key: string, value: string, fallback = '') {
 
     <!-- HERO -->
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">admin-einstellungen</span>
+      <span class="settings-hero__eyebrow">Admin-Einstellungen</span>
       <h1 class="settings-hero__title">Hotel-Einstellungen<span class="dot-pink">.</span></h1>
       <p class="settings-hero__sub">Hier verwaltest du die Daten und Regeln deines Hotels.</p>
     </section>
