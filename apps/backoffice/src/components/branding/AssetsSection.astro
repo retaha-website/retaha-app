@@ -32,12 +32,10 @@ const assets = [
             }
             <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key={a.key} />
           </div>
-          {url && (
-            <div class="asset-slot__actions">
-              <button class="asset-slot__btn" data-action="replace" data-key={a.key} type="button">Ersetzen</button>
-              <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key={a.key} type="button">Entfernen</button>
-            </div>
-          )}
+          <div class="asset-slot__actions" hidden={!url || undefined}>
+            <button class="asset-slot__btn" data-action="replace" data-key={a.key} type="button">Ersetzen</button>
+            <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key={a.key} type="button">Entfernen</button>
+          </div>
           <div class="asset-slot__status" hidden></div>
         </div>
       );
@@ -127,15 +125,12 @@ const assets = [
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       if (res.ok) {
         showStatus(slot, true, '✓ Gespeichert');
-        // Show action buttons if not present
-        if (!slot.querySelector('.asset-slot__actions')) {
-          const actions = document.createElement('div');
-          actions.className = 'asset-slot__actions';
-          actions.innerHTML = `
-            <button class="asset-slot__btn" data-action="replace" data-key="${key}" type="button">Ersetzen</button>
-            <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key="${key}" type="button">Entfernen</button>`;
-          slot.querySelector('.asset-slot__status')?.before(actions);
-          bindActions(slot);
+        // Buttons sind immer im HTML — einfach einblenden
+        const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
+        if (actions) {
+          actions.hidden = false;
+          // data-key auf Buttons aktualisieren (relevant nach drop-replacement)
+          actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
         }
       } else {
         const j = await res.json();
@@ -159,7 +154,8 @@ const assets = [
           if (res.ok) {
             drop.innerHTML = `<div class="asset-slot__empty"><span class="asset-slot__plus">+</span><span class="asset-slot__cta">Ablegen oder klicken</span></div><input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
             drop.classList.remove('has-image');
-            btn.closest('.asset-slot__actions')?.remove();
+            const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
+            if (actions) actions.hidden = true;
             showStatus(slot, true, '✓ Entfernt');
             bindSlot(slot);
           }
