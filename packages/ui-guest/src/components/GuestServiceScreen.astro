@@ -1,0 +1,38 @@
+---
+import type { GuestTheme, GuestServiceTile } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  tiles?: GuestServiceTile[];
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  tiles = [
+    { icon: '🛏', label: 'Zimmerservice',    sub: '24h verfügbar',          badge: 'Sofort', badgeClass: 'green'  },
+    { icon: '🧺', label: 'Wäsche',           sub: 'Bis 10 Uhr abgeben'                                            },
+    { icon: '🚗', label: 'Taxi',             sub: 'Sofort · ~5 Min',        badge: 'Jetzt',  badgeClass: 'burgund'},
+    { icon: '💆', label: 'Spa-Termin',        sub: 'Nach Verfügbarkeit'                                            },
+  ],
+  previewMode = false,
+} = Astro.props;
+---
+
+<section class="gate-actions">
+  <div class="gate-actions-head">
+    <div class="gate-actions-eyebrow">— Service —</div>
+  </div>
+  <div class="gate-grid">
+    {tiles.map(tile => (
+      <button class="gate-tile" type="button" disabled={previewMode}>
+        {tile.badge && (
+          <span class={`gate-tile-badge ${tile.badgeClass ?? ''}`}>{tile.badge}</span>
+        )}
+        <span class="gate-tile-icon" style="font-size:22px">{tile.icon}</span>
+        <span class="gate-tile-label">{tile.label}</span>
+        <span class="gate-tile-sub">{tile.sub}</span>
+      </button>
+    ))}
+  </div>
+</section>

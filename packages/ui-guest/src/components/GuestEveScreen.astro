@@ -1,0 +1,70 @@
+---
+import type { GuestTheme, GuestEveMessage } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  messages?: GuestEveMessage[];
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  messages = [
+    { role: 'assistant', content: `Hallo! Ich bin ${theme.eveName ?? 'Eve'}, dein Concierge. Wie kann ich dir helfen?` },
+    { role: 'user',      content: 'Wann ist das Frühstück?' },
+    { role: 'assistant', content: `Frühstück gibt es täglich von 7:30 bis 10:30 Uhr im ${theme.hotelName}. Soll ich dir einen Tisch reservieren?` },
+  ],
+  previewMode = false,
+} = Astro.props;
+---
+
+<div class="eve-preview">
+  <!-- Header -->
+  <div class="eve-sheet-header">
+    <div class="eve-sheet-header-info">
+      <span class="eve-sheet-header-eyebrow">concierge</span>
+      <h2 class="eve-sheet-header-name">{theme.eveName ?? 'Eve'}</h2>
+    </div>
+    <div class="eve-online-dot"></div>
+  </div>
+
+  <!-- Messages -->
+  <div class="eve-sheet-messages">
+    {messages.map(msg => (
+      <div class={`eve-message eve-message--${msg.role}`}>
+        <div class="eve-message-bubble">{msg.content}</div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Input (disabled in preview) -->
+  <div class="eve-sheet-input-row">
+    <input
+      class="eve-sheet-input"
+      type="text"
+      placeholder="Frag mich etwas..."
+      disabled={previewMode}
+      readonly={previewMode}
+    />
+    <button class="eve-sheet-send" type="button" disabled={previewMode}>↑</button>
+  </div>
+</div>
+
+<style>
+  .eve-preview {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--theme-bg-secondary, #FAFAF8);
+  }
+  .eve-online-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--theme-sage, #5C9070);
+    box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
+    animation: led-pulse 2s ease-in-out infinite;
+  }
+  @keyframes led-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(1.15); }
+  }
+</style>

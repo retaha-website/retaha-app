@@ -1,0 +1,82 @@
+---
+import type { GuestTheme, GuestRecommendation } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  recs?: GuestRecommendation[];
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  recs = [
+    { name: 'Café am Marktplatz',  category: 'Café',        distance: '250m', rating: 4.6, isHotelierPick: true },
+    { name: 'Trattoria Bella',     category: 'Italienisch', distance: '400m', rating: 4.5 },
+    { name: 'Stadtpark',           category: 'Park',        distance: '550m', rating: 4.8 },
+  ],
+  previewMode = false,
+} = Astro.props;
+---
+
+<div class="recs-preview">
+  <div class="gate-actions-head" style="padding: 16px 20px 0;">
+    <div class="gate-actions-eyebrow">— In der Nähe —</div>
+  </div>
+
+  <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+    {recs.map(rec => (
+      <button
+        class="place-preview-card"
+        type="button"
+        disabled={previewMode}
+      >
+        <div class="place-preview-img"></div>
+        <div class="place-preview-body">
+          <div class="place-preview-name">
+            {rec.isHotelierPick && <span class="place-preview-pick">✦</span>}
+            {rec.name}
+          </div>
+          <div class="place-preview-meta">
+            {rec.category}
+            {rec.distance && ` · ${rec.distance}`}
+          </div>
+          {rec.rating && (
+            <div class="place-preview-rating">
+              {'★'.repeat(Math.round(rec.rating))} {rec.rating}
+            </div>
+          )}
+        </div>
+        <span class="place-preview-arrow">›</span>
+      </button>
+    ))}
+  </div>
+</div>
+
+<style>
+  .recs-preview {
+    background: var(--theme-bg-secondary, #FAFAF8);
+    min-height: 100%;
+  }
+  .place-preview-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--theme-bg-primary, #fff);
+    border: 1px solid var(--theme-border, #E8E4DD);
+    padding: 12px; width: 100%; text-align: left; cursor: pointer;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  .place-preview-card:hover:not(:disabled) {
+    border-color: var(--theme-accent, #FF4A82);
+  }
+  .place-preview-img {
+    width: 48px; height: 48px; flex-shrink: 0;
+    background: var(--theme-bg-tertiary, #F4F4F2);
+    border-radius: 3px;
+  }
+  .place-preview-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .place-preview-name { font-size: 14px; font-weight: 500; color: var(--theme-text-primary, #1A1A1A); }
+  .place-preview-pick { color: var(--theme-accent, #FF4A82); margin-right: 4px; }
+  .place-preview-meta { font-size: 12px; color: var(--theme-text-tertiary, rgba(26,26,26,.45)); }
+  .place-preview-rating { font-size: 11px; color: #C8973F; }
+  .place-preview-arrow { color: var(--theme-text-tertiary, rgba(26,26,26,.45)); font-size: 20px; }
+</style>
