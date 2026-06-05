@@ -6,9 +6,9 @@ interface Props { branding: BrandingData; }
 const { branding } = Astro.props;
 
 const assets = [
-  { key: 'splash_background', label: 'Welcome-Hintergrund',  hint: 'Splash-Screen · Gäste-App Start', ratio: '9/16' },
-  { key: 'wallet_pass_bg',    label: 'Wallet-Pass Hintergrund', hint: 'Apple / Google Wallet-Karten', ratio: '16/9' },
-  { key: 'email_header',      label: 'E-Mail-Header',         hint: 'Welcome-Mail, Buchungsbestätigung', ratio: '3/1' },
+  { key: 'splash_background', label: 'Welcome-Hintergrund',   hint: 'Splash-Screen · Gäste-App Start',              ratio: '9/16' },
+  { key: 'wallet_pass_bg',    label: 'Wallet-Pass',           hint: 'Apple / Google Wallet-Karten',                 ratio: '16/9' },
+  { key: 'email_header',      label: 'E-Mail-Header',         hint: 'Banner oben in Gäste-Mails (600 × 200 px)',    ratio: '3/1'  },
 ];
 ---
 
@@ -17,7 +17,7 @@ const assets = [
     {assets.map(a => {
       const url = branding[a.key as keyof BrandingData] as string | null;
       return (
-        <div class="asset-slot">
+        <div class="asset-slot" data-slot={a.key}>
           <div class="asset-slot__head">
             <span class="asset-slot__label">{a.label}</span>
             <span class="asset-slot__hint">{a.hint}</span>
@@ -25,10 +25,20 @@ const assets = [
           <div class="asset-slot__drop" style={`aspect-ratio:${a.ratio}`} data-key={a.key}>
             {url
               ? <img src={url} class="asset-slot__img" alt="" />
-              : <span class="asset-slot__cta">+ Datei ablegen</span>
+              : <div class="asset-slot__empty">
+                  <span class="asset-slot__plus">+</span>
+                  <span class="asset-slot__cta">Ablegen oder klicken</span>
+                </div>
             }
             <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key={a.key} />
           </div>
+          {url && (
+            <div class="asset-slot__actions">
+              <button class="asset-slot__btn" data-action="replace" data-key={a.key} type="button">Ersetzen</button>
+              <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key={a.key} type="button">Entfernen</button>
+            </div>
+          )}
+          <div class="asset-slot__status" hidden></div>
         </div>
       );
     })}
@@ -36,7 +46,7 @@ const assets = [
 </BrandSection>
 
 <style>
-  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
   .asset-slot { display: flex; flex-direction: column; gap: 8px; }
   .asset-slot__head { display: flex; flex-direction: column; gap: 2px; }
   .asset-slot__label {
@@ -56,37 +66,110 @@ const assets = [
   .asset-slot__drop:hover { background: var(--te-yellow-soft); border-color: var(--ink); }
   .asset-slot__drop.has-image { border-style: solid; border-color: var(--sage); }
   .asset-slot__img { width: 100%; height: 100%; object-fit: cover; }
+  .asset-slot__empty { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .asset-slot__plus { font-size: 22px; font-weight: 300; color: var(--ink-faint); line-height: 1; }
   .asset-slot__cta {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.06em; color: var(--ink-muted);
+    font-family: 'Space Grotesk', sans-serif; font-size: 11px; color: var(--ink-soft);
   }
   .asset-slot__input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .asset-slot__actions { display: flex; gap: 6px; }
+  .asset-slot__btn {
+    flex: 1; padding: 6px 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer; transition: all 150ms;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.08em; color: var(--ink-soft);
+  }
+  .asset-slot__btn:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .asset-slot__btn--del:hover { background: var(--burgund-soft); color: var(--burgund); border-color: var(--burgund); }
+
+  .asset-slot__status {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.06em; padding: 6px 10px; border-radius: var(--r-sm);
+  }
+  .asset-slot__status--ok  { background: var(--sage-soft); color: var(--sage-strong); }
+  .asset-slot__status--err { background: var(--burgund-soft); color: var(--burgund); }
 </style>
 
 <script>
-  document.querySelectorAll<HTMLInputElement>('.asset-slot__input').forEach(input => {
+  function showStatus(slot: HTMLElement, ok: boolean, msg: string) {
+    const el = slot.querySelector<HTMLElement>('.asset-slot__status');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `asset-slot__status asset-slot__status--${ok ? 'ok' : 'err'}`;
+    el.hidden = false;
+    setTimeout(() => { el.hidden = true; }, 3000);
+  }
+
+  function bindSlot(slot: HTMLElement) {
+    const input = slot.querySelector<HTMLInputElement>('.asset-slot__input');
+    if (!input) return;
+
     input.addEventListener('change', async () => {
       const file = input.files?.[0];
       if (!file) return;
       const key = input.dataset.key!;
-      const drop = input.closest('.asset-slot__drop') as HTMLElement;
+      const drop = slot.querySelector<HTMLElement>('.asset-slot__drop')!;
 
+      // Optimistic preview
       const reader = new FileReader();
       reader.onload = () => {
         drop.innerHTML = `<img src="${reader.result}" class="asset-slot__img" alt="" />
           <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
         drop.classList.add('has-image');
+        bindSlot(slot); // rebind after innerHTML update
       };
       reader.readAsDataURL(file);
 
       const fd = new FormData();
-      fd.append('key', key);
-      fd.append('file', file);
+      fd.append('key', key); fd.append('file', file);
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
-      if (!res.ok) {
+      if (res.ok) {
+        showStatus(slot, true, '✓ Gespeichert');
+        // Show action buttons if not present
+        if (!slot.querySelector('.asset-slot__actions')) {
+          const actions = document.createElement('div');
+          actions.className = 'asset-slot__actions';
+          actions.innerHTML = `
+            <button class="asset-slot__btn" data-action="replace" data-key="${key}" type="button">Ersetzen</button>
+            <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key="${key}" type="button">Entfernen</button>`;
+          slot.querySelector('.asset-slot__status')?.before(actions);
+          bindActions(slot);
+        }
+      } else {
         const j = await res.json();
-        alert(`Upload fehlgeschlagen: ${j.error}`);
+        showStatus(slot, false, `✗ ${j.error}`);
       }
     });
+  }
+
+  function bindActions(slot: HTMLElement) {
+    slot.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const key = btn.dataset.key!;
+        const drop = slot.querySelector<HTMLElement>('.asset-slot__drop')!;
+        if (btn.dataset.action === 'replace') {
+          slot.querySelector<HTMLInputElement>('.asset-slot__input')?.click();
+        } else if (btn.dataset.action === 'delete') {
+          if (!confirm('Asset entfernen?')) return;
+          const fd = new FormData();
+          fd.append('key', key); fd.append('delete', 'true');
+          const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+          if (res.ok) {
+            drop.innerHTML = `<div class="asset-slot__empty"><span class="asset-slot__plus">+</span><span class="asset-slot__cta">Ablegen oder klicken</span></div><input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
+            drop.classList.remove('has-image');
+            btn.closest('.asset-slot__actions')?.remove();
+            showStatus(slot, true, '✓ Entfernt');
+            bindSlot(slot);
+          }
+        }
+      });
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('.asset-slot').forEach(slot => {
+    bindSlot(slot);
+    bindActions(slot);
   });
 </script>
