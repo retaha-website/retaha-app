@@ -76,6 +76,7 @@ const firstInitial = getInitials(user).charAt(0);
 
   if (userMenu && avatar && dropdown) {
     const open = () => {
+      document.dispatchEvent(new CustomEvent('retaha:menu-open', { detail: 'userMenu' }));
       avatar.classList.add('is-open');
       dropdown.classList.add('is-open');
       avatar.setAttribute('aria-expanded', 'true');
@@ -95,6 +96,10 @@ const firstInitial = getInitials(user).charAt(0);
 
     document.addEventListener('click', (e) => {
       if (!userMenu.contains(e.target as Node)) close();
+    });
+
+    document.addEventListener('retaha:menu-open', (e: Event) => {
+      if ((e as CustomEvent).detail !== 'userMenu') close();
     });
 
     document.addEventListener('keydown', (e) => {

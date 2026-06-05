@@ -21,6 +21,7 @@ import KeyMenuDropdown from './KeyMenuDropdown.astro';
 
   if (wrap && button && dropdown) {
     function openMenu() {
+      document.dispatchEvent(new CustomEvent('retaha:menu-open', { detail: 'keyMenu' }));
       button!.classList.add('is-open');
       dropdown!.classList.add('is-open');
       button!.setAttribute('aria-expanded', 'true');
@@ -76,6 +77,10 @@ import KeyMenuDropdown from './KeyMenuDropdown.astro';
 
     document.addEventListener('click', e => {
       if (!wrap!.contains(e.target as Node)) closeMenu();
+    });
+
+    document.addEventListener('retaha:menu-open', (e: Event) => {
+      if ((e as CustomEvent).detail !== 'keyMenu') closeMenu();
     });
 
     document.addEventListener('keydown', e => {
