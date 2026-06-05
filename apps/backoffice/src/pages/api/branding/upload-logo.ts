@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const VALID_KEYS = ['logo_primary', 'logo_icon', 'logo_wordmark', 'logo_dark', 'logo_print',
                     'splash_background', 'wallet_pass_bg', 'email_header'] as const;
@@ -22,7 +22,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return new Response(JSON.stringify({ error: 'Ungültiger key' }), { status: 400 });
   }
 
-  const client = createSupabaseServerInstance(cookies, request);
+  // User-Client für hotels-Tabelle, Service-Role für Storage (umgeht RLS)
+  const client        = createSupabaseServerInstance(cookies, request);
+  const serviceClient = createSupabaseServiceRoleInstance();
 
   // DELETE
   if (deleteFlag) {
@@ -42,7 +44,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
   const filename = `${hotel.id}/${key}-${Date.now()}.${ext}`;
 
-  const { error: uploadError } = await client.storage
+  const { error: uploadError } = await serviceClient.storage
     .from('branding-assets')
     .upload(filename, file, { cacheControl: '31536000', upsert: true });
 
@@ -50,7 +52,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return new Response(JSON.stringify({ error: uploadError.message }), { status: 500 });
   }
 
-  const { data: { publicUrl } } = client.storage
+  const { data: { publicUrl } } = serviceClient.storage
     .from('branding-assets')
     .getPublicUrl(filename);
 
