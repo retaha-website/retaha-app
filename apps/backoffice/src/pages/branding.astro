@@ -7,6 +7,8 @@ import ColorsSection  from '../components/branding/ColorsSection.astro';
 import ThemeSection   from '../components/branding/ThemeSection.astro';
 import AssetsSection  from '../components/branding/AssetsSection.astro';
 import BrandMiniPreview from '../components/branding/BrandMiniPreview.astro';
+import DemoQrCard from '../components/shared/DemoQrCard.astro';
+import { getOrCreateShowcaseUrl } from '../lib/demo/get-showcase-url';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -67,6 +69,8 @@ if (Astro.request.method === 'POST') {
 // ─── DATEN LADEN ───────────────────────────────────────────────────────────
 const branding = await getBranding(Astro.cookies, Astro.request);
 if (!branding) return Astro.redirect('/admin/login?error=no_hotel');
+
+const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 ---
 
 <Layout title="Branding" activeTab="backoffice" hotelName={hotel.name} hotelLogoUrl={hotel.logo_url}>
@@ -106,6 +110,7 @@ if (!branding) return Astro.redirect('/admin/login?error=no_hotel');
 
       <div class="branding-sidebar">
         <BrandMiniPreview branding={branding} hotelName={hotel.name} />
+        <DemoQrCard demoUrl={demoUrl} compact />
       </div>
 
     </div>

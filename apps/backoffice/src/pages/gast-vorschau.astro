@@ -4,6 +4,8 @@ import PhonePreview from '../components/gast-vorschau/PhonePreview.astro';
 import SettingsPanel from '../components/gast-vorschau/settings/SettingsPanel.astro';
 import { getUser, getUserHotels } from '@retaha/auth';
 import { demoTags } from '../lib/gast-vorschau/demo-data';
+import DemoQrCard from '../components/shared/DemoQrCard.astro';
+import { getOrCreateShowcaseUrl } from '../lib/demo/get-showcase-url';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -11,6 +13,8 @@ if (!user) return Astro.redirect('/admin/login');
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 ---
 
 <Layout
@@ -31,7 +35,10 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
   <div class="gast-layout">
     <PhonePreview tags={demoTags} />
-    <SettingsPanel tags={demoTags} hotelName={hotel.name} />
+    <div class="gast-sidebar">
+      <SettingsPanel tags={demoTags} hotelName={hotel.name} />
+      <DemoQrCard demoUrl={demoUrl} />
+    </div>
   </div>
 </Layout>
 
@@ -67,4 +74,5 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
   @media (max-width: 1000px) {
     .gast-layout { grid-template-columns: 1fr; gap: 32px; padding: 0 20px 64px; }
   }
+  .gast-sidebar { display: flex; flex-direction: column; gap: 16px; }
 </style>
