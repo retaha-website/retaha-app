@@ -1,0 +1,103 @@
+---
+interface Props {
+  name?: string;
+  location?: string;
+  stars?: number;
+  logoUrl?: string | null;
+  href?: string;
+}
+
+const {
+  name     = 'Hotel',
+  location,
+  stars    = 4,
+  logoUrl,
+  href     = '/admin/settings',
+} = Astro.props;
+
+const starPositions: Record<number, number[]> = {
+  3: [11, 14, 21],
+  4: [11, 14, 18, 21],
+  5: [9, 12, 16, 20, 23],
+};
+const positions = starPositions[stars] ?? [11, 14, 18, 21];
+---
+
+<a href={href} class="hotel-logo" title="Hotel-Einstellungen öffnen">
+  {logoUrl ? (
+    <img src={logoUrl} alt={name} class="hotel-logo__img" />
+  ) : (
+    <svg class="hotel-logo__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      {positions.map((x, i) => (
+        <circle cx={x} cy={i % 2 === 0 ? 4 : 3} r="0.9" fill="currentColor"/>
+      ))}
+      <path d="M6 26 L6 14 Q6 8 16 8 Q26 8 26 14 L26 26"
+            stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <line x1="11" y1="13" x2="11" y2="26" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+      <line x1="21" y1="13" x2="21" y2="26" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+      <line x1="4" y1="28" x2="28" y2="28" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M9 28 Q9 25 11 25" stroke="currentColor" stroke-width="0.8" fill="none"/>
+      <path d="M23 28 Q23 25 21 25" stroke="currentColor" stroke-width="0.8" fill="none"/>
+    </svg>
+  )}
+  <div class="hotel-logo__text">
+    <span class="hotel-logo__name">{name}</span>
+    {location && <span class="hotel-logo__loc">{location}</span>}
+  </div>
+</a>
+
+<style>
+  .hotel-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    transition: all 200ms ease;
+    text-decoration: none;
+    color: inherit;
+    justify-self: center;
+  }
+  .hotel-logo:hover {
+    border-color: var(--ink);
+    background: var(--bg-deep);
+  }
+  .hotel-logo__mark {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    color: var(--ink);
+  }
+  .hotel-logo__img {
+    height: 32px;
+    width: auto;
+    max-width: 80px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .hotel-logo__text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+  .hotel-logo__name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-transform: lowercase;
+  }
+  .hotel-logo__loc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  @media (max-width: 900px) {
+    .hotel-logo { justify-self: start; }
+  }
+</style>

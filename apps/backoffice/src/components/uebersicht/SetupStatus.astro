@@ -1,0 +1,86 @@
+---
+import { getDoneCount, type Stage } from '../../lib/uebersicht/setup-stage';
+
+interface Props {
+  stage: Stage;
+}
+
+const { stage } = Astro.props;
+const done = getDoneCount(stage);
+const isDone = stage === 100;
+---
+
+<section class="setup">
+  <div class="setup__box">
+    <div class="setup__row">
+      <span class="setup__label">
+        {isDone ? '— Setup vollständig —' : '— Setup-Fortschritt —'}
+      </span>
+      <span class="setup__value">
+        <strong class:list={[{ 'is-done': isDone }]}>{stage}%</strong>
+        <span> · {done} von 7 Schritten</span>
+      </span>
+    </div>
+    <div class="progress-rail" role="progressbar" aria-valuenow={stage} aria-valuemin={0} aria-valuemax={100}>
+      <div class:list={['progress-fill', { 'is-done': isDone }]} style={`width: ${stage}%`}></div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .setup {
+    max-width: 1400px;
+    margin: 24px auto 0;
+    padding: 0 32px;
+  }
+  @media (max-width: 768px) { .setup { padding: 0 20px; } }
+
+  .setup__box {
+    background: var(--surface);
+    border: 1px solid var(--ink);
+    padding: 24px 28px;
+    border-radius: var(--r);
+  }
+  @media (max-width: 768px) { .setup__box { padding: 20px 24px; } }
+
+  .setup__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .setup__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .setup__value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ink-muted);
+  }
+  .setup__value strong {
+    color: var(--ink);
+    font-weight: 500;
+    font-size: 22px;
+  }
+  .setup__value strong.is-done { color: var(--sage); }
+
+  .progress-rail {
+    height: 4px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    border-radius: 99px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--te-yellow);
+    transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1), background 400ms ease;
+  }
+  .progress-fill.is-done { background: var(--sage); }
+</style>

@@ -1,0 +1,80 @@
+---
+import type { AppStatus } from '../../lib/uebersicht/apps-data';
+
+interface Props {
+  num: string;
+  label: string;
+  status: AppStatus;
+  delay?: string;
+}
+
+const { num, label, status, delay = '0s' } = Astro.props;
+const shortLabel = label.toUpperCase().substring(0, 6);
+---
+
+<div
+  class:list={['rack-key', `rack-key--${status}`]}
+  style={`animation-delay: ${delay}`}
+>
+  <svg viewBox="0 0 50 110" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <!-- Faden zur Schiene -->
+    <line x1="25" y1="0" x2="25" y2="14" class="k-string"/>
+    <!-- Anhänger -->
+    <rect x="9" y="14" width="32" height="40" class="k-tag" rx="3"/>
+    <!-- Loch oben -->
+    <circle cx="25" cy="20" r="2.5" class="k-hole"/>
+    <!-- Nummer -->
+    <text x="25" y="38" text-anchor="middle" class="k-num">{num}</text>
+    <!-- Kürzel -->
+    <text x="25" y="48" text-anchor="middle" class="k-label">{shortLabel}</text>
+    <!-- Schaft oben -->
+    <line x1="25" y1="54" x2="25" y2="62" class="k-shaft"/>
+    <!-- Ring -->
+    <circle cx="25" cy="68" r="5" class="k-ring"/>
+    <circle cx="25" cy="68" r="2" class="k-ring-dot"/>
+    <!-- Schaft unten -->
+    <line x1="25" y1="73" x2="25" y2="100" class="k-shaft"/>
+    <!-- Zähne -->
+    <rect x="25" y="92" width="5" height="2.5" class="k-tooth"/>
+    <rect x="25" y="97" width="4" height="2.5" class="k-tooth"/>
+  </svg>
+</div>
+
+<style>
+  .rack-key {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+    animation: keySway 4s ease-in-out infinite;
+    transform-origin: top center;
+  }
+  .rack-key svg { width: 100%; max-width: 64px; display: block; }
+
+  /* Hardware (theme-aware via CSS vars) */
+  .k-string { stroke: var(--ink); stroke-width: 0.6; opacity: 0.5; }
+  .k-shaft  { stroke: var(--ink); stroke-width: 0.8; }
+  .k-ring   { fill: none; stroke: var(--ink); stroke-width: 1.8; }
+  .k-tooth  { fill: var(--ink); }
+
+  /* Tag — todo */
+  .rack-key--todo .k-tag      { fill: var(--surface); stroke: var(--ink); stroke-width: 1; }
+  .rack-key--todo .k-hole     { fill: var(--bg-deep); stroke: var(--ink); stroke-width: 0.4; }
+  .rack-key--todo .k-num      { fill: var(--ink); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+  .rack-key--todo .k-label    { fill: var(--ink); opacity: 0.5; font-family: 'JetBrains Mono', monospace; font-size: 5px; letter-spacing: 0.06em; }
+  .rack-key--todo .k-ring-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 0.4; }
+
+  /* Tag — active */
+  .rack-key--active .k-tag      { fill: var(--te-yellow); stroke: var(--ink); stroke-width: 1; }
+  .rack-key--active .k-hole     { fill: #B8A100; stroke: var(--ink); stroke-width: 0.4; }
+  .rack-key--active .k-num      { fill: #0A0A0A; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+  .rack-key--active .k-label    { fill: #0A0A0A; opacity: 0.6; font-family: 'JetBrains Mono', monospace; font-size: 5px; letter-spacing: 0.06em; }
+  .rack-key--active .k-ring-dot { fill: var(--te-yellow); stroke: var(--ink); stroke-width: 0.4; }
+
+  /* Tag — done */
+  .rack-key--done .k-tag      { fill: var(--sage); stroke: var(--ink); stroke-width: 1; }
+  .rack-key--done .k-hole     { fill: var(--sage-strong); stroke: var(--ink); stroke-width: 0.4; }
+  .rack-key--done .k-num      { fill: white; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+  .rack-key--done .k-label    { fill: white; opacity: 0.6; font-family: 'JetBrains Mono', monospace; font-size: 5px; letter-spacing: 0.06em; }
+  .rack-key--done .k-ring-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 0.4; }
+</style>

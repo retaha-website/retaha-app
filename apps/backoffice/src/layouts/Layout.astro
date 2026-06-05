@@ -1,0 +1,77 @@
+---
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '../styles/global.css';
+import Header from '../components/header/Header.astro';
+import Footer from '../components/footer/Footer.astro';
+import { getUserProfileForLayout } from '../lib/auth/get-user-profile';
+
+interface Props {
+  title: string;
+  activeTab: 'gast' | 'backoffice' | 'dashboard';
+  hotelName?: string;
+  hotelLocation?: string;
+  hotelStars?: number;
+  hotelLogoUrl?: string | null;
+}
+
+const {
+  title,
+  activeTab,
+  hotelName,
+  hotelLocation,
+  hotelStars,
+  hotelLogoUrl,
+} = Astro.props;
+
+// User-Profil laden (für UserMenu im Header)
+const userProfile = await getUserProfileForLayout(Astro.cookies, Astro.request);
+
+if (!userProfile) {
+  const authUrl = import.meta.env.AUTH_APP_URL ?? 'https://auth.retaha.de';
+  return Astro.redirect(`${authUrl}/login`);
+}
+
+// Staff hat kein Backoffice-Zugriff
+if (userProfile.role === 'staff') {
+  return Astro.redirect('/admin/dashboard');
+}
+
+// Hotel-Daten: Props überschreiben Profil-Fallback
+const displayHotelName    = hotelName    ?? userProfile.hotel_name;
+const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProfile.hotel_logo_url;
+---
+
+<!DOCTYPE html>
+<html lang={userProfile.language} data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FAFAF8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · retaha</title>
+  </head>
+  <body>
+    <Header
+      activeTab={activeTab}
+      user={userProfile}
+      hotelName={displayHotelName}
+      hotelLocation={hotelLocation}
+      hotelStars={hotelStars}
+      hotelLogoUrl={displayHotelLogoUrl}
+    />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+
+    <script>
+      const stored = localStorage.getItem('v9-theme');
+      if (stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
+  </body>
+</html>
