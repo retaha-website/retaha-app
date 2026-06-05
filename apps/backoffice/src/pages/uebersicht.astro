@@ -18,15 +18,25 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-// setup_progress — graceful fallback wenn Spalte noch nicht existiert
+// setup_progress laden + automatisch auf 30 setzen wenn Hotel-Name vorhanden
 let rawProgress: number | null = null;
 try {
   const { data } = await supabase
     .from('hotels')
-    .select('setup_progress')
+    .select('setup_progress, name')
     .eq('id', hotel.id)
     .maybeSingle();
-  rawProgress = (data as { setup_progress?: number } | null)?.setup_progress ?? null;
+  rawProgress = (data as any)?.setup_progress ?? null;
+
+  // Pflichtfeld (Hotel-Name) gesetzt, aber Fortschritt noch unter 30?
+  // → automatisch auf 30 hochsetzen ohne dass der User nochmal speichern muss
+  const hotelName = (data as any)?.name;
+  if (hotelName && (rawProgress ?? 0) < 30) {
+    await supabase.from('hotels')
+      .update({ setup_progress: 30 })
+      .eq('id', hotel.id);
+    rawProgress = 30;
+  }
 } catch { /* Spalte existiert noch nicht — DB-Migration ausstehend */ }
 
 const stage = normalizeStage(rawProgress);
