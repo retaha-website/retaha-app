@@ -1,0 +1,58 @@
+---
+---
+
+<section class="settings-section">
+  <div class="settings-section__head">
+    <span class="settings-section__title">— Willkommenstext —</span>
+    <span class="settings-section__hint" id="welcomeCount">42 Zeichen</span>
+  </div>
+  <textarea
+    class="welcome-textarea"
+    id="welcomeTextarea"
+    maxlength="120"
+    placeholder="willkommen im the gate garden hotel"
+    aria-label="Willkommenstext für Gäste"
+  >willkommen im the gate garden hotel</textarea>
+  <p class="welcome-hint">Wird ganz oben im Gast-App angezeigt.</p>
+</section>
+
+<style>
+  .settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 24px 28px;
+  }
+  .settings-section__head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  }
+  .settings-section__title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase;
+  }
+  .settings-section__hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted);
+  }
+  .welcome-textarea {
+    width: 100%; min-height: 80px; padding: 12px 14px;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: var(--r-sm); resize: vertical;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--ink); line-height: 1.5; outline: none;
+    transition: border-color 200ms ease;
+  }
+  .welcome-textarea:focus { border-color: var(--ink); }
+  .welcome-hint { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted); margin-top: 8px; letter-spacing: 0.04em; }
+</style>
+
+<script>
+  import { updateState } from '../../../lib/gast-vorschau/state';
+  const textarea = document.getElementById('welcomeTextarea') as HTMLTextAreaElement;
+  const counter  = document.getElementById('welcomeCount');
+  function updateCount() {
+    if (counter) counter.textContent = `${textarea.value.length} / 120`;
+  }
+  updateCount();
+  textarea?.addEventListener('input', () => {
+    updateState({ welcomeText: textarea.value });
+    updateCount();
+  });
+</script>

@@ -1,0 +1,69 @@
+---
+import HomeScreen from './screens/HomeScreen.astro';
+import EveScreen from './screens/EveScreen.astro';
+import EmpfehlungenScreen from './screens/EmpfehlungenScreen.astro';
+import ServiceScreen from './screens/ServiceScreen.astro';
+import PhoneTabs from './PhoneTabs.astro';
+---
+
+<div class="phone-screen">
+  <!-- Status Bar -->
+  <div class="phone-screen__statusbar">
+    <span class="phone-screen__time">14:23</span>
+    <span class="phone-screen__icons" aria-hidden="true">
+      <svg viewBox="0 0 16 12" width="14" height="10">
+        <rect x="0" y="6" width="2" height="6" fill="currentColor"/>
+        <rect x="4" y="4" width="2" height="8" fill="currentColor"/>
+        <rect x="8" y="2" width="2" height="10" fill="currentColor"/>
+        <rect x="12" y="0" width="2" height="12" fill="currentColor"/>
+      </svg>
+      <svg viewBox="0 0 24 12" width="22" height="10">
+        <rect x="1" y="2" width="20" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="3" y="4" width="13" height="4" rx="1" fill="currentColor"/>
+        <rect x="22" y="4" width="1.5" height="4" rx="0.75" fill="currentColor"/>
+      </svg>
+    </span>
+  </div>
+
+  <!-- Screen Content -->
+  <div class="phone-screen__content">
+    <div data-screen="home"><HomeScreen /></div>
+    <div data-screen="eve" hidden><EveScreen /></div>
+    <div data-screen="empfehlungen" hidden><EmpfehlungenScreen /></div>
+    <div data-screen="service" hidden><ServiceScreen /></div>
+  </div>
+
+  <PhoneTabs />
+</div>
+
+<style>
+  .phone-screen {
+    width: 100%; height: 100%;
+    background: white;
+    display: flex; flex-direction: column;
+    color: #0A0A0A;
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  .phone-screen__statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px 8px;
+    font-size: 13px; font-weight: 500; color: #0A0A0A;
+    flex-shrink: 0;
+  }
+  .phone-screen__icons { display: inline-flex; gap: 6px; align-items: center; }
+  .phone-screen__content {
+    flex: 1; overflow-y: auto; padding: 12px 20px 8px;
+    scrollbar-width: none;
+  }
+  .phone-screen__content::-webkit-scrollbar { display: none; }
+</style>
+
+<script>
+  import { subscribe } from '../../lib/gast-vorschau/state';
+  subscribe(state => {
+    document.querySelectorAll<HTMLElement>('[data-screen]').forEach(el => {
+      el.hidden = el.dataset.screen !== state.view;
+    });
+  });
+</script>

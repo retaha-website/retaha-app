@@ -1,0 +1,66 @@
+---
+import type { NfcTag } from '../../lib/gast-vorschau/demo-data';
+interface Props { tags: NfcTag[] }
+const { tags } = Astro.props;
+---
+
+<div class="tag-picker">
+  <span class="tag-picker__label">— Szene wählen —</span>
+  <div class="tag-picker__pills">
+    {tags.map((tag, i) => (
+      <button
+        class:list={['tag-pill', { 'is-active': i === 0 }]}
+        data-scene={tag.id}
+        aria-pressed={i === 0 ? 'true' : 'false'}
+        type="button"
+      >
+        <span class="tag-pill__dot" aria-hidden="true"></span>
+        <span>{tag.label}</span>
+      </button>
+    ))}
+  </div>
+</div>
+
+<style>
+  .tag-picker { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
+  .tag-picker__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em;
+    color: var(--ink-muted); text-transform: uppercase;
+  }
+  .tag-picker__pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .tag-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-muted);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 99px; cursor: pointer;
+    transition: all 200ms ease;
+  }
+  .tag-pill:hover { background: var(--te-yellow-soft); color: var(--ink); border-color: var(--ink-faint); }
+  .tag-pill.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tag-pill__dot {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.35;
+  }
+  .tag-pill.is-active .tag-pill__dot {
+    background: var(--te-yellow); opacity: 1;
+    box-shadow: 0 0 0 3px rgba(255,230,0,0.3);
+    animation: led-pulse 2s ease-in-out infinite;
+  }
+</style>
+
+<script>
+  import { updateState } from '../../lib/gast-vorschau/state';
+  document.querySelectorAll<HTMLButtonElement>('.tag-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const scene = pill.dataset.scene as any;
+      if (!scene) return;
+      document.querySelectorAll('.tag-pill').forEach(p => { p.classList.remove('is-active'); p.setAttribute('aria-pressed','false'); });
+      pill.classList.add('is-active');
+      pill.setAttribute('aria-pressed','true');
+      updateState({ scene });
+    });
+  });
+</script>
