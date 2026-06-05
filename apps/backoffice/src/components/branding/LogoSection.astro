@@ -38,12 +38,10 @@ const slots = [
             )}
             <input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key={slot.key} />
           </div>
-          {url && (
-            <div class="logo-slot__actions">
-              <button class="logo-slot__btn" data-action="replace" data-key={slot.key} type="button">Ersetzen</button>
-              <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key={slot.key} type="button">Entfernen</button>
-            </div>
-          )}
+          <div class="logo-slot__actions" hidden={!url || undefined}>
+            <button class="logo-slot__btn" data-action="replace" data-key={slot.key} type="button">Ersetzen</button>
+            <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key={slot.key} type="button">Entfernen</button>
+          </div>
         </div>
       );
     })}
@@ -178,16 +176,12 @@ const slots = [
         if (previewName) previewName.style.display = 'none';
       }
 
-      // Show actions row
+      // Buttons sind immer im HTML — einfach einblenden
       const slot = input.closest('.logo-slot') as HTMLElement;
-      if (!slot.querySelector('.logo-slot__actions')) {
-        const actions = document.createElement('div');
-        actions.className = 'logo-slot__actions';
-        actions.innerHTML = `
-          <button class="logo-slot__btn" data-action="replace" data-key="${key}" type="button">Ersetzen</button>
-          <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key="${key}" type="button">Entfernen</button>`;
-        slot.appendChild(actions);
-        bindActionButtons(actions);
+      const actions = slot.querySelector<HTMLElement>('.logo-slot__actions');
+      if (actions) {
+        actions.hidden = false;
+        actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
       }
     });
   });
@@ -212,7 +206,9 @@ const slots = [
           if (res.ok) {
             drop.innerHTML = `<div class="logo-slot__empty"><span class="logo-slot__plus">+</span><span class="logo-slot__cta">Ablegen oder klicken</span></div><input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key="${key}" />`;
             drop.classList.remove('has-image');
-            btn.closest('.logo-slot__actions')?.remove();
+            const actions = slot.querySelector<HTMLElement>('.logo-slot__actions');
+            if (actions) actions.hidden = true;
+            bindActionButtons(slot.querySelector('.logo-slot__actions')!);
           }
         }
       });
