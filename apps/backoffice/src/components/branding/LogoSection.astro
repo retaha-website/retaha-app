@@ -1,0 +1,224 @@
+---
+import BrandSection from './BrandSection.astro';
+import type { BrandingData } from '../../lib/branding/get-branding';
+
+interface Props { branding: BrandingData; }
+const { branding } = Astro.props;
+
+const slots = [
+  { key: 'logo_primary',  label: 'Primary',         hint: 'Wort + Symbol · Header, E-Mails', bg: 'light', required: true  },
+  { key: 'logo_icon',     label: 'Icon Only',        hint: 'Symbol · Favicon, App-Icon, Wallet', bg: 'light' },
+  { key: 'logo_wordmark', label: 'Wordmark Only',    hint: 'Nur Text · Footer, Briefkopf', bg: 'light' },
+  { key: 'logo_dark',     label: 'Dark Variant',     hint: 'Für dunkle Hintergründe', bg: 'dark' },
+  { key: 'logo_print',    label: 'Print Version',    hint: 'Hochauflösend · NFC-Karten, Drucksachen', bg: 'light', optional: true },
+];
+---
+
+<BrandSection title="Logo" num="01">
+  <div class="logo-grid">
+    {slots.map(slot => {
+      const url = branding[slot.key as keyof BrandingData] as string | null;
+      return (
+        <div class="logo-slot" data-key={slot.key}>
+          <div class="logo-slot__head">
+            <span class="logo-slot__label">
+              {slot.label}
+              {slot.required && <span class="req">*</span>}
+              {slot.optional && <span class="opt">opt.</span>}
+            </span>
+            <span class="logo-slot__hint">{slot.hint}</span>
+          </div>
+          <div class={`logo-slot__drop ${url ? 'has-image' : ''}`} data-bg={slot.bg}>
+            {url ? (
+              <img src={url} alt={`Logo ${slot.label}`} class="logo-slot__img" />
+            ) : (
+              <div class="logo-slot__empty">
+                <span class="logo-slot__plus">+</span>
+                <span class="logo-slot__cta">Ablegen oder klicken</span>
+                <span class="logo-slot__fmt">SVG · PNG</span>
+              </div>
+            )}
+            <input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key={slot.key} />
+          </div>
+          {url && (
+            <div class="logo-slot__actions">
+              <button class="logo-slot__btn" data-action="replace" data-key={slot.key} type="button">Ersetzen</button>
+              <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key={slot.key} type="button">Entfernen</button>
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+
+  <div class="logo-spacing">
+    <span class="spacing-label">Logo-Mindestabstand</span>
+    <div class="radio-cards" id="spacingCards">
+      {(['tight','normal','loose'] as const).map(v => (
+        <button class={`radio-card ${branding.logo_spacing === v ? 'is-active' : ''}`}
+          data-value={v} type="button">
+          {v === 'tight' ? 'Eng (8px)' : v === 'normal' ? 'Normal (16px)' : 'Weit (24px)'}
+        </button>
+      ))}
+    </div>
+  </div>
+</BrandSection>
+
+<style>
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .logo-slot { display: flex; flex-direction: column; gap: 8px; }
+  .logo-slot__head { display: flex; flex-direction: column; gap: 2px; }
+  .logo-slot__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; color: var(--ink); font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .req { color: var(--pink); }
+  .opt { font-size: 9px; color: var(--ink-faint); }
+  .logo-slot__hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.06em; color: var(--ink-muted);
+  }
+  .logo-slot__drop {
+    position: relative; aspect-ratio: 16/10;
+    background: var(--surface); border: 1px dashed var(--border-medium);
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 200ms ease; overflow: hidden;
+  }
+  .logo-slot__drop[data-bg="dark"] { background: #0A0A0A; }
+  .logo-slot__drop:hover { background: var(--te-yellow-soft); border-color: var(--ink); }
+  .logo-slot__drop[data-bg="dark"]:hover { background: #1A1A1A; border-color: var(--ink-muted); }
+  .logo-slot__drop.has-image { border-style: solid; border-color: var(--sage); }
+  .logo-slot__img { max-width: 80%; max-height: 80%; object-fit: contain; }
+  .logo-slot__empty {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .logo-slot__plus { font-size: 22px; font-weight: 300; color: var(--ink-faint); line-height: 1; }
+  .logo-slot__cta { font-family: 'Space Grotesk', sans-serif; font-size: 11px; color: var(--ink-soft); }
+  .logo-slot__fmt {
+    font-family: 'JetBrains Mono', monospace; font-size: 8px;
+    letter-spacing: 0.14em; color: var(--ink-faint); text-transform: uppercase;
+  }
+  .logo-slot__input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .logo-slot__actions { display: flex; gap: 6px; }
+  .logo-slot__btn {
+    flex: 1; padding: 6px 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer; transition: all 150ms ease;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.08em; color: var(--ink-soft);
+  }
+  .logo-slot__btn:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .logo-slot__btn--del:hover { background: var(--burgund-soft); color: var(--burgund); border-color: var(--burgund); }
+
+  .logo-spacing { padding-top: 20px; border-top: 1px solid var(--border); }
+  .spacing-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-muted); display: block; margin-bottom: 10px;
+  }
+  .radio-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio-card {
+    padding: 8px 16px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border-medium);
+    border-radius: var(--r-sm); transition: all 150ms ease;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500;
+    color: var(--ink-soft);
+  }
+  .radio-card:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .radio-card.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+</style>
+
+<script>
+  // Logo Upload
+  document.querySelectorAll<HTMLInputElement>('.logo-slot__input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const key = input.dataset.key!;
+      const drop = input.closest('.logo-slot__drop') as HTMLElement;
+
+      // Optimistic preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        drop.innerHTML = `<img src="${reader.result}" class="logo-slot__img" alt="" />`;
+        drop.classList.add('has-image');
+      };
+      reader.readAsDataURL(file);
+
+      const fd = new FormData();
+      fd.append('key', key);
+      fd.append('file', file);
+
+      const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (!res.ok) { alert(`Upload fehlgeschlagen: ${json.error}`); return; }
+
+      // Update mini-preview logo if primary
+      if (key === 'logo_primary') {
+        const previewLogo = document.getElementById('previewLogo') as HTMLImageElement | null;
+        if (previewLogo) { previewLogo.src = json.url; previewLogo.style.display = 'block'; }
+        const previewName = document.getElementById('previewName');
+        if (previewName) previewName.style.display = 'none';
+      }
+
+      // Show actions row
+      const slot = input.closest('.logo-slot') as HTMLElement;
+      if (!slot.querySelector('.logo-slot__actions')) {
+        const actions = document.createElement('div');
+        actions.className = 'logo-slot__actions';
+        actions.innerHTML = `
+          <button class="logo-slot__btn" data-action="replace" data-key="${key}" type="button">Ersetzen</button>
+          <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key="${key}" type="button">Entfernen</button>`;
+        slot.appendChild(actions);
+        bindActionButtons(actions);
+      }
+    });
+  });
+
+  function bindActionButtons(container: HTMLElement) {
+    container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const key = btn.dataset.key!;
+        const action = btn.dataset.action!;
+        const slot = btn.closest('.logo-slot') as HTMLElement;
+        const drop = slot.querySelector('.logo-slot__drop') as HTMLElement;
+
+        if (action === 'replace') {
+          const input = slot.querySelector<HTMLInputElement>('.logo-slot__input');
+          input?.click();
+        } else if (action === 'delete') {
+          if (!confirm('Logo entfernen?')) return;
+          const fd = new FormData();
+          fd.append('key', key);
+          fd.append('delete', 'true');
+          const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+          if (res.ok) {
+            drop.innerHTML = `<div class="logo-slot__empty"><span class="logo-slot__plus">+</span><span class="logo-slot__cta">Ablegen oder klicken</span></div><input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key="${key}" />`;
+            drop.classList.remove('has-image');
+            btn.closest('.logo-slot__actions')?.remove();
+          }
+        }
+      });
+    });
+  }
+  document.querySelectorAll<HTMLElement>('.logo-slot__actions').forEach(bindActionButtons);
+
+  // Spacing Radio-Cards
+  const spacingCards = document.querySelectorAll<HTMLButtonElement>('#spacingCards .radio-card');
+  spacingCards.forEach(card => {
+    card.addEventListener('click', async () => {
+      spacingCards.forEach(c => c.classList.remove('is-active'));
+      card.classList.add('is-active');
+      const fd = new FormData();
+      fd.append('_action', 'spacing');
+      fd.append('logo_spacing', card.dataset.value!);
+      await fetch('/branding', { method: 'POST', body: fd });
+    });
+  });
+</script>

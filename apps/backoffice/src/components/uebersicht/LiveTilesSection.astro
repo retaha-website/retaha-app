@@ -1,0 +1,79 @@
+---
+import LiveTile from './LiveTile.astro';
+import type { LiveTileData } from '../../lib/uebersicht/live-data';
+
+interface Props {
+  tiles: LiveTileData[];
+}
+const { tiles } = Astro.props;
+
+const now = new Date();
+const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+---
+
+<section class="live-section">
+  <div class="live__head">
+    <span class="live__label">— Live · aus deinem Hotel —</span>
+    <span class="live__time">Aktuell · {timeStr}</span>
+  </div>
+  <div class="live-tiles">
+    {tiles.map(tile => (
+      <LiveTile tile={tile} />
+    ))}
+  </div>
+</section>
+
+<style>
+  .live-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px 64px;
+  }
+  @media (max-width: 768px) { .live-section { padding: 0 20px 48px; } }
+
+  .live__head {
+    padding: 16px 0;
+    margin-bottom: 24px;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .live__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .live__time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .live__time::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sage);
+    box-shadow: 0 0 6px var(--sage);
+    animation: led-pulse 2s ease-in-out infinite;
+  }
+
+  .live-tiles {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 1000px) { .live-tiles { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width:  600px) { .live-tiles { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width:  380px) { .live-tiles { grid-template-columns: 1fr; } }
+</style>

@@ -14,27 +14,25 @@
  */
 
 import {
-  createSupabaseServerInstance,
-  createSupabaseServiceRoleInstance,
+  getUser,
   getUserHotels,
+  createSupabaseServiceRoleInstance,
 } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
 import AdminLayout from '../../components/AdminLayout.astro';
 import BauhausToggle from '@retaha/ui/components/admin/BauhausToggle.astro';
+import TrianglePulse from '@retaha/ui/components/TrianglePulse.astro';
 
-const supabase = createSupabaseServerInstance(Astro.cookies);
-const { data: userRes } = await supabase.auth.getUser();
-if (!userRes?.user) return Astro.redirect('/admin/login');
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
 
-const user = userRes.user;
-const hotels = await getUserHotels(supabase, user.id);
-const ownerHotel = hotels.find(
-  (h: { id: string; role?: string }) => h.role === 'owner',
-);
-if (!ownerHotel) {
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const ownerEntry = hotels?.find(h => h.role === 'owner');
+if (!ownerEntry) {
   // Nicht-Owner -> zu eigenem Sicherheits-Setup
   return Astro.redirect('/admin/sicherheit');
 }
+const ownerHotel = ownerEntry.hotel;
 
 const service = createSupabaseServiceRoleInstance();
 const [userMfa, hotelPolicy] = await Promise.all([
@@ -84,7 +82,7 @@ const magicLinkMfa = userMfa?.requireOnMagicLink ?? false;
 const teamRequired = hotelPolicy?.required ?? false;
 ---
 
-<AdminLayout title="Sicherheit · Zwei-Faktor" user={user}>
+<AdminLayout title="Sicherheit · Zwei-Faktor" user={user} hotel={ownerHotel}>
 
   <main class="admin-shell" x-data={`{
     hotelId: ${JSON.stringify(ownerHotel.id)},
@@ -268,7 +266,7 @@ const teamRequired = hotelPolicy?.required ?? false;
 
     <!-- ENFORCEMENT-BANNER -->
     <aside class="enforcement-banner" x-show="teamRequired && pendingCount > 0" x-cloak>
-      <span class="enforcement-banner__triangle" aria-hidden="true"></span>
+      <TrianglePulse variant="white" motion="infinite" label="Aufmerksamkeit erforderlich" class="enforcement-banner__icon" />
       <div class="enforcement-banner__content">
         <p class="enforcement-banner__title">— hinweis · team-pflicht aktiv —</p>
         <p class="enforcement-banner__text">
@@ -503,22 +501,9 @@ const teamRequired = hotelPolicy?.required ?? false;
       border-radius: var(--radius);
       margin-top: 48px;
     }
-    .enforcement-banner__triangle {
+    .enforcement-banner__icon {
+      margin-top: 7px;
       flex-shrink: 0;
-      width: 0; height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-bottom: 12px solid var(--color-pink-shock);
-      margin-top: 8px;
-      animation: bannerTrianglePulse 2s ease-in-out;
-      animation-iteration-count: 3;
-    }
-    @keyframes bannerTrianglePulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.15); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .enforcement-banner__triangle { animation: none; }
     }
     .enforcement-banner__content { flex: 1; }
     .enforcement-banner__title {

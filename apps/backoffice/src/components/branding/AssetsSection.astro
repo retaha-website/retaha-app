@@ -1,0 +1,92 @@
+---
+import BrandSection from './BrandSection.astro';
+import type { BrandingData } from '../../lib/branding/get-branding';
+
+interface Props { branding: BrandingData; }
+const { branding } = Astro.props;
+
+const assets = [
+  { key: 'splash_background', label: 'Welcome-Hintergrund',  hint: 'Splash-Screen · Gäste-App Start', ratio: '9/16' },
+  { key: 'wallet_pass_bg',    label: 'Wallet-Pass Hintergrund', hint: 'Apple / Google Wallet-Karten', ratio: '16/9' },
+  { key: 'email_header',      label: 'E-Mail-Header',         hint: 'Welcome-Mail, Buchungsbestätigung', ratio: '3/1' },
+];
+---
+
+<BrandSection title="Brand-Assets" num="04" optional>
+  <div class="asset-grid">
+    {assets.map(a => {
+      const url = branding[a.key as keyof BrandingData] as string | null;
+      return (
+        <div class="asset-slot">
+          <div class="asset-slot__head">
+            <span class="asset-slot__label">{a.label}</span>
+            <span class="asset-slot__hint">{a.hint}</span>
+          </div>
+          <div class="asset-slot__drop" style={`aspect-ratio:${a.ratio}`} data-key={a.key}>
+            {url
+              ? <img src={url} class="asset-slot__img" alt="" />
+              : <span class="asset-slot__cta">+ Datei ablegen</span>
+            }
+            <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key={a.key} />
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</BrandSection>
+
+<style>
+  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .asset-slot { display: flex; flex-direction: column; gap: 8px; }
+  .asset-slot__head { display: flex; flex-direction: column; gap: 2px; }
+  .asset-slot__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; color: var(--ink); font-weight: 500;
+  }
+  .asset-slot__hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.06em; color: var(--ink-muted);
+  }
+  .asset-slot__drop {
+    position: relative; background: var(--bg-deep);
+    border: 1px dashed var(--border-medium); border-radius: var(--r-sm);
+    overflow: hidden; cursor: pointer; transition: all 200ms;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .asset-slot__drop:hover { background: var(--te-yellow-soft); border-color: var(--ink); }
+  .asset-slot__drop.has-image { border-style: solid; border-color: var(--sage); }
+  .asset-slot__img { width: 100%; height: 100%; object-fit: cover; }
+  .asset-slot__cta {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.06em; color: var(--ink-muted);
+  }
+  .asset-slot__input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLInputElement>('.asset-slot__input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const key = input.dataset.key!;
+      const drop = input.closest('.asset-slot__drop') as HTMLElement;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        drop.innerHTML = `<img src="${reader.result}" class="asset-slot__img" alt="" />
+          <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
+        drop.classList.add('has-image');
+      };
+      reader.readAsDataURL(file);
+
+      const fd = new FormData();
+      fd.append('key', key);
+      fd.append('file', file);
+      const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const j = await res.json();
+        alert(`Upload fehlgeschlagen: ${j.error}`);
+      }
+    });
+  });
+</script>

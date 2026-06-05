@@ -1,0 +1,50 @@
+---
+import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
+import type { GuestTheme } from '@retaha/ui-guest/types';
+import { getBranding } from '../../lib/branding/get-branding';
+import { getUser, getUserHotels } from '@retaha/auth';
+import { mapThemeName } from '@retaha/ui-guest/types';
+
+const user  = await getUser(Astro.cookies, Astro.request);
+const hotels = user ? await getUserHotels(Astro.cookies, Astro.request) : null;
+const hotel  = hotels?.[0]?.hotel;
+const branding = hotel ? await getBranding(Astro.cookies, Astro.request) : null;
+
+const theme: GuestTheme = {
+  primary:        branding?.brand_primary   ?? '#FF4A82',
+  secondary:      branding?.brand_secondary ?? undefined,
+  themeName:      (branding?.brand_theme    ?? 'coffee') as GuestTheme['themeName'],
+  guestThemeName: mapThemeName(branding?.brand_theme ?? 'coffee'),
+  designIdentity: branding?.design_identity ?? 'classic',
+  logoUrl:        branding?.logo_primary    ?? null,
+  logoDarkUrl:    branding?.logo_dark       ?? null,
+  hotelName:      hotel?.name               ?? 'Hotel',
+  eveName:        'Eve',
+};
+---
+
+<GuestPhoneView
+  theme={theme}
+  previewMode={true}
+/>
+
+<script>
+  import { subscribe } from '../../lib/gast-vorschau/state';
+
+  // Brücke: WelcomeSection-State → GuestPhoneView welcome text
+  subscribe(state => {
+    // Willkommenstext im HomeScreen aktualisieren
+    document.querySelectorAll<HTMLElement>('[data-screen="home"] .gate-hero-sub').forEach(el => {
+      el.textContent = state.welcomeText;
+    });
+
+    // Module toggles — Tabs ein-/ausblenden
+    const tabs = document.querySelectorAll<HTMLButtonElement>('.gp-tab');
+    tabs.forEach(tab => {
+      const key = tab.dataset.tab;
+      if (key === 'eve')     tab.style.opacity = state.modules.eve           ? '1' : '0.3';
+      if (key === 'tipps')   tab.style.opacity = state.modules.empfehlungen  ? '1' : '0.3';
+      if (key === 'service') tab.style.opacity = state.modules.service       ? '1' : '0.3';
+    });
+  });
+</script>

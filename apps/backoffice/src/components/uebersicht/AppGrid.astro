@@ -1,0 +1,92 @@
+---
+import AppTile from './AppTile.astro';
+import { APPS } from '../../lib/uebersicht/apps-data';
+import { getAppStatus, getDoneCount, type Stage } from '../../lib/uebersicht/setup-stage';
+
+interface Props {
+  stage: Stage;
+}
+
+const { stage } = Astro.props;
+const done = getDoneCount(stage);
+const open = 7 - done;
+---
+
+<section class="apps-section">
+  <div class="apps__head">
+    <span class="apps__label">— Deine Apps · 07 Bereiche —</span>
+    <div class="apps__counts">
+      {open > 0 && (
+        <span class="count-badge count-badge--open">{open} offen</span>
+      )}
+      {done > 0 && (
+        <span class="count-badge count-badge--done">{done} erledigt</span>
+      )}
+    </div>
+  </div>
+  <div class="apps-grid">
+    {APPS.map(app => (
+      <AppTile app={app} status={getAppStatus(app, stage)} />
+    ))}
+  </div>
+</section>
+
+<style>
+  .apps-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+  @media (max-width: 768px) { .apps-section { padding: 32px 20px 64px; } }
+
+  .apps__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    margin-bottom: 24px;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .apps__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .apps__counts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    border-radius: 99px;
+    text-transform: uppercase;
+  }
+  .count-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .count-badge--open { background: var(--te-yellow); color: #0A0A0A; }
+  .count-badge--done { background: var(--sage); color: white; }
+
+  .apps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 1000px) { .apps-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; } }
+  @media (max-width:  700px) { .apps-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } }
+  @media (max-width:  400px) { .apps-grid { grid-template-columns: 1fr; } }
+</style>

@@ -1,0 +1,220 @@
+---
+import BrandSection from './BrandSection.astro';
+import type { BrandingData } from '../../lib/branding/get-branding';
+
+interface Props { branding: BrandingData; }
+const { branding } = Astro.props;
+
+const primary   = branding.brand_primary   ?? '#FF4A82';
+const secondary = branding.brand_secondary ?? '';
+---
+
+<BrandSection title="Brand-Farben" num="02">
+  <form method="POST" id="colorsForm">
+    <input type="hidden" name="_action" value="colors" />
+
+    <!-- Primary -->
+    <div class="field field--row">
+      <label class="field__label req" for="brand-primary">Primärfarbe *</label>
+      <div class="color-row">
+        <div class="color-swatch" id="primarySwatch" style={`background:${primary}`}></div>
+        <input type="text" id="brand-primary" name="brand_primary" class="s-input color-hex"
+          value={primary} placeholder="#FF4A82" maxlength="7" data-swatch="primarySwatch" />
+        <input type="color" class="color-picker" value={primary}
+          data-target="brand-primary" data-swatch="primarySwatch" aria-label="Farbwähler Primärfarbe" />
+      </div>
+    </div>
+    <p class="field__hint">Hauptakzentfarbe der Gäste-App (CTAs, Eve-Chat, Action-Karten)</p>
+
+    <!-- Secondary -->
+    <div class="field field--row">
+      <label class="field__label" for="brand-secondary">Sekundärfarbe</label>
+      <div class="color-row">
+        <div class="color-swatch" id="secondarySwatch" style={`background:${secondary || '#8C2128'}`}></div>
+        <input type="text" id="brand-secondary" name="brand_secondary" class="s-input color-hex"
+          value={secondary} placeholder="Optional · #8C2128" maxlength="7" data-swatch="secondarySwatch" />
+        <input type="color" class="color-picker" value={secondary || '#8C2128'}
+          data-target="brand-secondary" data-swatch="secondarySwatch" aria-label="Farbwähler Sekundärfarbe" />
+      </div>
+    </div>
+
+    <!-- Kontrast-Info -->
+    <div class="contrast-box" id="contrastBox">
+      <div class="contrast-row">
+        <span class="contrast-label">Kontrast auf Weiß</span>
+        <span class="contrast-badge" id="contrastWhite">—</span>
+      </div>
+      <div class="contrast-row">
+        <span class="contrast-label">Kontrast auf Schwarz</span>
+        <span class="contrast-badge" id="contrastBlack">—</span>
+      </div>
+    </div>
+
+    <!-- Auto-Varianten -->
+    <div class="variants">
+      <span class="variants__label">Auto-Varianten</span>
+      <div class="variant-grid" id="variantGrid">
+        {[['10%','Hover-Tint','1A'],['25%','Weich','40'],['60%','Gedimmt','99'],['100%','Primär','FF']].map(([pct, hint]) => (
+          <div class="variant-chip variant-chip--auto">
+            <span class="variant-chip__pct">{pct}</span>
+            <span class="variant-chip__hint">{hint}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="s-card__footer">
+      <button type="submit" class="s-btn">Speichern</button>
+    </div>
+  </form>
+</BrandSection>
+
+<style>
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field--row {
+    display: grid; grid-template-columns: minmax(140px, 200px) 1fr;
+    gap: 20px; align-items: center;
+  }
+  @media (max-width: 600px) { .field--row { grid-template-columns: 1fr; } }
+  .field__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; font-weight: 500; color: var(--ink);
+  }
+  .field__label.req::after { content: ' *'; color: var(--pink); }
+  .field__hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--ink-muted); letter-spacing: 0.04em; margin-top: -8px;
+  }
+  .color-row { display: flex; align-items: center; gap: 10px; }
+  .color-swatch {
+    width: 36px; height: 36px; border-radius: var(--r-sm);
+    border: 1px solid var(--border); flex-shrink: 0; transition: background 200ms;
+  }
+  .s-input {
+    background: var(--surface); border: 1px solid var(--border-medium);
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: var(--ink); transition: all 150ms; flex: 1;
+  }
+  .s-input:focus { outline: none; border-color: var(--ink); background: var(--te-yellow-soft); }
+  .color-picker {
+    width: 36px; height: 36px; border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer; flex-shrink: 0;
+    padding: 2px;
+  }
+  .contrast-box {
+    background: var(--bg-deep); border-radius: var(--r-sm);
+    padding: 14px 18px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .contrast-row { display: flex; align-items: center; justify-content: space-between; }
+  .contrast-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; color: var(--ink-muted); text-transform: uppercase;
+  }
+  .contrast-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    padding: 3px 10px; border-radius: 99px; letter-spacing: 0.08em;
+    background: var(--bg-deep); color: var(--ink-muted); border: 1px solid var(--border);
+  }
+  .contrast-badge.ok  { background: var(--sage-soft); color: var(--sage-strong); border-color: var(--sage); }
+  .contrast-badge.warn { background: var(--te-yellow-soft); color: var(--ink); border-color: var(--te-yellow); }
+  .contrast-badge.fail { background: var(--burgund-soft); color: var(--burgund); border-color: var(--burgund); }
+  .variants { margin-top: 4px; }
+  .variants__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
+    display: block; margin-bottom: 10px;
+  }
+  .variant-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .variant-chip {
+    aspect-ratio: 1.4; border-radius: var(--r-sm); padding: 10px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    border: 1px solid var(--border);
+  }
+  .variant-chip__pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; color: var(--ink); }
+  .variant-chip__hint { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); }
+  .s-card__footer { margin-top: 8px; display: flex; justify-content: flex-end; }
+  .s-btn {
+    background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
+    border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.14em; cursor: pointer; transition: all 200ms;
+  }
+  .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
+</style>
+
+<script>
+  // Hex → swatch sync
+  function hexToRgb(hex: string) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return { r, g, b };
+  }
+  function relativeLuminance({ r, g, b }: {r:number,g:number,b:number}) {
+    const sRGB = [r,g,b].map(c => { const s = c/255; return s <= 0.03928 ? s/12.92 : Math.pow((s+0.055)/1.055,2.4); });
+    return 0.2126*sRGB[0] + 0.7152*sRGB[1] + 0.0722*sRGB[2];
+  }
+  function contrastRatio(hex: string, bg: 'white'|'black') {
+    const fg = relativeLuminance(hexToRgb(hex));
+    const bg2 = bg === 'white' ? 1 : 0;
+    const [l1,l2] = fg > bg2 ? [fg,bg2] : [bg2,fg];
+    return (l1+0.05)/(l2+0.05);
+  }
+  function contrastLabel(ratio: number) {
+    if (ratio >= 7)  return { text: `AAA · ${ratio.toFixed(1)}:1`, cls: 'ok' };
+    if (ratio >= 4.5) return { text: `AA · ${ratio.toFixed(1)}:1`, cls: 'ok' };
+    if (ratio >= 3)   return { text: `AA Large · ${ratio.toFixed(1)}:1`, cls: 'warn' };
+    return { text: `Fail · ${ratio.toFixed(1)}:1`, cls: 'fail' };
+  }
+
+  function updateContrast(hex: string) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+    const cw = contrastLabel(contrastRatio(hex,'white'));
+    const cb = contrastLabel(contrastRatio(hex,'black'));
+    const wEl = document.getElementById('contrastWhite')!;
+    const bEl = document.getElementById('contrastBlack')!;
+    wEl.textContent = cw.text; wEl.className = `contrast-badge ${cw.cls}`;
+    bEl.textContent = cb.text; bEl.className = `contrast-badge ${cb.cls}`;
+  }
+
+  function updateVariants(hex: string) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+    const chips = document.querySelectorAll('.variant-chip--auto');
+    const alphas = ['1A','40','99','FF'];
+    chips.forEach((chip, i) => {
+      (chip as HTMLElement).style.background = `${hex}${alphas[i]}`;
+    });
+  }
+
+  function syncColor(hexInput: HTMLInputElement) {
+    const hex = hexInput.value.trim();
+    const swatchId = hexInput.dataset.swatch!;
+    const swatch = document.getElementById(swatchId);
+    if (swatch && /^#[0-9A-Fa-f]{6}$/.test(hex)) {
+      swatch.style.background = hex;
+    }
+    if (hexInput.id === 'brand-primary') {
+      updateContrast(hex);
+      updateVariants(hex);
+      // Update mini-preview CTA color
+      const cta = document.getElementById('previewCta') as HTMLElement | null;
+      if (cta && /^#[0-9A-Fa-f]{6}$/.test(hex)) cta.style.background = hex;
+    }
+  }
+
+  document.querySelectorAll<HTMLInputElement>('.color-hex').forEach(input => {
+    input.addEventListener('input', () => syncColor(input));
+    syncColor(input);
+  });
+
+  document.querySelectorAll<HTMLInputElement>('.color-picker').forEach(picker => {
+    picker.addEventListener('input', () => {
+      const targetId = picker.dataset.target!;
+      const hex = picker.value;
+      const textInput = document.getElementById(targetId) as HTMLInputElement;
+      if (textInput) { textInput.value = hex; syncColor(textInput); }
+    });
+  });
+
+  // Initial contrast calculation
+  const primaryInput = document.getElementById('brand-primary') as HTMLInputElement;
+  if (primaryInput) updateContrast(primaryInput.value);
+</script>

@@ -19,19 +19,22 @@
  * Sprint-J-Backlog: PDF-Download (pdf-lib), Email an User nach Setup-Complete.
  */
 
-import { createSupabaseServerInstance } from '@retaha/auth';
+import { getUser, getUserHotels } from '@retaha/auth';
 import AdminLayout from '../../components/AdminLayout.astro';
+import TrianglePulse from '@retaha/ui/components/TrianglePulse.astro';
 
-const supabase = createSupabaseServerInstance(Astro.cookies);
-const { data: userRes } = await supabase.auth.getUser();
-if (!userRes?.user) return Astro.redirect('/admin/login');
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 // ?required=true wenn von Team-Pflicht-Redirect kommend
-const url = new URL(Astro.request.url);
-const isRequired = url.searchParams.get('required') === 'true';
+const isRequired = Astro.url.searchParams.get('required') === 'true';
 ---
 
-<AdminLayout title="Zwei-Faktor-Authentifizierung" user={userRes.user}>
+<AdminLayout title="Zwei-Faktor-Authentifizierung" user={user} hotel={hotel}>
 
   <main class="admin-shell" x-data={`{
     step: 1,
@@ -307,9 +310,9 @@ const isRequired = url.searchParams.get('required') === 'true';
     <section class="step-panel" x-show="step === 4" x-cloak>
 
       <div class="setup-complete">
-        <div class="setup-complete__triangle">
-          <span class="shape-triangle" aria-hidden="true"></span>
-          <span class="setup-complete__label">— erfolgreich aktiviert —</span>
+        <div class="setup-complete__indicator">
+          <TrianglePulse variant="sage" motion="once" label="Setup erfolgreich abgeschlossen" />
+          <span class="setup-complete__label">erfolgreich aktiviert</span>
         </div>
       </div>
 
@@ -575,33 +578,13 @@ const isRequired = url.searchParams.get('required') === 'true';
 
     /* STEP 4 — Recovery */
     .setup-complete { text-align: center; padding: 32px 0; }
-    .setup-complete__triangle {
-      display: inline-flex; align-items: center; gap: 16px;
+    .setup-complete__indicator {
+      display: inline-flex; align-items: center; gap: 12px;
       margin-bottom: 24px;
-      animation: triangleFadeIn 700ms var(--ease-out-expo);
-    }
-    @keyframes triangleFadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .setup-complete__triangle .shape-triangle {
-      width: 0; height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-bottom: 12px solid var(--color-sage);
-      animation: pulse-tri 2s ease-in-out;
-      animation-iteration-count: 3;
-    }
-    @keyframes pulse-tri {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.15); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .setup-complete__triangle .shape-triangle { animation: none; }
     }
     .setup-complete__label {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
       color: var(--color-sage);
     }
 

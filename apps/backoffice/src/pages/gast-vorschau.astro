@@ -1,0 +1,78 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PhonePreview from '../components/gast-vorschau/PhonePreview.astro';
+import SettingsPanel from '../components/gast-vorschau/settings/SettingsPanel.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+import { demoTags } from '../lib/gast-vorschau/demo-data';
+import DemoQrCard from '../components/shared/DemoQrCard.astro';
+import { getOrCreateShowcaseUrl } from '../lib/demo/get-showcase-url';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
+---
+
+<Layout
+  title="Gast-Vorschau"
+  activeTab="gast"
+  hotelName={hotel.name}
+  hotelLogoUrl={hotel.logo_url}
+>
+  <section class="gast-hero">
+    <span class="gast-hero__eyebrow">Gast-Vorschau · Live</span>
+    <h1 class="gast-hero__title">
+      So sehen es deine Gäste<span class="dot-pink">.</span>
+    </h1>
+    <p class="gast-hero__sub">
+      Klicke durch verschiedene Szenen — Settings ändern, Handy aktualisiert live.
+    </p>
+  </section>
+
+  <div class="gast-layout">
+    <PhonePreview tags={demoTags} />
+    <div class="gast-sidebar">
+      <SettingsPanel tags={demoTags} hotelName={hotel.name} />
+      <DemoQrCard demoUrl={demoUrl} />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .gast-hero {
+    max-width: 1400px; margin: 0 auto;
+    padding: 48px 32px 32px;
+  }
+  @media (max-width: 768px) { .gast-hero { padding: 32px 20px 24px; } }
+
+  .gast-hero__eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #0A0A0A; background: var(--te-yellow);
+    padding: 5px 10px; display: inline-block;
+    margin-bottom: 24px; font-weight: 500; border-radius: var(--r-sm);
+  }
+  .gast-hero__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 400; line-height: 1; letter-spacing: -0.03em; margin-bottom: 16px;
+  }
+  .gast-hero__sub {
+    font-size: 16px; color: var(--ink-soft); line-height: 1.5; max-width: 560px;
+  }
+
+  .gast-layout {
+    max-width: 1400px; margin: 0 auto;
+    padding: 0 32px 80px;
+    display: grid; grid-template-columns: 5fr 7fr;
+    gap: 48px; align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .gast-layout { grid-template-columns: 1fr; gap: 32px; padding: 0 20px 64px; }
+  }
+  .gast-sidebar { display: flex; flex-direction: column; gap: 16px; }
+</style>

@@ -1,0 +1,71 @@
+---
+import Layout from '../layouts/Layout.astro';
+import HeroSection from '../components/uebersicht/HeroSection.astro';
+import RackBanner from '../components/uebersicht/RackBanner.astro';
+import SetupStatus from '../components/uebersicht/SetupStatus.astro';
+import AppGrid from '../components/uebersicht/AppGrid.astro';
+import LiveTilesSection from '../components/uebersicht/LiveTilesSection.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { normalizeStage } from '../lib/uebersicht/setup-stage';
+import { getLiveData } from '../lib/uebersicht/live-data';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+// setup_progress laden + automatisch anpassen basierend auf konfigurierten Feldern
+let rawProgress: number | null = null;
+try {
+  const { data } = await supabase
+    .from('hotels')
+    .select('setup_progress, name, logo_primary, brand_primary, brand_theme')
+    .eq('id', hotel.id)
+    .maybeSingle();
+  rawProgress = (data as any)?.setup_progress ?? null;
+
+  const hotelName    = (data as any)?.name;
+  const logoSet      = !!((data as any)?.logo_primary);
+  const colorCustom  = (data as any)?.brand_primary && (data as any).brand_primary !== '#FF4A82';
+  const themeCustom  = (data as any)?.brand_theme && (data as any).brand_theme !== 'coffee';
+  const brandingDone = logoSet || colorCustom || themeCustom;
+
+  const current = rawProgress ?? 0;
+  let target = current;
+
+  // Stufe 15: Hotel-Name (Pflichtfeld) gesetzt
+  if (hotelName && current < 15) target = 15;
+  // Stufe 30: Branding konfiguriert (Logo ODER eigene Farbe/Theme)
+  if (hotelName && brandingDone && current < 30) target = 30;
+
+  if (target > current) {
+    await supabase.from('hotels').update({ setup_progress: target }).eq('id', hotel.id);
+    rawProgress = target;
+  }
+} catch { /* Spalte existiert noch nicht — DB-Migration ausstehend */ }
+
+const stage = normalizeStage(rawProgress);
+const liveData = await getLiveData(hotel.id);
+
+// User-Initial für Avatar (erster Buchstabe der Email)
+const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
+---
+
+<Layout
+  title="Übersicht"
+  activeTab="backoffice"
+  hotelName={hotel.name}
+  hotelLocation={hotel.city ?? undefined}
+  hotelLogoUrl={hotel.logo_url}
+  userInitial={userInitial}
+>
+  <HeroSection stage={stage} />
+  <RackBanner stage={stage} />
+  <SetupStatus stage={stage} />
+  <AppGrid stage={stage} />
+  <LiveTilesSection tiles={liveData} />
+</Layout>

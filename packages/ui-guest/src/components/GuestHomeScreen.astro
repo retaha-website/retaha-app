@@ -1,0 +1,145 @@
+---
+import type { GuestTheme, GuestActionCard } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  welcomeText?: string;
+  actionCard?: GuestActionCard;
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  welcomeText = `Willkommen im ${theme.hotelName}`,
+  actionCard = {
+    eyebrow: '— Empfang —',
+    title: 'Check-in starten',
+    sub: 'Schlüssel in 2 Minuten bereit.',
+    cta: 'Jetzt einchecken',
+    cardClass: 'rec-anthrazit',
+  },
+  previewMode = false,
+} = Astro.props;
+---
+
+<!-- Hero -->
+<section class="gate-hero">
+  <div class="gate-hero-bg"></div>
+  <div class="gate-hero-overlay"></div>
+  <div class="gate-hero-content">
+    <div class="gate-hero-top">
+      <div class="gate-hero-tag">
+        <span class="gate-hero-tag-shapes">
+          <span class="circle"></span>
+          <span class="square"></span>
+          <span class="triangle"></span>
+        </span>
+        <span>{theme.hotelName}</span>
+      </div>
+    </div>
+
+    {theme.logoUrl ? (
+      <img class="gate-hero-logo" src={theme.logoUrl} alt={theme.hotelName} />
+    ) : (
+      <div class="gate-hero-name-fallback">{theme.hotelName}</div>
+    )}
+
+    <div class="gate-hero-welcome">
+      <div class="gate-hero-kicker">— herzlich willkommen —</div>
+      <h1 class="gate-hero-greeting">Guten Tag<span class="dot">.</span></h1>
+      <p class="gate-hero-sub">{welcomeText}</p>
+    </div>
+
+    <div class="gate-hero-stay">
+      <div class="gate-hero-stay-block">
+        <div class="label">Zimmer</div>
+        <div class="value">101 · Deluxe Suite</div>
+      </div>
+      <div class="gate-hero-stay-block">
+        <div class="label">Check-in → Check-out</div>
+        <div class="value">Heute → Morgen</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Concierge Card -->
+<div class="gate-recommend-card">
+  <div class="gate-recommend-card-left">
+    <div class="gate-recommend-eyebrow">— {theme.eveName ?? 'Eve'}, Concierge —</div>
+    <p class="gate-recommend-text">Frag mich alles — ich helfe rund um die Uhr.</p>
+  </div>
+</div>
+
+<!-- Action Card -->
+<section class="rec-slider-section">
+  <div class="rec-slider-eyebrow">— Empfohlen für dich —</div>
+  <div class="rec-slider">
+    <div class="rec-slider-track">
+      <div class="rec-slide">
+        <div class={`rec-card ${actionCard.cardClass ?? 'rec-anthrazit'}`}>
+          {actionCard.eyebrow && <div class="rec-card-eyebrow">{actionCard.eyebrow}</div>}
+          <div class="rec-card-title">{actionCard.title}</div>
+          {actionCard.sub && <div class="rec-card-sub">{actionCard.sub}</div>}
+          <button
+            class="rec-card-cta"
+            type="button"
+            disabled={previewMode}
+          >{actionCard.cta}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Service Tiles -->
+<section class="gate-actions">
+  <div class="gate-actions-head">
+    <div class="gate-actions-eyebrow">— Was brauchst du? —</div>
+  </div>
+  <div class="gate-grid">
+    <button class="gate-tile" type="button" disabled={previewMode}>
+      <span class="gate-tile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+      </span>
+      <span class="gate-tile-label">WLAN</span>
+      <span class="gate-tile-sub">Passwort anzeigen</span>
+    </button>
+
+    <button class="gate-tile" type="button" disabled={previewMode}>
+      <span class="gate-tile-badge burgund">Online</span>
+      <span class="gate-tile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </span>
+      <span class="gate-tile-label">{theme.eveName ?? 'Eve'}</span>
+      <span class="gate-tile-sub">KI-Concierge</span>
+    </button>
+
+    <button class="gate-tile" type="button" disabled={previewMode}>
+      <span class="gate-tile-badge green">Täglich</span>
+      <span class="gate-tile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      </span>
+      <span class="gate-tile-label">Frühstück</span>
+      <span class="gate-tile-sub">07:30 – 10:30</span>
+    </button>
+
+    <button class="gate-tile" type="button" disabled={previewMode}>
+      <span class="gate-tile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </span>
+      <span class="gate-tile-label">Service</span>
+      <span class="gate-tile-sub">Zimmer · Wäsche · Taxi</span>
+    </button>
+  </div>
+</section>
+
+<style>
+  .gate-hero-name-fallback {
+    font-size: 22px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: -0.01em;
+    padding: 4px 0;
+  }
+</style>

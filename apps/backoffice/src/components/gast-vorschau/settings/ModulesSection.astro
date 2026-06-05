@@ -1,0 +1,84 @@
+---
+const modules = [
+  { key: 'eve',          label: 'Eve Concierge',     sub: 'KI-Chat für Gäste' },
+  { key: 'empfehlungen', label: 'Empfehlungen',       sub: 'Google Places, Tipps' },
+  { key: 'service',      label: 'Service-Anfragen',   sub: 'Zimmerwünsche, Buchungen' },
+];
+---
+
+<section class="settings-section">
+  <div class="settings-section__head">
+    <span class="settings-section__title">— Module —</span>
+    <span class="settings-section__hint">live toggle</span>
+  </div>
+  <div class="modules-list">
+    {modules.map(mod => (
+      <div class="module-row">
+        <div class="module-row__info">
+          <span class="module-row__label">{mod.label}</span>
+          <span class="module-row__sub">{mod.sub}</span>
+        </div>
+        <button
+          class="module-toggle is-on"
+          data-module-key={mod.key}
+          aria-pressed="true"
+          aria-label={`${mod.label} ein/aus`}
+          type="button"
+        >
+          <span class="module-toggle__led"></span>
+          <span class="module-toggle__label">an</span>
+        </button>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px 28px; }
+  .settings-section__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .settings-section__title { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase; }
+  .settings-section__hint { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted); }
+  .modules-list { display: flex; flex-direction: column; gap: 2px; }
+  .module-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .module-row:last-child { border-bottom: none; }
+  .module-row__info { display: flex; flex-direction: column; gap: 2px; }
+  .module-row__label { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .module-row__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em; }
+  .module-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border: 1px solid var(--border);
+    border-radius: 99px; cursor: pointer; background: transparent;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted);
+    transition: all 200ms ease;
+  }
+  .module-toggle.is-on { border-color: var(--sage); color: var(--sage); background: var(--sage-soft); }
+  .module-toggle__led {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint);
+    transition: all 200ms ease;
+  }
+  .module-toggle.is-on .module-toggle__led {
+    background: var(--sage); box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
+    animation: led-pulse 2s ease-in-out infinite;
+  }
+</style>
+
+<script>
+  import { updateState, getState } from '../../../lib/gast-vorschau/state';
+  document.querySelectorAll('.module-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.moduleKey;
+      if (!key) return;
+      const current = getState().modules;
+      const newVal = !current[key];
+      btn.classList.toggle('is-on', newVal);
+      btn.setAttribute('aria-pressed', String(newVal));
+      const lbl = btn.querySelector('.module-toggle__label');
+      if (lbl) lbl.textContent = newVal ? 'an' : 'aus';
+      updateState({ modules: { ...current, [key]: newVal } });
+    });
+  });
+</script>
