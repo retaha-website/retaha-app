@@ -122,9 +122,11 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
         <AssetsSection branding={branding} />
       </div>
 
-      <div class="branding-sidebar">
-        <BrandMiniPreview branding={branding} hotelName={hotel.name} />
-        <DemoQrCard demoUrl={demoUrl} compact />
+      <div class="branding-col-right">
+        <div class="branding-sidebar">
+          <BrandMiniPreview branding={branding} hotelName={hotel.name} />
+          <DemoQrCard demoUrl={demoUrl} compact />
+        </div>
       </div>
 
     </div>
@@ -194,8 +196,13 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     align-items: start;
   }
   .branding-sections { display: flex; flex-direction: column; gap: 32px; min-width: 0; }
+
+  /* Wrapper füllt die volle rechte Grid-Spalte (gleich hoch wie linke Spalte) */
+  .branding-col-right { min-height: 100%; }
+
+  /* Sidebar selbst: sticky + scrollbar */
   .branding-sidebar {
-    position: sticky; top: 100px; align-self: start;
+    position: sticky; top: 100px;
     display: flex; flex-direction: column; gap: 16px;
     height: calc(100vh - 120px);
     overflow-y: auto;
@@ -205,16 +212,27 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 
   @media (max-width: 1024px) {
     .branding-layout { grid-template-columns: 1fr; }
-    .branding-sidebar { display: none; }
+    .branding-col-right { display: none; }
   }
 </style>
 
 <script>
-  // Capture-Phase: Wheel-Events auf der gesamten rechten Spalte → Sidebar scrollen
-  // (verhindert, dass das Phone-Mockup oder leerer Raum den Scroll an die Page gibt)
-  const sidebar = document.querySelector<HTMLElement>('.branding-sidebar');
-  if (sidebar) {
-    sidebar.addEventListener('wheel', (e) => {
+  const colRight = document.querySelector<HTMLElement>('.branding-col-right');
+  const sidebar  = document.querySelector<HTMLElement>('.branding-sidebar');
+  const phoneEl  = document.querySelector<HTMLElement>('.brand-preview__phone');
+
+  if (colRight && sidebar) {
+    // Listener auf den vollen Wrapper (gesamte rechte Spalte, volle Seitenhöhe)
+    colRight.addEventListener('wheel', (e) => {
+      // Wenn der Cursor über dem Phone ist → Phone selbst scrollen lassen
+      if (phoneEl) {
+        const r = phoneEl.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right &&
+            e.clientY >= r.top  && e.clientY <= r.bottom) {
+          return;
+        }
+      }
+      // Sonst: Sidebar scrollen, Page-Scroll verhindern
       const maxScroll = sidebar.scrollHeight - sidebar.clientHeight;
       if (maxScroll <= 0) return;
       e.preventDefault();
