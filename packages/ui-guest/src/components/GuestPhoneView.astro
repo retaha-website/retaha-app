@@ -2,13 +2,16 @@
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/retaha.css';
 import '../styles/guest-preview.css';
+import '../themes/classic/tokens.css';
+import '../themes/bauhaus/tokens.css';
+import '../themes/editorial/tokens.css';
 
 import GuestHomeScreen from './GuestHomeScreen.astro';
 import GuestEveScreen from './GuestEveScreen.astro';
 import GuestRecsScreen from './GuestRecsScreen.astro';
 import GuestServiceScreen from './GuestServiceScreen.astro';
 import type { GuestTheme } from '../types/index.ts';
-import { mapThemeName } from '../types/index.ts';
+import { mapThemeName, resolveDataTheme } from '../types/index.ts';
 
 interface Props {
   theme: GuestTheme;
@@ -27,12 +30,13 @@ const {
 
 const guestTheme = theme.guestThemeName ?? mapThemeName(theme.themeName);
 const accentColor = theme.primary ?? '#FF4A82';
+const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
 ---
 
 <div
   class="guest-phone-view"
-  data-theme={guestTheme}
-  style={`--theme-accent:${accentColor};--theme-accent-hover:${accentColor};${scale ? `--preview-scale:${scale}` : ''}`}
+  data-theme={dataTheme}
+  style={`--user-brand-primary:${accentColor};--theme-accent:${accentColor};--theme-accent-hover:${accentColor};${scale ? `--preview-scale:${scale}` : ''}`}
 >
   <!-- Status Bar -->
   <div class="gp-statusbar">

@@ -13,8 +13,10 @@ export interface BrandingData {
   // Farben
   brand_primary:   string;
   brand_secondary: string | null;
-  // Theme
+  // Theme (legacy)
   brand_theme:     'coffee' | 'ocean' | 'forest' | 'custom';
+  // Design-Identität
+  design_identity: 'classic' | 'bauhaus' | 'editorial';
   // Assets
   splash_background: string | null;
   wallet_pass_bg:    string | null;
@@ -36,7 +38,7 @@ export async function getBranding(
       id,
       logo_primary, logo_icon, logo_wordmark, logo_dark, logo_print, logo_spacing,
       brand_primary, brand_secondary,
-      brand_theme,
+      brand_theme, design_identity,
       splash_background, wallet_pass_bg, email_header
     `)
     .eq('id', hotel.id)
@@ -56,6 +58,7 @@ export async function getBranding(
     brand_primary:     (d.brand_primary as string) ?? '#FF4A82',
     brand_secondary:   (d.brand_secondary as string) ?? null,
     brand_theme:       ((d.brand_theme as string) ?? 'coffee') as 'coffee' | 'ocean' | 'forest' | 'custom',
+    design_identity:   ((d.design_identity as string) ?? 'classic') as 'classic' | 'bauhaus' | 'editorial',
     splash_background: (d.splash_background as string) ?? null,
     wallet_pass_bg:    (d.wallet_pass_bg as string) ?? null,
     email_header:      (d.email_header as string) ?? null,

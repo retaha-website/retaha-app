@@ -5,51 +5,74 @@ import type { BrandingData } from '../../lib/branding/get-branding';
 interface Props { branding: BrandingData; }
 const { branding } = Astro.props;
 
-const themes = [
-  { key: 'coffee', label: 'Coffee',  desc: 'Warm, gemütlich, klassisch', colors: ['#3E2723','#A1887F','#D7CCC8','#F5F1E8'] },
-  { key: 'ocean',  label: 'Ocean',   desc: 'Frisch, weit, professionell', colors: ['#0D3B66','#3E92CC','#A8DADC','#E8F4F8'] },
-  { key: 'forest', label: 'Forest',  desc: 'Natürlich, ruhig, Wellness', colors: ['#1B4332','#52B788','#D8F3DC','#F0F7EE'] },
-  { key: 'custom', label: 'Custom',  desc: 'Aus deinen Brand-Farben', custom: true },
+const active = branding.design_identity ?? 'classic';
+
+const identities = [
+  {
+    key: 'classic',
+    label: 'Classic',
+    description: 'Das aktuelle Gäste-App-Design',
+    badge: 'Aktuell',
+    previewHeadline: 'Willkommen',
+    previewCta: 'Check-in starten',
+  },
+  {
+    key: 'bauhaus',
+    label: 'Bauhaus',
+    description: 'Minimal, geometrisch, modern',
+    badge: 'Default · Neu',
+    previewHeadline: 'willkommen',
+    previewCta: 'check-in starten',
+  },
+  {
+    key: 'editorial',
+    label: 'Editorial',
+    description: 'Warm, Serif, Magazin-Feel',
+    badge: 'Neu',
+    previewHeadline: 'Willkommen',
+    previewCta: 'Check-in starten',
+  },
 ];
-const active = branding.brand_theme ?? 'coffee';
 ---
 
-<BrandSection title="Theme" num="03">
-  <form method="POST" id="themeForm">
-    <input type="hidden" name="_action" value="theme" />
-    <input type="hidden" name="brand_theme" id="themeValue" value={active} />
+<BrandSection title="Design-Identität" num="03">
+  <form method="POST" id="identityForm">
+    <input type="hidden" name="_action" value="identity" />
+    <input type="hidden" name="design_identity" id="identityValue" value={active} />
 
-    <div class="theme-grid">
-      {themes.map(t => (
+    <div class="identity-grid">
+      {identities.map(id => (
         <button
-          class={`theme-card ${active === t.key ? 'is-active' : ''}`}
-          data-key={t.key}
+          class={`identity-card ${active === id.key ? 'is-active' : ''}`}
+          data-key={id.key}
           type="button"
         >
-          {t.custom ? (
-            <div class="theme-card__custom">
-              <span class="theme-card__plus">+</span>
-              <span class="theme-card__custom-hint">Aus Brand-Farben</span>
+          {active === id.key && <span class="identity-badge">Aktiv</span>}
+
+          <div class={`identity-preview identity-preview--${id.key}`}>
+            <div class="identity-preview__content">
+              <div class="identity-preview__headline">{id.previewHeadline}</div>
+              <div class="identity-preview__line"></div>
+              <div class="identity-preview__cta">{id.previewCta}</div>
             </div>
-          ) : (
-            <div class="theme-card__swatches">
-              {t.colors!.map(c => <span class="theme-swatch" style={`background:${c}`}></span>)}
-            </div>
-          )}
-          <div class="theme-card__body">
-            <span class="theme-card__label">{t.label}</span>
-            <span class="theme-card__desc">{t.desc}</span>
           </div>
-          {active === t.key && <span class="theme-badge">Aktiv</span>}
+
+          <div class="identity-card__body">
+            <div class="identity-card__head">
+              <span class="identity-card__label">{id.label}</span>
+              {id.badge && <span class="identity-card__badge">{id.badge}</span>}
+            </div>
+            <span class="identity-card__desc">{id.description}</span>
+          </div>
         </button>
       ))}
     </div>
 
-    <div class="theme-info">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
+    <div class="identity-info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
       </svg>
-      <p>Das Theme wird in der <strong>Gäste-App</strong> und in <strong>E-Mails</strong> verwendet.
+      <p>Brand-Farben (Abschnitt 02) werden in alle Identitäten als Primary übernommen.
         <a href="/gast-vorschau">→ Live-Vorschau ansehen</a>
       </p>
     </div>
@@ -61,47 +84,132 @@ const active = branding.brand_theme ?? 'coffee';
 </BrandSection>
 
 <style>
-  .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-  .theme-card {
+  .identity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px;
+  }
+
+  .identity-card {
     display: flex; flex-direction: column;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r); overflow: hidden;
     cursor: pointer; transition: all 200ms ease;
-    text-align: left; position: relative;
+    text-align: left; position: relative; padding: 0;
   }
-  .theme-card:hover { background: var(--te-yellow-soft); border-color: var(--ink-faint); }
-  .theme-card.is-active { border-color: var(--sage); box-shadow: 0 0 0 2px var(--sage-soft); }
-  .theme-card__swatches { display: grid; grid-template-columns: repeat(4, 1fr); height: 56px; }
-  .theme-swatch { height: 100%; }
-  .theme-card__custom {
-    height: 56px; background: var(--bg-deep);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  }
-  .theme-card__plus { font-size: 20px; color: var(--ink-muted); }
-  .theme-card__custom-hint {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
-    color: var(--ink-muted); letter-spacing: 0.08em;
-  }
-  .theme-card__body { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .theme-card__label { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
-  .theme-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); letter-spacing: 0.04em; }
-  .theme-badge {
-    position: absolute; top: 8px; right: 8px;
+  .identity-card:hover { background: var(--te-yellow-soft); border-color: var(--ink-faint); transform: translateY(-2px); }
+  .identity-card.is-active { border-color: var(--sage); box-shadow: 0 0 0 2px var(--sage-soft); }
+
+  .identity-badge {
+    position: absolute; top: 10px; right: 10px; z-index: 1;
     background: var(--sage); color: white;
-    padding: 2px 8px; border-radius: 99px;
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
-    font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 99px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
   }
-  .theme-info {
+
+  /* Preview Box */
+  .identity-preview {
+    height: 120px;
+    display: flex; align-items: center; justify-content: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .identity-preview__content {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+    pointer-events: none;
+  }
+
+  /* Classic */
+  .identity-preview--classic {
+    background: #FAFAF8;
+  }
+  .identity-preview--classic .identity-preview__headline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 400; color: #1A1A1A;
+  }
+  .identity-preview--classic .identity-preview__line {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #FF4A82;
+  }
+  .identity-preview--classic .identity-preview__cta {
+    background: #1A1A1A; color: #fff;
+    padding: 5px 10px; font-size: 9px;
+    font-family: 'Space Grotesk', sans-serif;
+    border-radius: 3px;
+  }
+
+  /* Bauhaus */
+  .identity-preview--bauhaus {
+    background: #FAFAF8;
+  }
+  .identity-preview--bauhaus .identity-preview__headline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 500; color: #0A0A0A;
+    letter-spacing: -0.025em; text-transform: lowercase;
+  }
+  .identity-preview--bauhaus .identity-preview__line {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #FF4A82;
+  }
+  .identity-preview--bauhaus .identity-preview__cta {
+    background: #0A0A0A; color: #FAFAF8;
+    padding: 5px 10px; font-size: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    border-radius: 6px;
+  }
+
+  /* Editorial */
+  .identity-preview--editorial {
+    background: #FAF7F2;
+  }
+  .identity-preview--editorial .identity-preview__headline {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 19px; font-weight: 400; color: #1F1812;
+  }
+  .identity-preview--editorial .identity-preview__line {
+    width: 36px; height: 1px;
+    background: #8C2128;
+  }
+  .identity-preview--editorial .identity-preview__cta {
+    background: #1F1812; color: #FAF7F2;
+    padding: 5px 12px; font-size: 9px;
+    font-family: 'Inter', sans-serif;
+    border-radius: 5px;
+  }
+
+  /* Info + Body */
+  .identity-card__body {
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .identity-card__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .identity-card__label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 500; color: var(--ink);
+  }
+  .identity-card__badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 2px 6px; background: var(--bg-deep); color: var(--ink-muted); border-radius: 99px;
+  }
+  .identity-card__desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.02em; line-height: 1.4;
+  }
+
+  .identity-info {
     padding: 14px 18px; background: var(--bg-deep); border-radius: var(--r-sm);
     display: flex; gap: 12px; align-items: flex-start;
   }
-  .theme-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
-  .theme-info p {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    line-height: 1.5; color: var(--ink-soft); letter-spacing: 0.02em; margin: 0;
+  .identity-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
+  .identity-info p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; line-height: 1.5; color: var(--ink-soft); margin: 0;
   }
-  .theme-info a { color: var(--ink); text-decoration: underline; margin-left: 6px; }
+  .identity-info a { color: var(--ink); text-decoration: underline; margin-left: 6px; }
+
   .s-card__footer { display: flex; justify-content: flex-end; }
   .s-btn {
     background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
@@ -112,20 +220,27 @@ const active = branding.brand_theme ?? 'coffee';
 </style>
 
 <script>
-  const cards = document.querySelectorAll<HTMLButtonElement>('.theme-card');
-  const hiddenInput = document.getElementById('themeValue') as HTMLInputElement;
+  const cards = document.querySelectorAll<HTMLButtonElement>('.identity-card');
+  const hiddenInput = document.getElementById('identityValue') as HTMLInputElement;
 
   cards.forEach(card => {
     card.addEventListener('click', () => {
       cards.forEach(c => {
         c.classList.remove('is-active');
-        c.querySelector('.theme-badge')?.remove();
+        c.querySelector('.identity-badge')?.remove();
       });
       card.classList.add('is-active');
-      const badge = document.createElement('span');
-      badge.className = 'theme-badge'; badge.textContent = 'Aktiv';
-      card.appendChild(badge);
       if (hiddenInput) hiddenInput.value = card.dataset.key!;
+
+      const badge = document.createElement('span');
+      badge.className = 'identity-badge'; badge.textContent = 'Aktiv';
+      card.appendChild(badge);
+
+      // Mini-Phone-Preview updaten
+      const phoneView = document.querySelector<HTMLElement>('.guest-phone-view');
+      if (phoneView) {
+        phoneView.setAttribute('data-theme', card.dataset.key!);
+      }
     });
   });
 </script>

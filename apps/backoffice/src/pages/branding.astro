@@ -51,6 +51,20 @@ if (Astro.request.method === 'POST') {
         : { section: 'theme', ok: true, msg: '✓ Theme gespeichert' };
     }
 
+  } else if (action === 'identity') {
+    const design_identity = form.get('design_identity')?.toString();
+    const validIdentities = ['classic', 'bauhaus', 'editorial'];
+    if (!design_identity || !validIdentities.includes(design_identity)) {
+      saved = { section: 'identity', ok: false, msg: 'Ungültige Design-Identität.' };
+    } else {
+      const { error } = await client.from('hotels')
+        .update({ design_identity })
+        .eq('id', hotel.id);
+      saved = error
+        ? { section: 'identity', ok: false, msg: error.message }
+        : { section: 'identity', ok: true, msg: '✓ Design-Identität gespeichert' };
+    }
+
   } else if (action === 'spacing') {
     const logo_spacing = form.get('logo_spacing')?.toString();
     if (!['tight','normal','loose'].includes(logo_spacing ?? '')) {
