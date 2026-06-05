@@ -44,8 +44,8 @@ export async function getBranding(
     .eq('id', hotel.id)
     .maybeSingle();
 
-  if (!data) return null;
-  const d = data as Record<string, unknown>;
+  // Bei DB-Fehler (z.B. fehlende Spalte) → Fallback-Objekt, nicht null
+  const d = (data ?? {}) as Record<string, unknown>;
 
   return {
     hotel_id:          hotel.id,
