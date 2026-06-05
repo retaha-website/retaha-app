@@ -23,13 +23,11 @@ const assets = [
             <span class="asset-slot__hint">{a.hint}</span>
           </div>
           <div class="asset-slot__drop" style={`aspect-ratio:${a.ratio}`} data-key={a.key}>
-            {url
-              ? <img src={url} class="asset-slot__img" alt="" />
-              : <div class="asset-slot__empty">
-                  <span class="asset-slot__plus">+</span>
-                  <span class="asset-slot__cta">Ablegen oder klicken</span>
-                </div>
-            }
+            <img class="asset-slot__img" alt="" src={url || undefined} hidden={!url || undefined} />
+            <div class="asset-slot__empty" hidden={!!url || undefined}>
+              <span class="asset-slot__plus">+</span>
+              <span class="asset-slot__cta">Ablegen oder klicken</span>
+            </div>
             <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key={a.key} />
           </div>
           <div class="asset-slot__actions" hidden={!url || undefined}>
@@ -110,13 +108,15 @@ const assets = [
       const key = input.dataset.key!;
       const drop = slot.querySelector<HTMLElement>('.asset-slot__drop')!;
 
-      // Optimistic preview
+      // Optimistic preview — toggle existing elements (kein innerHTML, kein Scope-Bug)
       const reader = new FileReader();
       reader.onload = () => {
-        drop.innerHTML = `<img src="${reader.result}" class="asset-slot__img" alt="" />
-          <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
+        const img = drop.querySelector<HTMLImageElement>('.asset-slot__img')!;
+        img.src = reader.result as string;
+        img.hidden = false;
+        const empty = drop.querySelector<HTMLElement>('.asset-slot__empty');
+        if (empty) empty.hidden = true;
         drop.classList.add('has-image');
-        bindSlot(slot); // rebind after innerHTML update
       };
       reader.readAsDataURL(file);
 
@@ -125,11 +125,9 @@ const assets = [
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       if (res.ok) {
         showStatus(slot, true, '✓ Gespeichert');
-        // Buttons sind immer im HTML — einfach einblenden
         const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
         if (actions) {
           actions.hidden = false;
-          // data-key auf Buttons aktualisieren (relevant nach drop-replacement)
           actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
         }
       } else {
@@ -141,24 +139,27 @@ const assets = [
 
   function bindActions(slot: HTMLElement) {
     slot.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const key = btn.dataset.key!;
         const drop = slot.querySelector<HTMLElement>('.asset-slot__drop')!;
         if (btn.dataset.action === 'replace') {
           slot.querySelector<HTMLInputElement>('.asset-slot__input')?.click();
         } else if (btn.dataset.action === 'delete') {
-          if (!confirm('Asset entfernen?')) return;
-          const fd = new FormData();
-          fd.append('key', key); fd.append('delete', 'true');
-          const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
-          if (res.ok) {
-            drop.innerHTML = `<div class="asset-slot__empty"><span class="asset-slot__plus">+</span><span class="asset-slot__cta">Ablegen oder klicken</span></div><input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key="${key}" />`;
-            drop.classList.remove('has-image');
-            const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
-            if (actions) actions.hidden = true;
-            showStatus(slot, true, '✓ Entfernt');
-            bindSlot(slot);
-          }
+          (window as any).__brandConfirm('Asset wirklich entfernen?', async () => {
+            const fd = new FormData();
+            fd.append('key', key); fd.append('delete', 'true');
+            const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+            if (res.ok) {
+              const img = drop.querySelector<HTMLImageElement>('.asset-slot__img');
+              if (img) { img.src = ''; img.hidden = true; }
+              const empty = drop.querySelector<HTMLElement>('.asset-slot__empty');
+              if (empty) empty.hidden = false;
+              drop.classList.remove('has-image');
+              const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
+              if (actions) actions.hidden = true;
+              showStatus(slot, true, '✓ Entfernt');
+            }
+          });
         }
       });
     });

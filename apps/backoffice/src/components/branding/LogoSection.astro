@@ -27,15 +27,12 @@ const slots = [
             <span class="logo-slot__hint">{slot.hint}</span>
           </div>
           <div class={`logo-slot__drop ${url ? 'has-image' : ''}`}>
-            {url ? (
-              <img src={url} alt={`Logo ${slot.label}`} class="logo-slot__img" />
-            ) : (
-              <div class="logo-slot__empty">
-                <span class="logo-slot__plus">+</span>
-                <span class="logo-slot__cta">Ablegen oder klicken</span>
-                <span class="logo-slot__fmt">SVG · PNG</span>
-              </div>
-            )}
+            <img src={url || undefined} alt={`Logo ${slot.label}`} class="logo-slot__img" hidden={!url || undefined} />
+            <div class="logo-slot__empty" hidden={!!url || undefined}>
+              <span class="logo-slot__plus">+</span>
+              <span class="logo-slot__cta">Ablegen oder klicken</span>
+              <span class="logo-slot__fmt">SVG · PNG</span>
+            </div>
             <input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key={slot.key} />
           </div>
           <div class="logo-slot__actions" hidden={!url || undefined}>
@@ -152,10 +149,14 @@ const slots = [
       const key = input.dataset.key!;
       const drop = input.closest('.logo-slot__drop') as HTMLElement;
 
-      // Optimistic preview
+      // Optimistic preview — toggle existing elements (kein innerHTML, kein Scope-Bug)
       const reader = new FileReader();
       reader.onload = () => {
-        drop.innerHTML = `<img src="${reader.result}" class="logo-slot__img" alt="" />`;
+        const img = drop.querySelector<HTMLImageElement>('.logo-slot__img')!;
+        img.src = reader.result as string;
+        img.hidden = false;
+        const empty = drop.querySelector<HTMLElement>('.logo-slot__empty');
+        if (empty) empty.hidden = true;
         drop.classList.add('has-image');
       };
       reader.readAsDataURL(file);
@@ -198,23 +199,26 @@ const slots = [
           const input = slot.querySelector<HTMLInputElement>('.logo-slot__input');
           input?.click();
         } else if (action === 'delete') {
-          if (!confirm('Logo entfernen?')) return;
-          const fd = new FormData();
-          fd.append('key', key);
-          fd.append('delete', 'true');
-          const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
-          if (res.ok) {
-            drop.innerHTML = `<div class="logo-slot__empty"><span class="logo-slot__plus">+</span><span class="logo-slot__cta">Ablegen oder klicken</span></div><input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key="${key}" />`;
-            drop.classList.remove('has-image');
-            const actions = slot.querySelector<HTMLElement>('.logo-slot__actions');
-            if (actions) actions.hidden = true;
-            bindActionButtons(slot.querySelector('.logo-slot__actions')!);
-          }
+          (window as any).__brandConfirm('Logo wirklich entfernen?', async () => {
+            const fd = new FormData();
+            fd.append('key', key);
+            fd.append('delete', 'true');
+            const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
+            if (res.ok) {
+              const img = drop.querySelector<HTMLImageElement>('.logo-slot__img');
+              if (img) { img.src = ''; img.hidden = true; }
+              const empty = drop.querySelector<HTMLElement>('.logo-slot__empty');
+              if (empty) empty.hidden = false;
+              drop.classList.remove('has-image');
+              const actions = slot.querySelector<HTMLElement>('.logo-slot__actions');
+              if (actions) actions.hidden = true;
+            }
+          });
         }
       });
     });
   }
-  document.querySelectorAll<HTMLElement>('.logo-slot__actions').forEach(bindActionButtons);
+  document.querySelectorAll<HTMLElement>('.logo-slot').forEach(slot => bindActionButtons(slot));
 
   // Spacing Radio-Cards — nur visuell; Speichern via Form-Submit
   const spacingCards = document.querySelectorAll<HTMLButtonElement>('#spacingCards .radio-card');
