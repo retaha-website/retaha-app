@@ -18,24 +18,33 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-// setup_progress laden + automatisch auf 30 setzen wenn Hotel-Name vorhanden
+// setup_progress laden + automatisch anpassen basierend auf konfigurierten Feldern
 let rawProgress: number | null = null;
 try {
   const { data } = await supabase
     .from('hotels')
-    .select('setup_progress, name')
+    .select('setup_progress, name, logo_primary, brand_primary, brand_theme')
     .eq('id', hotel.id)
     .maybeSingle();
   rawProgress = (data as any)?.setup_progress ?? null;
 
-  // Pflichtfeld (Hotel-Name) gesetzt, aber Fortschritt noch unter 30?
-  // → automatisch auf 30 hochsetzen ohne dass der User nochmal speichern muss
-  const hotelName = (data as any)?.name;
-  if (hotelName && (rawProgress ?? 0) < 30) {
-    await supabase.from('hotels')
-      .update({ setup_progress: 30 })
-      .eq('id', hotel.id);
-    rawProgress = 30;
+  const hotelName    = (data as any)?.name;
+  const logoSet      = !!((data as any)?.logo_primary);
+  const colorCustom  = (data as any)?.brand_primary && (data as any).brand_primary !== '#FF4A82';
+  const themeCustom  = (data as any)?.brand_theme && (data as any).brand_theme !== 'coffee';
+  const brandingDone = logoSet || colorCustom || themeCustom;
+
+  const current = rawProgress ?? 0;
+  let target = current;
+
+  // Stufe 15: Hotel-Name (Pflichtfeld) gesetzt
+  if (hotelName && current < 15) target = 15;
+  // Stufe 30: Branding konfiguriert (Logo ODER eigene Farbe/Theme)
+  if (hotelName && brandingDone && current < 30) target = 30;
+
+  if (target > current) {
+    await supabase.from('hotels').update({ setup_progress: target }).eq('id', hotel.id);
+    rawProgress = target;
   }
 } catch { /* Spalte existiert noch nicht — DB-Migration ausstehend */ }
 

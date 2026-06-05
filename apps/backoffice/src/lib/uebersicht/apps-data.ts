@@ -13,9 +13,9 @@ export interface SetupApp {
 
 export const APPS: SetupApp[] = [
   { id: 1, num: '01', label: 'Hotel-Daten',  sub: 'Name · Adresse',
-    activeAt: 0,  doneAt: 30,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/settings'          },
+    activeAt: 0,  doneAt: 15,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/settings'          },
   { id: 2, num: '02', label: 'Branding',     sub: 'Farben · Schrift',
-    activeAt: -1, doneAt: 30,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/branding'          },
+    activeAt: 15, doneAt: 30,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/branding'          },
   { id: 3, num: '03', label: 'Module',       sub: 'Eve · Empfehlungen',
     activeAt: 30, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: '3/5 ON' }, href: '/admin/features'    },
   { id: 4, num: '04', label: 'PMS-Bridge',   sub: 'Apaleo · Protel',
