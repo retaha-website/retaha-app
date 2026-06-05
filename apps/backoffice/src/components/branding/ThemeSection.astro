@@ -1,0 +1,131 @@
+---
+import BrandSection from './BrandSection.astro';
+import type { BrandingData } from '../../lib/branding/get-branding';
+
+interface Props { branding: BrandingData; }
+const { branding } = Astro.props;
+
+const themes = [
+  { key: 'coffee', label: 'Coffee',  desc: 'Warm, gemütlich, klassisch', colors: ['#3E2723','#A1887F','#D7CCC8','#F5F1E8'] },
+  { key: 'ocean',  label: 'Ocean',   desc: 'Frisch, weit, professionell', colors: ['#0D3B66','#3E92CC','#A8DADC','#E8F4F8'] },
+  { key: 'forest', label: 'Forest',  desc: 'Natürlich, ruhig, Wellness', colors: ['#1B4332','#52B788','#D8F3DC','#F0F7EE'] },
+  { key: 'custom', label: 'Custom',  desc: 'Aus deinen Brand-Farben', custom: true },
+];
+const active = branding.brand_theme ?? 'coffee';
+---
+
+<BrandSection title="Theme" num="03">
+  <form method="POST" id="themeForm">
+    <input type="hidden" name="_action" value="theme" />
+    <input type="hidden" name="brand_theme" id="themeValue" value={active} />
+
+    <div class="theme-grid">
+      {themes.map(t => (
+        <button
+          class={`theme-card ${active === t.key ? 'is-active' : ''}`}
+          data-key={t.key}
+          type="button"
+        >
+          {t.custom ? (
+            <div class="theme-card__custom">
+              <span class="theme-card__plus">+</span>
+              <span class="theme-card__custom-hint">Aus Brand-Farben</span>
+            </div>
+          ) : (
+            <div class="theme-card__swatches">
+              {t.colors!.map(c => <span class="theme-swatch" style={`background:${c}`}></span>)}
+            </div>
+          )}
+          <div class="theme-card__body">
+            <span class="theme-card__label">{t.label}</span>
+            <span class="theme-card__desc">{t.desc}</span>
+          </div>
+          {active === t.key && <span class="theme-badge">Aktiv</span>}
+        </button>
+      ))}
+    </div>
+
+    <div class="theme-info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      <p>Das Theme wird in der <strong>Gäste-App</strong> und in <strong>E-Mails</strong> verwendet.
+        <a href="/gast-vorschau">→ Live-Vorschau ansehen</a>
+      </p>
+    </div>
+
+    <div class="s-card__footer">
+      <button type="submit" class="s-btn">Speichern</button>
+    </div>
+  </form>
+</BrandSection>
+
+<style>
+  .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .theme-card {
+    display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); overflow: hidden;
+    cursor: pointer; transition: all 200ms ease;
+    text-align: left; position: relative;
+  }
+  .theme-card:hover { background: var(--te-yellow-soft); border-color: var(--ink-faint); }
+  .theme-card.is-active { border-color: var(--sage); box-shadow: 0 0 0 2px var(--sage-soft); }
+  .theme-card__swatches { display: grid; grid-template-columns: repeat(4, 1fr); height: 56px; }
+  .theme-swatch { height: 100%; }
+  .theme-card__custom {
+    height: 56px; background: var(--bg-deep);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .theme-card__plus { font-size: 20px; color: var(--ink-muted); }
+  .theme-card__custom-hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--ink-muted); letter-spacing: 0.08em;
+  }
+  .theme-card__body { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .theme-card__label { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .theme-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); letter-spacing: 0.04em; }
+  .theme-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--sage); color: white;
+    padding: 2px 8px; border-radius: 99px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .theme-info {
+    padding: 14px 18px; background: var(--bg-deep); border-radius: var(--r-sm);
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .theme-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
+  .theme-info p {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    line-height: 1.5; color: var(--ink-soft); letter-spacing: 0.02em; margin: 0;
+  }
+  .theme-info a { color: var(--ink); text-decoration: underline; margin-left: 6px; }
+  .s-card__footer { display: flex; justify-content: flex-end; }
+  .s-btn {
+    background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
+    border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.14em; cursor: pointer; transition: all 200ms;
+  }
+  .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
+</style>
+
+<script>
+  const cards = document.querySelectorAll<HTMLButtonElement>('.theme-card');
+  const hiddenInput = document.getElementById('themeValue') as HTMLInputElement;
+
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      cards.forEach(c => {
+        c.classList.remove('is-active');
+        c.querySelector('.theme-badge')?.remove();
+      });
+      card.classList.add('is-active');
+      const badge = document.createElement('span');
+      badge.className = 'theme-badge'; badge.textContent = 'Aktiv';
+      card.appendChild(badge);
+      if (hiddenInput) hiddenInput.value = card.dataset.key!;
+    });
+  });
+</script>
