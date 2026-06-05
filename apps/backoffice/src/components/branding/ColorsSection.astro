@@ -1,5 +1,6 @@
 ---
 import BrandSection from './BrandSection.astro';
+import ColorPicker from './ColorPicker.astro';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
 interface Props { branding: BrandingData; }
@@ -19,8 +20,7 @@ const secondary = branding.brand_secondary ?? '';
       <div class="color-row">
         <input type="text" id="brand-primary" name="brand_primary" class="s-input color-hex"
           value={primary} placeholder="#FF4A82" maxlength="7" />
-        <input type="color" class="color-picker" id="picker-primary" value={primary}
-          data-target="brand-primary" aria-label="Farbwähler Primärfarbe" />
+        <ColorPicker targetId="brand-primary" value={primary} ariaLabel="Farbwähler Primärfarbe" />
       </div>
     </div>
     <p class="field__hint">Hauptakzentfarbe der Gäste-App (CTAs, Eve-Chat, Action-Karten)</p>
@@ -31,8 +31,7 @@ const secondary = branding.brand_secondary ?? '';
       <div class="color-row">
         <input type="text" id="brand-secondary" name="brand_secondary" class="s-input color-hex"
           value={secondary} placeholder="Optional · #8C2128" maxlength="7" />
-        <input type="color" class="color-picker" id="picker-secondary" value={secondary || '#8C2128'}
-          data-target="brand-secondary" aria-label="Farbwähler Sekundärfarbe" />
+        <ColorPicker targetId="brand-secondary" value={secondary || '#8C2128'} ariaLabel="Farbwähler Sekundärfarbe" />
       </div>
     </div>
 
@@ -81,22 +80,6 @@ const secondary = branding.brand_secondary ?? '';
   }
   .s-input:focus { outline: none; border-color: var(--ink); background: var(--te-yellow-soft); }
 
-  /* Color Picker — vollflächig, kein inneres Rechteck */
-  .color-picker {
-    width: 40px; height: 40px;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    cursor: pointer; flex-shrink: 0;
-    padding: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    overflow: hidden;
-    background: none;
-  }
-  .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
-  .color-picker::-webkit-color-swatch { border: none; border-radius: calc(var(--r-sm) - 1px); }
-  .color-picker::-moz-color-swatch { border: none; }
-
   .variants { margin-top: 4px; }
   .variants__label {
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
@@ -134,10 +117,6 @@ const secondary = branding.brand_secondary ?? '';
     const hex = hexInput.value.trim();
     if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
 
-    // Entsprechenden Color-Picker aktualisieren
-    const picker = document.getElementById(`picker-${hexInput.id.replace('brand-', '')}`) as HTMLInputElement | null;
-    if (picker) picker.value = hex;
-
     if (hexInput.id === 'brand-primary') {
       updateVariants(hex);
       // Mini-Phone-Preview live updaten
@@ -149,18 +128,9 @@ const secondary = branding.brand_secondary ?? '';
     }
   }
 
-  // Hex-Input → Picker + Varianten
+  // Hex-Input (direkte Eingabe) → Varianten
   document.querySelectorAll<HTMLInputElement>('.color-hex').forEach(input => {
     input.addEventListener('input', () => syncFromHex(input));
     syncFromHex(input); // Initialer Sync
-  });
-
-  // Picker → Hex-Input → Varianten
-  document.querySelectorAll<HTMLInputElement>('.color-picker').forEach(picker => {
-    picker.addEventListener('input', () => {
-      const targetId = picker.dataset.target!;
-      const hexInput = document.getElementById(targetId) as HTMLInputElement | null;
-      if (hexInput) { hexInput.value = picker.value; syncFromHex(hexInput); }
-    });
   });
 </script>

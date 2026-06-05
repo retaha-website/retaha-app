@@ -19,6 +19,8 @@ interface Props {
   previewMode?: boolean;
   /** Skalierung für Mini-Preview (z.B. 0.45) */
   scale?: number;
+  /** Wheel-Scroll im Phone deaktivieren (z.B. in BrandMiniPreview) */
+  noScroll?: boolean;
 }
 
 const {
@@ -26,6 +28,7 @@ const {
   welcomeText,
   previewMode = true,
   scale,
+  noScroll,
 } = Astro.props;
 
 const guestTheme = theme.guestThemeName ?? mapThemeName(theme.themeName);
@@ -36,6 +39,7 @@ const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
 <div
   class="guest-phone-view"
   data-theme={dataTheme}
+  data-no-scroll={noScroll ? '' : undefined}
   style={`--user-brand-primary:${accentColor};--theme-accent:${accentColor};--theme-accent-hover:${accentColor};${scale ? `--preview-scale:${scale}` : ''}`}
 >
   <!-- Status Bar -->
@@ -154,8 +158,9 @@ const dataTheme = resolveDataTheme(theme.designIdentity, guestTheme);
       });
     });
 
-    // Phone-Screen scrollbar via Wheel — nur wenn preview-scale gesetzt
+    // Phone-Screen scrollbar via Wheel — nur wenn preview-scale gesetzt und noScroll nicht aktiv
     if (!screensEl || !scaler) return;
+    if (view.hasAttribute('data-no-scroll')) return;
     const previewScale = parseFloat(
       getComputedStyle(view).getPropertyValue('--preview-scale').trim() || '1'
     );
