@@ -2,10 +2,23 @@
 import Layout from '../layouts/Layout.astro';
 import PhonePreview from '../components/gast-vorschau/PhonePreview.astro';
 import SettingsPanel from '../components/gast-vorschau/settings/SettingsPanel.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
 import { demoTags } from '../lib/gast-vorschau/demo-data';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 ---
 
-<Layout title="Gast-Vorschau" activeTab="gast">
+<Layout
+  title="Gast-Vorschau"
+  activeTab="gast"
+  hotelName={hotel.name}
+  hotelLogoUrl={hotel.logo_url}
+>
   <section class="gast-hero">
     <span class="gast-hero__eyebrow">Gast-Vorschau · Live</span>
     <h1 class="gast-hero__title">
@@ -18,7 +31,7 @@ import { demoTags } from '../lib/gast-vorschau/demo-data';
 
   <div class="gast-layout">
     <PhonePreview tags={demoTags} />
-    <SettingsPanel tags={demoTags} />
+    <SettingsPanel tags={demoTags} hotelName={hotel.name} />
   </div>
 </Layout>
 

@@ -1,10 +1,13 @@
 ---
+interface Props { hotelName?: string }
+const { hotelName = 'Ihrem Hotel' } = Astro.props;
+const defaultText = `Willkommen im ${hotelName}`;
 ---
 
 <section class="settings-section">
   <div class="settings-section__head">
-    <span class="settings-section__title">— willkommen & ansprache —</span>
-    <span class="settings-section__hint" id="welcomeCount">36 / 120</span>
+    <span class="settings-section__title">— Willkommen & Ansprache —</span>
+    <span class="settings-section__hint" id="welcomeCount">{defaultText.length} / 120</span>
   </div>
 
   <!-- Willkommenstext -->
@@ -12,9 +15,9 @@
     class="welcome-textarea"
     id="welcomeTextarea"
     maxlength="120"
-    placeholder="willkommen im the gate garden hotel"
+    placeholder={`z.B. Willkommen im ${hotelName}`}
     aria-label="Willkommenstext für Gäste"
-  >willkommen im the gate garden hotel</textarea>
+  >{defaultText}</textarea>
   <p class="welcome-hint">wird ganz oben im gast-app angezeigt.</p>
 
   <!-- Du/Sie Toggle -->
@@ -104,6 +107,8 @@
     if (counter) counter.textContent = `${textarea.value.length} / 120`;
   }
   updateCount();
+  // Initial state sync — phone screen zeigt sofort den korrekten Hotel-Namen
+  updateState({ welcomeText: textarea.value });
   textarea?.addEventListener('input', () => {
     updateState({ welcomeText: textarea.value });
     updateCount();
