@@ -197,7 +197,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   .branding-sidebar {
     position: sticky; top: 100px; align-self: start;
     display: flex; flex-direction: column; gap: 16px;
-    max-height: calc(100vh - 120px);
+    height: calc(100vh - 120px);
     overflow-y: auto;
     scrollbar-width: thin;
     padding-right: 4px;
@@ -208,3 +208,17 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     .branding-sidebar { display: none; }
   }
 </style>
+
+<script>
+  // Capture-Phase: Wheel-Events auf der gesamten rechten Spalte → Sidebar scrollen
+  // (verhindert, dass das Phone-Mockup oder leerer Raum den Scroll an die Page gibt)
+  const sidebar = document.querySelector<HTMLElement>('.branding-sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('wheel', (e) => {
+      const maxScroll = sidebar.scrollHeight - sidebar.clientHeight;
+      if (maxScroll <= 0) return;
+      e.preventDefault();
+      sidebar.scrollTop = Math.max(0, Math.min(maxScroll, sidebar.scrollTop + e.deltaY));
+    }, { capture: true, passive: false });
+  }
+</script>
