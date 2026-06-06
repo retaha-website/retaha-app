@@ -1,124 +1,556 @@
 ---
 import AdminLayout from '../../components/AdminLayout.astro';
-import BauhausToggle from '@retaha/ui/components/admin/BauhausToggle.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
-import { t } from '../../i18n/helpers';
-
-const userLocale = Astro.locals.locale;
+import { MODULE_REGISTRY, TIER_LABELS, type ModuleDefinition } from '../../lib/modules-registry';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
+const layoutUser = { email: user.email ?? '' };
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-let message: { type: 'success' | 'error'; text: string } | null = null;
+let flashMsg: { ok: boolean; text: string } | null = null;
 
-const featureDefs = [
-  { key: 'breakfast_reservation', label: 'Frühstück reservieren', desc: 'Gäste können einen Tisch fürs Frühstück buchen' },
-  { key: 'conference_booking', label: 'Konferenz buchen', desc: 'Gäste können Salon Linde / Eiche reservieren' },
-  { key: 'concierge_chat', label: 'Concierge-Chat', desc: 'Direkter Chat mit dem Empfang' },
-  { key: 'berlin_tips', label: 'Berliner Tipps', desc: 'Lokale Empfehlungen mit Karte' },
-  { key: 'wallet_card', label: 'Treuekarte (Wallet)', desc: 'Apple/Google Wallet-Karte für Stammgäste' },
-  { key: 'service_requests', label: 'Service-Anfragen', desc: 'Handtücher, Wasser, Bügeleisen anfordern' },
-  { key: 'checkout_flow', label: 'Self-Checkout', desc: 'Gast kann ohne Empfang auschecken' },
-];
-
-// Handle POST
+// ── POST: Feature-Toggles speichern ───────────────────────────────────────
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
-  const newFeatures: Record<string, boolean> = {};
 
-  featureDefs.forEach(f => {
-    newFeatures[f.key] = form.getAll(`feature_${f.key}`).includes('on');
-  });
-
-  const { data: updatedRows, error } = await client
+  const { data: current } = await client
     .from('hotel_settings')
-    .update({ features: newFeatures, updated_at: new Date().toISOString() })
+    .select('features')
     .eq('hotel_id', hotel.id)
-    .select('hotel_id');
+    .maybeSingle();
 
-  if (error) {
-    message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-  } else if (!updatedRows || updatedRows.length === 0) {
-    message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
-  } else {
-    message = { type: 'success', text: 'Funktionen aktualisiert.' };
+  const existing = (current?.features as Record<string, boolean>) ?? {};
+
+  const updated: Record<string, boolean> = { ...existing };
+
+  for (const mod of MODULE_REGISTRY) {
+    if (mod.required || mod.comingSoon) continue;
+    const val = form.get(`feature_${mod.key}`) === 'on';
+    updated[mod.key] = val;
+    // Legacy-Key-Sync für Rückwärtskompatibilität (Gäste-App liest noch _enabled-Keys)
+    if (mod.legacyKey) updated[mod.legacyKey] = val;
   }
+  // Pflicht-Module immer true
+  updated['welcome'] = true;
+  updated['wifi'] = true;
+
+  const { error } = await client
+    .from('hotel_settings')
+    .update({ features: updated })
+    .eq('hotel_id', hotel.id);
+
+  flashMsg = error
+    ? { ok: false, text: `Fehler: ${error.message}` }
+    : { ok: true, text: '✓ Module gespeichert.' };
 }
 
-// Load current
+// ── Daten laden ────────────────────────────────────────────────────────────
 const { data: settings } = await client
   .from('hotel_settings')
   .select('features')
   .eq('hotel_id', hotel.id)
   .maybeSingle();
 
-const features = (settings?.features as Record<string, boolean>) || {};
+const features = (settings?.features as Record<string, boolean>) ?? {};
+
+function isActive(mod: ModuleDefinition): boolean {
+  if (mod.required) return true;
+  if (mod.comingSoon) return false;
+  // Neuer Key hat Priorität; fall back auf Legacy-Key
+  if (typeof features[mod.key] === 'boolean') return features[mod.key];
+  if (mod.legacyKey && typeof features[mod.legacyKey] === 'boolean') return features[mod.legacyKey];
+  return false;
+}
+
+const activeCount = MODULE_REGISTRY.filter(m => !m.comingSoon && isActive(m)).length;
+const totalToggleable = MODULE_REGISTRY.filter(m => !m.comingSoon && !m.required).length;
+
+// Tier-Farben als CSS-String (für Badges)
+const TIER_CSS: Record<string, string> = {
+  lite:       'background:#E8F5E8; color:#2D6B2D; border-color:#B5D9B5',
+  pro:        'background:#EFF6FF; color:#1D4ED8; border-color:#BFDBFE',
+  premium:    'background:#F5F3FF; color:#6D28D9; border-color:#DDD6FE',
+  enterprise: 'background:#F3F2F0; color:#1F1812; border-color:#D1CCC6',
+};
 ---
 
-<AdminLayout title="Funktionen" hotel={hotel} user={user} activeTab="features">
-  <div class="-mt-10">
-    <EditorialPageHeader
-      sectionNumber={t('pages.features.section_number', userLocale)}
-      sectionLabel={t('pages.features.section_label', userLocale)}
-      headlineLight={t('pages.features.headline_light', userLocale)}
-      headlineBold={t('pages.features.headline_bold', userLocale)}
-      subtitle={t('pages.features.subtitle', userLocale)}
-    />
-  </div>
+<AdminLayout title="Module" hotel={hotel} user={layoutUser} activeTab="features">
 
-  {message && (
-    <div class={`mb-6 px-4 py-3 text-sm ${
-      message.type === 'success'
-        ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
-        : 'bg-red-50 border-l-4 border-red-700 text-red-800'
-    }`}>
-      {message.text}
+  <!-- Flash -->
+  {flashMsg && (
+    <div class={`features-flash ${flashMsg.ok ? 'features-flash--ok' : 'features-flash--err'}`}>
+      {flashMsg.text}
     </div>
   )}
 
-  <form method="POST">
-    <div class="flex flex-col">
-      {featureDefs.map(f => {
-        const isOn = features[f.key] !== false; // default true
-        const inputId = `toggle-feature-${f.key}`;
-        return (
-          <label
-            for={inputId}
-            class="flex items-center gap-5 py-[26px] border-b border-anthrazit/7 last:border-b-0 cursor-pointer"
-          >
-            <span
-              data-toggle-accent
-              class="w-1.5 h-1.5 rounded-full bg-anthrazit/30 transition-colors duration-200 ease-in-out flex-shrink-0 pointer-events-none"
-              aria-hidden="true"
-            ></span>
+  <!-- Page Header -->
+  <div class="features-header">
+    <div class="features-header__eyebrow">
+      <span class="features-eyebrow-dot"></span>
+      Deine Module
+    </div>
+    <h1 class="features-header__title">module<span class="features-dot">.</span></h1>
+    <p class="features-header__sub">
+      Was du nutzt — was du noch aktivieren kannst.
+      <span class="features-header__count">{activeCount} von {MODULE_REGISTRY.filter(m => !m.comingSoon).length} aktiv</span>
+    </p>
+  </div>
 
-            <div class="flex-1 min-w-0">
-              <p class="text-[15px] font-medium text-anthrazit leading-tight tracking-tight mb-1.5">{f.label}</p>
-              <p class="text-[13px] italic text-anthrazit/55 leading-[1.55]">{f.desc}</p>
+  <!-- Alpine: Tab-Filter + Form -->
+  <div
+    x-data={`{
+      filter: 'alle',
+      isVisible(status, active) {
+        if (this.filter === 'alle') return true;
+        if (this.filter === 'aktiv') return active;
+        if (this.filter === 'verfügbar') return !active && status !== 'coming-soon';
+        if (this.filter === 'bald') return status === 'coming-soon';
+        return true;
+      }
+    }`}
+  >
+
+    <!-- Tab-Filter -->
+    <div class="features-tabs" role="tablist">
+      {[
+        { key: 'alle', label: 'Alle' },
+        { key: 'aktiv', label: 'Aktiv' },
+        { key: 'verfügbar', label: 'Verfügbar' },
+        { key: 'bald', label: 'Bald' },
+      ].map(tab => (
+        <button
+          type="button"
+          role="tab"
+          class="features-tab"
+          :class={`filter === '${tab.key}' ? 'features-tab--active' : ''`}
+          @click={`filter = '${tab.key}'`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+
+    <!-- Module-Grid (Form für Toggles) -->
+    <form method="POST" id="featuresForm">
+
+      <div class="features-grid">
+        {MODULE_REGISTRY.map(mod => {
+          const active = isActive(mod);
+          const statusKey = mod.comingSoon ? 'coming-soon' : (active ? 'active' : 'available');
+          const tierCss = TIER_CSS[mod.tier] ?? TIER_CSS.lite;
+          const inputId = `toggle-${mod.key}`;
+
+          return (
+            <div
+              class={`fcard ${active ? 'fcard--active' : ''} ${mod.comingSoon ? 'fcard--soon' : ''} ${mod.required ? 'fcard--required' : ''}`}
+              x-show={`isVisible('${mod.comingSoon ? 'coming-soon' : 'toggleable'}', ${active})`}
+              x-cloak
+            >
+              <!-- Card Header -->
+              <div class="fcard__head">
+                <!-- Tier Badge -->
+                <span class="fcard__tier" style={tierCss}>
+                  {TIER_LABELS[mod.tier]}
+                </span>
+
+                <!-- Status Indicator -->
+                {mod.required ? (
+                  <span class="fcard__status fcard__status--required">Pflicht</span>
+                ) : mod.comingSoon ? (
+                  <span class="fcard__status fcard__status--soon">Bald</span>
+                ) : mod.beta ? (
+                  <span class="fcard__status fcard__status--beta">Beta</span>
+                ) : (
+                  <!-- Toggle -->
+                  <label class="fcard__toggle" for={inputId} title={active ? 'Deaktivieren' : 'Aktivieren'}>
+                    <input
+                      type="checkbox"
+                      id={inputId}
+                      name={`feature_${mod.key}`}
+                      checked={active}
+                      class="fcard__toggle-input"
+                      onchange="this.form.requestSubmit()"
+                    />
+                    <span class="fcard__toggle-track">
+                      <span class="fcard__toggle-thumb"></span>
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <!-- Icon + Name -->
+              <div class="fcard__identity">
+                <span class="fcard__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                    <Fragment set:html={mod.icon} />
+                  </svg>
+                </span>
+                <span class="fcard__name">{mod.label}</span>
+              </div>
+
+              <!-- Description -->
+              <p class="fcard__desc">{mod.desc}</p>
+
+              <!-- Meta Badges -->
+              <div class="fcard__meta">
+                {mod.requiresHardware && (
+                  <a href="/admin/shop" class="fcard__meta-badge fcard__meta-badge--hw">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    Hardware nötig → Shop
+                  </a>
+                )}
+                {mod.addonPrice && (
+                  <span class="fcard__meta-badge fcard__meta-badge--addon">
+                    + {mod.addonPrice} Add-On
+                  </span>
+                )}
+                {mod.linkedRoute && !mod.comingSoon && (
+                  <a href={mod.linkedRoute} class="fcard__meta-badge fcard__meta-badge--config">
+                    Konfigurieren →
+                  </a>
+                )}
+              </div>
             </div>
+          );
+        })}
+      </div>
 
-            <BauhausToggle id={inputId} name={`feature_${f.key}`} checked={isOn} label={f.label} />
-          </label>
-        );
-      })}
+    </form>
+  </div>
+
+  <!-- Footer Summary -->
+  <div class="features-footer">
+    <div class="features-footer__left">
+      <div class="features-footer__stat">
+        <span class="features-footer__num">{activeCount}</span>
+        <span class="features-footer__label">Module aktiv</span>
+      </div>
+      <div class="features-footer__sep"></div>
+      <div class="features-footer__stat">
+        <span class="features-footer__num">{MODULE_REGISTRY.filter(m => !m.comingSoon && !m.required && !isActive(m)).length}</span>
+        <span class="features-footer__label">verfügbar</span>
+      </div>
+      <div class="features-footer__sep"></div>
+      <div class="features-footer__stat">
+        <span class="features-footer__num">{MODULE_REGISTRY.filter(m => m.comingSoon).length}</span>
+        <span class="features-footer__label">bald verfügbar</span>
+      </div>
     </div>
-
-    <div class="mt-6 flex justify-end">
-      <button type="submit" class="bauhaus-button bauhaus-button--primary">
-        Änderungen speichern
-      </button>
+    <div class="features-footer__right">
+      <a href="/admin/subscription" class="features-footer__link">
+        Plan verwalten →
+      </a>
+      <a href="/admin/shop" class="features-footer__link features-footer__link--primary">
+        Hardware bestellen →
+      </a>
     </div>
-  </form>
+  </div>
 
-  <p class="mt-12 eyebrow text-anthrazit/40">
-    Hinweis: deaktivierte Funktionen verschwinden sofort aus der Gast-Ansicht.
-    Aktive Buchungen bleiben aber bestehen.
+  <p class="features-hint">
+    Deaktivierte Module verschwinden sofort aus der Gäste-App. Aktive Buchungen bleiben bestehen.
   </p>
+
 </AdminLayout>
+
+<style>
+  /* ── Flash ─────────────────────────────────────────────────────────────── */
+  .features-flash {
+    margin-bottom: 20px; padding: 12px 16px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+  }
+  .features-flash--ok  { background: #EDF7ED; color: #2D6B2D; border: 1px solid #B5D9B5; }
+  .features-flash--err { background: #FEF2F2; color: #8C2128; border: 1px solid #F5C6C6; }
+
+  /* ── Page Header ────────────────────────────────────────────────────────── */
+  .features-header {
+    padding: 32px 0 28px;
+    border-bottom: 1px solid var(--border, #E8E6E1);
+    margin-bottom: 28px;
+  }
+  .features-header__eyebrow {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-muted, #666); margin-bottom: 12px;
+  }
+  .features-eyebrow-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--sage, #4A8C4A);
+  }
+  .features-header__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(36px, 5vw, 56px); font-weight: 300;
+    letter-spacing: -0.03em; line-height: 1;
+    color: var(--ink, #0A0A0A); text-transform: lowercase;
+    margin: 0 0 10px;
+  }
+  .features-dot { color: var(--pink, #FF4A82); }
+  .features-header__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink-muted, #666); letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .features-header__count {
+    background: var(--bg-deep, #F5F5F3); color: var(--ink-soft, #444);
+    padding: 3px 10px; border-radius: 99px; font-size: 10px;
+    border: 1px solid var(--border, #E8E6E1);
+  }
+
+  /* ── Tab-Filter ──────────────────────────────────────────────────────────── */
+  .features-tabs {
+    display: flex; gap: 6px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--border, #E8E6E1);
+    padding-bottom: 0;
+  }
+  .features-tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 8px 14px;
+    border: none; background: none; cursor: pointer;
+    color: var(--ink-muted, #888);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 150ms ease;
+  }
+  .features-tab:hover { color: var(--ink, #0A0A0A); }
+  .features-tab--active {
+    color: var(--ink, #0A0A0A);
+    border-bottom-color: var(--ink, #0A0A0A);
+  }
+  [x-cloak] { display: none !important; }
+
+  /* ── Module Grid ─────────────────────────────────────────────────────────── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 700px) {
+    .features-grid { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 1200px) {
+    .features-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ── Module Card ─────────────────────────────────────────────────────────── */
+  .fcard {
+    border: 1px solid var(--border, #E8E6E1);
+    border-radius: 10px;
+    background: var(--surface, #FFFFFF);
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 150ms, box-shadow 150ms;
+    position: relative;
+  }
+  .fcard:hover:not(.fcard--soon) {
+    border-color: var(--ink-faint, #CCC);
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+  .fcard--active {
+    border-color: var(--sage, #4A8C4A);
+    background: #FAFFFE;
+  }
+  .fcard--active:hover {
+    border-color: var(--sage, #4A8C4A);
+    box-shadow: 0 2px 12px rgba(74,140,74,.12);
+  }
+  .fcard--soon {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .fcard--required {
+    background: var(--bg-deep, #F9F9F7);
+  }
+
+  /* Card Head */
+  .fcard__head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .fcard__tier {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 99px;
+    border: 1px solid;
+  }
+  .fcard__status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 99px;
+  }
+  .fcard__status--required {
+    background: var(--sage-soft, #EDF7ED); color: var(--sage, #2D6B2D);
+    border: 1px solid #B5D9B5;
+  }
+  .fcard__status--soon {
+    background: #F3F2F0; color: #888; border: 1px solid #DDD;
+  }
+  .fcard__status--beta {
+    background: #FFF8E6; color: #8C6700; border: 1px solid #F7D97A;
+  }
+
+  /* Toggle */
+  .fcard__toggle { display: flex; align-items: center; cursor: pointer; }
+  .fcard__toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .fcard__toggle-track {
+    width: 36px; height: 20px; border-radius: 10px;
+    background: var(--border, #E0DDD8);
+    display: flex; align-items: center;
+    padding: 2px;
+    transition: background 200ms ease;
+    cursor: pointer;
+  }
+  .fcard__toggle-input:checked + .fcard__toggle-track {
+    background: var(--sage, #4A8C4A);
+  }
+  .fcard__toggle-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform 200ms ease;
+  }
+  .fcard__toggle-input:checked + .fcard__toggle-track .fcard__toggle-thumb {
+    transform: translateX(16px);
+  }
+
+  /* Identity */
+  .fcard__identity {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fcard__icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--bg-deep, #F5F5F3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-soft, #555);
+    flex-shrink: 0;
+  }
+  .fcard--active .fcard__icon {
+    background: #EDF7ED; color: var(--sage, #2D6B2D);
+  }
+  .fcard__name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--ink, #0A0A0A);
+    line-height: 1.2;
+  }
+  .fcard--soon .fcard__name { color: var(--ink-muted, #888); }
+
+  /* Description */
+  .fcard__desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; line-height: 1.5;
+    color: var(--ink-muted, #888);
+    letter-spacing: 0.01em;
+    margin: 0;
+    flex: 1;
+  }
+
+  /* Meta Badges */
+  .fcard__meta {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 2px;
+  }
+  .fcard__meta-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
+    padding: 3px 8px; border-radius: 99px;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: all 120ms;
+  }
+  .fcard__meta-badge--hw {
+    background: #FFF3E0; color: #8C5000;
+    border: 1px solid #F5CFA0;
+  }
+  .fcard__meta-badge--hw:hover {
+    background: #8C5000; color: #FFF;
+  }
+  .fcard__meta-badge--addon {
+    background: #F5F3FF; color: #6D28D9;
+    border: 1px solid #DDD6FE;
+  }
+  .fcard__meta-badge--config {
+    background: var(--bg-deep, #F5F5F3); color: var(--ink-muted, #666);
+    border: 1px solid var(--border, #E0DDD8);
+  }
+  .fcard__meta-badge--config:hover {
+    background: var(--ink, #0A0A0A); color: var(--bg, #FAFAF8);
+  }
+
+  /* ── Footer Summary ──────────────────────────────────────────────────────── */
+  .features-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px;
+    padding: 18px 20px;
+    border: 1px solid var(--border, #E8E6E1);
+    border-radius: 10px;
+    background: var(--bg-deep, #F9F9F7);
+    margin-bottom: 20px;
+  }
+  @media (max-width: 600px) {
+    .features-footer { flex-direction: column; align-items: flex-start; }
+  }
+  .features-footer__left {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .features-footer__stat {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .features-footer__num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px; font-weight: 300; color: var(--ink, #0A0A0A);
+    line-height: 1;
+  }
+  .features-footer__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-muted, #888);
+  }
+  .features-footer__sep {
+    width: 1px; height: 32px;
+    background: var(--border, #E0DDD8);
+  }
+  .features-footer__right {
+    display: flex; gap: 10px; align-items: center; flex-shrink: 0;
+  }
+  .features-footer__link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    text-decoration: none; color: var(--ink-muted, #888);
+    padding: 8px 14px;
+    border: 1px solid var(--border, #E0DDD8);
+    border-radius: 8px;
+    background: var(--surface, #FFF);
+    transition: all 150ms;
+  }
+  .features-footer__link:hover {
+    background: var(--ink, #0A0A0A); color: var(--bg, #FAFAF8);
+    border-color: var(--ink, #0A0A0A);
+  }
+  .features-footer__link--primary {
+    background: var(--ink, #0A0A0A); color: var(--bg, #FAFAF8);
+    border-color: var(--ink, #0A0A0A);
+  }
+  .features-footer__link--primary:hover {
+    background: var(--te-yellow, #FFE600);
+    color: var(--ink, #0A0A0A);
+    border-color: var(--te-yellow, #FFE600);
+  }
+
+  /* ── Hint ────────────────────────────────────────────────────────────────── */
+  .features-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--ink-faint, #BBB);
+    letter-spacing: 0.04em;
+    margin-top: 8px;
+  }
+</style>
