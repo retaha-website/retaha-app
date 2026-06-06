@@ -35,6 +35,9 @@ import '@fontsource/inter-tight/500.css';
 import '@fontsource/cormorant-garamond/400.css';
 import '@fontsource/cormorant-garamond/500.css';
 import '@fontsource/cormorant-garamond/600.css';
+import '@retaha/ui-guest/themes/classic';
+import '@retaha/ui-guest/themes/bauhaus';
+import '@retaha/ui-guest/themes/editorial';
 import { resolveTheme } from '@retaha/ui/theme';
 import { isShowcaseToken, findShowcaseSessionByToken, type ShowcaseSession } from '../../lib/showcase/session';
 
@@ -370,10 +373,14 @@ const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_inclu
 const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
 // Sprint H · Group 1 — Theme aktiv (Preview-Query ?preview_theme=X > hotel.theme > Default)
-const activeTheme = resolveTheme({
-  hotelTheme: (hotel as any).theme,
-  requestUrl: Astro.url,
-});
+// Showcase: ?preview_identity=classic|bauhaus|editorial überschreibt data-theme
+const VALID_IDENTITIES = new Set(['classic', 'bauhaus', 'editorial']);
+const previewIdentity = isShowcase
+  ? (new URL(Astro.request.url).searchParams.get('preview_identity') ?? null)
+  : null;
+const activeTheme = (previewIdentity && VALID_IDENTITIES.has(previewIdentity))
+  ? previewIdentity
+  : resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
 
 // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.

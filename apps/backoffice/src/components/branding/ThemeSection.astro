@@ -2,8 +2,8 @@
 import BrandSection from './BrandSection.astro';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
-interface Props { branding: BrandingData; }
-const { branding } = Astro.props;
+interface Props { branding: BrandingData; demoUrl?: string | null; }
+const { branding, demoUrl } = Astro.props;
 
 const active = branding.design_identity ?? 'classic';
 
@@ -71,10 +71,23 @@ const identities = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
       </svg>
-      <p>Brand-Farben (Abschnitt 02) werden in alle Identitäten als Primary übernommen.
-        <a href="/gast-vorschau">→ Live-Vorschau ansehen</a>
-      </p>
+      <p>Brand-Farben (Abschnitt 02) werden in alle Identitäten als Primary übernommen.</p>
     </div>
+
+    {demoUrl && (
+      <div class="identity-preview-links">
+        <span class="identity-preview-links__label">In Browser öffnen —</span>
+        {identities.map(id => (
+          <a
+            href={`${demoUrl}?preview_identity=${id.key}`}
+            target="_blank"
+            rel="noopener"
+            class="identity-preview-link"
+            title={`${id.label} im Browser öffnen`}
+          >{id.label}</a>
+        ))}
+      </div>
+    )}
 
     <div class="s-card__footer">
       <button type="submit" class="s-btn">Speichern</button>
@@ -204,6 +217,27 @@ const identities = [
   }
 
   form { display: flex; flex-direction: column; gap: 24px; }
+
+  .identity-preview-links {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 16px; background: var(--bg-deep); border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+  }
+  .identity-preview-links__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; color: var(--ink-muted);
+  }
+  .identity-preview-link {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink); text-decoration: none;
+    padding: 5px 12px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    transition: all 150ms ease;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .identity-preview-link::after { content: '↗'; font-size: 10px; opacity: 0.5; }
+  .identity-preview-link:hover { background: var(--te-yellow-soft); border-color: var(--ink-faint); }
 
   .identity-info {
     padding: 14px 18px; background: var(--bg-deep); border-radius: var(--r-sm);
