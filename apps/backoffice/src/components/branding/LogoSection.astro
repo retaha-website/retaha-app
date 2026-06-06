@@ -128,12 +128,14 @@ const slots = [
       const json = await res.json();
       if (!res.ok) { alert(`Upload fehlgeschlagen: ${json.error}`); return; }
 
-      // Update mini-preview logo if primary
+      // Live-Preview im Phone updaten
+      const phoneLogo = document.querySelector<HTMLImageElement>('#brandPhoneScreen .gate-hero-logo');
+      const phoneFallback = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-name-fallback');
       if (key === 'logo_primary') {
-        const previewLogo = document.getElementById('previewLogo') as HTMLImageElement | null;
-        if (previewLogo) { previewLogo.src = json.url; previewLogo.style.display = 'block'; }
-        const previewName = document.getElementById('previewName');
-        if (previewName) previewName.style.display = 'none';
+        if (phoneLogo) { phoneLogo.src = json.url; phoneLogo.hidden = false; }
+        if (phoneFallback) phoneFallback.hidden = true;
+      } else if (key === 'logo_dark') {
+        if (phoneLogo) { phoneLogo.src = json.url; phoneLogo.classList.remove('gate-hero-logo--invert'); }
       }
 
       // Buttons sind immer im HTML — einfach einblenden
@@ -171,6 +173,13 @@ const slots = [
               drop.classList.remove('has-image');
               const actions = slot.querySelector<HTMLElement>('.logo-slot__actions');
               if (actions) actions.hidden = true;
+              // Live-Preview zurücksetzen
+              const phoneLogo = document.querySelector<HTMLImageElement>('#brandPhoneScreen .gate-hero-logo');
+              const phoneFallback = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-name-fallback');
+              if (key === 'logo_primary' && phoneLogo) {
+                phoneLogo.hidden = true;
+                if (phoneFallback) phoneFallback.hidden = false;
+              }
             }
           });
         }

@@ -132,6 +132,11 @@ const assets = [
           actions.hidden = false;
           actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
         }
+        // Live-Preview: Splash-Background → Hero-Hintergrund im Phone
+        if (key === 'splash_background') {
+          const heroBg = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-bg');
+          if (heroBg && reader.result) heroBg.style.backgroundImage = `url('${reader.result}')`;
+        }
       } else {
         const j = await res.json();
         showStatus(slot, false, `✗ ${j.error}`);
@@ -160,6 +165,10 @@ const assets = [
               const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
               if (actions) actions.hidden = true;
               showStatus(slot, true, '✓ Entfernt');
+              if (key === 'splash_background') {
+                const heroBg = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-bg');
+                if (heroBg) heroBg.style.backgroundImage = '';
+              }
             }
           });
         }
