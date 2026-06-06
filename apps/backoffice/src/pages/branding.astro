@@ -9,6 +9,7 @@ import AssetsSection  from '../components/branding/AssetsSection.astro';
 import BrandMiniPreview from '../components/branding/BrandMiniPreview.astro';
 import DemoQrCard from '../components/shared/DemoQrCard.astro';
 import { getOrCreateShowcaseUrl } from '../lib/demo/get-showcase-url';
+import { createPreviewToken } from '../lib/preview/preview-token';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -73,6 +74,13 @@ const branding = await getBranding(Astro.cookies, Astro.request);
 if (!branding) return Astro.redirect('/uebersicht');
 
 const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
+
+const guestAppUrl = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+const previewUrls: Record<string, string> = {};
+for (const id of ['classic', 'bauhaus', 'editorial']) {
+  const t = createPreviewToken(hotel.id, id);
+  previewUrls[id] = `${guestAppUrl}/g/preview?t=${t}`;
+}
 ---
 
 <Layout title="Branding" activeTab="backoffice" hotelName={hotel.name} hotelLogoUrl={hotel.logo_url}>
@@ -106,7 +114,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       <div class="branding-sections">
         <LogoSection branding={branding} />
         <ColorsSection branding={branding} />
-        <ThemeSection branding={branding} demoUrl={demoUrl} />
+        <ThemeSection branding={branding} demoUrl={demoUrl} previewUrls={previewUrls} />
         <AssetsSection branding={branding} />
       </div>
 

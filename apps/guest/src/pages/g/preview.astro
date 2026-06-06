@@ -1,0 +1,258 @@
+---
+// /g/preview — Hotel-Design-Vorschau ohne echten Gäste-Token
+// Signierter Token (HMAC) vom Backoffice, verifiziert mit SUPABASE_SERVICE_ROLE_KEY.
+// Zeigt die echte Gäste-App-Optik mit Demo-Daten — kein DB-Session-Lookup nötig.
+import { createHmac } from 'node:crypto';
+import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getEnv } from '@retaha/db';
+
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui/styles/components/buttons.css';
+import '@retaha/ui/styles/components/pills.css';
+
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/600.css';
+
+import '@retaha/ui-guest/themes/classic';
+import '@retaha/ui-guest/themes/bauhaus';
+import '@retaha/ui-guest/themes/editorial';
+
+const searchParams = new URL(Astro.request.url).searchParams;
+const rawToken = searchParams.get('t') ?? '';
+
+// ── Token-Verifikation ─────────────────────────────────────────────────────
+function verifyToken(token: string): { hotelId: string; identity: string } | null {
+  try {
+    const secret = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+    if (!secret) return null;
+    const payload = JSON.parse(Buffer.from(token, 'base64url').toString('utf-8'));
+    const { h: hotelId, e: expires, i: identity, s: sig } = payload;
+    if (!hotelId || !expires || !identity || !sig) return null;
+    if (expires < Math.floor(Date.now() / 1000)) return null;
+    const data = `${hotelId}:${expires}:${identity}`;
+    const expected = createHmac('sha256', secret).update(data).digest('hex').slice(0, 32);
+    if (sig !== expected) return null;
+    const VALID = ['classic', 'bauhaus', 'editorial'];
+    if (!VALID.includes(identity)) return null;
+    return { hotelId, identity };
+  } catch {
+    return null;
+  }
+}
+
+if (!rawToken) return Astro.redirect('/');
+
+const verified = verifyToken(rawToken);
+if (!verified) {
+  return new Response(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Ungültig</title></head>
+     <body style="font-family:sans-serif;padding:48px;text-align:center">
+       <p style="color:#8C2128">Vorschau-Link abgelaufen oder ungültig.</p>
+       <p><a href="javascript:history.back()">← Zurück</a></p>
+     </body></html>`,
+    { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}
+
+const { hotelId, identity } = verified;
+
+// ── Hotel-Daten laden ──────────────────────────────────────────────────────
+const sb = createSupabaseServiceRoleInstance();
+const [{ data: hotel }, { data: settings }] = await Promise.all([
+  sb.from('hotels').select('id, name, city, logo_url, logo_dark, theme, splash_background, brand_primary, brand_secondary').eq('id', hotelId).single(),
+  sb.from('hotel_settings').select('welcome_message_de, hotel_eyebrow_de, eve_name, wifi_ssid').eq('hotel_id', hotelId).maybeSingle(),
+]);
+
+if (!hotel) {
+  return new Response('Hotel nicht gefunden.', { status: 404 });
+}
+
+const accentColor: string = (hotel as any).brand_primary ?? '#FF4A82';
+const hotelLogoDark = hotel.logo_dark ?? null;
+const hotelHeroBg = hotel.splash_background ?? null;
+const welcomeMsg = settings?.welcome_message_de ?? `Willkommen im ${hotel.name}.`;
+const hotelEyebrow = settings?.hotel_eyebrow_de ?? hotel.city ?? '';
+const eveName = settings?.eve_name ?? 'Eve';
+
+const LABEL_MAP: Record<string, string> = {
+  classic: 'Classic',
+  bauhaus: 'Bauhaus',
+  editorial: 'Editorial',
+};
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme={identity} style={`--user-brand-primary:${accentColor};--theme-accent:${accentColor};--theme-accent-hover:${accentColor}`}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>{hotel.name} · {LABEL_MAP[identity]} Design-Vorschau</title>
+  </head>
+  <body class="gate-guest">
+
+    <!-- Preview-Badge -->
+    <div class="preview-topbar">
+      <span class="preview-topbar__label">Design-Vorschau</span>
+      <span class="preview-topbar__identity">{LABEL_MAP[identity]}</span>
+      <span class="preview-topbar__note">Deine echten Gäste sehen diese Leiste nicht</span>
+    </div>
+
+    <main style="padding-top: 38px">
+      <!-- HERO -->
+      <section class="gate-hero">
+        <div class="gate-hero-bg" style={hotelHeroBg ? `background-image: url('${hotelHeroBg}')` : undefined}></div>
+        <div class="gate-hero-overlay"></div>
+        <div class="gate-hero-content">
+          <div class="gate-hero-top">
+            <div class="gate-hero-tag">
+              <span class="gate-hero-tag-shapes">
+                <span class="circle"></span>
+                <span class="square"></span>
+                <span class="triangle"></span>
+              </span>
+              <span>{hotelEyebrow}</span>
+            </div>
+          </div>
+
+          {hotel.logo_url ? (
+            hotelLogoDark
+              ? <img class="gate-hero-logo" src={hotelLogoDark} alt={hotel.name} />
+              : <img class="gate-hero-logo gate-hero-logo--invert" src={hotel.logo_url} alt={hotel.name} />
+          ) : (
+            <img class="gate-hero-logo" src="/specht-anthrazit.svg" alt={hotel.name} />
+          )}
+
+          <div class="gate-hero-welcome">
+            <div class="gate-hero-kicker">Herzlich willkommen</div>
+            <h1 class="gate-hero-greeting">
+              Hallo, Anna<span class="dot">.</span>
+            </h1>
+            <p class="gate-hero-sub">{welcomeMsg}</p>
+          </div>
+
+          <div class="gate-hero-stay">
+            <div class="gate-hero-stay-block">
+              <div class="label">Zimmer</div>
+              <div class="value">101 · Deluxe Suite</div>
+            </div>
+            <div class="gate-hero-stay-block">
+              <div class="label">Aufenthalt</div>
+              <div class="value">Fr. 06. Jun – Sa. 07. Jun · 1 Nacht</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONCIERGE CARD -->
+      <div class="gate-recommend-card">
+        <div class="gate-recommend-card-left">
+          <div class="gate-recommend-eyebrow themed-eyebrow-flank">{eveName} · Dein persönlicher Concierge</div>
+          <p class="gate-recommend-text">Womit kann ich Ihnen heute helfen?</p>
+        </div>
+      </div>
+
+      <!-- ACTION TILES -->
+      <section class="gate-actions">
+        <div class="gate-actions-head">
+          <div class="gate-actions-eyebrow themed-eyebrow-flank">Services</div>
+          <div class="gate-actions-time">Guten Morgen · Fr., 6. Jun</div>
+        </div>
+        <div class="gate-grid">
+          <button class="gate-tile" type="button">
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5 a16 16 0 0 1 20 0"/><path d="M5 12 a11 11 0 0 1 14 0"/><path d="M8.5 15.5 a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+            </span>
+            <span class="gate-tile-label">WLAN</span>
+            <span class="gate-tile-sub">Zugangsdaten</span>
+          </button>
+          <button class="gate-tile" type="button">
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </span>
+            <span class="gate-tile-label">{eveName}</span>
+            <span class="gate-tile-sub">Concierge · KI</span>
+          </button>
+          <button class="gate-tile" type="button">
+            <span class="gate-tile-badge green">Heute</span>
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
+            </span>
+            <span class="gate-tile-label">Frühstück</span>
+            <span class="gate-tile-sub">Reservierung</span>
+          </button>
+          <button class="gate-tile" type="button">
+            <span class="gate-tile-badge orange">Neu</span>
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
+            </span>
+            <span class="gate-tile-label">Service</span>
+            <span class="gate-tile-sub">Anfragen</span>
+          </button>
+          <button class="gate-tile" type="button">
+            <span class="gate-tile-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
+            </span>
+            <span class="gate-tile-label">Tipps</span>
+            <span class="gate-tile-sub">Empfehlungen</span>
+          </button>
+          <button class="gate-tile tile-checkout" type="button">
+            <div class="checkout-left">
+              <span class="check-icon">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12 L10 17 L19 7"/></svg>
+              </span>
+              <div class="checkout-info">
+                <span class="gate-tile-label">Check-out</span>
+                <span class="gate-tile-sub">Abreise vorbereiten</span>
+              </div>
+            </div>
+            <span class="arrow">›</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <div class="gate-made-by">
+        <span class="gate-made-by-shapes">
+          <span class="circle"></span>
+          <span class="square"></span>
+          <span class="triangle"></span>
+        </span>
+        <span>powered by </span>
+        <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a>
+      </div>
+    </main>
+
+  </body>
+</html>
+
+<style>
+  .preview-topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: rgba(10,10,10,0.88);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+    height: 38px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .preview-topbar__label {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+  .preview-topbar__identity {
+    font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #FFE600; padding: 2px 8px; background: rgba(255,230,0,0.15);
+    border-radius: 4px;
+  }
+  .preview-topbar__note {
+    font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.04em;
+    margin-left: auto;
+  }
+</style>

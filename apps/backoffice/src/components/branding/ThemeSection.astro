@@ -2,8 +2,8 @@
 import BrandSection from './BrandSection.astro';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
-interface Props { branding: BrandingData; demoUrl?: string | null; }
-const { branding, demoUrl } = Astro.props;
+interface Props { branding: BrandingData; demoUrl?: string | null; previewUrls?: Record<string, string>; }
+const { branding, demoUrl, previewUrls } = Astro.props;
 
 const active = branding.design_identity ?? 'classic';
 
@@ -74,16 +74,16 @@ const identities = [
       <p>Brand-Farben (Abschnitt 02) werden in alle Identitäten als Primary übernommen.</p>
     </div>
 
-    {demoUrl && (
+    {previewUrls && Object.keys(previewUrls).length > 0 && (
       <div class="identity-preview-links">
         <span class="identity-preview-links__label">In Browser öffnen —</span>
         {identities.map(id => (
           <a
-            href={`${demoUrl}?preview_identity=${id.key}`}
+            href={previewUrls![id.key]}
             target="_blank"
             rel="noopener"
             class="identity-preview-link"
-            title={`${id.label} im Browser öffnen`}
+            title={`${id.label} in der echten Gäste-App anzeigen`}
           >{id.label}</a>
         ))}
       </div>
