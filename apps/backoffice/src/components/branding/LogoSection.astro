@@ -44,24 +44,6 @@ const slots = [
     })}
   </div>
 
-  <form method="POST" id="logoSpacingForm">
-    <input type="hidden" name="_action" value="spacing" />
-    <input type="hidden" name="logo_spacing" id="logoSpacingValue" value={branding.logo_spacing ?? 'normal'} />
-    <div class="logo-spacing">
-      <span class="spacing-label">Logo-Mindestabstand</span>
-      <div class="radio-cards" id="spacingCards">
-        {(['tight','normal','loose'] as const).map(v => (
-          <button class={`radio-card ${(branding.logo_spacing ?? 'normal') === v ? 'is-active' : ''}`}
-            data-value={v} type="button">
-            {v === 'tight' ? 'Eng (8px)' : v === 'normal' ? 'Normal (16px)' : 'Weit (24px)'}
-          </button>
-        ))}
-      </div>
-    </div>
-    <div class="s-card__footer">
-      <button type="submit" class="s-btn">Speichern</button>
-    </div>
-  </form>
 </BrandSection>
 
 <style>
@@ -115,31 +97,6 @@ const slots = [
   .logo-slot__btn:hover { background: var(--te-yellow-soft); color: var(--ink); }
   .logo-slot__btn--del:hover { background: var(--burgund-soft); color: var(--burgund); border-color: var(--burgund); }
 
-  .logo-spacing { }
-  .spacing-label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-muted); display: block; margin-bottom: 10px;
-  }
-  .radio-cards { display: flex; gap: 8px; flex-wrap: wrap; }
-  .radio-card {
-    padding: 8px 16px; cursor: pointer;
-    background: var(--surface); border: 1px solid var(--border-medium);
-    border-radius: var(--r-sm); transition: all 150ms ease;
-    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500;
-    color: var(--ink-soft);
-  }
-  .radio-card:hover { background: var(--te-yellow-soft); color: var(--ink); }
-  .radio-card.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-
-  .logo-spacing { padding-top: 0; }
-  .s-card__footer { display: flex; justify-content: flex-end; }
-  .s-btn {
-    background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
-    border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 500; letter-spacing: 0.14em; cursor: pointer; transition: all 200ms;
-  }
-  .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
 </style>
 
 <script>
@@ -222,14 +179,4 @@ const slots = [
   }
   document.querySelectorAll<HTMLElement>('.logo-slot').forEach(slot => bindActionButtons(slot));
 
-  // Spacing Radio-Cards — nur visuell; Speichern via Form-Submit
-  const spacingCards = document.querySelectorAll<HTMLButtonElement>('#spacingCards .radio-card');
-  const spacingInput = document.getElementById('logoSpacingValue') as HTMLInputElement | null;
-  spacingCards.forEach(card => {
-    card.addEventListener('click', () => {
-      spacingCards.forEach(c => c.classList.remove('is-active'));
-      card.classList.add('is-active');
-      if (spacingInput) spacingInput.value = card.dataset.value!;
-    });
-  });
 </script>
