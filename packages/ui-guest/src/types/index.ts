@@ -10,6 +10,7 @@ export interface GuestTheme {
   designIdentity?: 'classic' | 'bauhaus' | 'editorial';
   logoUrl?: string | null;
   logoDarkUrl?: string | null;
+  heroBackground?: string | null;
   hotelName: string;
   eveName?: string;
 }
