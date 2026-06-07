@@ -1,0 +1,157 @@
+---
+import type { GuestTheme } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  guestFirstName?: string;
+  checkoutTimeLabel?: string;
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  guestFirstName = 'Anna',
+  checkoutTimeLabel = 'heute bis 11:00 Uhr',
+  previewMode = true,
+} = Astro.props;
+---
+
+<div class="checkout">
+  <div class="checkout__back">
+    <span>← zurück</span>
+  </div>
+
+  <section class="checkout__hero">
+    <div class="checkout__eyebrow">Abreise · {checkoutTimeLabel}</div>
+    <h1 class="checkout__title">
+      Vielen Dank, {guestFirstName}<span class="dot-accent">.</span>
+    </h1>
+    <p class="checkout__sub">Wir freuen uns, dich bald wieder begrüßen zu dürfen.</p>
+  </section>
+
+  <section class="checkout__steps">
+    <div class="checkout__step checkout__step--done">
+      <div class="checkout__step-num">1</div>
+      <div class="checkout__step-body">
+        <div class="checkout__step-title">Rechnung prüfen</div>
+        <div class="checkout__step-sub">Alles automatisch erfasst. Fragen? Ruf kurz an.</div>
+      </div>
+      <svg class="checkout__step-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <path d="M5 12 L10 17 L19 7"/>
+      </svg>
+    </div>
+
+    <div class="checkout__step">
+      <div class="checkout__step-num">2</div>
+      <div class="checkout__step-body">
+        <div class="checkout__step-title">Schlüsselkarten abgeben</div>
+        <div class="checkout__step-sub">Briefkasten am Empfang — du musst niemanden wecken.</div>
+      </div>
+    </div>
+
+    <div class="checkout__step checkout__step--primary">
+      <div class="checkout__step-num">3</div>
+      <div class="checkout__step-body">
+        <div class="checkout__step-title">Auschecken bestätigen</div>
+        <div class="checkout__step-sub">Ein Klick — und du bist fertig.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="checkout__cta-area">
+    <button class="checkout__btn-primary" type="button">
+      Jetzt auschecken ✓
+    </button>
+    <p class="checkout__cta-hint">Du erhältst eine Bestätigungsnachricht.</p>
+  </div>
+</div>
+
+<style>
+  .checkout {
+    display: flex; flex-direction: column; gap: 0;
+    padding: 8px 0 24px;
+    font-family: var(--theme-font-sans, 'Space Grotesk', sans-serif);
+    overflow-y: auto; height: 100%; box-sizing: border-box;
+  }
+  .checkout__back {
+    padding: 4px 16px 0;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--theme-text-secondary, #666); cursor: pointer;
+  }
+  .checkout__hero {
+    padding: 16px 16px 20px;
+  }
+  .checkout__eyebrow {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--theme-text-primary, #1A1A1A);
+    background: var(--theme-bg-secondary, #F5F5F3);
+    display: inline-block; padding: 3px 8px; border-radius: 2px;
+    margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.08);
+  }
+  .checkout__title {
+    font-size: 22px; font-weight: 400; letter-spacing: -0.02em;
+    line-height: 1.15; margin: 0 0 6px; color: var(--theme-text-primary, #1A1A1A);
+  }
+  .dot-accent { color: var(--theme-accent, #FF4A82); }
+  .checkout__sub {
+    font-size: 12px; color: var(--theme-text-secondary, #666); line-height: 1.4; margin: 0;
+  }
+
+  .checkout__steps {
+    padding: 0 16px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;
+  }
+  .checkout__step {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px;
+    background: var(--theme-bg-secondary, #F5F5F3);
+    border-radius: 8px; border: 1px solid transparent;
+  }
+  .checkout__step--done {
+    opacity: 0.55;
+  }
+  .checkout__step--primary {
+    border-color: var(--theme-accent, #FF4A82);
+    background: var(--theme-bg-primary, #fff);
+  }
+  .checkout__step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--theme-text-primary, #1A1A1A);
+    color: var(--theme-bg-primary, #fff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; flex-shrink: 0; margin-top: 1px;
+  }
+  .checkout__step--primary .checkout__step-num {
+    background: var(--theme-accent, #FF4A82);
+  }
+  .checkout__step-check {
+    margin-left: auto; opacity: 0.5; flex-shrink: 0; margin-top: 3px;
+  }
+  .checkout__step-title {
+    font-size: 12px; font-weight: 500; color: var(--theme-text-primary, #1A1A1A);
+    line-height: 1.2; margin-bottom: 2px;
+  }
+  .checkout__step-sub {
+    font-size: 10px; color: var(--theme-text-secondary, #888);
+  }
+
+  .checkout__cta-area {
+    padding: 0 16px; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .checkout__btn-primary {
+    width: 100%; padding: 14px;
+    background: var(--theme-text-primary, #1A1A1A);
+    color: var(--theme-bg-primary, #fff);
+    border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
+    transition: background 150ms;
+  }
+  .checkout__btn-primary:hover {
+    background: var(--theme-accent, #FF4A82);
+  }
+  .checkout__cta-hint {
+    font-size: 10px; color: var(--theme-text-secondary, #999);
+    text-align: center; margin: 0;
+  }
+</style>

@@ -1,0 +1,320 @@
+---
+// Loyalty-Sheet
+// Zugängig via Status-Tab / direktem Link: /g/[token]/loyalty
+// Feature-Gate: features.loyalty
+
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const ctx = await loadStayByToken(token);
+if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+
+const { stay, guest, hotel, settings } = ctx;
+
+// Feature-Gate
+const features = (settings?.features ?? {}) as Record<string, boolean>;
+if (features.loyalty === false) {
+  return Astro.redirect(`/g/${token}`);
+}
+
+const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
+
+// Stay-Session sicherstellen
+const existingSession = await getStaySession(Astro.cookies);
+if (!existingSession || existingSession.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id,
+    hotel_id: hotel.id,
+    check_out_utc: stay.check_out,
+    is_showcase: false,
+  });
+}
+
+// Loyalty-Daten laden
+const sbSr = createSupabaseServiceRoleInstance();
+let loyaltyData: {
+  points: number;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  tier_progress: number;
+  benefits: string[];
+  earned_history: Array<{ label: string; pts: number; date: string }>;
+} | null = null;
+
+if (guest?.id) {
+  const { data: row } = await sbSr
+    .from('loyalty_points')
+    .select('points, tier, tier_progress, benefits, earned_history')
+    .eq('hotel_id', hotel.id)
+    .eq('guest_id', guest.id)
+    .maybeSingle();
+
+  if (row) {
+    loyaltyData = {
+      points: (row as any).points ?? 0,
+      tier: ((row as any).tier as any) ?? 'bronze',
+      tier_progress: (row as any).tier_progress ?? 0,
+      benefits: ((row as any).benefits as string[]) ?? [],
+      earned_history: ((row as any).earned_history as any[]) ?? [],
+    };
+  }
+}
+
+const TIER_NEXT_AT: Record<string, number> = {
+  bronze: 250, silver: 500, gold: 1000, platinum: 9999,
+};
+
+const TIER_LABELS: Record<Lang, Record<string, string>> = {
+  de: { bronze: 'Bronze', silver: 'Silber', gold: 'Gold', platinum: 'Platin' },
+  en: { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' },
+  fr: { bronze: 'Bronze', silver: 'Argent', gold: 'Or', platinum: 'Platine' },
+  es: { bronze: 'Bronce', silver: 'Plata', gold: 'Oro', platinum: 'Platino' },
+};
+
+const NEXT_TIER_LABELS: Record<Lang, Record<string, string>> = {
+  de: { bronze: 'Silber', silver: 'Gold', gold: 'Platin' },
+  en: { bronze: 'Silver', silver: 'Gold', gold: 'Platinum' },
+  fr: { bronze: 'Argent', silver: 'Or', gold: 'Platine' },
+  es: { bronze: 'Plata', silver: 'Oro', gold: 'Platino' },
+};
+
+const tier = loyaltyData?.tier ?? 'bronze';
+const points = loyaltyData?.points ?? 0;
+const nextAt = TIER_NEXT_AT[tier] ?? 500;
+const progressPct = Math.min(100, Math.round((points / nextAt) * 100));
+const tierLabel = TIER_LABELS[lang][tier] ?? tier;
+const nextTierLabel = NEXT_TIER_LABELS[lang][tier] ?? '';
+
+const backHref = `/g/${token}`;
+
+type LabelSet = {
+  status: string; points: string; progress: string;
+  benefits: string; history: string; empty: string; emptySub: string;
+  back: string;
+};
+
+const labels: Record<Lang, LabelSet> = {
+  de: {
+    status: 'Dein Status', points: 'Punkte',
+    progress: `Noch ${Math.max(0, nextAt - points)} Punkte bis ${nextTierLabel}`,
+    benefits: 'Deine Vorteile', history: 'Punkte-Verlauf',
+    empty: 'Noch keine Punkte', emptySub: 'Punkte sammelst du automatisch bei jedem Aufenthalt.',
+    back: '← zurück',
+  },
+  en: {
+    status: 'Your Status', points: 'Points',
+    progress: `${Math.max(0, nextAt - points)} more points until ${nextTierLabel}`,
+    benefits: 'Your Benefits', history: 'Points History',
+    empty: 'No points yet', emptySub: 'You earn points automatically with every stay.',
+    back: '← back',
+  },
+  fr: {
+    status: 'Votre Statut', points: 'Points',
+    progress: `Encore ${Math.max(0, nextAt - points)} points jusqu'à ${nextTierLabel}`,
+    benefits: 'Vos Avantages', history: 'Historique des Points',
+    empty: 'Pas encore de points', emptySub: 'Vous gagnez des points automatiquement à chaque séjour.',
+    back: '← retour',
+  },
+  es: {
+    status: 'Tu Estado', points: 'Puntos',
+    progress: `${Math.max(0, nextAt - points)} puntos más hasta ${nextTierLabel}`,
+    benefits: 'Tus Ventajas', history: 'Historial de Puntos',
+    empty: 'Aún sin puntos', emptySub: 'Ganas puntos automáticamente con cada estancia.',
+    back: '← volver',
+  },
+};
+
+const L = labels[lang];
+const defaultBenefits = tier === 'bronze'
+  ? (lang === 'de' ? ['Willkommensgetränk', 'Späteres Check-out auf Anfrage'] : ['Welcome drink', 'Late check-out on request'])
+  : tier === 'silver'
+    ? (lang === 'de' ? ['Frühes Check-in ab 12:00', 'Spätes Check-out bis 13:00', 'Willkommensgetränk'] : ['Early check-in from 12:00', 'Late check-out until 13:00', 'Welcome drink'])
+    : (lang === 'de' ? ['Frühes Check-in ab 10:00', 'Spätes Check-out bis 15:00', 'Zimmer-Upgrade', 'Willkommenspaket'] : ['Early check-in from 10:00', 'Late check-out until 15:00', 'Room upgrade', 'Welcome package']);
+
+const benefitsList = (loyaltyData?.benefits?.length ? loyaltyData.benefits : defaultBenefits) as string[];
+const historyList = loyaltyData?.earned_history ?? [];
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0A0A" />
+    <title>{hotel.name} · {tierLabel}</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 0;
+        background: #FAFAF8; color: #0A0A0A;
+        font-family: 'Space Grotesk', system-ui, sans-serif; min-height: 100vh;
+      }
+      .page { max-width: 520px; margin: 0 auto; padding-bottom: 60px; }
+
+      .back-link {
+        display: inline-block; padding: 16px 20px 0;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: #888; text-decoration: none;
+      }
+      .back-link:hover { color: #0A0A0A; }
+
+      /* Hero (dark background) */
+      .hero {
+        background: #0A0A0A; color: #FAFAF8;
+        padding: 32px 20px 28px; margin-bottom: 24px;
+      }
+      .hero__eyebrow {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+        opacity: 0.45; margin-bottom: 12px; display: block;
+      }
+      .hero__tier {
+        font-size: clamp(36px, 9vw, 60px); font-weight: 400; letter-spacing: -0.03em;
+        line-height: 1; margin: 0 0 8px;
+      }
+      .hero__tier .dot { color: #FF4A82; }
+      .hero__pts {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px; opacity: 0.6; letter-spacing: 0.08em;
+      }
+
+      /* Progress */
+      .progress { padding: 0 20px 24px; }
+      .progress__bar-wrap {
+        height: 6px; background: #E0DDD8; border-radius: 3px; overflow: hidden; margin-bottom: 8px;
+      }
+      .progress__bar { height: 100%; background: #FF4A82; border-radius: 3px; transition: width 0.5s ease; }
+      .progress__label {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; letter-spacing: 0.04em;
+      }
+
+      /* Section */
+      .section { padding: 0 20px 24px; }
+      .section__head {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: #888; padding-bottom: 10px; margin-bottom: 12px;
+        border-bottom: 1px solid #E0DDD8;
+      }
+
+      /* Benefits */
+      .benefits { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+      .benefit {
+        display: flex; align-items: center; gap: 10px;
+        font-size: 14px; color: #0A0A0A;
+      }
+      .benefit svg { color: #5C9070; flex-shrink: 0; }
+
+      /* History */
+      .history { display: flex; flex-direction: column; }
+      .history__item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 0; border-bottom: 1px solid #F0EDE8;
+        font-size: 13px; color: #0A0A0A;
+      }
+      .history__item:last-child { border-bottom: none; }
+      .history__item-date {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA;
+        margin-top: 2px; display: block;
+      }
+      .history__pts {
+        font-family: 'JetBrains Mono', monospace; font-size: 13px;
+        font-weight: 500; color: #FF4A82;
+      }
+
+      /* Empty state */
+      .empty {
+        background: #F5F5F3; border: 1px solid #E0DDD8; border-radius: 10px;
+        padding: 24px; text-align: center; margin: 0 20px;
+      }
+      .empty__title { font-size: 16px; font-weight: 400; margin: 0 0 6px; }
+      .empty__sub { font-size: 13px; color: #888; margin: 0; line-height: 1.4; }
+
+      .made-by {
+        margin-top: 48px; padding-top: 20px;
+        border-top: 1px solid #E0DDD8;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: #BBB; text-align: center; letter-spacing: 0.06em;
+      }
+      .made-by a { color: #888; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <a href={backHref} class="back-link">{L.back}</a>
+
+      <!-- Hero -->
+      <div class="hero">
+        <span class="hero__eyebrow">{L.status}</span>
+        <h1 class="hero__tier">{tierLabel}<span class="dot">.</span></h1>
+        <p class="hero__pts">{points} {L.points}</p>
+      </div>
+
+      {loyaltyData === null ? (
+        <!-- Kein Loyalty-Eintrag -->
+        <div class="empty">
+          <h2 class="empty__title">{L.empty}</h2>
+          <p class="empty__sub">{L.emptySub}</p>
+        </div>
+      ) : (
+        <>
+          <!-- Progress Bar -->
+          {tier !== 'platinum' && (
+            <div class="progress">
+              <div class="progress__bar-wrap">
+                <div class="progress__bar" style={`width:${progressPct}%`}></div>
+              </div>
+              <p class="progress__label">{L.progress}</p>
+            </div>
+          )}
+
+          <!-- Benefits -->
+          {benefitsList.length > 0 && (
+            <div class="section">
+              <div class="section__head">{L.benefits}</div>
+              <ul class="benefits">
+                {benefitsList.map((b: string) => (
+                  <li class="benefit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" aria-hidden="true">
+                      <path d="M5 12 L10 17 L19 7"/>
+                    </svg>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <!-- History -->
+          {historyList.length > 0 && (
+            <div class="section">
+              <div class="section__head">{L.history}</div>
+              <div class="history">
+                {historyList.slice(0, 10).map((h: any) => (
+                  <div class="history__item">
+                    <div>
+                      <span>{h.label}</span>
+                      {h.date && <span class="history__item-date">{h.date}</span>}
+                    </div>
+                    <span class="history__pts">+{h.pts}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <div class="made-by" style="padding: 20px 20px 0">
+        powered by <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a>
+      </div>
+    </div>
+  </body>
+</html>
