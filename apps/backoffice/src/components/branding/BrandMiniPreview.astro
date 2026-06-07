@@ -35,12 +35,12 @@ const theme: GuestTheme = {
     </div>
   </div>
 
-  <a href="/gast-vorschau" class="brand-preview__link">
-    → Vollständige Gast-Vorschau
+  <button class="brand-preview__link" id="open-guest-preview" type="button">
+    → In Gäste-App öffnen
     <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
       <path d="M6 3l5 5-5 5"/>
     </svg>
-  </a>
+  </button>
 </aside>
 
 <script>
@@ -54,6 +54,26 @@ const theme: GuestTheme = {
         phone.style.setProperty('--theme-accent-hover', input.value);
       }
     });
+  });
+
+  // Vorschau-Button: Token on-demand generieren, echte Gäste-App öffnen
+  document.getElementById('open-guest-preview')?.addEventListener('click', async () => {
+    const btn = document.getElementById('open-guest-preview') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const res = await fetch('/api/admin/preview-url');
+      const data = await res.json();
+      if (data?.url) {
+        window.open(data.url, '_retaha_preview');
+      }
+    } catch {
+      // stilles Fallback zur Vorschau-Seite
+      window.open('/gast-vorschau', '_retaha_preview');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '→ In Gäste-App öffnen <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>';
+    }
   });
 </script>
 
@@ -93,9 +113,10 @@ const theme: GuestTheme = {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px; background: var(--bg-deep);
     border: 1px solid var(--border); border-radius: var(--r-sm);
-    color: var(--ink); text-decoration: none;
+    color: var(--ink); text-decoration: none; cursor: pointer; width: 100%;
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.06em; transition: all 200ms;
   }
-  .brand-preview__link:hover { background: var(--te-yellow-soft); }
+  .brand-preview__link:hover:not(:disabled) { background: var(--te-yellow-soft); }
+  .brand-preview__link:disabled { opacity: 0.5; cursor: wait; }
 </style>

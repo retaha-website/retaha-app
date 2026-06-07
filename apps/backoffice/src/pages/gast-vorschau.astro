@@ -31,7 +31,32 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     <p class="gast-hero__sub">
       Klicke durch verschiedene Szenen — Settings ändern, Handy aktualisiert live.
     </p>
+    <button class="gast-preview-btn" id="open-live-preview" type="button">
+      → In Gäste-App öffnen
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M6 3l5 5-5 5"/>
+      </svg>
+    </button>
   </section>
+
+  <script>
+    document.getElementById('open-live-preview')?.addEventListener('click', async () => {
+      const btn = document.getElementById('open-live-preview') as HTMLButtonElement;
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.textContent = '…';
+      try {
+        const res = await fetch('/api/admin/preview-url');
+        const data = await res.json();
+        if (data?.url) window.open(data.url, '_retaha_preview');
+      } catch {
+        window.open('/gast-vorschau', '_retaha_preview');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+    });
+  </script>
 
   <div class="gast-layout">
     <PhonePreview tags={demoTags} />
@@ -75,4 +100,16 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     .gast-layout { grid-template-columns: 1fr; gap: 32px; padding: 0 20px 64px; }
   }
   .gast-sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .gast-preview-btn {
+    margin-top: 20px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; background: var(--bg-deep);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--ink); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.06em; transition: all 200ms;
+  }
+  .gast-preview-btn:hover:not(:disabled) { background: var(--te-yellow-soft); }
+  .gast-preview-btn:disabled { opacity: 0.5; cursor: wait; }
 </style>
