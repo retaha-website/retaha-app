@@ -7,7 +7,7 @@ export interface GuestTheme {
   /** Gemappter Gäste-App Theme-Name — legacy, für retaha.css */
   guestThemeName: 'bauhaus_manufaktur' | 'premium_anthrazit' | 'warmes_burgund';
   /** Neue Design-Identität — bestimmt data-theme auf GuestPhoneView */
-  designIdentity?: 'classic' | 'bauhaus' | 'editorial';
+  designIdentity?: 'classic' | 'bauhaus' | 'editorial' | 'maison';
   logoUrl?: string | null;
   logoDarkUrl?: string | null;
   heroBackground?: string | null;
@@ -61,7 +61,7 @@ export function resolveDataTheme(
   designIdentity: string | undefined | null,
   guestThemeName: string,
 ): string {
-  if (designIdentity === 'classic' || designIdentity === 'bauhaus' || designIdentity === 'editorial') {
+  if (designIdentity === 'classic' || designIdentity === 'bauhaus' || designIdentity === 'editorial' || designIdentity === 'maison') {
     return designIdentity;
   }
   return guestThemeName; // legacy fallback
