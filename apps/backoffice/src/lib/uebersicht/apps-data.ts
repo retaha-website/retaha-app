@@ -17,7 +17,7 @@ export const APPS: SetupApp[] = [
   { id: 2, num: '02', label: 'Branding',     sub: 'Farben · Schrift',
     activeAt: 15, doneAt: 30,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/branding'          },
   { id: 3, num: '03', label: 'Module',       sub: 'Eve · Empfehlungen',
-    activeAt: 30, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: '3/5 ON' }, href: '/admin/features'    },
+    activeAt: 30, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: '3/5 ON' }, href: '/features'          },
   { id: 4, num: '04', label: 'PMS-Bridge',   sub: 'Apaleo · Protel',
     activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'LINKED' }, href: '/admin/pms'         },
   { id: 5, num: '05', label: '2FA-Sicherheit', sub: 'Zwei-Faktor',
