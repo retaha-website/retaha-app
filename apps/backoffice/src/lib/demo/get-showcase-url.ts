@@ -8,29 +8,42 @@ function makeToken(): string {
   return SHOWCASE_PREFIX + randomBytes(16).toString('hex');
 }
 
+function buildGuestUrl(hotelSlug: string | null | undefined, token: string): string {
+  const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
+  if (hotelSlug) {
+    return `https://${hotelSlug}.${domain}/${token}`;
+  }
+  // Fallback falls kein Slug gesetzt
+  return `https://app.${domain}/g/${token}`;
+}
+
 export async function getOrCreateShowcaseUrl(
   hotelId: string,
   userId: string,
 ): Promise<string | null> {
-  const guestAppUrl = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
   const sb = createSupabaseServiceRoleInstance();
 
-  // 1. Vorhandene aktive Session suchen
-  const { data: existing } = await sb
-    .from('showcase_sessions')
-    .select('token')
-    .eq('hotel_id', hotelId)
-    .eq('is_active', true)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Hotel-Slug + vorhandene aktive Session in einem Query
+  const [{ data: hotel }, { data: existing }] = await Promise.all([
+    sb.from('hotels').select('slug').eq('id', hotelId).single(),
+    sb
+      .from('showcase_sessions')
+      .select('token')
+      .eq('hotel_id', hotelId)
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const slug = (hotel as any)?.slug ?? null;
 
   if (existing?.token) {
-    return `${guestAppUrl}/g/${existing.token}`;
+    return buildGuestUrl(slug, existing.token);
   }
 
-  // 2. Neue Session erstellen
+  // Neue Session erstellen
   const expiresAt = new Date(Date.now() + TTL_DAYS * 86_400_000).toISOString();
   const { data: created, error } = await sb
     .from('showcase_sessions')
@@ -51,5 +64,5 @@ export async function getOrCreateShowcaseUrl(
     .single();
 
   if (error || !created?.token) return null;
-  return `${guestAppUrl}/g/${created.token}`;
+  return buildGuestUrl(slug, created.token);
 }

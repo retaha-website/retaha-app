@@ -42,8 +42,10 @@ export const GET: APIRoute = async ({ cookies, request }) => {
   }
 
   const token = createPreviewToken(hotel.id, identity);
-  const guestAppUrl = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
-  const previewUrl = `${guestAppUrl}/g/preview?t=${token}`;
+  const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
+  const slug   = hotel.slug ?? null;
+  const base   = slug ? `https://${slug}.${domain}` : `https://app.${domain}`;
+  const previewUrl = `${base}/g/preview?t=${token}`;
 
   return json({ ok: true, url: previewUrl, identity });
 };
