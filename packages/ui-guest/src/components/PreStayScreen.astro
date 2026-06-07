@@ -1,0 +1,173 @@
+---
+import type { GuestTheme } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  guestFirstName?: string;
+  daysUntil?: number;
+  arrivalDateLabel?: string;
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  guestFirstName = 'Anna',
+  daysUntil = 3,
+  arrivalDateLabel = 'Do., 12. Jun',
+  previewMode = true,
+} = Astro.props;
+---
+
+<div class="prestay">
+  <div class="prestay__back">
+    <span>← zurück</span>
+  </div>
+
+  <section class="prestay__hero">
+    {theme.logoUrl && (
+      <img class="prestay__logo" src={theme.logoUrl} alt={theme.hotelName} />
+    )}
+    <div class="prestay__eyebrow">In {daysUntil} {daysUntil === 1 ? 'Tag' : 'Tagen'}</div>
+    <h1 class="prestay__title">
+      Hallo, {guestFirstName}<span class="dot-accent">.</span>
+    </h1>
+    <p class="prestay__sub">
+      Wir freuen uns auf dich am {arrivalDateLabel}.
+    </p>
+  </section>
+
+  <section class="prestay__cards">
+    <article class="prestay__card">
+      <div class="prestay__card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+          <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+          <circle cx="12" cy="20" r="1" fill="currentColor"/>
+        </svg>
+      </div>
+      <div>
+        <div class="prestay__card-title">WLAN inklusive</div>
+        <div class="prestay__card-sub">Im ganzen Haus kostenlos</div>
+      </div>
+    </article>
+
+    <article class="prestay__card">
+      <div class="prestay__card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+          <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/>
+          <line x1="10" y1="1" x2="10" y2="4"/>
+          <line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="prestay__card-title">Frühstück 7:00–10:30</div>
+        <div class="prestay__card-sub">Reservierung in der App möglich</div>
+      </div>
+    </article>
+
+    <article class="prestay__card">
+      <div class="prestay__card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path d="M18 20V10"/>
+          <path d="M12 20V4"/>
+          <path d="M6 20v-6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="prestay__card-title">Service auf Abruf</div>
+        <div class="prestay__card-sub">Handtücher, Zimmerservice & mehr</div>
+      </div>
+    </article>
+  </section>
+
+  <div class="prestay__wallet-cta">
+    <div class="prestay__wallet-text">
+      <strong>Bereit für die Anreise?</strong>
+      <span>Hol dir deinen Wallet-Pass — damit geht alles schneller.</span>
+    </div>
+    <button class="prestay__wallet-btn" type="button">Wallet-Pass holen</button>
+  </div>
+</div>
+
+<style>
+  .prestay {
+    display: flex; flex-direction: column; gap: 0;
+    padding: 8px 0 24px;
+    font-family: var(--theme-font-sans, 'Space Grotesk', sans-serif);
+    overflow-y: auto; height: 100%; box-sizing: border-box;
+  }
+  .prestay__back {
+    padding: 4px 16px 0;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--theme-text-secondary, #666);
+    cursor: pointer;
+  }
+  .prestay__hero {
+    padding: 16px 16px 20px;
+  }
+  .prestay__logo {
+    height: 28px; max-width: 100px; object-fit: contain; margin-bottom: 12px;
+  }
+  .prestay__eyebrow {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--theme-text-primary, #1A1A1A);
+    background: var(--theme-accent, #FF4A82);
+    display: inline-block; padding: 3px 8px; border-radius: 2px;
+    margin-bottom: 10px;
+  }
+  .prestay__title {
+    font-size: 26px; font-weight: 400; letter-spacing: -0.025em;
+    line-height: 1.1; margin: 0 0 8px; color: var(--theme-text-primary, #1A1A1A);
+  }
+  .dot-accent { color: var(--theme-accent, #FF4A82); }
+  .prestay__sub {
+    font-size: 13px; color: var(--theme-text-secondary, #666); line-height: 1.4; margin: 0;
+  }
+
+  .prestay__cards {
+    padding: 0 16px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;
+  }
+  .prestay__card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--theme-bg-secondary, #F5F5F3);
+    border-radius: 8px;
+  }
+  .prestay__card-icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: var(--theme-bg-primary, #fff);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: var(--theme-text-primary, #1A1A1A);
+  }
+  .prestay__card-title {
+    font-size: 12px; font-weight: 500; color: var(--theme-text-primary, #1A1A1A);
+    line-height: 1.2;
+  }
+  .prestay__card-sub {
+    font-size: 10px; color: var(--theme-text-secondary, #888); margin-top: 2px;
+  }
+
+  .prestay__wallet-cta {
+    margin: 0 16px;
+    background: var(--theme-text-primary, #1A1A1A);
+    color: var(--theme-bg-primary, #fff);
+    border-radius: 8px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .prestay__wallet-text {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .prestay__wallet-text strong { font-size: 13px; font-weight: 500; }
+  .prestay__wallet-text span { font-size: 11px; opacity: 0.7; }
+  .prestay__wallet-btn {
+    background: var(--theme-accent, #FF4A82);
+    color: white; border: none; border-radius: 6px;
+    padding: 10px; font-size: 12px; font-weight: 500; cursor: pointer;
+    font-family: inherit;
+  }
+</style>

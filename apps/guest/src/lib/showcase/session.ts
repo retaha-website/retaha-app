@@ -38,6 +38,7 @@ export interface ShowcaseSession {
   last_reset_at: string | null;
   created_at: string;
   created_by: string | null;
+  theme_override: 'bauhaus' | 'editorial' | 'maison' | null;
 }
 
 export async function createShowcaseSession(args: {

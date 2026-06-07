@@ -1,147 +1,615 @@
 ---
-import type { GuestTheme, GuestActionCard } from '../types/index.ts';
+import type { GuestTheme } from '../types/index.ts';
 
 interface Props {
   theme: GuestTheme;
   welcomeText?: string;
-  actionCard?: GuestActionCard;
   previewMode?: boolean;
 }
 
-const {
-  theme,
-  welcomeText = `Willkommen im ${theme.hotelName}`,
-  actionCard = {
-    eyebrow: '— Empfang —',
-    title: 'Check-in starten',
-    sub: 'Schlüssel in 2 Minuten bereit.',
-    cta: 'Jetzt einchecken',
-    cardClass: 'rec-anthrazit',
-  },
-  previewMode = false,
-} = Astro.props;
+const { theme, previewMode = false } = Astro.props;
+const guestName = 'Maximilian';
+const hotelInitial = (theme.hotelName ?? 'H').charAt(0).toUpperCase();
 ---
 
-<!-- Hero -->
-<section class="gate-hero">
-  <div class="gate-hero-bg" style={theme.heroBackground ? `background-image: url('${theme.heroBackground}')` : undefined}></div>
-  <div class="gate-hero-overlay"></div>
-  <div class="gate-hero-content">
-    <div class="gate-hero-top">
-      <div class="gate-hero-tag">
-        <span class="gate-hero-tag-shapes">
-          <span class="circle"></span>
-          <span class="square"></span>
-          <span class="triangle"></span>
-        </span>
-        <span>{theme.hotelName}</span>
+<div class="gs-home">
+  <!-- Hotel Header -->
+  <div class="gs-head">
+    <div class="gs-head__mark">
+      <div class="gs-head__logo">{hotelInitial}</div>
+      <div class="gs-head__info">
+        <span class="gs-head__name">{theme.hotelName}</span>
+        <span class="gs-head__room">Berlin · Zimmer 204</span>
       </div>
     </div>
+    <div class="gs-head__lang">DE</div>
+  </div>
 
-    {theme.logoUrl ? (
-      theme.logoDarkUrl
-        ? <img class="gate-hero-logo" src={theme.logoDarkUrl} alt={theme.hotelName} />
-        : <img class="gate-hero-logo gate-hero-logo--invert" src={theme.logoUrl} alt={theme.hotelName} />
-    ) : (
-      <div class="gate-hero-name-fallback">{theme.hotelName}</div>
-    )}
+  <!-- Hero -->
+  <section class="gs-hero">
+    <span class="gs-hero__eyebrow">Willkommen</span>
+    <h1 class="gs-hero__title">
+      Hallo, <em>{guestName}</em><span class="guest-signature"></span>
+    </h1>
+    <p class="gs-hero__sub">Schön, dass du da bist.</p>
+  </section>
 
-    <div class="gate-hero-welcome">
-      <div class="gate-hero-kicker">— herzlich willkommen —</div>
-      <h1 class="gate-hero-greeting">Guten Tag<span class="dot">.</span></h1>
-      <p class="gate-hero-sub">{welcomeText}</p>
+  <!-- Stay info -->
+  <div class="gs-stay">
+    <div class="gs-stay__col">
+      <div class="gs-stay__label">Anreise</div>
+      <div class="gs-stay__value">Heute</div>
     </div>
-
-    <div class="gate-hero-stay">
-      <div class="gate-hero-stay-block">
-        <div class="label">Zimmer</div>
-        <div class="value">101 · Deluxe Suite</div>
-      </div>
-      <div class="gate-hero-stay-block">
-        <div class="label">Check-in → Check-out</div>
-        <div class="value">Heute → Morgen</div>
-      </div>
+    <div class="gs-stay__sep"></div>
+    <div class="gs-stay__col">
+      <div class="gs-stay__label">Abreise</div>
+      <div class="gs-stay__value">Morgen</div>
+    </div>
+    <div class="gs-stay__sep"></div>
+    <div class="gs-stay__col">
+      <div class="gs-stay__label">Nächte</div>
+      <div class="gs-stay__value gs-stay__value--num">1</div>
     </div>
   </div>
-</section>
 
-<!-- Concierge Card -->
-<div class="gate-recommend-card">
-  <div class="gate-recommend-card-left">
-    <div class="gate-recommend-eyebrow">— {theme.eveName ?? 'Eve'}, Concierge —</div>
-    <p class="gate-recommend-text">Frag mich alles — ich helfe rund um die Uhr.</p>
+  <!-- Ornamental divider (used in editorial + maison) -->
+  <div class="gs-divider" aria-hidden="true">
+    <span class="gs-divider__line"></span>
+    <span class="gs-divider__mark"></span>
+    <span class="gs-divider__line"></span>
+  </div>
+
+  <!-- Actions -->
+  <section class="gs-actions">
+    <div class="gs-actions__head">
+      <h2 class="gs-actions__title">Was du brauchst</h2>
+      <span class="gs-actions__count">04</span>
+    </div>
+    <div class="gs-actions__list">
+      <div class="gs-action" data-key="wifi">
+        <span class="gs-action__num">01</span>
+        <div class="gs-action__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div class="gs-action__body">
+          <span class="gs-action__title">WLAN</span>
+          <span class="gs-action__sub">Passwort anzeigen</span>
+        </div>
+        <span class="gs-action__arrow">›</span>
+      </div>
+
+      <div class="gs-action" data-key="eve">
+        <span class="gs-action__num">02</span>
+        <div class="gs-action__icon gs-action__icon--accent" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <div class="gs-action__body">
+          <span class="gs-action__title">{theme.eveName ?? 'Eve'}</span>
+          <span class="gs-action__sub">KI-Concierge</span>
+        </div>
+        <span class="gs-action__arrow">›</span>
+      </div>
+
+      <div class="gs-action" data-key="breakfast">
+        <span class="gs-action__num">03</span>
+        <div class="gs-action__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        </div>
+        <div class="gs-action__body">
+          <span class="gs-action__title">Frühstück</span>
+          <span class="gs-action__sub">Slot buchen</span>
+        </div>
+        <span class="gs-action__arrow">›</span>
+      </div>
+
+      <div class="gs-action" data-key="service">
+        <span class="gs-action__num">04</span>
+        <div class="gs-action__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <div class="gs-action__body">
+          <span class="gs-action__title">Service</span>
+          <span class="gs-action__sub">Anfrage senden</span>
+        </div>
+        <span class="gs-action__arrow">›</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature card -->
+  <div class="gs-feature">
+    <div class="gs-feature__corner gs-feature__corner--tl"></div>
+    <div class="gs-feature__corner gs-feature__corner--br"></div>
+    <div class="gs-feature__eyebrow">Empfehlung</div>
+    <div class="gs-feature__title">Schöne Cafés in 5 Minuten<span class="gs-feature__em"> direkt nebenan.</span></div>
+    <div class="gs-feature__sub">Charlottenburg &amp; nebenan</div>
   </div>
 </div>
 
-<!-- Action Card -->
-<section class="rec-slider-section">
-  <div class="rec-slider-eyebrow">— Empfohlen für dich —</div>
-  <div class="rec-slider">
-    <div class="rec-slider-track">
-      <div class="rec-slide">
-        <div class={`rec-card ${actionCard.cardClass ?? 'rec-anthrazit'}`}>
-          {actionCard.eyebrow && <div class="rec-card-eyebrow">{actionCard.eyebrow}</div>}
-          <div class="rec-card-title">{actionCard.title}</div>
-          {actionCard.sub && <div class="rec-card-sub">{actionCard.sub}</div>}
-          <button
-            class="rec-card-cta"
-            type="button"
-            disabled={previewMode}
-          >{actionCard.cta}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<style is:global>
+/* ── BASE: alle Themes ── */
+.gs-home {
+  display: flex;
+  flex-direction: column;
+  background: var(--guest-bg, var(--theme-bg-secondary, #FAFAF8));
+  color: var(--guest-ink, var(--theme-text-primary, #0A0A0A));
+  font-family: var(--guest-font-body, var(--theme-font-sans, 'Space Grotesk', sans-serif));
+  min-height: 100%;
+  overflow-x: hidden;
+}
 
-<!-- Service Tiles -->
-<section class="gate-actions">
-  <div class="gate-actions-head">
-    <div class="gate-actions-eyebrow">— Was brauchst du? —</div>
-  </div>
-  <div class="gate-grid">
-    <button class="gate-tile" type="button" disabled={previewMode}>
-      <span class="gate-tile-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-      </span>
-      <span class="gate-tile-label">WLAN</span>
-      <span class="gate-tile-sub">Passwort anzeigen</span>
-    </button>
+/* ── Hotel Header ── */
+.gs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--guest-border, var(--theme-border, #E5E4DF));
+}
+.gs-head__mark { display: flex; align-items: center; gap: 10px; }
+.gs-head__logo {
+  width: 30px; height: 30px;
+  background: var(--guest-ink, #0A0A0A);
+  color: var(--guest-bg, #FAFAF7);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--guest-radius-sm, 6px);
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 13px; font-weight: 600;
+}
+.gs-head__name {
+  display: block;
+  font-size: 12px; font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.gs-head__room {
+  display: block;
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--guest-ink-faint, var(--theme-text-muted, #A3A3A3));
+  margin-top: 1px;
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+}
+.gs-head__lang {
+  font-size: 10px; letter-spacing: 0.14em;
+  color: var(--guest-ink-faint, var(--theme-text-muted));
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  cursor: pointer;
+}
 
-    <button class="gate-tile" type="button" disabled={previewMode}>
-      <span class="gate-tile-badge burgund">Online</span>
-      <span class="gate-tile-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-      </span>
-      <span class="gate-tile-label">{theme.eveName ?? 'Eve'}</span>
-      <span class="gate-tile-sub">KI-Concierge</span>
-    </button>
+/* ── Hero ── */
+.gs-hero {
+  padding: 28px 20px 20px;
+}
+.gs-hero__eyebrow {
+  display: inline-block;
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.gs-hero__title {
+  font-family: var(--guest-font-display, var(--theme-font-headline));
+  font-size: 36px; line-height: 1.05;
+  font-weight: var(--guest-display-weight, 500);
+  letter-spacing: var(--guest-display-tracking, -0.025em);
+  font-style: normal;
+  margin: 0 0 8px;
+}
+.gs-hero__title em { font-style: var(--guest-display-style, normal); }
+.gs-hero__sub {
+  font-size: 13px; color: var(--guest-ink-muted, var(--theme-text-muted));
+  line-height: 1.5;
+}
 
-    <button class="gate-tile" type="button" disabled={previewMode}>
-      <span class="gate-tile-badge green">Täglich</span>
-      <span class="gate-tile-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-      </span>
-      <span class="gate-tile-label">Frühstück</span>
-      <span class="gate-tile-sub">07:30 – 10:30</span>
-    </button>
+/* ── Stay strip ── */
+.gs-stay {
+  display: flex; align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid var(--guest-border, var(--theme-border));
+  border-bottom: 1px solid var(--guest-border, var(--theme-border));
+  margin: 0 0 0 0;
+}
+.gs-stay__col { flex: 1; }
+.gs-stay__label {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--guest-ink-faint, var(--theme-text-muted));
+  margin-bottom: 3px;
+}
+.gs-stay__value {
+  font-size: 14px; font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.gs-stay__sep {
+  width: 1px; height: 28px;
+  background: var(--guest-border, var(--theme-border));
+  margin: 0 12px;
+}
 
-    <button class="gate-tile" type="button" disabled={previewMode}>
-      <span class="gate-tile-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      </span>
-      <span class="gate-tile-label">Service</span>
-      <span class="gate-tile-sub">Zimmer · Wäsche · Taxi</span>
-    </button>
-  </div>
-</section>
+/* ── Ornamental divider (only visible in editorial/maison via CSS) ── */
+.gs-divider {
+  display: none;
+  align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 16px 20px;
+}
+.gs-divider__line {
+  flex: 1; height: 1px;
+  background: var(--guest-accent, var(--theme-accent));
+  opacity: 0.4;
+}
+.gs-divider__mark {
+  width: 6px; height: 6px;
+  background: var(--guest-accent, var(--theme-accent));
+  transform: rotate(45deg);
+}
 
-<style>
-  .gate-hero-name-fallback {
-    font-size: 22px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.9);
-    letter-spacing: -0.01em;
-    padding: 4px 0;
-  }
+/* ── Actions ── */
+.gs-actions { padding: 20px 20px 16px; }
+.gs-actions__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.gs-actions__title {
+  font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+}
+.gs-actions__count {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--guest-ink-faint);
+}
+.gs-actions__list {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.gs-action {
+  background: var(--guest-bg-card, #FFFFFF);
+  border: 1px solid var(--guest-border, var(--theme-border));
+  border-radius: var(--guest-radius, 12px);
+  padding: 14px;
+  min-height: 96px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  cursor: pointer;
+  transition: all 180ms ease;
+  position: relative;
+}
+.gs-action__num { display: none; }
+.gs-action__icon {
+  width: 28px; height: 28px;
+  border: 1px solid var(--guest-border-strong, var(--theme-border-strong));
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.gs-action__icon svg { width: 16px; height: 16px; }
+.gs-action__title { font-size: 13px; font-weight: 500; letter-spacing: -0.01em; }
+.gs-action__sub {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--guest-ink-faint);
+  margin-top: 3px;
+}
+.gs-action__arrow { display: none; }
+
+/* ── Feature card ── */
+.gs-feature {
+  margin: 4px 20px 20px;
+  padding: 18px;
+  background: var(--guest-accent, #FF4A82);
+  color: var(--guest-bg, #FAFAF7);
+  border-radius: var(--guest-radius, 12px);
+  position: relative;
+}
+.gs-feature__corner { display: none; }
+.gs-feature__eyebrow {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase;
+  opacity: 0.75; margin-bottom: 6px;
+}
+.gs-feature__title {
+  font-size: 16px; font-weight: 500; line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.gs-feature__em { opacity: 0.85; }
+.gs-feature__sub {
+  font-size: 11px; opacity: 0.75; margin-top: 4px;
+}
+
+/* ════════════════════════════════════ */
+/* BAUHAUS overrides                    */
+/* ════════════════════════════════════ */
+[data-theme="bauhaus"] .gs-hero__eyebrow {
+  background: var(--guest-hover, #FFE600);
+  color: var(--guest-ink, #0A0A0A);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+[data-theme="bauhaus"] .gs-action:hover {
+  background: var(--guest-hover-soft, #FFFAB8);
+  border-color: var(--guest-hover, #FFE600);
+  transform: translateY(-2px);
+}
+[data-theme="bauhaus"] .gs-action[data-key="eve"] {
+  background: var(--guest-ink, #0A0A0A);
+  color: var(--guest-bg, #FAFAF7);
+  border-color: var(--guest-ink);
+}
+[data-theme="bauhaus"] .gs-action[data-key="eve"] .gs-action__icon {
+  border-color: rgba(255,255,255,0.3);
+}
+[data-theme="bauhaus"] .gs-action[data-key="eve"] .gs-action__sub {
+  color: rgba(255,255,255,0.5);
+}
+[data-theme="bauhaus"] .gs-stay__sep { background: var(--guest-border); }
+
+/* ════════════════════════════════════ */
+/* EDITORIAL overrides                  */
+/* ════════════════════════════════════ */
+[data-theme="editorial"] .gs-head {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+[data-theme="editorial"] .gs-head__logo { display: none; }
+[data-theme="editorial"] .gs-head__name {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 18px; font-weight: 500; font-style: italic;
+  letter-spacing: 0.005em;
+}
+[data-theme="editorial"] .gs-head__room {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 9px; color: var(--guest-ink-muted);
+}
+[data-theme="editorial"] .gs-head__lang { color: var(--guest-accent); }
+
+[data-theme="editorial"] .gs-hero__eyebrow {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--guest-accent);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  letter-spacing: 0.22em; font-weight: 500;
+  background: none; padding: 0;
+}
+[data-theme="editorial"] .gs-hero__eyebrow::after {
+  content: ''; flex: 1; height: 1px;
+  background: var(--guest-accent); opacity: 0.3;
+}
+[data-theme="editorial"] .gs-hero__title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 40px; font-weight: 400;
+}
+[data-theme="editorial"] .gs-hero__title em { font-style: italic; color: var(--guest-accent); }
+[data-theme="editorial"] .gs-hero__sub {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 16px; color: var(--guest-ink-muted);
+}
+
+[data-theme="editorial"] .gs-stay {
+  border-top: 1px solid var(--guest-border);
+  border-bottom: 1px solid var(--guest-border);
+  margin: 0 20px;
+}
+[data-theme="editorial"] .gs-stay__value {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 17px;
+}
+[data-theme="editorial"] .gs-stay__value--num { font-style: normal; }
+[data-theme="editorial"] .gs-stay__sep { background: var(--guest-border); }
+
+[data-theme="editorial"] .gs-divider { display: flex; }
+
+[data-theme="editorial"] .gs-actions__title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 22px; font-weight: 400;
+}
+[data-theme="editorial"] .gs-actions__list {
+  display: flex; flex-direction: column; gap: 0;
+}
+[data-theme="editorial"] .gs-action {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--guest-border);
+  border-radius: 0;
+  padding: 16px 0;
+  min-height: auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  transition: padding 220ms ease;
+}
+[data-theme="editorial"] .gs-action:last-child { border-bottom: none; }
+[data-theme="editorial"] .gs-action:hover { padding-left: 6px; }
+[data-theme="editorial"] .gs-action__num {
+  display: block;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 20px; font-weight: 300;
+  color: var(--guest-accent); width: 22px; flex-shrink: 0;
+}
+[data-theme="editorial"] .gs-action__icon { display: none; }
+[data-theme="editorial"] .gs-action__body { flex: 1; }
+[data-theme="editorial"] .gs-action__title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 18px; font-weight: 500;
+}
+[data-theme="editorial"] .gs-action__sub {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 10px; letter-spacing: 0.04em; text-transform: none; color: var(--guest-ink-muted);
+}
+[data-theme="editorial"] .gs-action__arrow {
+  display: block;
+  color: var(--guest-accent);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 22px; font-style: italic; font-weight: 300;
+}
+[data-theme="editorial"] .gs-feature {
+  background: var(--guest-accent-soft);
+  color: var(--guest-ink);
+  border-radius: 0;
+  border: 1px solid var(--guest-accent);
+  padding: 20px;
+}
+[data-theme="editorial"] .gs-feature__corner {
+  display: block;
+  position: absolute;
+  width: 10px; height: 10px;
+  border: 1px solid var(--guest-accent);
+}
+[data-theme="editorial"] .gs-feature__corner--tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+[data-theme="editorial"] .gs-feature__corner--br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+[data-theme="editorial"] .gs-feature__eyebrow { color: var(--guest-accent); opacity: 1; }
+[data-theme="editorial"] .gs-feature__title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 20px; font-weight: 400; font-style: italic;
+}
+[data-theme="editorial"] .gs-feature__sub { color: var(--guest-ink-muted); opacity: 1; }
+
+/* ════════════════════════════════════ */
+/* MAISON overrides                     */
+/* ════════════════════════════════════ */
+[data-theme="maison"] .gs-home {
+  background: radial-gradient(circle at 50% 0%, rgba(201,163,106,.05) 0%, transparent 50%), var(--guest-bg);
+}
+[data-theme="maison"] .gs-head {
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--guest-border);
+}
+[data-theme="maison"] .gs-head__mark { flex-direction: column; align-items: center; gap: 2px; }
+[data-theme="maison"] .gs-head__logo { display: none; }
+[data-theme="maison"] .gs-head__info { text-align: center; }
+[data-theme="maison"] .gs-head__name {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-size: 16px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--guest-ink);
+}
+[data-theme="maison"] .gs-head__room {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 9px; letter-spacing: 0.24em;
+  color: var(--guest-accent);
+}
+[data-theme="maison"] .gs-head__lang {
+  position: absolute; top: 14px; right: 20px;
+  color: var(--guest-accent); letter-spacing: 0.22em;
+  font-family: 'Inter Tight', system-ui, sans-serif;
+}
+
+[data-theme="maison"] .gs-divider { display: flex; }
+
+[data-theme="maison"] .gs-hero {
+  padding: 16px 20px 16px;
+  text-align: center;
+}
+[data-theme="maison"] .gs-hero__eyebrow {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 9px; letter-spacing: 0.30em;
+  color: var(--guest-accent);
+  background: none; padding: 0;
+}
+[data-theme="maison"] .gs-hero__title {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-size: 34px; font-weight: 400; letter-spacing: 0em;
+  color: var(--guest-ink);
+}
+[data-theme="maison"] .gs-hero__title em {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-weight: 300; color: var(--guest-accent);
+  font-size: 32px;
+}
+[data-theme="maison"] .gs-hero__sub {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 15px; color: var(--guest-ink-muted);
+}
+
+[data-theme="maison"] .gs-stay {
+  justify-content: space-between; text-align: center;
+  margin: 0 20px;
+  border-color: var(--guest-border);
+}
+[data-theme="maison"] .gs-stay__col { text-align: center; }
+[data-theme="maison"] .gs-stay__label {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  letter-spacing: 0.22em; color: var(--guest-ink-faint);
+}
+[data-theme="maison"] .gs-stay__value {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-weight: 500; color: var(--guest-ink); font-size: 16px;
+}
+[data-theme="maison"] .gs-stay__sep { background: var(--guest-border); }
+
+[data-theme="maison"] .gs-actions__head { text-align: center; justify-content: center; flex-direction: column; gap: 4px; }
+[data-theme="maison"] .gs-actions__title {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-style: italic; font-size: 20px; font-weight: 400;
+  color: var(--guest-ink);
+}
+[data-theme="maison"] .gs-actions__count {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  letter-spacing: 0.28em; color: var(--guest-accent);
+}
+[data-theme="maison"] .gs-actions__list {
+  display: flex; flex-direction: column; gap: 0;
+}
+[data-theme="maison"] .gs-action {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--guest-border);
+  border-radius: 0;
+  padding: 16px 0;
+  min-height: auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  transition: background 250ms ease, padding 250ms ease;
+}
+[data-theme="maison"] .gs-action:last-child { border-bottom: none; }
+[data-theme="maison"] .gs-action:hover { background: var(--guest-hover); }
+[data-theme="maison"] .gs-action__num { display: none; }
+[data-theme="maison"] .gs-action__icon {
+  width: 38px; height: 38px;
+  border: 1px solid var(--guest-accent);
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+[data-theme="maison"] .gs-action__icon svg { color: var(--guest-accent); }
+[data-theme="maison"] .gs-action__body { flex: 1; }
+[data-theme="maison"] .gs-action__title {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-size: 17px; font-weight: 500; color: var(--guest-ink);
+}
+[data-theme="maison"] .gs-action__sub {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; font-size: 12px; letter-spacing: 0; text-transform: none;
+  color: var(--guest-ink-muted);
+}
+[data-theme="maison"] .gs-action__arrow {
+  display: block;
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 18px; font-weight: 300; color: var(--guest-accent);
+}
+[data-theme="maison"] .gs-feature {
+  background: var(--guest-bg-deep);
+  color: var(--guest-ink);
+  border: 1px solid var(--guest-accent);
+  border-radius: 0;
+  padding: 20px; margin: 4px 20px 20px;
+  text-align: center;
+}
+[data-theme="maison"] .gs-feature__corner {
+  display: block;
+  position: absolute;
+  width: 12px; height: 12px;
+  border: 1px solid var(--guest-accent);
+}
+[data-theme="maison"] .gs-feature__corner--tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+[data-theme="maison"] .gs-feature__corner--br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+[data-theme="maison"] .gs-feature__eyebrow { color: var(--guest-accent); opacity: 1; letter-spacing: 0.28em; }
+[data-theme="maison"] .gs-feature__title {
+  font-family: 'Bodoni Moda', 'Didot', Georgia, serif;
+  font-size: 18px; font-weight: 400; color: var(--guest-ink);
+}
+[data-theme="maison"] .gs-feature__em {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic; color: var(--guest-accent);
+}
+[data-theme="maison"] .gs-feature__sub { color: var(--guest-ink-muted); opacity: 1; }
 </style>

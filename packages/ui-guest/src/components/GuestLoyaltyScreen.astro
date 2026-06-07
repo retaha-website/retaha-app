@@ -1,0 +1,156 @@
+---
+import type { GuestTheme } from '../types/index.ts';
+
+interface Props {
+  theme: GuestTheme;
+  tier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  points?: number;
+  nextTierAt?: number;
+  benefits?: string[];
+  previewMode?: boolean;
+}
+
+const {
+  theme,
+  tier = 'silver',
+  points = 340,
+  nextTierAt = 500,
+  benefits = ['Frühes Check-in (ab 12:00)', 'Spätes Check-out (bis 13:00)', 'Willkommensgetränk'],
+  previewMode = true,
+} = Astro.props;
+
+const TIER_LABELS: Record<string, string> = {
+  bronze: 'Bronze',
+  silver: 'Silber',
+  gold: 'Gold',
+  platinum: 'Platin',
+};
+
+const progressPct = Math.min(100, Math.round((points / nextTierAt) * 100));
+const nextTierLabel = tier === 'bronze' ? 'Silber' : tier === 'silver' ? 'Gold' : tier === 'gold' ? 'Platin' : '—';
+---
+
+<div class="loyalty">
+  <section class="loyalty__hero">
+    <div class="loyalty__eyebrow">Dein Status</div>
+    <h1 class="loyalty__tier">{TIER_LABELS[tier] ?? tier}<span class="dot-accent">.</span></h1>
+    <p class="loyalty__pts">{points} Punkte</p>
+  </section>
+
+  {tier !== 'platinum' && (
+    <section class="loyalty__progress">
+      <div class="loyalty__progress-bar-wrap">
+        <div class="loyalty__progress-bar" style={`width:${progressPct}%`}></div>
+      </div>
+      <p class="loyalty__progress-label">
+        Noch {nextTierAt - points} Punkte bis {nextTierLabel}
+      </p>
+    </section>
+  )}
+
+  <section class="loyalty__benefits">
+    <div class="loyalty__section-label">Deine Vorteile</div>
+    <ul class="loyalty__list">
+      {benefits.map(b => (
+        <li class="loyalty__item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true">
+            <path d="M5 12 L10 17 L19 7"/>
+          </svg>
+          {b}
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="loyalty__history">
+    <div class="loyalty__section-label">Punkte-Verlauf</div>
+    <div class="loyalty__history-item">
+      <span>Aufenthalt gebucht</span>
+      <span class="loyalty__history-pts">+50</span>
+    </div>
+    <div class="loyalty__history-item">
+      <span>Frühstück reserviert</span>
+      <span class="loyalty__history-pts">+10</span>
+    </div>
+    <div class="loyalty__history-item">
+      <span>Bewertung hinterlassen</span>
+      <span class="loyalty__history-pts">+20</span>
+    </div>
+  </section>
+</div>
+
+<style>
+  .loyalty {
+    display: flex; flex-direction: column; gap: 0;
+    padding: 8px 0 24px;
+    font-family: var(--theme-font-sans, 'Space Grotesk', sans-serif);
+    overflow-y: auto; height: 100%; box-sizing: border-box;
+  }
+  .loyalty__hero {
+    padding: 20px 16px 16px;
+    background: var(--theme-text-primary, #1A1A1A);
+    color: var(--theme-bg-primary, #fff);
+    margin-bottom: 16px;
+  }
+  .loyalty__eyebrow {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    opacity: 0.55; margin-bottom: 8px;
+  }
+  .loyalty__tier {
+    font-size: 32px; font-weight: 400; letter-spacing: -0.03em;
+    margin: 0 0 4px; line-height: 1;
+  }
+  .dot-accent { color: var(--theme-accent, #FF4A82); }
+  .loyalty__pts {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px; letter-spacing: 0.08em; opacity: 0.7; margin: 0;
+  }
+
+  .loyalty__progress {
+    padding: 0 16px 16px;
+  }
+  .loyalty__progress-bar-wrap {
+    height: 6px; background: var(--theme-bg-secondary, #F0F0EE);
+    border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+  }
+  .loyalty__progress-bar {
+    height: 100%; background: var(--theme-accent, #FF4A82);
+    border-radius: 3px; transition: width 0.5s ease;
+  }
+  .loyalty__progress-label {
+    font-size: 10px; color: var(--theme-text-secondary, #888);
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    letter-spacing: 0.04em; margin: 0;
+  }
+
+  .loyalty__benefits, .loyalty__history {
+    padding: 0 16px 16px;
+  }
+  .loyalty__section-label {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--theme-text-secondary, #888);
+    padding-bottom: 8px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--theme-border, rgba(0,0,0,0.08));
+  }
+  .loyalty__list {
+    list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;
+  }
+  .loyalty__item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--theme-text-primary, #1A1A1A);
+  }
+  .loyalty__item svg { color: var(--theme-accent, #FF4A82); flex-shrink: 0; }
+
+  .loyalty__history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--theme-border, rgba(0,0,0,0.05));
+    font-size: 12px; color: var(--theme-text-primary, #1A1A1A);
+  }
+  .loyalty__history-pts {
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px; color: var(--theme-accent, #FF4A82); font-weight: 500;
+  }
+</style>

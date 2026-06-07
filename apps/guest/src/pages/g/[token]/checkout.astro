@@ -1,0 +1,379 @@
+---
+// Self-Checkout-Sheet
+// Zugängig via Tile-Klick auf der Hauptseite: /g/[token]/checkout
+// Feature-Gate: features.self_checkout
+
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const ctx = await loadStayByToken(token);
+if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+
+const { stay, guest, hotel, settings } = ctx;
+
+// Feature-Gate
+const features = (settings?.features ?? {}) as Record<string, boolean>;
+if (features.self_checkout === false) {
+  return Astro.redirect(`/g/${token}`);
+}
+
+const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
+
+// Stay-Session sicherstellen
+const existingSession = await getStaySession(Astro.cookies);
+if (!existingSession || existingSession.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id,
+    hotel_id: hotel.id,
+    check_out_utc: stay.check_out,
+    is_showcase: false,
+  });
+}
+
+// Checkout-Datum formatieren
+const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+const checkoutDate = new Date(stay.check_out);
+const checkoutDateLabel = checkoutDate.toLocaleDateString(localeMap[lang], {
+  weekday: 'long', day: '2-digit', month: 'long',
+});
+const checkoutTime = checkoutDate.toLocaleTimeString(localeMap[lang], {
+  hour: '2-digit', minute: '2-digit',
+});
+
+const guestName = guest?.first_name ?? null;
+const isCheckoutDay = new Date().toDateString() === checkoutDate.toDateString();
+const alreadyPast = Date.parse(stay.check_out) < Date.now();
+
+// Check ob schon ausgecheckt
+const sbSr = createSupabaseServiceRoleInstance();
+const { data: stayRow } = await sbSr
+  .from('stays')
+  .select('checked_out_at')
+  .eq('id', stay.id)
+  .maybeSingle();
+const alreadyCheckedOut = !!(stayRow as any)?.checked_out_at;
+
+const backHref = `/g/${token}`;
+
+type LabelSet = {
+  eyebrow: string; title: string; titleFallback: string; sub: string;
+  step1Title: string; step1Sub: string;
+  step2Title: string; step2Sub: string;
+  step3Title: string; step3Sub: string;
+  btnLabel: string; hintLabel: string;
+  doneTitle: string; doneSub: string;
+  notYetTitle: string; notYetSub: string;
+  back: string;
+};
+
+const labels: Record<Lang, LabelSet> = {
+  de: {
+    eyebrow: `Abreise · ${checkoutDateLabel} · ${checkoutTime} Uhr`,
+    title: `Auf Wiedersehen${guestName ? `, ${guestName}` : ''}`,
+    titleFallback: 'Auf Wiedersehen',
+    sub: 'Danke für deinen Aufenthalt — wir hoffen, es hat dir gefallen.',
+    step1Title: 'Rechnung prüfen',
+    step1Sub: 'Alles automatisch erfasst. Fragen? Ruf die Rezeption kurz an.',
+    step2Title: 'Schlüsselkarten abgeben',
+    step2Sub: 'Briefkasten am Empfang — kein Warten an der Rezeption nötig.',
+    step3Title: 'Auschecken bestätigen',
+    step3Sub: 'Ein Klick — du erhältst eine Bestätigungs-Email.',
+    btnLabel: 'Jetzt auschecken ✓',
+    hintLabel: 'Du erhältst eine kurze Bestätigung per E-Mail.',
+    doneTitle: 'Erfolgreich ausgecheckt.',
+    doneSub: 'Gute Reise — wir hoffen, dich bald wieder begrüßen zu dürfen.',
+    notYetTitle: 'Checkout noch nicht möglich.',
+    notYetSub: `Dein Abreise-Tag ist ${checkoutDateLabel}. Bis dahin — genieß deinen Aufenthalt!`,
+    back: '← zurück',
+  },
+  en: {
+    eyebrow: `Check-out · ${checkoutDateLabel} · ${checkoutTime}`,
+    title: `Goodbye${guestName ? `, ${guestName}` : ''}`,
+    titleFallback: 'Goodbye',
+    sub: 'Thank you for your stay — we hope you enjoyed it.',
+    step1Title: 'Review your bill',
+    step1Sub: 'Everything is captured automatically. Questions? Call reception.',
+    step2Title: 'Return key cards',
+    step2Sub: 'Drop them in the box at reception — no waiting required.',
+    step3Title: 'Confirm check-out',
+    step3Sub: "One click — you'll receive a confirmation email.",
+    btnLabel: 'Check out now ✓',
+    hintLabel: "You'll receive a short confirmation by email.",
+    doneTitle: 'Successfully checked out.',
+    doneSub: 'Safe travels — we hope to welcome you back soon.',
+    notYetTitle: 'Check-out not yet available.',
+    notYetSub: `Your check-out date is ${checkoutDateLabel}. Until then — enjoy your stay!`,
+    back: '← back',
+  },
+  fr: {
+    eyebrow: `Départ · ${checkoutDateLabel} · ${checkoutTime}`,
+    title: `Au revoir${guestName ? `, ${guestName}` : ''}`,
+    titleFallback: 'Au revoir',
+    sub: 'Merci pour votre séjour — nous espérons vous revoir bientôt.',
+    step1Title: 'Vérifier la facture',
+    step1Sub: 'Tout est capturé automatiquement. Questions? Appelez la réception.',
+    step2Title: 'Rendre les clés',
+    step2Sub: 'Glissez-les dans la boîte à la réception — sans attente.',
+    step3Title: 'Confirmer le départ',
+    step3Sub: "Un clic — vous recevrez un e-mail de confirmation.",
+    btnLabel: 'Partir maintenant ✓',
+    hintLabel: "Vous recevrez une confirmation par e-mail.",
+    doneTitle: 'Départ confirmé.',
+    doneSub: 'Bon voyage — à bientôt!',
+    notYetTitle: 'Départ pas encore disponible.',
+    notYetSub: `Votre date de départ est le ${checkoutDateLabel}.`,
+    back: '← retour',
+  },
+  es: {
+    eyebrow: `Salida · ${checkoutDateLabel} · ${checkoutTime}`,
+    title: `Hasta pronto${guestName ? `, ${guestName}` : ''}`,
+    titleFallback: 'Hasta pronto',
+    sub: 'Gracias por tu estancia — esperamos verte pronto.',
+    step1Title: 'Revisar la factura',
+    step1Sub: 'Todo registrado automáticamente. ¿Preguntas? Llama a recepción.',
+    step2Title: 'Devolver las llaves',
+    step2Sub: 'Deposítalas en la caja de recepción — sin esperar.',
+    step3Title: 'Confirmar la salida',
+    step3Sub: 'Un clic — recibirás un correo de confirmación.',
+    btnLabel: 'Salir ahora ✓',
+    hintLabel: 'Recibirás una confirmación breve por e-mail.',
+    doneTitle: 'Salida confirmada.',
+    doneSub: '¡Buen viaje — esperamos verte pronto!',
+    notYetTitle: 'Salida aún no disponible.',
+    notYetSub: `Tu fecha de salida es el ${checkoutDateLabel}.`,
+    back: '← volver',
+  },
+};
+
+const L = labels[lang];
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0A0A" />
+    <title>{hotel.name} · {lang === 'de' ? 'Auschecken' : 'Check-out'}</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 0;
+        background: #FAFAF8; color: #0A0A0A;
+        font-family: 'Space Grotesk', system-ui, sans-serif; min-height: 100vh;
+      }
+      .page { max-width: 520px; margin: 0 auto; padding: 0 20px 60px; }
+
+      .back-link {
+        display: inline-block; padding: 16px 0 0;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: #888; text-decoration: none;
+      }
+      .back-link:hover { color: #0A0A0A; }
+
+      .hero { padding: 32px 0 28px; border-bottom: 1px solid #E0DDD8; margin-bottom: 28px; }
+      .hero__eyebrow {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px; letter-spacing: 0.14em; font-weight: 500;
+        color: #888; display: block; margin-bottom: 12px;
+      }
+      .hero__title {
+        font-size: clamp(26px, 6vw, 42px); font-weight: 400; letter-spacing: -0.025em;
+        line-height: 1.05; margin: 0 0 10px; color: #0A0A0A;
+      }
+      .hero__title .dot { color: #FF4A82; }
+      .hero__sub { font-size: 15px; color: #666; line-height: 1.5; margin: 0; }
+
+      /* Steps */
+      .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+      .step {
+        display: flex; align-items: flex-start; gap: 14px;
+        padding: 14px 16px;
+        background: #fff; border: 1px solid #E0DDD8; border-radius: 10px;
+      }
+      .step--highlight { border-color: #0A0A0A; }
+      .step--done { opacity: 0.45; }
+      .step__num {
+        width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+        background: #E0DDD8; color: #555;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+        margin-top: 1px;
+      }
+      .step--highlight .step__num { background: #0A0A0A; color: #FAFAF8; }
+      .step__title { font-size: 14px; font-weight: 500; color: #0A0A0A; line-height: 1.2; margin-bottom: 3px; }
+      .step__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; line-height: 1.4; }
+      .step__check { margin-left: auto; flex-shrink: 0; color: #5C9070; margin-top: 4px; }
+
+      /* CTA */
+      .cta-area { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+      .cta-btn {
+        width: 100%; padding: 16px;
+        background: #0A0A0A; color: #FAFAF8;
+        border: none; border-radius: 10px;
+        font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit;
+        transition: background 150ms;
+      }
+      .cta-btn:hover { background: #FF4A82; }
+      .cta-btn:disabled { opacity: 0.5; cursor: wait; }
+      .cta-hint {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA;
+        text-align: center; margin: 0; letter-spacing: 0.04em;
+      }
+
+      /* Done state */
+      .done-state {
+        background: #0A0A0A; color: #FAFAF8;
+        border-radius: 12px; padding: 28px 24px; text-align: center;
+        margin-bottom: 20px;
+      }
+      .done-state__icon { font-size: 36px; margin-bottom: 16px; }
+      .done-state__title { font-size: 20px; font-weight: 400; margin: 0 0 8px; }
+      .done-state__sub { font-size: 13px; opacity: 0.65; line-height: 1.4; margin: 0; }
+
+      /* Not-yet state */
+      .notyet-state {
+        background: #F5F5F3; border: 1px solid #E0DDD8;
+        border-radius: 12px; padding: 24px; text-align: center;
+      }
+      .notyet-state__title { font-size: 18px; font-weight: 400; margin: 0 0 8px; }
+      .notyet-state__sub { font-size: 13px; color: #666; line-height: 1.4; margin: 0; }
+
+      /* Flash */
+      .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+      .flash--ok { background: #EDF7ED; color: #2D6B2D; border: 1px solid #B5D9B5; }
+      .flash--err { background: #FEF2F2; color: #8C2128; border: 1px solid #F5C6C6; }
+      .flash[hidden] { display: none; }
+
+      .made-by {
+        margin-top: 48px; padding-top: 20px;
+        border-top: 1px solid #E0DDD8;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: #BBB; text-align: center; letter-spacing: 0.06em;
+      }
+      .made-by a { color: #888; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <a href={backHref} class="back-link">{L.back}</a>
+
+      <div class="hero">
+        <span class="hero__eyebrow">{L.eyebrow}</span>
+        <h1 class="hero__title">{L.title}<span class="dot">.</span></h1>
+        <p class="hero__sub">{L.sub}</p>
+      </div>
+
+      {alreadyCheckedOut ? (
+        <!-- Schon ausgecheckt -->
+        <div class="done-state">
+          <div class="done-state__icon">✓</div>
+          <h2 class="done-state__title">{L.doneTitle}</h2>
+          <p class="done-state__sub">{L.doneSub}</p>
+        </div>
+      ) : !isCheckoutDay && !alreadyPast ? (
+        <!-- Noch nicht Abreise-Tag -->
+        <div class="notyet-state">
+          <h2 class="notyet-state__title">{L.notYetTitle}</h2>
+          <p class="notyet-state__sub">{L.notYetSub}</p>
+        </div>
+      ) : (
+        <!-- Checkout-Flow -->
+        <>
+          <div id="flash-ok" class="flash flash--ok" hidden></div>
+          <div id="flash-err" class="flash flash--err" hidden></div>
+
+          <div class="steps">
+            <div class="step step--done">
+              <div class="step__num">1</div>
+              <div>
+                <div class="step__title">{L.step1Title}</div>
+                <div class="step__sub">{L.step1Sub}</div>
+              </div>
+              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                <path d="M5 12 L10 17 L19 7"/>
+              </svg>
+            </div>
+
+            <div class="step step--done">
+              <div class="step__num">2</div>
+              <div>
+                <div class="step__title">{L.step2Title}</div>
+                <div class="step__sub">{L.step2Sub}</div>
+              </div>
+              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                <path d="M5 12 L10 17 L19 7"/>
+              </svg>
+            </div>
+
+            <div class="step step--highlight">
+              <div class="step__num">3</div>
+              <div>
+                <div class="step__title">{L.step3Title}</div>
+                <div class="step__sub">{L.step3Sub}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cta-area">
+            <button class="cta-btn" id="checkout-btn" type="button">
+              {L.btnLabel}
+            </button>
+            <p class="cta-hint">{L.hintLabel}</p>
+          </div>
+        </>
+      )}
+
+      <div class="made-by">
+        powered by <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a>
+      </div>
+    </div>
+
+    <script is:inline define:vars={{ token, doneTitle: L.doneTitle, doneSub: L.doneSub }}>
+      const btn = document.getElementById('checkout-btn');
+      const flashOk = document.getElementById('flash-ok');
+      const flashErr = document.getElementById('flash-err');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          flashOk && (flashOk.hidden = true);
+          flashErr && (flashErr.hidden = true);
+          try {
+            const res = await fetch('/api/checkout/complete', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ stay_token: token }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) {
+              if (flashOk) {
+                flashOk.textContent = '✓ ' + doneTitle;
+                flashOk.hidden = false;
+              }
+              setTimeout(() => {
+                window.location.href = '/g/' + token;
+              }, 1800);
+            } else {
+              throw new Error(data.error || 'checkout failed');
+            }
+          } catch (err) {
+            if (flashErr) {
+              flashErr.textContent = 'Fehler: ' + (err.message || 'Bitte nochmal versuchen.');
+              flashErr.hidden = false;
+            }
+            btn.disabled = false;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
