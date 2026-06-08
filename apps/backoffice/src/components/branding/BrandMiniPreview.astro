@@ -1,24 +1,12 @@
 ---
-import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
-import type { GuestTheme } from '@retaha/ui-guest/types';
-import { mapThemeName } from '@retaha/ui-guest/types';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
-interface Props { branding: BrandingData; hotelName: string; }
-const { branding, hotelName } = Astro.props;
-
-const theme: GuestTheme = {
-  primary:        branding.brand_primary   ?? '#FF4A82',
-  secondary:      branding.brand_secondary ?? undefined,
-  themeName:      (branding.brand_theme    ?? 'coffee') as GuestTheme['themeName'],
-  guestThemeName: mapThemeName(branding.brand_theme ?? 'coffee'),
-  designIdentity: branding.design_identity ?? 'classic',
-  logoUrl:        branding.logo_primary    ?? null,
-  logoDarkUrl:    branding.logo_dark       ?? null,
-  heroBackground: branding.splash_background ?? null,
-  hotelName,
-  eveName:        'Eve',
-};
+interface Props {
+  branding: BrandingData;
+  hotelName: string;
+  demoUrl?: string | null;
+}
+const { demoUrl } = Astro.props;
 ---
 
 <aside class="brand-preview">
@@ -31,7 +19,20 @@ const theme: GuestTheme = {
   <div class="brand-preview__phone">
     <div class="brand-preview__notch"></div>
     <div class="brand-preview__screen" id="brandPhoneScreen">
-      <GuestPhoneView theme={theme} previewMode={true} scale={0.6} />
+      {demoUrl ? (
+        <iframe
+          class="brand-preview__iframe"
+          src={demoUrl}
+          title="Gäste-App Vorschau"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          loading="lazy"
+          scrolling="no"
+        ></iframe>
+      ) : (
+        <div class="brand-preview__placeholder">
+          <span>Vorschau wird vorbereitet…</span>
+        </div>
+      )}
     </div>
   </div>
 
@@ -44,19 +45,6 @@ const theme: GuestTheme = {
 </aside>
 
 <script>
-  // Live-Update: Brand-Color → --theme-accent im Phone
-  document.querySelectorAll<HTMLInputElement>('[data-swatch]').forEach(input => {
-    if (input.id !== 'brand-primary') return;
-    input.addEventListener('input', () => {
-      const phone = document.getElementById('brandPhoneScreen');
-      if (phone && /^#[0-9A-Fa-f]{6}$/.test(input.value)) {
-        phone.style.setProperty('--theme-accent', input.value);
-        phone.style.setProperty('--theme-accent-hover', input.value);
-      }
-    });
-  });
-
-  // Vorschau-Button: Token on-demand generieren, echte Gäste-App öffnen
   document.getElementById('open-guest-preview')?.addEventListener('click', async () => {
     const btn = document.getElementById('open-guest-preview') as HTMLButtonElement;
     btn.disabled = true;
@@ -68,7 +56,6 @@ const theme: GuestTheme = {
         window.open(data.url, '_retaha_preview');
       }
     } catch {
-      // stilles Fallback zur Vorschau-Seite
       window.open('/gast-vorschau', '_retaha_preview');
     } finally {
       btn.disabled = false;
@@ -102,13 +89,32 @@ const theme: GuestTheme = {
     width: 64px; height: 16px; background: #0A0A0A; border-radius: 8px; z-index: 10;
   }
   .brand-preview__screen {
-    /* position: absolute + inset damit der Screen eine explizit definierte
-       Höhe hat — height:100% auf aspect-ratio-Eltern funktioniert nicht zuverlässig */
     position: absolute;
     inset: 10px;
     border-radius: 20px;
     overflow: hidden;
+    background: #FAFAF8;
   }
+
+  /* iframe: wird in voller mobiler Breite gerendert, dann auf 60% skaliert */
+  .brand-preview__iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: calc(100% / 0.58);
+    height: calc(100% / 0.58);
+    transform: scale(0.58);
+    transform-origin: top left;
+    border: none;
+    pointer-events: none;
+  }
+
+  .brand-preview__placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.1em; color: var(--ink-muted);
+  }
+
   .brand-preview__link {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px; background: var(--bg-deep);

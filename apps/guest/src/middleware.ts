@@ -5,20 +5,28 @@ const SYSTEM_SUBDOMAINS = new Set(['app', 'www', 'api', 'mail', 'smtp', 'ftp']);
 const DOMAIN_SUFFIX = '.retaha.de';
 const MAIN_HOST    = 'app.retaha.de';
 
+const FRAME_ANCESTORS_CSP = "frame-ancestors 'self' https://backoffice.retaha.de https://*.retaha.de";
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const host     = context.request.headers.get('host') ?? '';
   const hostname = host.split(':')[0]; // Port abschneiden
 
-  // Kein Hotel-Subdomain → normal weiter
+  // Kein Hotel-Subdomain → normal weiter (aber CSP-Header trotzdem setzen)
   if (
     hostname === MAIN_HOST ||
     !hostname.endsWith(DOMAIN_SUFFIX)
   ) {
-    return next();
+    const res = await next();
+    res.headers.set('Content-Security-Policy', FRAME_ANCESTORS_CSP);
+    return res;
   }
 
   const subdomain = hostname.slice(0, hostname.length - DOMAIN_SUFFIX.length);
-  if (!subdomain || SYSTEM_SUBDOMAINS.has(subdomain)) return next();
+  if (!subdomain || SYSTEM_SUBDOMAINS.has(subdomain)) {
+    const res = await next();
+    res.headers.set('Content-Security-Policy', FRAME_ANCESTORS_CSP);
+    return res;
+  }
 
   // Hotel-Subdomain erkannt (z.B. "thegategarden")
   // /{token}             → /g/{token}
@@ -33,11 +41,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // Pfade die schon /g/ oder /api/ haben — unverändert lassen
   if (pathname.startsWith('/g/') || pathname.startsWith('/api/') || pathname.startsWith('/_')) {
-    return next();
+    const res = await next();
+    res.headers.set('Content-Security-Policy', FRAME_ANCESTORS_CSP);
+    return res;
   }
 
   // /{token}[/...] → /g/{token}[/...]
   const rewriteUrl = new URL(url);
   rewriteUrl.pathname = `/g${pathname}`;
-  return context.rewrite(rewriteUrl);
+  const res = await context.rewrite(rewriteUrl);
+  res.headers.set('Content-Security-Policy', FRAME_ANCESTORS_CSP);
+  return res;
 });
