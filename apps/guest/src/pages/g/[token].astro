@@ -383,18 +383,13 @@ const breakfastIncluded = breakfastIncludedMap[lang] || settings.breakfast_inclu
 
 const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
-// Sprint H · Group 1 — Theme aktiv
-// Priorität: showcase.theme_override > ?preview_identity > hotel.design_identity > hotel.theme > Default
-const VALID_IDENTITIES = new Set(['classic', 'bauhaus', 'editorial', 'maison']);
-const previewIdentity = isShowcase
-  ? ((showcaseSession as any)?.theme_override ?? new URL(Astro.request.url).searchParams.get('preview_identity') ?? null)
-  : null;
+// Theme kommt ausschließlich aus hotel.design_identity — einzige Source of Truth.
+// Kein URL-Override, kein session.theme_override — hotel-level only.
+const VALID_IDENTITIES = new Set(['bauhaus', 'editorial', 'maison']);
 const hotelDesignIdentity = (hotel as any).design_identity ?? null;
-const activeTheme = (previewIdentity && VALID_IDENTITIES.has(previewIdentity))
-  ? previewIdentity
-  : (hotelDesignIdentity && VALID_IDENTITIES.has(hotelDesignIdentity))
-    ? hotelDesignIdentity
-    : resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
+const activeTheme = (hotelDesignIdentity && VALID_IDENTITIES.has(hotelDesignIdentity))
+  ? hotelDesignIdentity
+  : resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
 
 // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
