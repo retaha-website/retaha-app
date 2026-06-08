@@ -1,12 +1,11 @@
 // GET /api/admin/preview-url
-// Generiert einen frischen, signierten Preview-Token für die aktuelle Design-Identität
-// des Hotels und gibt die URL zur echten Gäste-App zurück.
-// Kein DB-Write — rein HMAC-signiert, TTL 30 Tage.
+// Gibt eine vollständige Showcase-Session-URL zurück — identisch zur echten Gäste-App.
+// Erstellt die Session on-demand (oder gibt bestehende zurück).
 
 import type { APIRoute } from 'astro';
 import { getUserHotels } from '@retaha/auth';
-import { createSupabaseServiceRoleInstance } from '@retaha/auth';
-import { createPreviewToken } from '../../../lib/preview/preview-token';
+import { getOrCreateShowcaseUrl } from '../../../lib/demo/get-showcase-url';
+import { getUser } from '@retaha/auth';
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -15,37 +14,16 @@ function json(data: any, status = 200) {
   });
 }
 
-const VALID_IDENTITIES = new Set(['classic', 'bauhaus', 'editorial', 'maison']);
-
 export const GET: APIRoute = async ({ cookies, request }) => {
+  const user = await getUser(cookies, request);
+  if (!user) return json({ ok: false, error: 'unauthenticated' }, 401);
+
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
   if (!hotel) return json({ ok: false, error: 'no_hotel' }, 403);
 
-  // Optionaler ?identity=X Parameter (z.B. aus ThemeSection)
-  const url = new URL(request.url);
-  const identityParam = url.searchParams.get('identity');
+  const url = await getOrCreateShowcaseUrl(hotel.id, user.id);
+  if (!url) return json({ ok: false, error: 'session_failed' }, 500);
 
-  let identity: string;
-  if (identityParam && VALID_IDENTITIES.has(identityParam)) {
-    identity = identityParam;
-  } else {
-    // Aktuelle Design-Identität des Hotels aus DB
-    const sb = createSupabaseServiceRoleInstance();
-    const { data } = await sb
-      .from('hotels')
-      .select('design_identity')
-      .eq('id', hotel.id)
-      .single();
-    identity = (data as any)?.design_identity ?? 'bauhaus';
-    if (!VALID_IDENTITIES.has(identity)) identity = 'bauhaus';
-  }
-
-  const token = createPreviewToken(hotel.id, identity);
-  const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
-  const slug   = hotel.slug ?? null;
-  const base   = slug ? `https://${slug}.${domain}` : `https://app.${domain}`;
-  const previewUrl = `${base}/g/preview?t=${token}`;
-
-  return json({ ok: true, url: previewUrl, identity });
+  return json({ ok: true, url });
 };
