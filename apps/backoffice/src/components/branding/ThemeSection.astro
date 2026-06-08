@@ -1,319 +1,292 @@
 ---
 import BrandSection from './BrandSection.astro';
+import BauhausPreview from './previews/BauhausPreview.astro';
+import EditorialPreview from './previews/EditorialPreview.astro';
+import MaisonPreview from './previews/MaisonPreview.astro';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
-interface Props { branding: BrandingData; previewUrls?: Record<string, string>; }
-const { branding, previewUrls } = Astro.props;
+interface Props {
+  branding: BrandingData;
+  hotelName?: string;
+}
 
-const active = branding.design_identity ?? 'classic';
+const { branding, hotelName = 'Ihr Hotel' } = Astro.props;
 
-const identities = [
-  {
-    key: 'classic',
-    label: 'Classic',
-    description: 'Das vertraute Gäste-App-Design',
-    badge: 'Vorlage',
-    previewHeadline: 'Willkommen',
-    previewCta: 'Check-in starten',
-  },
-  {
-    key: 'bauhaus',
-    label: 'Bauhaus',
-    description: 'Minimal, geometrisch, modern',
-    badge: 'Default',
-    previewHeadline: 'willkommen',
-    previewCta: 'check-in starten',
-  },
-  {
-    key: 'editorial',
-    label: 'Editorial',
-    description: 'Warm, Serif, Magazin-Feel',
-    badge: null,
-    previewHeadline: 'Willkommen',
-    previewCta: 'Check-in starten',
-  },
-  {
-    key: 'maison',
-    label: 'Maison',
-    description: 'Dunkel, Luxus, Gold-Akzente',
-    badge: null,
-    previewHeadline: 'Bienvenue',
-    previewCta: 'Check-in starten',
-  },
-];
+const raw = branding.design_identity ?? 'bauhaus';
+const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus';
 ---
 
 <BrandSection title="Design-Identität" num="03">
-  <form method="POST" id="identityForm">
-    <input type="hidden" name="_action" value="identity" />
-    <input type="hidden" name="design_identity" id="identityValue" value={active} />
+  <div class="di-layout" x-data={`{ theme: '${active}' }`}>
 
-    <div class="identity-grid">
-      {identities.map(id => (
-        <button
-          class={`identity-card ${active === id.key ? 'is-active' : ''}`}
-          data-key={id.key}
-          type="button"
-        >
-          <div class={`identity-preview identity-preview--${id.key}`}>
-            {active === id.key && <span class="identity-badge">Aktiv</span>}
-            <div class="identity-preview__inner">
-              <div class="identity-preview__headline">{id.previewHeadline}</div>
-              <div class="identity-preview__line"></div>
-              <div class="identity-preview__cta">{id.previewCta}</div>
-            </div>
-          </div>
+    <!-- LEFT: Theme-Cards + Speichern -->
+    <div class="di-left">
+      <form method="POST" id="identityForm">
+        <input type="hidden" name="_action" value="identity" />
+        <input type="hidden" name="design_identity" x-bind:value="theme" />
 
-          <div class="identity-card__body">
-            <div class="identity-card__head">
-              <span class="identity-card__label">{id.label}</span>
-              {id.badge && <span class="identity-card__badge">{id.badge}</span>}
+        <div class="di-cards">
+
+          <button
+            class="di-card"
+            type="button"
+            data-theme="bauhaus"
+            :class="theme === 'bauhaus' ? 'is-active' : ''"
+            @click="theme = 'bauhaus'"
+          >
+            <div class="di-card__hint di-card__hint--bauhaus">
+              <span class="bh-initial">B</span>
+              <span class="bh-pink-dot"></span>
             </div>
-            <span class="identity-card__desc">{id.description}</span>
-          </div>
-        </button>
-      ))}
+            <div class="di-card__body">
+              <div class="di-card__title bauhaus-title">Bauhaus</div>
+              <div class="di-card__desc">Anti-Luxus · Selbstbewusst</div>
+              <div class="di-card__meta">Space Grotesk · Pink-Punkt</div>
+            </div>
+          </button>
+
+          <button
+            class="di-card"
+            type="button"
+            data-theme="editorial"
+            :class="theme === 'editorial' ? 'is-active' : ''"
+            @click="theme = 'editorial'"
+          >
+            <div class="di-card__hint di-card__hint--editorial">
+              <span class="ed-name">Editorial</span>
+            </div>
+            <div class="di-card__body">
+              <div class="di-card__title editorial-title">Editorial</div>
+              <div class="di-card__desc">Magazinhaft · Storytelling</div>
+              <div class="di-card__meta">Cormorant Garamond · Olive</div>
+            </div>
+          </button>
+
+          <button
+            class="di-card"
+            type="button"
+            data-theme="maison"
+            :class="theme === 'maison' ? 'is-active' : ''"
+            @click="theme = 'maison'"
+          >
+            <div class="di-card__hint di-card__hint--maison">
+              <span class="ms-name">MAISON</span>
+              <span class="ms-rhombus"></span>
+            </div>
+            <div class="di-card__body">
+              <div class="di-card__title maison-title">Maison</div>
+              <div class="di-card__desc">Klassisch · Opulent</div>
+              <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
+            </div>
+          </button>
+
+        </div>
+
+        <div class="di-info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <p>Brand-Farben aus Abschnitt 02 werden in alle Identitäten als Primary übernommen.</p>
+        </div>
+
+        <div class="s-card__footer">
+          <button type="submit" class="s-btn">Speichern</button>
+        </div>
+      </form>
     </div>
 
-    <div class="identity-info">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-      </svg>
-      <p>Brand-Farben (Abschnitt 02) werden in alle Identitäten als Primary übernommen.</p>
-    </div>
-
-    {previewUrls && Object.keys(previewUrls).length > 0 && (
-      <div class="identity-preview-links">
-        <span class="identity-preview-links__label">In Browser öffnen —</span>
-        {identities.map(id => (
-          <a
-            href={previewUrls![id.key]}
-            target="_blank"
-            rel="noopener"
-            class="identity-preview-link"
-            title={`${id.label} in der echten Gäste-App anzeigen`}
-          >{id.label}</a>
-        ))}
+    <!-- RIGHT: Live Phone-Preview -->
+    <div class="di-right">
+      <div
+        class="di-preview-label"
+        x-text="theme === 'bauhaus' ? 'Bauhaus — Anti-Luxus' : theme === 'editorial' ? 'Editorial — Magazinhaft' : 'Maison — Opulent'"
+      ></div>
+      <div class="di-preview-outer">
+        <div class="di-preview-inner">
+          <div x-show="theme === 'bauhaus'">
+            <BauhausPreview hotelName={hotelName} />
+          </div>
+          <div x-show="theme === 'editorial'">
+            <EditorialPreview hotelName={hotelName} />
+          </div>
+          <div x-show="theme === 'maison'">
+            <MaisonPreview hotelName={hotelName} />
+          </div>
+        </div>
       </div>
-    )}
-
-    <div class="s-card__footer">
-      <button type="submit" class="s-btn">Speichern</button>
     </div>
-  </form>
+
+  </div>
 </BrandSection>
 
 <style>
-  .identity-grid {
+  /* Layout: cards links, preview rechts */
+  .di-layout {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+    grid-template-columns: 1fr 300px;
+    gap: 32px;
+    align-items: start;
   }
   @media (max-width: 900px) {
-    .identity-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 500px) {
-    .identity-grid { grid-template-columns: 1fr; }
+    .di-layout { grid-template-columns: 1fr; }
+    .di-right { display: none; }
   }
 
-  /* Card */
-  .identity-card {
-    display: flex; flex-direction: column;
-    width: 100%;
-    border: 1px solid var(--border);
-    border-radius: var(--r); overflow: hidden;
-    cursor: pointer; transition: border-color 200ms, box-shadow 200ms, transform 200ms;
-    text-align: left; padding: 0;
-    background: var(--surface);
+  /* Left column */
+  .di-left form { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Theme cards */
+  .di-cards { display: flex; flex-direction: column; gap: 10px; }
+
+  .di-card {
+    display: flex; align-items: center; gap: 0;
+    width: 100%; text-align: left; padding: 0;
+    border: 1px solid var(--border); border-radius: var(--r);
+    background: var(--surface); cursor: pointer;
+    transition: border-color 200ms, box-shadow 200ms, transform 200ms;
+    overflow: hidden;
     -webkit-appearance: none; appearance: none;
   }
-  .identity-card:hover { border-color: var(--ink-faint); transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,.07); }
-  .identity-card.is-active { border-color: var(--sage); box-shadow: 0 0 0 2px var(--sage-soft); }
-
-  /* Preview — fills top of card */
-  .identity-preview {
-    height: 140px;
-    width: 100%;
-    position: relative; overflow: hidden;
-    display: flex; flex-direction: column; justify-content: center;
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+  .di-card:hover {
+    border-color: var(--ink-faint);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.06);
   }
-  .identity-preview__inner {
-    display: flex; flex-direction: column;
-    align-items: flex-start; gap: 8px;
-    pointer-events: none;
-    width: 100%;
+  .di-card.is-active {
+    border-color: var(--sage);
+    box-shadow: 0 0 0 2px var(--sage-soft);
   }
 
-  /* Active badge — inside preview, top-right */
-  .identity-badge {
-    position: absolute; top: 12px; right: 12px; z-index: 1;
-    background: var(--sage); color: #fff;
-    padding: 3px 10px; border-radius: 99px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+  /* Hint strip */
+  .di-card__hint {
+    width: 76px; min-height: 80px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 7px; padding: 12px 8px;
   }
+  .di-card__hint--bauhaus { background: #F5F5F3; }
+  .di-card__hint--editorial { background: #FAF7F0; }
+  .di-card__hint--maison { background: #1A1410; }
 
-  /* ── Classic ── */
-  .identity-preview--classic { background: #FAFAF8; }
-  .identity-preview--classic .identity-preview__headline {
+  /* Bauhaus hint */
+  .bh-initial {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px; font-weight: 400; color: #1A1A1A; line-height: 1.2;
+    font-size: 28px; font-weight: 600;
+    color: #0A0A0A; letter-spacing: -.03em; line-height: 1;
   }
-  .identity-preview--classic .identity-preview__line {
-    width: 8px; height: 8px; border-radius: 50%; background: #FF4A82;
-  }
-  .identity-preview--classic .identity-preview__cta {
-    background: #1A1A1A; color: #fff;
-    padding: 5px 10px; font-size: 9px;
-    font-family: 'Space Grotesk', sans-serif; font-weight: 500;
-    border-radius: 4px; align-self: stretch; text-align: center;
+  .bh-pink-dot { width: 8px; height: 8px; background: #FF4A82; border-radius: 50%; }
+
+  /* Editorial hint */
+  .ed-name {
+    font-family: 'Georgia', serif;
+    font-size: 13px; font-style: italic; font-weight: 400;
+    color: #2B2A28; letter-spacing: .005em;
+    border-bottom: 1px solid #4A5C2A; padding-bottom: 2px;
   }
 
-  /* ── Bauhaus ── */
-  .identity-preview--bauhaus { background: #F5F5F3; }
-  .identity-preview--bauhaus .identity-preview__headline {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px; font-weight: 600; color: #0A0A0A;
-    letter-spacing: -0.03em; text-transform: lowercase; line-height: 1.1;
+  /* Maison hint */
+  .ms-name {
+    font-family: 'Georgia', serif;
+    font-size: 10px; font-weight: 400;
+    color: #E8D9B5; letter-spacing: .1em; text-transform: uppercase;
   }
-  .identity-preview--bauhaus .identity-preview__line {
-    width: 28px; height: 2px; background: #FF4A82; border-radius: 0;
-  }
-  .identity-preview--bauhaus .identity-preview__cta {
-    background: #0A0A0A; color: #F5F5F3;
-    padding: 5px 10px; font-size: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    border-radius: 6px; align-self: stretch; text-align: center;
-  }
+  .ms-rhombus { width: 6px; height: 6px; background: #C9A36A; transform: rotate(45deg); }
 
-  /* ── Editorial ── */
-  .identity-preview--editorial { background: #FAF7F2; }
-  .identity-preview--editorial .identity-preview__headline {
-    font-family: Georgia, serif;
-    font-size: 20px; font-weight: 400; color: #1F1812; line-height: 1.2;
-    font-style: italic;
-  }
-  .identity-preview--editorial .identity-preview__line {
-    width: 36px; height: 1px; background: #8C2128;
-  }
-  .identity-preview--editorial .identity-preview__cta {
-    background: #1F1812; color: #FAF7F2;
-    padding: 5px 10px; font-size: 9px;
-    font-family: 'Space Grotesk', sans-serif; font-weight: 400;
-    border-radius: 4px; letter-spacing: 0.01em; align-self: stretch; text-align: center;
-  }
+  /* Card body */
+  .di-card__body { padding: 14px 16px 14px 12px; flex: 1; }
 
-  /* ── Maison ── */
-  .identity-preview--maison { background: #1A1410; }
-  .identity-preview--maison .identity-preview__headline {
-    font-family: Georgia, serif;
-    font-size: 20px; font-weight: 400; color: #E8D9B5;
-    font-style: italic; line-height: 1.2; letter-spacing: 0.01em;
-  }
-  .identity-preview--maison .identity-preview__line {
-    width: 7px; height: 7px; background: #C9A36A;
-    transform: rotate(45deg); border-radius: 0; margin: 2px 0;
-  }
-  .identity-preview--maison .identity-preview__cta {
-    background: transparent; color: #C9A36A;
-    padding: 5px 10px; font-size: 8px;
-    font-family: 'Space Grotesk', sans-serif; font-weight: 400;
-    border: 1px solid #C9A36A; border-radius: 0;
-    letter-spacing: 0.15em; text-transform: uppercase;
-    align-self: stretch; text-align: center;
-  }
-
-  /* Card body — compact info strip at bottom */
-  .identity-card__body {
-    padding: 14px 18px 16px;
-    display: flex; flex-direction: column; gap: 3px;
-    background: var(--surface);
-  }
-  .identity-card__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .identity-card__label {
+  .di-card__title {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 15px; font-weight: 500; color: var(--ink);
+    margin-bottom: 3px;
   }
-  .identity-card__badge {
+  .bauhaus-title::after {
+    content: '';
+    display: inline-block; width: 6px; height: 6px;
+    background: #FF4A82; border-radius: 50%;
+    margin-left: 5px; vertical-align: middle;
+  }
+  .editorial-title {
+    font-family: 'Georgia', serif; font-style: italic;
+    border-bottom: 1px solid #4A5C2A;
+    display: inline-block; padding-bottom: 1px;
+    color: var(--ink);
+    font-size: 15px; font-weight: 400;
+  }
+  .maison-title {
+    font-family: 'Georgia', serif;
+    letter-spacing: .04em;
+  }
+  .maison-title::after {
+    content: '';
+    display: inline-block; width: 5px; height: 5px;
+    background: #C9A36A; transform: rotate(45deg);
+    margin-left: 6px; vertical-align: middle;
+  }
+
+  .di-card__desc {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 2px 7px; background: var(--bg-deep); color: var(--ink-muted); border-radius: 99px;
+    font-size: 10px; color: var(--ink-soft);
+    letter-spacing: .02em; line-height: 1.5;
   }
-  .identity-card__desc {
+  .di-card__meta {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.02em; line-height: 1.4;
+    font-size: 9px; color: var(--ink-faint);
+    letter-spacing: .1em; text-transform: uppercase;
+    margin-top: 2px;
   }
 
-  form { display: flex; flex-direction: column; gap: 24px; }
-
-  .identity-preview-links {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 12px 16px; background: var(--bg-deep); border-radius: var(--r-sm);
-    border: 1px solid var(--border);
+  /* Info strip */
+  .di-info {
+    padding: 12px 14px; background: var(--bg-deep);
+    border-radius: var(--r-sm); border: 1px solid var(--border);
+    display: flex; gap: 10px; align-items: flex-start;
   }
-  .identity-preview-links__label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.1em; color: var(--ink-muted);
-  }
-  .identity-preview-link {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--ink); text-decoration: none;
-    padding: 5px 12px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: var(--r-sm);
-    transition: all 150ms ease;
-    display: inline-flex; align-items: center; gap: 5px;
-  }
-  .identity-preview-link::after { content: '↗'; font-size: 10px; opacity: 0.5; }
-  .identity-preview-link:hover { background: var(--te-yellow-soft); border-color: var(--ink-faint); }
-
-  .identity-info {
-    padding: 14px 18px; background: var(--bg-deep); border-radius: var(--r-sm);
-    display: flex; gap: 12px; align-items: flex-start;
-  }
-  .identity-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
-  .identity-info p {
+  .di-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
+  .di-info p {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; line-height: 1.5; color: var(--ink-soft); margin: 0;
+    font-size: 10px; line-height: 1.5; color: var(--ink-soft); margin: 0;
   }
-  .identity-info a { color: var(--ink); text-decoration: underline; margin-left: 6px; }
 
+  /* Footer */
   .s-card__footer { display: flex; justify-content: flex-end; }
   .s-btn {
     background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
     border-radius: var(--r-sm); font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 500; letter-spacing: 0.14em; cursor: pointer; transition: all 200ms;
+    font-size: 11px; font-weight: 500; letter-spacing: .14em;
+    cursor: pointer; transition: all 200ms;
   }
   .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
+
+  /* Right: live preview */
+  .di-right {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    position: sticky; top: 100px;
+  }
+  .di-preview-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+
+  /* Scale phone 390x844 → ~273x591 (scale 0.7) */
+  .di-preview-outer {
+    width: 273px;
+    height: 591px;
+    overflow: hidden;
+    position: relative;
+    border-radius: 38px;
+  }
+  .di-preview-inner {
+    position: absolute;
+    top: 0; left: 0;
+    width: 390px;
+    height: 844px;
+    transform: scale(0.7);
+    transform-origin: top left;
+    pointer-events: none;
+  }
+  .di-preview-inner > div {
+    position: absolute; top: 0; left: 0;
+    width: 390px; height: 844px;
+  }
 </style>
-
-<script>
-  const cards = document.querySelectorAll<HTMLButtonElement>('.identity-card');
-  const hiddenInput = document.getElementById('identityValue') as HTMLInputElement;
-
-  cards.forEach(card => {
-    card.addEventListener('click', () => {
-      cards.forEach(c => {
-        c.classList.remove('is-active');
-        c.querySelector('.identity-badge')?.remove();
-      });
-      card.classList.add('is-active');
-      if (hiddenInput) hiddenInput.value = card.dataset.key!;
-
-      const badge = document.createElement('span');
-      badge.className = 'identity-badge'; badge.textContent = 'Aktiv';
-      card.querySelector('.identity-preview')?.appendChild(badge);
-
-      // Mini-Phone-Preview updaten
-      const phoneView = document.querySelector<HTMLElement>('.guest-phone-view');
-      if (phoneView) {
-        phoneView.setAttribute('data-theme', card.dataset.key!);
-      }
-    });
-  });
-</script>
