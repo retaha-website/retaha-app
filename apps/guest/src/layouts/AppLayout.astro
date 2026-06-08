@@ -1,21 +1,45 @@
 ---
-// Minimal layout placeholder — packages/ui wird in Phase B mit echtem
-// AdminLayout/GuestLayout aus dem root-src/ befüllt.
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui-guest/themes/bauhaus';
+import '@retaha/ui-guest/themes/editorial';
+import '@retaha/ui-guest/themes/maison';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+
 interface Props {
   title: string;
+  theme?: 'bauhaus' | 'editorial' | 'maison';
+  lang?: string;
 }
-const { title } = Astro.props;
+
+const { title, theme = 'bauhaus', lang = 'de' } = Astro.props;
 ---
 <!DOCTYPE html>
-<html lang="de">
+<html lang={lang} data-theme={theme}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="var(--guest-bg)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} · guest.retaha</title>
+    {theme === 'maison' && (
+      <>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400;1,6..96,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+      </>
+    )}
+    <title>{title}</title>
   </head>
-  <body>
+  <body class={`gate-guest gate-theme-${theme}`}>
     <slot />
   </body>
 </html>
