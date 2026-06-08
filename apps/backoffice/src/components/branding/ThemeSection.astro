@@ -1,8 +1,5 @@
 ---
 import BrandSection from './BrandSection.astro';
-import BauhausPreview from './previews/BauhausPreview.astro';
-import EditorialPreview from './previews/EditorialPreview.astro';
-import MaisonPreview from './previews/MaisonPreview.astro';
 import type { BrandingData } from '../../lib/branding/get-branding';
 
 interface Props {
@@ -10,136 +7,94 @@ interface Props {
   hotelName?: string;
 }
 
-const { branding, hotelName = 'Ihr Hotel' } = Astro.props;
+const { branding } = Astro.props;
 
 const raw = branding.design_identity ?? 'bauhaus';
 const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus';
 ---
 
 <BrandSection title="Design-Identität" num="03">
-  <div class="di-layout" x-data={`{ theme: '${active}' }`}>
+  <div
+    x-data={`{ theme: '${active}' }`}
+    x-init="$watch('theme', t => $dispatch('brand-theme-selected', { theme: t }))"
+  >
+    <form method="POST" id="identityForm">
+      <input type="hidden" name="_action" value="identity" />
+      <input type="hidden" name="design_identity" x-bind:value="theme" />
 
-    <!-- LEFT: Theme-Cards + Speichern -->
-    <div class="di-left">
-      <form method="POST" id="identityForm">
-        <input type="hidden" name="_action" value="identity" />
-        <input type="hidden" name="design_identity" x-bind:value="theme" />
+      <div class="di-cards">
 
-        <div class="di-cards">
-
-          <button
-            class="di-card"
-            type="button"
-            data-theme="bauhaus"
-            :class="theme === 'bauhaus' ? 'is-active' : ''"
-            @click="theme = 'bauhaus'"
-          >
-            <div class="di-card__hint di-card__hint--bauhaus">
-              <span class="bh-initial">B</span>
-              <span class="bh-pink-dot"></span>
-            </div>
-            <div class="di-card__body">
-              <div class="di-card__title bauhaus-title">Bauhaus</div>
-              <div class="di-card__desc">Anti-Luxus · Selbstbewusst</div>
-              <div class="di-card__meta">Space Grotesk · Pink-Punkt</div>
-            </div>
-          </button>
-
-          <button
-            class="di-card"
-            type="button"
-            data-theme="editorial"
-            :class="theme === 'editorial' ? 'is-active' : ''"
-            @click="theme = 'editorial'"
-          >
-            <div class="di-card__hint di-card__hint--editorial">
-              <span class="ed-name">Editorial</span>
-            </div>
-            <div class="di-card__body">
-              <div class="di-card__title editorial-title">Editorial</div>
-              <div class="di-card__desc">Magazinhaft · Storytelling</div>
-              <div class="di-card__meta">Cormorant Garamond · Olive</div>
-            </div>
-          </button>
-
-          <button
-            class="di-card"
-            type="button"
-            data-theme="maison"
-            :class="theme === 'maison' ? 'is-active' : ''"
-            @click="theme = 'maison'"
-          >
-            <div class="di-card__hint di-card__hint--maison">
-              <span class="ms-name">MAISON</span>
-              <span class="ms-rhombus"></span>
-            </div>
-            <div class="di-card__body">
-              <div class="di-card__title maison-title">Maison</div>
-              <div class="di-card__desc">Klassisch · Opulent</div>
-              <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
-            </div>
-          </button>
-
-        </div>
-
-        <div class="di-info">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
-          <p>Brand-Farben aus Abschnitt 02 werden in alle Identitäten als Primary übernommen.</p>
-        </div>
-
-        <div class="s-card__footer">
-          <button type="submit" class="s-btn">Speichern</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- RIGHT: Live Phone-Preview -->
-    <div class="di-right">
-      <div
-        class="di-preview-label"
-        x-text="theme === 'bauhaus' ? 'Bauhaus — Anti-Luxus' : theme === 'editorial' ? 'Editorial — Magazinhaft' : 'Maison — Opulent'"
-      ></div>
-      <div class="di-preview-outer">
-        <div class="di-preview-inner">
-          <div x-show="theme === 'bauhaus'">
-            <BauhausPreview hotelName={hotelName} />
+        <button
+          class="di-card"
+          type="button"
+          :class="theme === 'bauhaus' ? 'is-active' : ''"
+          @click="theme = 'bauhaus'"
+        >
+          <div class="di-card__hint di-card__hint--bauhaus">
+            <span class="bh-initial">B</span>
+            <span class="bh-pink-dot"></span>
           </div>
-          <div x-show="theme === 'editorial'">
-            <EditorialPreview hotelName={hotelName} />
+          <div class="di-card__body">
+            <div class="di-card__title bauhaus-title">Bauhaus</div>
+            <div class="di-card__desc">Anti-Luxus · Selbstbewusst</div>
+            <div class="di-card__meta">Space Grotesk · Pink-Punkt</div>
           </div>
-          <div x-show="theme === 'maison'">
-            <MaisonPreview hotelName={hotelName} />
+        </button>
+
+        <button
+          class="di-card"
+          type="button"
+          :class="theme === 'editorial' ? 'is-active' : ''"
+          @click="theme = 'editorial'"
+        >
+          <div class="di-card__hint di-card__hint--editorial">
+            <span class="ed-name">Editorial</span>
           </div>
-        </div>
+          <div class="di-card__body">
+            <div class="di-card__title editorial-title">Editorial</div>
+            <div class="di-card__desc">Magazinhaft · Storytelling</div>
+            <div class="di-card__meta">Cormorant Garamond · Olive</div>
+          </div>
+        </button>
+
+        <button
+          class="di-card"
+          type="button"
+          :class="theme === 'maison' ? 'is-active' : ''"
+          @click="theme = 'maison'"
+        >
+          <div class="di-card__hint di-card__hint--maison">
+            <span class="ms-name">MAISON</span>
+            <span class="ms-rhombus"></span>
+          </div>
+          <div class="di-card__body">
+            <div class="di-card__title maison-title">Maison</div>
+            <div class="di-card__desc">Klassisch · Opulent</div>
+            <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
+          </div>
+        </button>
+
       </div>
-    </div>
 
+      <div class="di-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <p>Brand-Farben aus Abschnitt 02 werden in alle Identitäten als Primary übernommen.</p>
+      </div>
+
+      <div class="s-card__footer">
+        <button type="submit" class="s-btn">Speichern</button>
+      </div>
+    </form>
   </div>
 </BrandSection>
 
 <style>
-  /* Layout: cards links, preview rechts */
-  .di-layout {
-    display: grid;
-    grid-template-columns: 1fr 300px;
-    gap: 32px;
-    align-items: start;
-  }
-  @media (max-width: 900px) {
-    .di-layout { grid-template-columns: 1fr; }
-    .di-right { display: none; }
-  }
-
-  /* Left column */
-  .di-left form { display: flex; flex-direction: column; gap: 20px; }
-
-  /* Theme cards */
-  .di-cards { display: flex; flex-direction: column; gap: 10px; }
+  .di-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 
   .di-card {
-    display: flex; align-items: center; gap: 0;
+    display: flex; align-items: center;
     width: 100%; text-align: left; padding: 0;
     border: 1px solid var(--border); border-radius: var(--r);
     background: var(--surface); cursor: pointer;
@@ -163,11 +118,10 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 7px; padding: 12px 8px;
   }
-  .di-card__hint--bauhaus { background: #F5F5F3; }
+  .di-card__hint--bauhaus  { background: #F5F5F3; }
   .di-card__hint--editorial { background: #FAF7F0; }
-  .di-card__hint--maison { background: #1A1410; }
+  .di-card__hint--maison   { background: #1A1410; }
 
-  /* Bauhaus hint */
   .bh-initial {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 28px; font-weight: 600;
@@ -175,7 +129,6 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
   }
   .bh-pink-dot { width: 8px; height: 8px; background: #FF4A82; border-radius: 50%; }
 
-  /* Editorial hint */
   .ed-name {
     font-family: 'Georgia', serif;
     font-size: 13px; font-style: italic; font-weight: 400;
@@ -183,7 +136,6 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     border-bottom: 1px solid #4A5C2A; padding-bottom: 2px;
   }
 
-  /* Maison hint */
   .ms-name {
     font-family: 'Georgia', serif;
     font-size: 10px; font-weight: 400;
@@ -209,12 +161,10 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     font-family: 'Georgia', serif; font-style: italic;
     border-bottom: 1px solid #4A5C2A;
     display: inline-block; padding-bottom: 1px;
-    color: var(--ink);
-    font-size: 15px; font-weight: 400;
+    color: var(--ink); font-size: 15px; font-weight: 400;
   }
   .maison-title {
-    font-family: 'Georgia', serif;
-    letter-spacing: .04em;
+    font-family: 'Georgia', serif; letter-spacing: .04em;
   }
   .maison-title::after {
     content: '';
@@ -222,7 +172,6 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     background: #C9A36A; transform: rotate(45deg);
     margin-left: 6px; vertical-align: middle;
   }
-
   .di-card__desc {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; color: var(--ink-soft);
@@ -231,15 +180,14 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
   .di-card__meta {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; color: var(--ink-faint);
-    letter-spacing: .1em; text-transform: uppercase;
-    margin-top: 2px;
+    letter-spacing: .1em; text-transform: uppercase; margin-top: 2px;
   }
 
-  /* Info strip */
   .di-info {
     padding: 12px 14px; background: var(--bg-deep);
     border-radius: var(--r-sm); border: 1px solid var(--border);
     display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 20px;
   }
   .di-info svg { flex-shrink: 0; color: var(--ink-muted); margin-top: 1px; }
   .di-info p {
@@ -247,7 +195,6 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     font-size: 10px; line-height: 1.5; color: var(--ink-soft); margin: 0;
   }
 
-  /* Footer */
   .s-card__footer { display: flex; justify-content: flex-end; }
   .s-btn {
     background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
@@ -256,37 +203,4 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     cursor: pointer; transition: all 200ms;
   }
   .s-btn:hover { background: var(--te-yellow); color: #0A0A0A; }
-
-  /* Right: live preview */
-  .di-right {
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    position: sticky; top: 100px;
-  }
-  .di-preview-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
-    color: var(--ink-muted);
-  }
-
-  /* Scale phone 390x844 → ~273x591 (scale 0.7) */
-  .di-preview-outer {
-    width: 273px;
-    height: 591px;
-    overflow: hidden;
-    position: relative;
-    border-radius: 38px;
-  }
-  .di-preview-inner {
-    position: absolute;
-    top: 0; left: 0;
-    width: 390px;
-    height: 844px;
-    transform: scale(0.7);
-    transform-origin: top left;
-    pointer-events: none;
-  }
-  .di-preview-inner > div {
-    position: absolute; top: 0; left: 0;
-    width: 390px; height: 844px;
-  }
 </style>
