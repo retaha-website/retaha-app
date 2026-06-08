@@ -1,0 +1,533 @@
+---
+import '../styles/guest-base.css';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  settings: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  greetingName: string;
+  checkInLabel: string;
+  checkOutLabel: string;
+  nightsCount: number;
+  recs: any[];
+  f: any;
+  walletAvailable?: boolean;
+  roomLabel?: string;
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, settings, token, lang,
+  hotelEnabledLangs, greetingName, checkInLabel, checkOutLabel,
+  nightsCount, recs, f, roomLabel = 'Zimmer',
+} = Astro.props;
+
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+const eveName   = settings.eve_name || 'Eve';
+const welcomeSub = settings.welcome_message_de || 'Schön, dass Sie da sind.';
+const cityLine  = hotel.city || '';
+const hasService    = f.service      !== false && (settings.service_items?.length ?? 0) > 0;
+const hasConference = f.conference   !== false && (settings.conference_rooms?.length ?? 0) > 0;
+
+// Roman numeral helper (Maison shows nights as IV, III, etc.)
+function toRoman(n: number): string {
+  const map: [number, string][] = [[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let r = '';
+  for (const [v, s] of map) { while (n >= v) { r += s; n -= v; } }
+  return r || String(n);
+}
+
+// Action items — built once, styled per theme via CSS
+type ActionItem = { num: string; icon: string; label: string; sub: string; handler: string };
+const allActions: ActionItem[] = [
+  {
+    num: '01',
+    icon: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
+    label: 'WLAN',
+    sub: 'Sofort verbinden',
+    handler: "openSheet('wifi')",
+  },
+  {
+    num: '02',
+    icon: '<path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>',
+    label: 'Frühstück',
+    sub: 'Slot buchen',
+    handler: "openSheet('breakfast')",
+  },
+  {
+    num: '03',
+    icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+    label: eveName,
+    sub: '24/7 Concierge',
+    handler: "eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()",
+    visible: f.eve !== false,
+  } as any,
+  {
+    num: '04',
+    icon: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>',
+    label: 'Service',
+    sub: 'Anfrage senden',
+    handler: "openSheet('service')",
+    visible: hasService,
+  } as any,
+  {
+    num: '05',
+    icon: '<circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>',
+    label: 'Tipps',
+    sub: cityLine || 'Entdecken',
+    handler: "openSheet('places')",
+    visible: f.recommendations !== false,
+  } as any,
+  {
+    num: '06',
+    icon: '<rect x="3" y="7" width="18" height="13"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    label: 'Konferenz',
+    sub: 'Raum buchen',
+    handler: "openSheet('conference')",
+    visible: hasConference,
+  } as any,
+  {
+    num: '07',
+    icon: '<path d="M5 12L10 17L19 7"/>',
+    label: 'Checkout',
+    sub: 'Abreise vorbereiten',
+    handler: `window.location='/g/${token}/checkout'`,
+    visible: f.self_checkout !== false,
+  } as any,
+].filter((a: any) => a.visible !== false);
+
+// Re-number after filter
+const actions = allActions.map((a, i) => ({
+  ...a,
+  num: String(i + 1).padStart(2, '0'),
+}));
+---
+
+<!-- ─── HEADER ───────────────────────────────────────────────────────────── -->
+<header class="ws-head">
+  <div class="ws-mark">
+    {hotelLogoDark ? (
+      <img class="ws-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+    ) : hotel.logo_url ? (
+      <img class="ws-mark__logo ws-mark__logo--invert" src={hotel.logo_url} alt={hotel.name} />
+    ) : (
+      <div class="ws-mark__initial">{hotel.name.charAt(0)}</div>
+    )}
+    <div class="ws-mark__text">
+      <div class="ws-mark__name">{hotel.name}</div>
+      {room && (
+        <div class="ws-mark__room">
+          {cityLine ? `${cityLine} · ` : ''}{roomLabel} {room.room_number}
+        </div>
+      )}
+    </div>
+  </div>
+  <nav class="ws-lang">
+    {hotelEnabledLangs.map(l => (
+      <a href={switchUrl(l)} class={`ws-lang__btn ${lang === l ? 'is-active' : ''}`}>{l.toUpperCase()}</a>
+    ))}
+  </nav>
+</header>
+
+<!-- ─── HERO ─────────────────────────────────────────────────────────────── -->
+<section class="ws-hero">
+  <div class="ws-hero__eyebrow g-eyebrow">
+    {cityLine || 'Willkommen'}
+  </div>
+  <h1 class="ws-hero__title g-title">
+    {guest?.first_name
+      ? <Fragment>{greetingName}<span class="ws-hero__comma">,</span><br /><em class="ws-hero__em">schön, dass Sie da sind.</em></Fragment>
+      : <Fragment>{greetingName}<span class="g-sig"></span></Fragment>
+    }
+  </h1>
+  <p class="ws-hero__sub g-sub">{welcomeSub}</p>
+</section>
+
+<!-- ─── STAY STRIP ────────────────────────────────────────────────────────── -->
+<div class="ws-stay">
+  <div class="ws-stay__col">
+    <div class="ws-stay__label">Anreise</div>
+    <div class="ws-stay__value">{checkInLabel}</div>
+  </div>
+  <div class="ws-stay__col">
+    <div class="ws-stay__label">Abreise</div>
+    <div class="ws-stay__value">{checkOutLabel}</div>
+  </div>
+  <div class="ws-stay__col">
+    <div class="ws-stay__label">Nächte</div>
+    <div class="ws-stay__value ws-stay__nights" data-nights={nightsCount}>{nightsCount}</div>
+    <div class="ws-stay__nights-roman">{toRoman(nightsCount)}</div>
+  </div>
+</div>
+
+<!-- ─── DIVIDER ──────────────────────────────────────────────────────────── -->
+<div class="ws-divider g-divider">
+  <span class="g-divider-ornament"></span>
+</div>
+
+<!-- ─── ACTIONS ──────────────────────────────────────────────────────────── -->
+<section class="ws-actions">
+  <div class="ws-actions__head">
+    <h2 class="ws-actions__title">Was Sie brauchen</h2>
+    <span class="ws-actions__count">0{actions.length} Wege</span>
+  </div>
+  <div class="ws-action-list">
+    {actions.map(action => (
+      <button class="ws-action" type="button" @click={action.handler}>
+        <span class="ws-action__num">{action.num}</span>
+        <span class="ws-action__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" set:html={action.icon} />
+        </span>
+        <span class="ws-action__body">
+          <span class="ws-action__label">{action.label}</span>
+          <span class="ws-action__sub">{action.sub}</span>
+        </span>
+        <span class="ws-action__arrow">→</span>
+      </button>
+    ))}
+  </div>
+</section>
+
+<!-- ─── RECOMMENDATION CARD ──────────────────────────────────────────────── -->
+{recs.length > 0 && (
+  <div class="ws-rec g-card"
+    role="button"
+    tabindex="0"
+    data-card-id={recs[0].id}
+    data-card-type={recs[0].cardType}
+    data-action-target={recs[0].actionTarget ?? ''}
+    @click="handleRecClick($el)"
+  >
+    <div class="ws-rec__eyebrow g-eyebrow">Empfehlung des Hauses</div>
+    <div class="ws-rec__title">{recs[0].title}</div>
+    {recs[0].sub && <div class="ws-rec__sub g-sub">{recs[0].sub}</div>}
+    <div class="ws-rec__arrow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M7 17l9.2-9.2M17 17V7H7"/>
+      </svg>
+    </div>
+  </div>
+)}
+
+<!-- ─── BOTTOM TABS ───────────────────────────────────────────────────────── -->
+<nav class="ws-tabs">
+  <button class="ws-tab ws-tab--active" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M3 12l9-9 9 9M5 10v10h14V10"/>
+    </svg>
+    <span>Start</span>
+  </button>
+  <button class="ws-tab" type="button"
+    @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+    </svg>
+    <span>{eveName}</span>
+  </button>
+  <button class="ws-tab" type="button" @click="openSheet('places')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+    </svg>
+    <span>Tipps</span>
+  </button>
+  <button class="ws-tab" type="button" @click="openSheet('service')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span>Service</span>
+  </button>
+</nav>
+
+<style>
+  /* ── Base layout ──────────────────────────────────────────────────────── */
+  .ws-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px 12px;
+    border-bottom: 1px solid var(--guest-border);
+  }
+  .ws-mark { display: flex; align-items: center; gap: 10px; }
+  .ws-mark__logo {
+    height: 28px; width: auto; max-width: 80px;
+    object-fit: contain;
+  }
+  .ws-mark__logo--invert { filter: invert(1); }
+  .ws-mark__initial {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--guest-ink); color: var(--guest-bg);
+    font-family: var(--guest-font-display); font-size: 14px; font-weight: 600;
+    border-radius: var(--guest-radius-sm);
+  }
+  .ws-mark__name {
+    font-family: var(--guest-font-display);
+    font-size: 14px; font-weight: var(--guest-display-weight);
+    font-style: var(--guest-display-style);
+    letter-spacing: var(--guest-display-tracking);
+    color: var(--guest-ink);
+  }
+  .ws-mark__room {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: var(--guest-label-tracking);
+    text-transform: var(--guest-label-transform);
+    color: var(--guest-ink-muted); margin-top: 2px;
+  }
+  .ws-lang { display: flex; gap: 6px; }
+  .ws-lang__btn {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: 0.14em;
+    color: var(--guest-ink-faint); text-decoration: none;
+    padding: 3px 6px; border-radius: var(--guest-radius-sm);
+    transition: color 150ms, background 150ms;
+  }
+  .ws-lang__btn.is-active {
+    color: var(--guest-accent);
+    background: var(--guest-accent-soft);
+    font-weight: 600;
+  }
+
+  /* ── Hero ─────────────────────────────────────────────────────────────── */
+  .ws-hero {
+    padding: 28px 24px 20px;
+  }
+  .ws-hero__eyebrow {
+    margin-bottom: 16px;
+  }
+  .ws-hero__title {
+    font-size: 40px; line-height: 1.05;
+    margin: 0 0 10px;
+  }
+  .ws-hero__comma { color: var(--guest-accent); }
+  .ws-hero__em {
+    font-style: var(--guest-display-style, normal);
+    color: var(--guest-accent);
+  }
+  .ws-hero__sub {
+    font-size: 14px; max-width: 92%;
+  }
+
+  /* ── Stay strip ──────────────────────────────────────────────────────── */
+  .ws-stay {
+    display: flex; justify-content: space-between;
+    margin: 0 24px; padding: 14px 0;
+    border-top: 1px solid var(--guest-border);
+    border-bottom: 1px solid var(--guest-border);
+  }
+  .ws-stay__col { display: flex; flex-direction: column; gap: 3px; }
+  .ws-stay__label {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: var(--guest-label-tracking);
+    text-transform: var(--guest-label-transform);
+    color: var(--guest-ink-faint); font-weight: var(--guest-label-weight);
+  }
+  .ws-stay__value {
+    font-family: var(--guest-font-display);
+    font-size: 17px; font-weight: var(--guest-display-weight);
+    font-style: var(--guest-display-style);
+    letter-spacing: var(--guest-display-tracking);
+    color: var(--guest-ink);
+  }
+  .ws-stay__nights-roman { display: none; }
+
+  /* ── Divider ─────────────────────────────────────────────────────────── */
+  .ws-divider {
+    margin: 0 24px;
+  }
+
+  /* ── Actions ─────────────────────────────────────────────────────────── */
+  .ws-actions {
+    padding: 24px 24px 8px;
+  }
+  .ws-actions__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .ws-actions__title {
+    font-family: var(--guest-font-display);
+    font-size: 18px; font-weight: var(--guest-display-weight);
+    font-style: var(--guest-display-style);
+    letter-spacing: var(--guest-display-tracking);
+    color: var(--guest-ink); margin: 0;
+  }
+  .ws-actions__count {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: var(--guest-label-tracking);
+    text-transform: var(--guest-label-transform);
+    color: var(--guest-ink-faint);
+  }
+  .ws-action-list { display: flex; flex-direction: column; }
+  .ws-action {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 0; border: none; background: none; cursor: pointer;
+    border-bottom: 1px solid var(--guest-border);
+    width: 100%; text-align: left;
+    transition: background var(--transition-fast, 150ms);
+  }
+  .ws-action:last-child { border-bottom: none; }
+  .ws-action:hover { background: var(--guest-hover); }
+  .ws-action__num {
+    font-family: var(--guest-font-display);
+    font-size: 20px; font-style: italic; font-weight: 300;
+    color: var(--guest-accent); width: 24px; flex-shrink: 0;
+  }
+  .ws-action__icon {
+    width: 36px; height: 36px; flex-shrink: 0;
+    display: none; /* shown per-theme below */
+    align-items: center; justify-content: center;
+    background: var(--guest-bg-deep);
+    border-radius: var(--guest-radius-sm);
+  }
+  .ws-action__icon svg { width: 18px; height: 18px; color: var(--guest-ink); }
+  .ws-action__body { flex: 1; min-width: 0; }
+  .ws-action__label {
+    display: block;
+    font-family: var(--guest-font-body);
+    font-size: 15px; font-weight: 500; color: var(--guest-ink);
+    margin-bottom: 2px;
+  }
+  .ws-action__sub {
+    display: block;
+    font-family: var(--guest-font-mono);
+    font-size: 10px; letter-spacing: 0.04em; color: var(--guest-ink-muted);
+  }
+  .ws-action__arrow {
+    color: var(--guest-accent); flex-shrink: 0;
+    font-family: var(--guest-font-display); font-size: 20px;
+    font-style: italic; font-weight: 300;
+  }
+
+  /* ── Recommendation card ─────────────────────────────────────────────── */
+  .ws-rec {
+    margin: 16px 24px;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px; position: relative;
+  }
+  .ws-rec__eyebrow { margin-bottom: 4px; }
+  .ws-rec__title {
+    font-family: var(--guest-font-display);
+    font-size: 20px; font-weight: var(--guest-display-weight);
+    font-style: var(--guest-display-style);
+    letter-spacing: var(--guest-display-tracking);
+    color: var(--guest-ink); margin: 0;
+    line-height: 1.2;
+  }
+  .ws-rec__sub { font-size: 13px; }
+  .ws-rec__arrow {
+    position: absolute; top: 16px; right: 16px;
+    color: var(--guest-accent);
+  }
+  .ws-rec__arrow svg { width: 18px; height: 18px; }
+
+  /* ── Bottom tabs ─────────────────────────────────────────────────────── */
+  .ws-tabs {
+    margin-top: auto;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--guest-border);
+    padding: 12px 8px 24px;
+    background: var(--guest-bg);
+  }
+  .ws-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 6px 4px; background: none; border: none; cursor: pointer;
+    color: var(--guest-ink-faint); text-decoration: none;
+    transition: color 150ms; position: relative;
+  }
+  .ws-tab svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+  .ws-tab span {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .ws-tab--active { color: var(--guest-accent); }
+  .ws-tab--active span { font-weight: 600; }
+
+  /* ── BAUHAUS overrides ──────────────────────────────────────────────── */
+  :global([data-theme="bauhaus"]) .ws-hero__title { font-size: 42px; }
+  :global([data-theme="bauhaus"]) .ws-action__num { display: none; }
+  :global([data-theme="bauhaus"]) .ws-action__icon { display: flex; }
+  :global([data-theme="bauhaus"]) .ws-action__label {
+    font-family: var(--guest-font-mono);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  :global([data-theme="bauhaus"]) .ws-action:hover {
+    background: var(--guest-hover);
+    padding-left: 8px;
+  }
+  :global([data-theme="bauhaus"]) .ws-mark__initial {
+    border-radius: 0;
+  }
+  :global([data-theme="bauhaus"]) .ws-tab--active::before {
+    content: '';
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 16px; height: 2px; background: var(--guest-accent);
+  }
+
+  /* ── EDITORIAL overrides ─────────────────────────────────────────────── */
+  :global([data-theme="editorial"]) .ws-hero__title { font-size: 44px; }
+  :global([data-theme="editorial"]) .ws-hero__em { font-style: italic; font-weight: 400; }
+  :global([data-theme="editorial"]) .ws-mark__name { font-size: 18px; }
+  :global([data-theme="editorial"]) .ws-action__num {
+    font-family: var(--guest-font-display);
+    font-style: italic; font-weight: 300;
+    color: var(--guest-accent);
+  }
+  :global([data-theme="editorial"]) .ws-action__label {
+    font-family: var(--guest-font-display);
+    font-size: 18px; font-weight: 500; letter-spacing: -0.005em;
+  }
+  :global([data-theme="editorial"]) .ws-action__arrow {
+    font-size: 22px; font-style: italic; font-weight: 300;
+  }
+  :global([data-theme="editorial"]) .ws-rec {
+    background: var(--guest-accent-soft);
+  }
+  :global([data-theme="editorial"]) .ws-tab--active::before {
+    content: '';
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 24px; height: 1px; background: var(--guest-accent);
+  }
+
+  /* ── MAISON overrides ────────────────────────────────────────────────── */
+  :global([data-theme="maison"]) .ws-head {
+    flex-direction: column; align-items: center; gap: 8px;
+    text-align: center; padding: 20px 24px 16px;
+  }
+  :global([data-theme="maison"]) .ws-mark { flex-direction: column; gap: 6px; }
+  :global([data-theme="maison"]) .ws-mark__logo { height: 32px; }
+  :global([data-theme="maison"]) .ws-mark__name { font-size: 18px; letter-spacing: 0.08em; }
+  :global([data-theme="maison"]) .ws-lang { margin-top: 4px; }
+  :global([data-theme="maison"]) .ws-stay { justify-content: center; gap: 32px; }
+  :global([data-theme="maison"]) .ws-stay__col { align-items: center; }
+  :global([data-theme="maison"]) .ws-stay__nights { display: none; }
+  :global([data-theme="maison"]) .ws-stay__nights-roman {
+    display: block;
+    font-family: var(--guest-font-display);
+    font-size: 17px; font-weight: var(--guest-display-weight);
+    letter-spacing: 0.1em; color: var(--guest-accent);
+  }
+  :global([data-theme="maison"]) .ws-hero { text-align: center; }
+  :global([data-theme="maison"]) .ws-hero__eyebrow { justify-content: center; }
+  :global([data-theme="maison"]) .ws-hero__sub { max-width: 100%; }
+  :global([data-theme="maison"]) .ws-action__num {
+    font-family: var(--guest-font-display);
+    font-size: 22px; font-weight: 500;
+    letter-spacing: 0.05em; font-style: normal;
+    color: var(--guest-accent);
+  }
+  :global([data-theme="maison"]) .ws-action__label {
+    font-family: var(--guest-font-display);
+    font-size: 16px; font-weight: 500; letter-spacing: 0.03em;
+  }
+  :global([data-theme="maison"]) .ws-rec { border-color: var(--guest-accent); }
+  :global([data-theme="maison"]) .ws-tab--active { color: var(--guest-accent); }
+  :global([data-theme="maison"]) .ws-tab--active::before {
+    content: '';
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px;
+    background: var(--guest-accent); transform: translateX(-50%) rotate(45deg);
+  }
+</style>

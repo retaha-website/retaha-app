@@ -2,6 +2,7 @@
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import WeatherIcon from '../../components/WeatherIcon.astro';
+import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
 import BauhausScreen from '../../components/screens/BauhausScreen.astro';
 import EditorialScreen from '../../components/screens/EditorialScreen.astro';
 import MaisonScreen from '../../components/screens/MaisonScreen.astro';
@@ -432,9 +433,9 @@ const showPostStay = stayEnded && !hasStayFeedback;
     )}
     <main x-data="guestPage" x-cloak>
 
-      {/* ── Bauhaus Design ── */}
-      {activeTheme === 'bauhaus' && (
-        <BauhausScreen
+      {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
+      {(activeTheme === 'bauhaus' || activeTheme === 'editorial' || activeTheme === 'maison') && (
+        <WelcomeScreen
           hotel={hotel}
           hotelLogoDark={hotelLogoDark}
           guest={guest}
@@ -450,48 +451,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           recs={recs}
           f={f}
           walletAvailable={walletAvailable}
-        />
-      )}
-
-      {/* ── Editorial Design ── */}
-      {activeTheme === 'editorial' && (
-        <EditorialScreen
-          hotel={hotel}
-          hotelLogoDark={hotelLogoDark}
-          guest={guest}
-          room={room}
-          settings={settings}
-          token={token!}
-          lang={lang}
-          hotelEnabledLangs={hotelEnabledLangs}
-          greetingName={greetingName}
-          checkInLabel={checkInLabel}
-          checkOutLabel={checkOutLabel}
-          nightsCount={nightsCount}
-          recs={recs}
-          f={f}
-          walletAvailable={walletAvailable}
-        />
-      )}
-
-      {/* ── Maison Design ── */}
-      {activeTheme === 'maison' && (
-        <MaisonScreen
-          hotel={hotel}
-          hotelLogoDark={hotelLogoDark}
-          guest={guest}
-          room={room}
-          settings={settings}
-          token={token!}
-          lang={lang}
-          hotelEnabledLangs={hotelEnabledLangs}
-          greetingName={greetingName}
-          checkInLabel={checkInLabel}
-          checkOutLabel={checkOutLabel}
-          nightsCount={nightsCount}
-          recs={recs}
-          f={f}
-          walletAvailable={walletAvailable}
+          roomLabel={t('hero.stay.room', lang as Lang)}
         />
       )}
 
