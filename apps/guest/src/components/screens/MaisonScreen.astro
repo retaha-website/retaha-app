@@ -1,0 +1,441 @@
+---
+import { t } from '@retaha/i18n';
+import type { Lang } from '@retaha/i18n';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  settings: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  greetingName: string;
+  checkInLabel: string;
+  checkOutLabel: string;
+  nightsCount: number;
+  recs: any[];
+  f: any;
+  walletAvailable: boolean;
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, settings, token, lang,
+  hotelEnabledLangs, greetingName, checkInLabel, checkOutLabel,
+  nightsCount, recs, f,
+} = Astro.props;
+
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+const eveName = settings.eve_name || 'Eve';
+const welcomeSub = settings.welcome_message_de || 'Drei Tage zu Gast. Wir hoffen, Sie finden bei uns Ruhe — und alles, was Sie wünschen.';
+const hasService = f.service !== false && settings.service_items?.length > 0;
+const cityLine = hotel.city || 'Est. 2024';
+
+const romanNights = (n: number): string => {
+  const numerals: [number, string][] = [[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let result = '';
+  for (const [val, numeral] of numerals) {
+    while (n >= val) { result += numeral; n -= val; }
+  }
+  return result;
+};
+---
+
+<!-- ─── HOTEL HEADER (zentriert) ─────────────────────────────────────── -->
+<header class="ms-head">
+  <div class="ms-head__sup">{cityLine}</div>
+  {hotelLogoDark ? (
+    <img class="ms-head__logo" src={hotelLogoDark} alt={hotel.name} />
+  ) : hotel.logo_url ? (
+    <img class="ms-head__logo ms-head__logo--invert" src={hotel.logo_url} alt={hotel.name} />
+  ) : (
+    <div class="ms-head__name">{hotel.name}</div>
+  )}
+  {room && <div class="ms-head__sub">{t('hero.stay.room', lang as Lang)} {room.room_number}</div>}
+  <div class="ms-head__lang">
+    {hotelEnabledLangs.map(l => (
+      <a href={switchUrl(l)} class={`ms-lang-btn ${lang === l ? 'is-active' : ''}`}>{l.toUpperCase()}</a>
+    ))}
+  </div>
+</header>
+
+<!-- ─── ORNAMENTAL DIVIDER ───────────────────────────────────────────── -->
+<div class="ms-ornament">
+  <div class="ms-ornament__line"></div>
+  <div class="ms-ornament__rhombus ms-ornament__rhombus--sm"></div>
+  <div class="ms-ornament__rhombus"></div>
+  <div class="ms-ornament__rhombus ms-ornament__rhombus--sm"></div>
+  <div class="ms-ornament__line"></div>
+</div>
+
+<!-- ─── HERO (zentriert) ─────────────────────────────────────────────── -->
+<section class="ms-hero">
+  <div class="ms-hero__eyebrow">Wir heißen Sie willkommen</div>
+  <h1 class="ms-hero__title">
+    {guest?.first_name
+      ? <Fragment>{guest.first_name},<br /><em>schön, dass Sie da sind.</em></Fragment>
+      : <em>{greetingName}.</em>
+    }
+  </h1>
+  <p class="ms-hero__sub">{welcomeSub}</p>
+</section>
+
+<!-- ─── STAY (symmetrisch) ───────────────────────────────────────────── -->
+<div class="ms-stay">
+  <div class="ms-stay__col">
+    <div class="ms-stay__label">Anreise</div>
+    <div class="ms-stay__value">{checkInLabel}</div>
+  </div>
+  <div class="ms-stay__col">
+    <div class="ms-stay__label">Abreise</div>
+    <div class="ms-stay__value">{checkOutLabel}</div>
+  </div>
+  <div class="ms-stay__col">
+    <div class="ms-stay__label">Nächte</div>
+    <div class="ms-stay__value">{romanNights(nightsCount)}</div>
+  </div>
+</div>
+
+<!-- ─── ACTIONS (Liste mit Kreisrahmen) ──────────────────────────────── -->
+<section class="ms-actions">
+  <div class="ms-actions__head">
+    <h2 class="ms-actions__title">Zu Ihren Diensten</h2>
+    <div class="ms-actions__sub">Vier Wege uns zu erreichen</div>
+  </div>
+  <div class="ms-action-list">
+
+    <button class="ms-action" type="button" @click="openSheet('wifi')">
+      <div class="ms-action__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+        </svg>
+      </div>
+      <div class="ms-action__body">
+        <div class="ms-action__title">WLAN</div>
+        <div class="ms-action__sub">Mit einem Druck verbinden</div>
+      </div>
+      <div class="ms-action__arrow">›</div>
+    </button>
+
+    <button class="ms-action" type="button" @click="openSheet('breakfast')">
+      <div class="ms-action__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+        </svg>
+      </div>
+      <div class="ms-action__body">
+        <div class="ms-action__title">Frühstück</div>
+        <div class="ms-action__sub">Ihren Slot reservieren</div>
+      </div>
+      <div class="ms-action__arrow">›</div>
+    </button>
+
+    {f.eve !== false && (
+      <button class="ms-action" type="button"
+        @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+        <div class="ms-action__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+        </div>
+        <div class="ms-action__body">
+          <div class="ms-action__title">{eveName}</div>
+          <div class="ms-action__sub">Ihr persönlicher Concierge</div>
+        </div>
+        <div class="ms-action__arrow">›</div>
+      </button>
+    )}
+
+    {hasService && (
+      <button class="ms-action" type="button" @click="openSheet('service')">
+        <div class="ms-action__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </div>
+        <div class="ms-action__body">
+          <div class="ms-action__title">Service</div>
+          <div class="ms-action__sub">Wir kümmern uns persönlich</div>
+        </div>
+        <div class="ms-action__arrow">›</div>
+      </button>
+    )}
+
+    {f.recommendations !== false && (
+      <button class="ms-action" type="button" @click="openSheet('places')">
+        <div class="ms-action__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+          </svg>
+        </div>
+        <div class="ms-action__body">
+          <div class="ms-action__title">Empfehlungen</div>
+          <div class="ms-action__sub">Exklusiv ausgewählt</div>
+        </div>
+        <div class="ms-action__arrow">›</div>
+      </button>
+    )}
+
+  </div>
+</section>
+
+<!-- ─── CONCIERGE BOX ─────────────────────────────────────────────────── -->
+{recs.length > 0 && (
+  <div class="ms-concierge"
+    role="button" tabindex="0"
+    data-card-id={recs[0].id}
+    data-card-type={recs[0].cardType}
+    data-action-target={recs[0].actionTarget ?? ''}
+    @click="handleRecClick($el)">
+    <div class="ms-concierge__eyebrow">Persönliche Empfehlung</div>
+    <div class="ms-concierge__title">{recs[0].title}</div>
+    {recs[0].sub && <div class="ms-concierge__sub">{recs[0].sub}</div>}
+  </div>
+)}
+
+<!-- ─── BOTTOM TABS ───────────────────────────────────────────────────── -->
+<nav class="ms-tabs">
+  <div class="ms-tabs__rhombus"></div>
+  <button class="ms-tab ms-tab--active" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M3 12l9-9 9 9M5 10v10h14V10"/>
+    </svg>
+    <span>Start</span>
+  </button>
+  <button class="ms-tab" type="button"
+    @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+    </svg>
+    <span>Eve</span>
+  </button>
+  <button class="ms-tab" type="button" @click="openSheet('places')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+    </svg>
+    <span>Tipps</span>
+  </button>
+  <button class="ms-tab" type="button" @click="openSheet('service')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span>Service</span>
+  </button>
+</nav>
+
+<style>
+  /* ── Maison — Bodoni · Gold · Dunkel ── */
+
+  .ms-head {
+    padding: 12px 28px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--guest-border, #3A2D24);
+    position: relative;
+  }
+  .ms-head__sup {
+    font-size: 9px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--guest-accent, #C9A36A); font-weight: 400; margin-bottom: 4px;
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+  }
+  .ms-head__logo { height: 36px; width: auto; margin: 4px auto; display: block; }
+  .ms-head__logo--invert { filter: brightness(0.9) sepia(0.3) saturate(0.6); }
+  .ms-head__name {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: 22px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--guest-ink, #E8D9B5); margin-bottom: 3px;
+  }
+  .ms-head__sub {
+    font-family: var(--guest-font-body, 'Cormorant Garamond', serif);
+    font-style: italic; font-size: 13px; color: var(--guest-ink-muted, #C4B595);
+  }
+  .ms-head__lang {
+    position: absolute; top: 12px; right: 28px;
+    display: flex; gap: 6px;
+  }
+  .ms-lang-btn {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 10px; letter-spacing: 0.22em; color: var(--guest-accent, #C9A36A);
+    font-weight: 400; text-transform: uppercase; text-decoration: none;
+    transition: opacity 150ms;
+  }
+  .ms-lang-btn.is-active { opacity: 1; text-decoration: underline; }
+  .ms-lang-btn:not(.is-active) { opacity: 0.6; }
+
+  .ms-ornament {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; padding: 20px 0;
+  }
+  .ms-ornament__line { width: 60px; height: 1px; background: var(--guest-accent, #C9A36A); opacity: 0.6; }
+  .ms-ornament__rhombus {
+    width: 7px; height: 7px; background: var(--guest-accent, #C9A36A);
+    transform: rotate(45deg);
+  }
+  .ms-ornament__rhombus--sm { width: 4px; height: 4px; opacity: 0.5; }
+
+  .ms-hero { padding: 8px 32px 28px; text-align: center; }
+  .ms-hero__eyebrow {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--guest-accent, #C9A36A); font-weight: 400; margin-bottom: 18px;
+  }
+  .ms-hero__title {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: clamp(34px, 10vw, 44px); line-height: 1.1;
+    font-weight: 400; letter-spacing: -0.005em;
+    color: var(--guest-ink, #E8D9B5); margin-bottom: 14px;
+  }
+  .ms-hero__title em {
+    font-family: var(--guest-font-body, 'Cormorant Garamond', serif);
+    font-style: italic; font-weight: 300;
+    color: var(--guest-accent, #C9A36A); font-size: 0.9em;
+  }
+  .ms-hero__sub {
+    font-family: var(--guest-font-body, 'Cormorant Garamond', serif);
+    font-size: 16px; font-style: italic;
+    color: var(--guest-ink-muted, #C4B595); line-height: 1.5;
+    max-width: 88%; margin: 0 auto;
+  }
+
+  .ms-stay {
+    margin: 8px 32px 20px;
+    padding: 20px 0;
+    border-top: 1px solid var(--guest-border, #3A2D24);
+    border-bottom: 1px solid var(--guest-border, #3A2D24);
+    display: flex; justify-content: space-between;
+    position: relative; text-align: center;
+  }
+  .ms-stay::before, .ms-stay::after {
+    content: ''; position: absolute; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 6px; height: 6px;
+    background: var(--guest-bg, #1A1410);
+    border: 1px solid var(--guest-accent, #C9A36A);
+  }
+  .ms-stay::before { top: -4px; }
+  .ms-stay::after { bottom: -4px; }
+  .ms-stay__col { flex: 1; }
+  .ms-stay__label {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--guest-ink-faint, #8A7E66); font-weight: 400; margin-bottom: 6px;
+  }
+  .ms-stay__value {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: 18px; font-weight: 500; color: var(--guest-ink, #E8D9B5);
+    letter-spacing: 0.005em;
+  }
+
+  .ms-actions { padding: 24px 32px 16px; }
+  .ms-actions__head { text-align: center; margin-bottom: 24px; }
+  .ms-actions__title {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-style: italic; font-size: 22px; font-weight: 400;
+    color: var(--guest-ink, #E8D9B5); letter-spacing: -0.005em; margin-bottom: 4px;
+  }
+  .ms-actions__sub {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--guest-accent, #C9A36A); font-weight: 400;
+  }
+  .ms-action-list { display: flex; flex-direction: column; gap: 0; }
+  .ms-action {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--guest-border, #3A2D24);
+    display: flex; align-items: center; gap: 18px;
+    cursor: pointer; text-align: left;
+    background: transparent; border-left: 0; border-right: 0; border-top: 0; width: 100%;
+    transition: background 280ms ease, padding-left 200ms;
+  }
+  .ms-action:hover, .ms-action:active {
+    background: rgba(201,163,106,0.04);
+    padding-left: 8px;
+  }
+  .ms-action:last-child { border-bottom: 0; }
+  .ms-action__icon {
+    width: 42px; height: 42px;
+    border: 1px solid var(--guest-accent, #C9A36A); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; position: relative;
+  }
+  .ms-action__icon::before {
+    content: ''; position: absolute; top: -3px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 4px; height: 4px; background: var(--guest-accent, #C9A36A);
+  }
+  .ms-action__icon svg { width: 18px; height: 18px; stroke: var(--guest-accent, #C9A36A); }
+  .ms-action__body { flex: 1; }
+  .ms-action__title {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: 18px; font-weight: 500; color: var(--guest-ink, #E8D9B5);
+    letter-spacing: 0.005em; margin-bottom: 2px;
+  }
+  .ms-action__sub {
+    font-family: var(--guest-font-body, 'Cormorant Garamond', serif);
+    font-style: italic; font-size: 13px;
+    color: var(--guest-ink-muted, #C4B595);
+  }
+  .ms-action__arrow {
+    color: var(--guest-accent, #C9A36A);
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: 18px; font-weight: 300;
+  }
+
+  .ms-concierge {
+    margin: 20px 32px 24px;
+    padding: 24px 20px; text-align: center;
+    background: var(--guest-bg-card, #221913);
+    border: 1px solid var(--guest-accent, #C9A36A);
+    position: relative; cursor: pointer;
+  }
+  .ms-concierge::before, .ms-concierge::after {
+    content: ''; position: absolute;
+    width: 14px; height: 14px; border: 1px solid var(--guest-accent, #C9A36A);
+  }
+  .ms-concierge::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+  .ms-concierge::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+  .ms-concierge__eyebrow {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 9px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--guest-accent, #C9A36A); font-weight: 400; margin-bottom: 10px;
+  }
+  .ms-concierge__title {
+    font-family: var(--guest-font-display, 'Bodoni Moda', serif);
+    font-size: 20px; font-weight: 400; line-height: 1.2;
+    color: var(--guest-ink, #E8D9B5); letter-spacing: 0.005em; margin-bottom: 6px;
+  }
+  .ms-concierge__sub {
+    font-family: var(--guest-font-body, 'Cormorant Garamond', serif);
+    font-style: italic; font-size: 14px; color: var(--guest-ink-muted, #C4B595);
+  }
+
+  .ms-tabs {
+    margin-top: auto;
+    padding: 14px 24px env(safe-area-inset-bottom, 16px);
+    border-top: 1px solid var(--guest-border, #3A2D24);
+    background: var(--guest-bg, #1A1410);
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    position: sticky; bottom: 0;
+  }
+  .ms-tabs__rhombus {
+    position: absolute; top: -5px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: var(--guest-bg, #1A1410); border: 1px solid var(--guest-accent, #C9A36A);
+  }
+  .ms-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 8px 4px; cursor: pointer; border: none; background: transparent;
+    color: var(--guest-ink-muted, #C4B595); transition: color 280ms;
+    font-family: inherit; position: relative;
+  }
+  .ms-tab svg { width: 18px; height: 18px; stroke: currentColor; }
+  .ms-tab span {
+    font-family: var(--guest-font-mono, 'Inter Tight', sans-serif);
+    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 400;
+  }
+  .ms-tab--active { color: var(--guest-accent, #C9A36A); }
+  .ms-tab--active span { font-weight: 500; color: var(--guest-accent-bright, #E0BC85); }
+  .ms-tab--active::after {
+    content: ''; position: absolute; bottom: -12px; left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 4px; height: 4px; background: var(--guest-accent, #C9A36A);
+  }
+</style>

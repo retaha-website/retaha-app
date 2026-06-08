@@ -2,6 +2,9 @@
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import WeatherIcon from '../../components/WeatherIcon.astro';
+import BauhausScreen from '../../components/screens/BauhausScreen.astro';
+import EditorialScreen from '../../components/screens/EditorialScreen.astro';
+import MaisonScreen from '../../components/screens/MaisonScreen.astro';
 import WifiSheet from '../../components/sheets/WifiSheet.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
@@ -422,13 +425,80 @@ const showPostStay = stayEnded && !hasStayFeedback;
     )}
     <title>{hotel.name} · {greetingName}</title>
   </head>
-  <body class="gate-guest">
+  <body class={`gate-guest gate-theme-${activeTheme}`}>
     {isShowcase && (
       <div class="demo-mode-badge" role="status" aria-label="Demo-Modus aktiv">
         DEMO-MODE
       </div>
     )}
     <main x-data="guestPage" x-cloak>
+
+      {/* ── Bauhaus Design ── */}
+      {activeTheme === 'bauhaus' && (
+        <BauhausScreen
+          hotel={hotel}
+          hotelLogoDark={hotelLogoDark}
+          guest={guest}
+          room={room}
+          settings={settings}
+          token={token!}
+          lang={lang}
+          hotelEnabledLangs={hotelEnabledLangs}
+          greetingName={greetingName}
+          checkInLabel={checkInLabel}
+          checkOutLabel={checkOutLabel}
+          nightsCount={nightsCount}
+          recs={recs}
+          f={f}
+          walletAvailable={walletAvailable}
+        />
+      )}
+
+      {/* ── Editorial Design ── */}
+      {activeTheme === 'editorial' && (
+        <EditorialScreen
+          hotel={hotel}
+          hotelLogoDark={hotelLogoDark}
+          guest={guest}
+          room={room}
+          settings={settings}
+          token={token!}
+          lang={lang}
+          hotelEnabledLangs={hotelEnabledLangs}
+          greetingName={greetingName}
+          checkInLabel={checkInLabel}
+          checkOutLabel={checkOutLabel}
+          nightsCount={nightsCount}
+          recs={recs}
+          f={f}
+          walletAvailable={walletAvailable}
+        />
+      )}
+
+      {/* ── Maison Design ── */}
+      {activeTheme === 'maison' && (
+        <MaisonScreen
+          hotel={hotel}
+          hotelLogoDark={hotelLogoDark}
+          guest={guest}
+          room={room}
+          settings={settings}
+          token={token!}
+          lang={lang}
+          hotelEnabledLangs={hotelEnabledLangs}
+          greetingName={greetingName}
+          checkInLabel={checkInLabel}
+          checkOutLabel={checkOutLabel}
+          nightsCount={nightsCount}
+          recs={recs}
+          f={f}
+          walletAvailable={walletAvailable}
+        />
+      )}
+
+      {/* ── Classic Design (Standard gate-* CSS) ── */}
+      {(activeTheme === 'classic' || (activeTheme !== 'bauhaus' && activeTheme !== 'editorial' && activeTheme !== 'maison')) && (
+      <Fragment>
       <!-- HERO -->
       <section class="gate-hero">
         <div class="gate-hero-bg" style={hotelHeroBg ? `background-image: url('${hotelHeroBg}')` : undefined}></div>
@@ -687,8 +757,10 @@ const showPostStay = stayEnded && !hasStayFeedback;
         <span aria-hidden="true">·</span>
         <a href={`/g/${token}/impressum`}>Impressum</a>
       </div>
+      </Fragment>
+      )}
 
-      <!-- SHEETS (rendered as overlays) -->
+      <!-- SHEETS (rendered as overlays, alle Themes) -->
       <WifiSheet
         hotelId={hotel.id}
         ssid={settings.wifi_ssid || 'Gate-Guest'}

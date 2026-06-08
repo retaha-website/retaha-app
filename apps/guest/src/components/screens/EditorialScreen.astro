@@ -1,0 +1,348 @@
+---
+import { t } from '@retaha/i18n';
+import type { Lang } from '@retaha/i18n';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  settings: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  greetingName: string;
+  checkInLabel: string;
+  checkOutLabel: string;
+  nightsCount: number;
+  recs: any[];
+  f: any;
+  walletAvailable: boolean;
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, settings, token, lang,
+  hotelEnabledLangs, greetingName, checkInLabel, checkOutLabel,
+  nightsCount, recs, f,
+} = Astro.props;
+
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+const eveName = settings.eve_name || 'Eve';
+const welcomeSub = settings.welcome_message_de || 'Wir freuen uns auf Ihren Aufenthalt. Hier finden Sie alles, was den Aufenthalt einfacher macht.';
+const hasService = f.service !== false && settings.service_items?.length > 0;
+const cityLine = hotel.city ? hotel.city : '';
+
+// Numbered action list — always show wifi + breakfast + eve + service if enabled
+const actions: { num: string; label: string; sub: string; handler: string; show: boolean }[] = [
+  { num: '01', label: 'WLAN verbinden', sub: 'In Sekunden eingerichtet', handler: "openSheet('wifi')", show: true },
+  { num: '02', label: 'Frühstück buchen', sub: 'Slot für Ihren Morgen wählen', handler: "openSheet('breakfast')", show: true },
+  { num: '03', label: eveName + ' · Concierge', sub: 'Persönliche Antworten, rund um die Uhr', handler: "eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()", show: f.eve !== false },
+  { num: '04', label: 'Service anfragen', sub: 'Wir kümmern uns persönlich', handler: "openSheet('service')", show: hasService },
+  { num: '05', label: 'Empfehlungen', sub: cityLine + ' entdecken', handler: "openSheet('places')", show: f.recommendations !== false },
+];
+const visibleActions = actions.filter(a => a.show);
+---
+
+<!-- ─── HOTEL HEADER ─────────────────────────────────────────────────── -->
+<header class="ed-head">
+  <div class="ed-mark">
+    {hotelLogoDark ? (
+      <img class="ed-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+    ) : hotel.logo_url ? (
+      <img class="ed-mark__logo ed-mark__logo--invert" src={hotel.logo_url} alt={hotel.name} />
+    ) : (
+      <span class="ed-mark__name">{hotel.name}</span>
+    )}
+    {room && <span class="ed-mark__room">{t('hero.stay.room', lang as Lang)} {room.room_number}</span>}
+  </div>
+  <div class="ed-lang">
+    {hotelEnabledLangs.map(l => (
+      <a href={switchUrl(l)} class={`ed-lang__btn ${lang === l ? 'is-active' : ''}`}>{l.toUpperCase()}</a>
+    ))}
+  </div>
+</header>
+
+<!-- ─── HERO ─────────────────────────────────────────────────────────── -->
+<section class="ed-hero">
+  <div class="ed-hero__eyebrow">
+    {cityLine || 'Willkommen'}
+  </div>
+  <h1 class="ed-hero__title">
+    {guest?.first_name
+      ? <Fragment>Schön, dass Sie<br /><em>da sind, {guest.first_name}.</em></Fragment>
+      : <em>{greetingName}.</em>
+    }
+  </h1>
+  <p class="ed-hero__sub">{welcomeSub}</p>
+</section>
+
+<!-- ─── STAY STRIP ────────────────────────────────────────────────────── -->
+<div class="ed-stay">
+  <div class="ed-stay__col">
+    <div class="ed-stay__label">Anreise</div>
+    <div class="ed-stay__value">{checkInLabel}</div>
+  </div>
+  <div class="ed-stay__col">
+    <div class="ed-stay__label">Abreise</div>
+    <div class="ed-stay__value">{checkOutLabel}</div>
+  </div>
+  <div class="ed-stay__col">
+    <div class="ed-stay__label">Nächte</div>
+    <div class="ed-stay__value ed-stay__value--num">{nightsCount}</div>
+  </div>
+</div>
+
+<!-- ─── DIVIDER ───────────────────────────────────────────────────────── -->
+<div class="ed-divider">
+  <div class="ed-divider__line"></div>
+  <div class="ed-divider__dot"></div>
+  <div class="ed-divider__line"></div>
+</div>
+
+<!-- ─── NUMBERED ACTION LIST ─────────────────────────────────────────── -->
+<section class="ed-actions">
+  <div class="ed-actions__head">
+    <h2 class="ed-actions__title">Was Sie brauchen</h2>
+    <span class="ed-actions__count">0{visibleActions.length} Wege</span>
+  </div>
+  <div class="ed-action-list">
+    {visibleActions.map(action => (
+      <button class="ed-action" type="button" @click={action.handler}>
+        <div class="ed-action__num">{action.num}</div>
+        <div class="ed-action__body">
+          <div class="ed-action__title">{action.label}</div>
+          <div class="ed-action__sub">{action.sub}</div>
+        </div>
+        <div class="ed-action__arrow">›</div>
+      </button>
+    ))}
+  </div>
+</section>
+
+<!-- ─── FEATURE CARD ──────────────────────────────────────────────────── -->
+{recs.length > 0 && (
+  <div class="ed-feature"
+    role="button" tabindex="0"
+    data-card-id={recs[0].id}
+    data-card-type={recs[0].cardType}
+    data-action-target={recs[0].actionTarget ?? ''}
+    @click="handleRecClick($el)">
+    <div class="ed-feature__eyebrow">Empfehlung des Hauses</div>
+    <h3 class="ed-feature__title">{recs[0].title}</h3>
+    {recs[0].sub && <p class="ed-feature__sub">{recs[0].sub}</p>}
+  </div>
+)}
+
+<!-- ─── BOTTOM TABS ───────────────────────────────────────────────────── -->
+<nav class="ed-tabs">
+  <button class="ed-tab ed-tab--active" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M3 12l9-9 9 9M5 10v10h14V10"/>
+    </svg>
+    <span>Start</span>
+  </button>
+  <button class="ed-tab" type="button"
+    @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+    </svg>
+    <span>Eve</span>
+  </button>
+  <button class="ed-tab" type="button" @click="openSheet('places')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>
+    </svg>
+    <span>Tipps</span>
+  </button>
+  <button class="ed-tab" type="button" @click="openSheet('service')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span>Service</span>
+  </button>
+</nav>
+
+<style>
+  /* ── Editorial — Cormorant · Olive · Cream ── */
+
+  .ed-head {
+    padding: 16px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ed-mark { display: flex; align-items: baseline; gap: 10px; }
+  .ed-mark__logo { height: 28px; width: auto; }
+  .ed-mark__logo--invert { filter: brightness(0) saturate(0); }
+  .ed-mark__name {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 20px; font-weight: 500; letter-spacing: 0.005em; font-style: italic;
+  }
+  .ed-mark__room {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--guest-ink-muted, #6B6862); font-weight: 500;
+  }
+  .ed-lang { display: flex; gap: 4px; }
+  .ed-lang__btn {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500; color: var(--guest-accent, #4A5C2A);
+    text-decoration: none; padding: 2px 6px;
+    transition: opacity 150ms;
+  }
+  .ed-lang__btn.is-active { text-decoration: underline; }
+
+  .ed-hero { padding: 12px 28px 24px; }
+  .ed-hero__eyebrow {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--guest-accent, #4A5C2A); margin-bottom: 20px;
+  }
+  .ed-hero__eyebrow::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--guest-accent, #4A5C2A); opacity: 0.3;
+  }
+  .ed-hero__title {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: clamp(38px, 12vw, 52px); line-height: 1.05;
+    font-weight: 400; letter-spacing: -0.015em;
+    color: var(--guest-ink, #2B2A28); margin-bottom: 12px;
+  }
+  .ed-hero__title em { font-style: italic; font-weight: 500; color: var(--guest-accent, #4A5C2A); }
+  .ed-hero__sub {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 17px; font-style: italic; color: var(--guest-ink-muted, #6B6862);
+    line-height: 1.45; max-width: 88%;
+  }
+
+  .ed-stay {
+    margin: 0 28px 8px;
+    padding: 16px 0;
+    border-top: 1px solid var(--guest-border, #D4CFC2);
+    border-bottom: 1px solid var(--guest-border, #D4CFC2);
+    display: flex; justify-content: space-between;
+  }
+  .ed-stay__col { display: flex; flex-direction: column; gap: 2px; }
+  .ed-stay__label {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--guest-ink-faint, #A8A39A); font-weight: 500;
+  }
+  .ed-stay__value {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 18px; font-weight: 500; letter-spacing: -0.005em;
+    font-style: italic; color: var(--guest-ink, #2B2A28);
+  }
+  .ed-stay__value--num { font-style: normal; font-weight: 400; }
+
+  .ed-divider {
+    margin: 24px 28px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .ed-divider__line { flex: 1; height: 1px; background: var(--guest-border, #D4CFC2); }
+  .ed-divider__dot {
+    width: 5px; height: 5px; background: var(--guest-accent, #4A5C2A);
+    transform: rotate(45deg);
+  }
+
+  .ed-actions { padding: 0 28px 20px; }
+  .ed-actions__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .ed-actions__title {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 24px; font-weight: 400; font-style: italic;
+    letter-spacing: -0.01em; color: var(--guest-ink, #2B2A28);
+  }
+  .ed-actions__count {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--guest-ink-faint, #A8A39A); font-weight: 500;
+  }
+  .ed-action-list { display: flex; flex-direction: column; }
+  .ed-action {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--guest-border, #D4CFC2);
+    display: flex; align-items: center; gap: 16px;
+    cursor: pointer; text-align: left; background: transparent; border-left: 0; border-right: 0; border-top: 0; width: 100%;
+    transition: padding-left 220ms ease;
+  }
+  .ed-action:hover, .ed-action:active { padding-left: 6px; }
+  .ed-action:last-child { border-bottom: 0; }
+  .ed-action__num {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-style: italic; color: var(--guest-accent, #4A5C2A);
+    font-size: 22px; font-weight: 300; width: 26px; flex-shrink: 0;
+  }
+  .ed-action__body { flex: 1; }
+  .ed-action__title {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 20px; font-weight: 500; letter-spacing: -0.005em;
+    margin-bottom: 2px; color: var(--guest-ink, #2B2A28);
+  }
+  .ed-action__sub {
+    font-size: 11px; letter-spacing: 0.04em;
+    color: var(--guest-ink-muted, #6B6862); font-weight: 400;
+  }
+  .ed-action__arrow {
+    color: var(--guest-accent, #4A5C2A);
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 24px; font-style: italic; font-weight: 300;
+  }
+
+  .ed-feature {
+    margin: 0 28px 28px;
+    padding: 24px;
+    background: var(--guest-accent-soft, #E6E8DC);
+    position: relative; cursor: pointer;
+  }
+  .ed-feature::before {
+    content: ''; position: absolute; top: 14px; left: 14px;
+    width: 8px; height: 8px;
+    border-top: 1px solid var(--guest-accent, #4A5C2A);
+    border-left: 1px solid var(--guest-accent, #4A5C2A);
+  }
+  .ed-feature::after {
+    content: ''; position: absolute; bottom: 14px; right: 14px;
+    width: 8px; height: 8px;
+    border-bottom: 1px solid var(--guest-accent, #4A5C2A);
+    border-right: 1px solid var(--guest-accent, #4A5C2A);
+  }
+  .ed-feature__eyebrow {
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--guest-accent, #4A5C2A); font-weight: 500; margin-bottom: 10px;
+  }
+  .ed-feature__title {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 24px; line-height: 1.2; font-weight: 400;
+    font-style: italic; color: var(--guest-ink, #2B2A28);
+    letter-spacing: -0.01em; margin-bottom: 8px;
+  }
+  .ed-feature__title em { font-style: normal; color: var(--guest-accent, #4A5C2A); }
+  .ed-feature__sub {
+    font-family: var(--guest-font-display, 'Cormorant Garamond', serif);
+    font-size: 14px; font-style: italic;
+    color: var(--guest-ink-muted, #6B6862); line-height: 1.4;
+  }
+
+  .ed-tabs {
+    margin-top: auto;
+    padding: 14px 24px env(safe-area-inset-bottom, 16px);
+    border-top: 1px solid var(--guest-border, #D4CFC2);
+    background: var(--guest-bg, #FAF7F0);
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    position: sticky; bottom: 0;
+  }
+  .ed-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 6px 4px; cursor: pointer; border: none; background: transparent;
+    color: var(--guest-ink-faint, #A8A39A); transition: color 220ms;
+    font-family: inherit; position: relative;
+  }
+  .ed-tab svg { width: 18px; height: 18px; stroke: currentColor; }
+  .ed-tab span {
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 400;
+  }
+  .ed-tab--active { color: var(--guest-accent, #4A5C2A); }
+  .ed-tab--active span { font-weight: 600; }
+  .ed-tab--active::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 1px; background: var(--guest-accent, #4A5C2A);
+  }
+</style>
