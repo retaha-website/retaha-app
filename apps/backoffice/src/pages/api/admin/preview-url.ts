@@ -4,7 +4,7 @@
 
 import type { APIRoute } from 'astro';
 import { getUserHotels } from '@retaha/auth';
-import { getOrCreateShowcaseUrl } from '../../../lib/demo/get-showcase-url';
+import { getOrCreateShowcaseUrl } from '@retaha/auth';
 import { getUser } from '@retaha/auth';
 
 function json(data: any, status = 200) {

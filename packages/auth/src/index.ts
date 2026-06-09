@@ -36,6 +36,13 @@ export {
   type SessionCookieOptions,
 } from './cross-subdomain-cookie';
 
+// Branding-Data Helper
+export { getBranding } from './branding';
+export type { BrandingData } from './branding';
+
+// Showcase-Session Helper
+export { getOrCreateShowcaseUrl } from './showcase';
+
 // MFA (Sprint-I Findings-Fix) — Server-side only
 // Importpfad: import { ... } from '@retaha/auth/mfa'
 // (NICHT vom root '@retaha/auth' damit Client-Bundles bcrypt nicht ziehen)

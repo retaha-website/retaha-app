@@ -1,5 +1,5 @@
-import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import type { AstroCookies } from 'astro';
+import { getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 
 export interface BrandingData {
   hotel_id: string;
@@ -44,7 +44,6 @@ export async function getBranding(
     .eq('id', hotel.id)
     .maybeSingle();
 
-  // Bei DB-Fehler (z.B. fehlende Spalte) → Fallback-Objekt, nicht null
   const d = (data ?? {}) as Record<string, unknown>;
 
   return {

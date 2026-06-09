@@ -13,7 +13,6 @@ function buildGuestUrl(hotelSlug: string | null | undefined, token: string): str
   if (hotelSlug) {
     return `https://${hotelSlug}.${domain}/${token}`;
   }
-  // Fallback falls kein Slug gesetzt
   return `https://app.${domain}/g/${token}`;
 }
 
@@ -23,7 +22,6 @@ export async function getOrCreateShowcaseUrl(
 ): Promise<string | null> {
   const sb = createSupabaseServiceRoleInstance();
 
-  // Hotel-Slug + vorhandene aktive Session in einem Query
   const [{ data: hotel }, { data: existing }] = await Promise.all([
     sb.from('hotels').select('slug').eq('id', hotelId).single(),
     sb
@@ -43,7 +41,6 @@ export async function getOrCreateShowcaseUrl(
     return buildGuestUrl(slug, existing.token);
   }
 
-  // Neue Session erstellen
   const expiresAt = new Date(Date.now() + TTL_DAYS * 86_400_000).toISOString();
   const { data: created, error } = await sb
     .from('showcase_sessions')
