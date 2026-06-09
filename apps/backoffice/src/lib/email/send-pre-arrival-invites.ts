@@ -57,7 +57,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
     // Hotel-Daten
     const { data: hotel } = await sb
       .from('hotels')
-      .select('id, name, logo_url')
+      .select('id, name, logo_primary, logo_dark')
       .eq('id', hotelId)
       .maybeSingle();
     if (!hotel) {
@@ -139,7 +139,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
 
         const data: PreArrivalInviteData = {
           hotelName: hotel.name ?? 'Hotel',
-          hotelLogoUrl: hotel.logo_url ?? null,
+          hotelLogoUrl: (hotel as any).logo_primary ?? (hotel as any).logo_dark ?? null,
           hotelAccentColor: settings?.accent_color ?? null,
           guestFirstName: s.guest_first_name,
           checkInLabel: formatLongGermanDate(s.check_in),

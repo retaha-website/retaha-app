@@ -25,7 +25,8 @@ export type StayContext = {
     name: string;
     city: string | null;
     default_language: string;
-    logo_url: string | null;
+    logo_primary: string | null;
+    logo_dark: string | null;
   };
   settings: {
     features: Record<string, boolean>;
@@ -83,7 +84,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       id, check_in, check_out, is_active,
       guest:guests(id, first_name, last_name, language, visit_count),
       room:rooms(id, room_number, room_name),
-      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_url, theme, brand_primary, brand_secondary)
+      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, brand_primary, brand_secondary)
     `)
     .eq('access_token', token)
     .eq('is_active', true)

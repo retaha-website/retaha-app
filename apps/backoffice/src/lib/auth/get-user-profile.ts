@@ -19,7 +19,7 @@ export async function getUserProfileForLayout(
       .maybeSingle(),
     supabase
       .from('hotel_users')
-      .select('role, hotels(id, name, logo_primary, logo_dark, logo_url, trial_started_at, subscription_status, theme)')
+      .select('role, hotels(id, name, logo_primary, logo_dark, trial_started_at, subscription_status, theme)')
       .eq('user_id', user.id)
       .maybeSingle(),
   ]);
@@ -32,7 +32,7 @@ export async function getUserProfileForLayout(
       name: string;
       logo_primary?: string;
       logo_dark?: string;
-      logo_url?: string;
+
       trial_started_at?: string | null;
       subscription_status?: string;
       theme?: string | null;
@@ -48,7 +48,7 @@ export async function getUserProfileForLayout(
     role: (hotelUser?.role ?? 'staff') as UserRole,
     hotel_id: h?.id ?? '',
     hotel_name: h?.name ?? '',
-    hotel_logo_url: h?.logo_primary ?? h?.logo_dark ?? h?.logo_url ?? null,
+    hotel_logo_url: h?.logo_primary ?? h?.logo_dark ?? null,
     hotel_trial_started_at: h?.trial_started_at ?? null,
     hotel_subscription_status: h?.subscription_status ?? '',
     hotel_theme: h?.theme ?? null,

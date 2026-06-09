@@ -49,7 +49,7 @@ export async function sendBookingNotification(ctx: BookingNotificationContext): 
     // Hotel + Settings + Stay + Guest + Room in einem Schub
     const [hotelRes, settingsRes, stayRes] = await Promise.all([
       sb.from('hotels')
-        .select('id, name, slug, logo_url')
+        .select('id, name, slug, logo_primary, logo_dark')
         .eq('id', ctx.hotelId)
         .maybeSingle(),
       sb.from('hotel_settings')
@@ -93,7 +93,7 @@ export async function sendBookingNotification(ctx: BookingNotificationContext): 
 
     const data: BookingNotificationData = {
       hotelName: hotel.name ?? 'Hotel',
-      hotelLogoUrl: hotel.logo_url ?? null,
+      hotelLogoUrl: (hotel as any).logo_primary ?? (hotel as any).logo_dark ?? null,
       hotelAccentColor: settings?.accent_color ?? null,
       recipientFirstName: await hotelOwnerFirstName(ctx.hotelId),
       guestName,

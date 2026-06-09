@@ -62,7 +62,7 @@ if (token && isShowcaseToken(token)) {
     // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
     const sbSrInit = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -488,10 +488,8 @@ const showPostStay = stayEnded && !hasStayFeedback;
             </div>
           </div>
 
-          {hotel.logo_url ? (
-            hotelLogoDark
-              ? <img class="gate-hero-logo" src={hotelLogoDark} alt={hotel.name} />
-              : <img class="gate-hero-logo gate-hero-logo--invert" src={hotel.logo_url} alt={hotel.name} />
+          {hotelLogoDark ? (
+            <img class="gate-hero-logo" src={hotelLogoDark} alt={hotel.name} />
           ) : (
             <img class="gate-hero-logo" src="/specht-anthrazit.svg" alt={hotel.name} />
           )}

@@ -37,7 +37,7 @@ async function main() {
   const sb = createSupabaseServiceRoleInstance();
   const { data: hotel, error } = await sb
     .from('hotels')
-    .select('id, name, logo_url, brand_color, hero_image_url, default_language')
+    .select("id, name, logo_primary, logo_dark, brand_color, hero_image_url, default_language")
     .eq('id', hotelId)
     .maybeSingle();
 
@@ -50,7 +50,7 @@ async function main() {
     hotelId: hotel.id,
     hotelName: hotel.name,
     brandColorHex: hotel.brand_color || DEFAULT_BRAND_COLOR,
-    logoUrl: absoluteUrl(hotel.logo_url),
+    logoUrl: absoluteUrl(hotel.logo_primary ?? hotel.logo_dark ?? null),
     heroImageUrl: absoluteUrl(hotel.hero_image_url),
     defaultLang: hotel.default_language || 'de',
   };

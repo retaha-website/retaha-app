@@ -14,11 +14,11 @@ const url = new URL(Astro.request.url);
 const hotelId = url.searchParams.get('hotel');
 const roomNumber = url.searchParams.get('room');
 
-let hotel: { name: string; logo_url: string | null; theme: string | null } | null = null;
+let hotel: { name: string; logo_primary: string | null; logo_dark: string | null; theme: string | null } | null = null;
 if (hotelId && /^[0-9a-f-]{36}$/i.test(hotelId)) {
   const sb = createServerClient();
   const { data } = await sb
-    .from('hotels').select('name, logo_url, theme').eq('id', hotelId).maybeSingle();
+    .from('hotels').select('name, logo_primary, logo_dark, theme').eq('id', hotelId).maybeSingle();
   if (data) hotel = data;
 }
 
@@ -44,8 +44,8 @@ const subtitle = roomNumber
   </head>
   <body class="nw-body">
     <main class="nw-shell">
-      {hotel?.logo_url && (
-        <img class="nw-logo" src={hotel.logo_url} alt={hotelName} />
+      {(hotel?.logo_primary ?? hotel?.logo_dark) && (
+        <img class="nw-logo" src={hotel.logo_primary ?? hotel.logo_dark!} alt={hotelName} />
       )}
       <p class="nw-eyebrow themed-eyebrow-flank">retaha</p>
       <h1 class="nw-heading">{heading}<span class="h-dot">.</span></h1>

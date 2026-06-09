@@ -17,7 +17,6 @@ export interface GuestHotel {
   name: string;
   city: string | null;
   default_language: string;
-  logo_url: string | null;
   logo_primary: string | null;
   logo_dark: string | null;
   splash_background: string | null;

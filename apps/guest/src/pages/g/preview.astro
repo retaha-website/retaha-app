@@ -71,7 +71,7 @@ const identity = IDENTITY_REMAP[rawIdentity] ?? rawIdentity;
 // ── Hotel-Daten laden ──────────────────────────────────────────────────────
 const sb = createSupabaseServiceRoleInstance();
 const [{ data: hotel }, { data: settings }] = await Promise.all([
-  sb.from('hotels').select('id, name, city, logo_url, logo_primary, logo_dark, theme, splash_background, brand_primary, brand_secondary').eq('id', hotelId).single(),
+  sb.from('hotels').select('id, name, city, logo_primary, logo_dark, theme, splash_background, brand_primary, brand_secondary').eq('id', hotelId).single(),
   sb.from('hotel_settings').select('welcome_message_de, hotel_eyebrow_de, eve_name, wifi_ssid').eq('hotel_id', hotelId).maybeSingle(),
 ]);
 
@@ -80,8 +80,7 @@ if (!hotel) {
 }
 
 const accentColor: string = (hotel as any).brand_primary ?? '#FF4A82';
-// logo_primary = über Branding-Seite hochgeladen; logo_url = legacy-Feld
-const logoUrl: string | null = (hotel as any).logo_primary ?? (hotel as any).logo_url ?? null;
+const logoUrl: string | null = (hotel as any).logo_primary ?? null;
 const hotelLogoDark: string | null = (hotel as any).logo_dark ?? null;
 const hotelHeroBg = hotel.splash_background ?? null;
 const welcomeMsg = settings?.welcome_message_de ?? `Willkommen im ${hotel.name}.`;
