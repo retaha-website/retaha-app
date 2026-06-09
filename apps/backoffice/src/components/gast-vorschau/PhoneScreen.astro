@@ -29,22 +29,63 @@ const theme: GuestTheme = {
 />
 
 <script>
-  import { subscribe } from '../../lib/gast-vorschau/state';
+  import { subscribe, type PreviewState } from '../../lib/gast-vorschau/state';
 
-  // Brücke: WelcomeSection-State → GuestPhoneView welcome text
+  type ModuleKey = keyof PreviewState['modules'];
+
+  // Label → module-key mapping for .ws-action tiles
+  const ACTION_LABEL_MAP: Record<string, ModuleKey> = {
+    'frühstück':  'breakfast',
+    'eve':        'eve',
+    'service':    'service',
+    'tipps':      'empfehlungen',
+    'konferenz':  'conference',
+    'checkout':   'self_checkout',
+  };
+
+  // Tab text → module-key mapping for .ws-tab bottom tabs
+  const TAB_TEXT_MAP: Record<string, ModuleKey> = {
+    'eve':     'eve',
+    'tipps':   'empfehlungen',
+    'service': 'service',
+  };
+
   subscribe(state => {
-    // Willkommenstext im HomeScreen aktualisieren
+    // 1 — Willkommenstext
     document.querySelectorAll<HTMLElement>('[data-screen="home"] .gate-hero-sub').forEach(el => {
       el.textContent = state.welcomeText;
     });
 
-    // Module toggles — Tabs ein-/ausblenden
-    const tabs = document.querySelectorAll<HTMLButtonElement>('.gp-tab');
-    tabs.forEach(tab => {
-      const key = tab.dataset.tab;
-      if (key === 'eve')     tab.style.opacity = state.modules.eve           ? '1' : '0.3';
-      if (key === 'tipps')   tab.style.opacity = state.modules.empfehlungen  ? '1' : '0.3';
-      if (key === 'service') tab.style.opacity = state.modules.service       ? '1' : '0.3';
+    // 2 — Action-Tiles ein-/ausblenden
+    document.querySelectorAll<HTMLElement>('.ws-action').forEach(tile => {
+      const labelEl = tile.querySelector<HTMLElement>('.ws-action__label');
+      if (!labelEl) return;
+      const labelKey = labelEl.textContent?.trim().toLowerCase() ?? '';
+      const moduleKey = ACTION_LABEL_MAP[labelKey];
+      if (moduleKey) {
+        const visible = state.modules[moduleKey];
+        tile.style.display = visible ? '' : 'none';
+      }
+    });
+
+    // 3 — Bottom-Tabs dimmen (nicht verstecken — sonst bricht das Layout)
+    document.querySelectorAll<HTMLElement>('.ws-tab').forEach(tab => {
+      const spanText = tab.querySelector('span')?.textContent?.trim().toLowerCase() ?? '';
+      const moduleKey = TAB_TEXT_MAP[spanText];
+      if (moduleKey) {
+        tab.style.opacity = state.modules[moduleKey] ? '1' : '0.3';
+        tab.style.pointerEvents = state.modules[moduleKey] ? '' : 'none';
+      }
+    });
+
+    // 4 — Hero Slider
+    document.querySelectorAll<HTMLElement>('.ws-slider').forEach(slider => {
+      slider.style.display = state.modules.action_cards ? '' : 'none';
+    });
+
+    // 5 — Wallet-Pass (soft card falls vorhanden)
+    document.querySelectorAll<HTMLElement>('.ws-wallet, [data-module="wallet"]').forEach(el => {
+      el.style.display = state.modules.wallet ? '' : 'none';
     });
   });
 </script>

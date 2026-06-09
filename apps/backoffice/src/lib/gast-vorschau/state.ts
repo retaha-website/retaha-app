@@ -2,7 +2,16 @@ export interface PreviewState {
   scene: 'empfang' | 'zimmer_101' | 'spa';
   view: 'home' | 'eve' | 'empfehlungen' | 'service';
   branding: { theme: 'coffee' | 'ocean' | 'forest' };
-  modules: { eve: boolean; empfehlungen: boolean; service: boolean };
+  modules: {
+    eve: boolean;
+    empfehlungen: boolean;
+    service: boolean;
+    breakfast: boolean;
+    conference: boolean;
+    self_checkout: boolean;
+    action_cards: boolean;
+    wallet: boolean;
+  };
   welcomeText: string;
   formality: 'du' | 'sie';
   activeLanguages: string[];
@@ -13,7 +22,16 @@ export const initialState: PreviewState = {
   scene: 'empfang',
   view: 'home',
   branding: { theme: 'coffee' },
-  modules: { eve: true, empfehlungen: true, service: true },
+  modules: {
+    eve: true,
+    empfehlungen: true,
+    service: true,
+    breakfast: true,
+    conference: true,
+    self_checkout: true,
+    action_cards: true,
+    wallet: true,
+  },
   welcomeText: 'willkommen im the gate garden hotel',
   formality: 'du',
   activeLanguages: ['de', 'en'],
