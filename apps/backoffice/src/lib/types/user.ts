@@ -9,6 +9,9 @@ export interface UserProfile {
   hotel_id: string;
   hotel_name: string;
   hotel_logo_url: string | null;
+  hotel_trial_started_at: string | null;
+  hotel_subscription_status: string;
+  hotel_theme: string | null;
   language: 'de' | 'en';
 }
 

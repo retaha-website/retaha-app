@@ -1,16 +1,40 @@
 ---
+// Fonts
+import '@fontsource/space-grotesk/300.css';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+// @retaha/ui CSS (enthält @import "tailwindcss" + @theme + Bauhaus-Komponenten)
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/tokens.css';
+import '@retaha/ui/styles/global.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui/styles/icons.css';
+import '@retaha/ui/styles/components/buttons.css';
+import '@retaha/ui/styles/components/inputs.css';
+import '@retaha/ui/styles/components/pills.css';
+import '@retaha/ui/styles/components/menu.css';
+import '@retaha/ui/styles/components/settings.css';
+import '@retaha/ui/styles/components/status-markers.css';
+// V9 CSS-Variablen (--bg, --ink, --border, --sage, --brass, etc.)
 import '../styles/global.css';
+
 import Header from '../components/header/Header.astro';
 import Footer from '../components/footer/Footer.astro';
 import { getUserProfileForLayout } from '../lib/auth/get-user-profile';
+import { calculateTrialStatus, TRIAL_DURATION_DAYS } from '../lib/trial-status';
+import { t } from '../i18n/helpers';
+import type { TrialUrgency } from '@retaha/ui/components/admin/NotificationBell.astro';
 
 interface Props {
   title: string;
-  activeTab: 'gast' | 'backoffice' | 'dashboard';
+  activeTab: 'gast' | 'backoffice';
   hotelName?: string;
   hotelLocation?: string;
   hotelStars?: number;
@@ -26,7 +50,6 @@ const {
   hotelLogoUrl,
 } = Astro.props;
 
-// User-Profil laden (für UserMenu im Header)
 const userProfile = await getUserProfileForLayout(Astro.cookies, Astro.request);
 
 if (!userProfile) {
@@ -34,14 +57,49 @@ if (!userProfile) {
   return Astro.redirect(`${authUrl}/login`);
 }
 
-// Staff hat kein Backoffice-Zugriff
 if (userProfile.role === 'staff') {
   return Astro.redirect('/uebersicht');
 }
 
-// Hotel-Daten: Props überschreiben Profil-Fallback
 const displayHotelName    = hotelName    ?? userProfile.hotel_name;
 const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProfile.hotel_logo_url;
+
+// Trial-Status für NotificationBell
+const userLocale = Astro.locals.locale;
+const trialStatus = calculateTrialStatus({
+  trial_started_at: userProfile.hotel_trial_started_at,
+  subscription_status: userProfile.hotel_subscription_status,
+});
+const trialUrgency: TrialUrgency = trialStatus.urgencyLevel;
+const trialHasNotification = trialStatus.isInTrial || trialStatus.urgencyLevel === 'expired';
+const trialCurrentDay = Math.max(
+  1,
+  Math.min(TRIAL_DURATION_DAYS - trialStatus.daysRemaining + 1, TRIAL_DURATION_DAYS),
+);
+const trialHeadlineKey =
+  trialUrgency === 'warning'  ? 'notification_bell.headline_warning' :
+  trialUrgency === 'critical' ? 'notification_bell.headline_critical' :
+  trialUrgency === 'expired'  ? 'notification_bell.headline_expired' :
+                                'notification_bell.headline_normal';
+const trialBodyKey =
+  trialUrgency === 'warning'  ? 'notification_bell.body_warning' :
+  trialUrgency === 'critical' ? 'notification_bell.body_critical' :
+  trialUrgency === 'expired'  ? 'notification_bell.body_expired' :
+                                'notification_bell.body_normal';
+const trialCtaKey =
+  trialUrgency === 'critical' || trialUrgency === 'expired'
+    ? 'notification_bell.cta_critical'
+    : 'notification_bell.cta_normal';
+const trialTexts = {
+  eyebrow:        'bell',
+  headline:       t(trialHeadlineKey, userLocale),
+  body:           t(trialBodyKey, userLocale),
+  cta:            t(trialCtaKey, userLocale),
+  ariaLabel:      t('notification_bell.aria_label', userLocale),
+  popoverAria:    t('notification_bell.popover_aria', userLocale),
+  testphaseLabel: t('notification_bell.testphase_label', userLocale),
+  daysLabel:      t('notification_bell.days_label', userLocale),
+};
 ---
 
 <!DOCTYPE html>
@@ -61,6 +119,11 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
       hotelLocation={hotelLocation}
       hotelStars={hotelStars}
       hotelLogoUrl={displayHotelLogoUrl}
+      trialUrgency={trialUrgency}
+      trialHasNotification={trialHasNotification}
+      trialCurrentDay={trialCurrentDay}
+      trialTotalDays={TRIAL_DURATION_DAYS}
+      trialTexts={trialTexts}
     />
     <main>
       <slot />
@@ -68,10 +131,21 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
     <Footer />
 
     <script>
+      // Theme-Toggle
       const stored = localStorage.getItem('v9-theme');
       if (stored === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
+    </script>
+
+    <script>
+      // Alpine.js — für alle Pages (admin + V9)
+      import Alpine from 'alpinejs';
+      import collapse from '@alpinejs/collapse';
+      Alpine.plugin(collapse);
+      // @ts-expect-error
+      window.Alpine = Alpine;
+      Alpine.start();
     </script>
   </body>
 </html>

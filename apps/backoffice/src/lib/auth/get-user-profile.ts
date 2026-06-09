@@ -19,7 +19,7 @@ export async function getUserProfileForLayout(
       .maybeSingle(),
     supabase
       .from('hotel_users')
-      .select('role, hotels(id, name, logo_primary, logo_dark, logo_url)')
+      .select('role, hotels(id, name, logo_primary, logo_dark, logo_url, trial_started_at, subscription_status, theme)')
       .eq('user_id', user.id)
       .maybeSingle(),
   ]);
@@ -27,7 +27,16 @@ export async function getUserProfileForLayout(
   const profile = profileResult.data as { first_name?: string; last_name?: string } | null;
   const hotelUser = hotelUserResult.data as {
     role: string;
-    hotels: { id: string; name: string; logo_primary?: string; logo_dark?: string; logo_url?: string } | null;
+    hotels: {
+      id: string;
+      name: string;
+      logo_primary?: string;
+      logo_dark?: string;
+      logo_url?: string;
+      trial_started_at?: string | null;
+      subscription_status?: string;
+      theme?: string | null;
+    } | null;
   } | null;
 
   const h = hotelUser?.hotels;
@@ -40,6 +49,9 @@ export async function getUserProfileForLayout(
     hotel_id: h?.id ?? '',
     hotel_name: h?.name ?? '',
     hotel_logo_url: h?.logo_primary ?? h?.logo_dark ?? h?.logo_url ?? null,
+    hotel_trial_started_at: h?.trial_started_at ?? null,
+    hotel_subscription_status: h?.subscription_status ?? '',
+    hotel_theme: h?.theme ?? null,
     language: 'de',
   };
 }
