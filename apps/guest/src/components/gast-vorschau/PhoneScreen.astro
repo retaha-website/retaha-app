@@ -1,0 +1,105 @@
+---
+import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
+import type { GuestTheme } from '@retaha/ui-guest/types';
+import { getBranding } from '@retaha/auth';
+import { getUser, getUserHotels } from '@retaha/auth';
+import { mapThemeName } from '@retaha/ui-guest/types';
+
+const user  = await getUser(Astro.cookies, Astro.request);
+const hotels = user ? await getUserHotels(Astro.cookies, Astro.request) : null;
+const hotel  = hotels?.[0]?.hotel;
+const branding = hotel ? await getBranding(Astro.cookies, Astro.request) : null;
+
+const theme: GuestTheme = {
+  primary:        branding?.brand_primary   ?? '#FF4A82',
+  secondary:      branding?.brand_secondary ?? undefined,
+  themeName:      (branding?.brand_theme    ?? 'coffee') as GuestTheme['themeName'],
+  guestThemeName: mapThemeName(branding?.brand_theme ?? 'coffee'),
+  designIdentity: branding?.design_identity ?? 'classic',
+  logoUrl:        branding?.logo_primary    ?? null,
+  logoDarkUrl:    branding?.logo_dark       ?? null,
+  hotelName:      hotel?.name               ?? 'Hotel',
+  eveName:        'Eve',
+};
+---
+
+<GuestPhoneView
+  theme={theme}
+  previewMode={true}
+/>
+
+<script>
+  import { subscribe, type PreviewState } from '../../lib/gast-vorschau/state';
+
+  type ModuleKey = keyof PreviewState['modules'];
+
+  // GuestPhoneView rendert .gate-tile Kacheln (GuestHomeScreen.astro)
+  // Label-Text → module-key
+  const TILE_LABEL_MAP: Record<string, ModuleKey> = {
+    'eve':        'eve',
+    'frühstück':  'breakfast',
+    'service':    'service',
+  };
+
+  // .gp-tab[data-tab] → module-key (aus GuestPhoneView.astro)
+  const TAB_KEY_MAP: Record<string, ModuleKey> = {
+    'eve':     'eve',
+    'tipps':   'empfehlungen',
+    'service': 'service',
+  };
+
+  // [data-screen] → module-key
+  const SCREEN_KEY_MAP: Record<string, ModuleKey> = {
+    'eve':     'eve',
+    'tipps':   'empfehlungen',
+    'service': 'service',
+  };
+
+  subscribe(state => {
+    // 0 — Hero-Slider ein-/ausblenden
+    document.querySelectorAll<HTMLElement>('.hero-slider').forEach(el => {
+      el.style.display = state.modules.action_cards ? '' : 'none';
+    });
+
+    // 1 — Action-Tiles ein-/ausblenden (.gate-tile in GuestHomeScreen)
+    document.querySelectorAll<HTMLElement>('.gate-tile').forEach(tile => {
+      const labelEl = tile.querySelector<HTMLElement>('.gate-tile-label');
+      if (!labelEl) return;
+      const labelKey = labelEl.textContent?.trim().toLowerCase() ?? '';
+      const moduleKey = TILE_LABEL_MAP[labelKey];
+      if (moduleKey) {
+        const visible = state.modules[moduleKey];
+        tile.style.opacity = visible ? '1' : '0.2';
+        tile.style.pointerEvents = visible ? '' : 'none';
+      }
+    });
+
+    // 2 — Bottom-Tabs dimmen (.gp-tab in GuestPhoneView)
+    document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(tab => {
+      const key = tab.dataset.tab ?? '';
+      const moduleKey = TAB_KEY_MAP[key];
+      if (moduleKey) {
+        const visible = state.modules[moduleKey];
+        tab.style.opacity = visible ? '1' : '0.25';
+        tab.style.pointerEvents = visible ? '' : 'none';
+      }
+    });
+
+    // 3 — Screens ausblenden wenn Modul aus
+    document.querySelectorAll<HTMLElement>('[data-screen]').forEach(screen => {
+      const key = screen.dataset.screen ?? '';
+      const moduleKey = SCREEN_KEY_MAP[key];
+      if (!moduleKey) return;
+      if (!state.modules[moduleKey] && !screen.hidden) {
+        // Wenn aktiver Screen deaktiviert → zurück zu Home
+        screen.hidden = true;
+        const homeScreen = document.querySelector<HTMLElement>('[data-screen="home"]');
+        if (homeScreen) homeScreen.hidden = false;
+        // Home-Tab aktivieren
+        document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(t => {
+          t.classList.toggle('gp-tab--active', t.dataset.tab === 'home');
+        });
+      }
+    });
+  });
+</script>

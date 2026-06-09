@@ -1,0 +1,52 @@
+---
+import { demoTags } from '../../../lib/gast-vorschau/demo-data';
+---
+
+<div class="home-screen">
+  <p class="home-screen__welcome" data-welcome-text></p>
+  {demoTags.map(tag => (
+    <div class="home-screen__scene" data-scene-content={tag.id} hidden={tag.id !== 'empfang'}>
+      <span class="home-screen__eyebrow">— {tag.label} —</span>
+      <h2 class="home-screen__title">{tag.actionCard.title}</h2>
+      <p class="home-screen__desc">{tag.actionCard.description}</p>
+      <button class="home-screen__cta" type="button">{tag.actionCard.cta}</button>
+    </div>
+  ))}
+</div>
+
+<style>
+  .home-screen { display: flex; flex-direction: column; gap: 20px; }
+  .home-screen__welcome { font-size: 15px; color: rgba(10,10,10,0.55); line-height: 1.4; }
+  .home-screen__scene {
+    background: #F5F1E8; border-radius: 16px; padding: 20px 18px;
+  }
+  .home-screen__eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(10,10,10,0.45); display: block; margin-bottom: 10px;
+  }
+  .home-screen__title {
+    font-size: 20px; font-weight: 500; line-height: 1.2; margin-bottom: 8px;
+  }
+  .home-screen__desc {
+    font-size: 13px; color: rgba(10,10,10,0.65); line-height: 1.5; margin-bottom: 18px;
+  }
+  .home-screen__cta {
+    background: #0A0A0A; color: white;
+    padding: 10px 18px; border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    border-radius: 8px; cursor: pointer;
+  }
+</style>
+
+<script>
+  import { subscribe } from '../../../lib/gast-vorschau/state';
+  subscribe(state => {
+    document.querySelectorAll<HTMLElement>('[data-scene-content]').forEach(el => {
+      el.hidden = el.dataset.sceneContent !== state.scene;
+    });
+    const welcome = document.querySelector('[data-welcome-text]');
+    if (welcome) welcome.textContent = state.welcomeText;
+  });
+</script>

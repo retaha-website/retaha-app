@@ -1,0 +1,121 @@
+---
+import HotelierLayout from '../layouts/HotelierLayout.astro';
+import PhonePreview from '../components/gast-vorschau/PhonePreview.astro';
+import SettingsPanel from '../components/gast-vorschau/settings/SettingsPanel.astro';
+import DemoQrCard from '../components/shared/DemoQrCard.astro';
+import { getUser, getUserHotels, getOrCreateShowcaseUrl } from '@retaha/auth';
+import { demoTags } from '../lib/gast-vorschau/demo-data';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) {
+  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${backoffice}/admin/login`);
+}
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) {
+  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${backoffice}/admin/login?error=no_hotel`);
+}
+
+const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
+---
+
+<HotelierLayout
+  title="Gast-Vorschau"
+  activeTab="gast"
+  hotelName={hotel.name}
+  hotelLogoUrl={hotel.logo_primary ?? hotel.logo_dark}
+>
+  <section class="gast-hero">
+    <span class="gast-hero__eyebrow">Gast-Vorschau · Live</span>
+    <h1 class="gast-hero__title">
+      So sehen es deine Gäste<span class="dot-pink">.</span>
+    </h1>
+    <p class="gast-hero__sub">
+      Klicke durch verschiedene Szenen — Settings ändern, Handy aktualisiert live.
+    </p>
+    <button class="gast-preview-btn" id="open-live-preview" type="button">
+      → In Gäste-App öffnen
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M6 3l5 5-5 5"/>
+      </svg>
+    </button>
+  </section>
+
+  <script>
+    document.getElementById('open-live-preview')?.addEventListener('click', async () => {
+      const btn = document.getElementById('open-live-preview') as HTMLButtonElement;
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.textContent = '…';
+      const win = window.open('', '_retaha_preview');
+      try {
+        const res = await fetch('/api/admin/preview-url');
+        const data = await res.json();
+        if (win) win.location.href = data?.url ?? '/gast-vorschau';
+      } catch {
+        if (win) win.location.href = '/gast-vorschau';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+    });
+  </script>
+
+  <div class="gast-layout">
+    <PhonePreview tags={demoTags} />
+    <div class="gast-sidebar">
+      <SettingsPanel tags={demoTags} hotelName={hotel.name} />
+      <DemoQrCard demoUrl={demoUrl} />
+    </div>
+  </div>
+</HotelierLayout>
+
+<style>
+  .gast-hero {
+    max-width: 1400px; margin: 0 auto;
+    padding: 48px 32px 32px;
+  }
+  @media (max-width: 768px) { .gast-hero { padding: 32px 20px 24px; } }
+
+  .gast-hero__eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #0A0A0A; background: var(--te-yellow);
+    padding: 5px 10px; display: inline-block;
+    margin-bottom: 24px; font-weight: 500; border-radius: var(--r-sm);
+  }
+  .gast-hero__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 400; line-height: 1; letter-spacing: -0.03em; margin-bottom: 16px;
+  }
+  .gast-hero__sub {
+    font-size: 16px; color: var(--ink-soft); line-height: 1.5; max-width: 560px;
+  }
+
+  .gast-layout {
+    max-width: 1400px; margin: 0 auto;
+    padding: 0 32px 80px;
+    display: grid; grid-template-columns: 5fr 7fr;
+    gap: 48px; align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .gast-layout { grid-template-columns: 1fr; gap: 32px; padding: 0 20px 64px; }
+  }
+  .gast-sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .gast-preview-btn {
+    margin-top: 20px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; background: var(--bg-deep);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--ink); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.06em; transition: all 200ms;
+  }
+  .gast-preview-btn:hover:not(:disabled) { background: var(--te-yellow-soft); }
+  .gast-preview-btn:disabled { opacity: 0.5; cursor: wait; }
+</style>

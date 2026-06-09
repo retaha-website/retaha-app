@@ -1,0 +1,83 @@
+---
+import { getBranding } from '@retaha/auth';
+const branding = await getBranding(Astro.cookies, Astro.request);
+
+const theme   = branding?.brand_theme ?? '—';
+const color   = branding?.brand_primary ?? '—';
+const hasLogo = !!branding?.logo_primary;
+---
+
+<section class="settings-section">
+  <div class="settings-section__head">
+    <span class="settings-section__title">— Branding —</span>
+    <span class="settings-section__num">03</span>
+  </div>
+
+  <div class="brand-summary">
+    <div class="brand-summary__row">
+      <span class="brand-summary__label">Theme</span>
+      <span class="brand-summary__value">{theme}</span>
+    </div>
+    <div class="brand-summary__row">
+      <span class="brand-summary__label">Primärfarbe</span>
+      <span class="brand-summary__value">
+        {color !== '—' && (
+          <span class="brand-summary__swatch" style={`background:${color}`}></span>
+        )}
+        {color}
+      </span>
+    </div>
+    <div class="brand-summary__row">
+      <span class="brand-summary__label">Logo</span>
+      <span class={`brand-summary__value ${hasLogo ? 'ok' : 'missing'}`}>
+        {hasLogo ? '✓ Gesetzt' : '✗ Nicht gesetzt'}
+      </span>
+    </div>
+  </div>
+
+  <a href="/branding" class="brand-summary__link">→ Branding bearbeiten</a>
+</section>
+
+<style>
+  .settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 24px 28px;
+  }
+  .settings-section__head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  }
+  .settings-section__title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase;
+  }
+  .settings-section__num {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--ink-muted); letter-spacing: 0.14em;
+  }
+  .brand-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .brand-summary__row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: var(--bg-deep); border-radius: var(--r-sm);
+  }
+  .brand-summary__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; color: var(--ink-muted); text-transform: uppercase;
+  }
+  .brand-summary__value {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--ink); display: inline-flex; align-items: center; gap: 6px;
+  }
+  .brand-summary__value.ok     { color: var(--sage-strong); }
+  .brand-summary__value.missing { color: var(--ink-muted); }
+  .brand-summary__swatch {
+    width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0;
+  }
+  .brand-summary__link {
+    display: flex; align-items: center; justify-content: center;
+    padding: 11px 16px; background: var(--ink); color: var(--bg);
+    border-radius: var(--r-sm); text-decoration: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 500; letter-spacing: 0.12em; transition: all 200ms;
+  }
+  .brand-summary__link:hover { background: var(--te-yellow); color: #0A0A0A; }
+</style>
