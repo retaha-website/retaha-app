@@ -192,25 +192,35 @@ const actions = allActions.map((a, i) => ({
   </div>
 </section>
 
-<!-- ─── RECOMMENDATION CARD ──────────────────────────────────────────────── -->
+<!-- ─── HERO SLIDER ───────────────────────────────────────────────────────── -->
 {recs.length > 0 && (
-  <div class="ws-rec g-card"
-    role="button"
-    tabindex="0"
-    data-card-id={recs[0].id}
-    data-card-type={recs[0].cardType}
-    data-action-target={recs[0].actionTarget ?? ''}
-    @click="handleRecClick($el)"
-  >
-    <div class="ws-rec__eyebrow g-eyebrow">Empfehlung des Hauses</div>
-    <div class="ws-rec__title">{recs[0].title}</div>
-    {recs[0].sub && <div class="ws-rec__sub g-sub">{recs[0].sub}</div>}
-    <div class="ws-rec__arrow">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M7 17l9.2-9.2M17 17V7H7"/>
-      </svg>
+  <section class="ws-slider">
+    <div class="ws-slider__track">
+      {recs.map((rec) => (
+        <div
+          class="ws-slider__card"
+          role={rec.cardType !== 'info' ? 'button' : undefined}
+          tabindex={rec.cardType !== 'info' ? '0' : undefined}
+          data-card-id={rec.id}
+          data-card-type={rec.cardType}
+          data-action-target={rec.actionTarget ?? ''}
+          @click={rec.cardType !== 'info' ? 'handleRecClick($el)' : undefined}
+        >
+          {rec.imageUrl && (
+            <img class="ws-slider__img" src={rec.imageUrl} alt="" loading="lazy" />
+          )}
+          <div class="ws-slider__body">
+            {rec.eyebrow && <div class="ws-slider__eyebrow">{rec.eyebrow}</div>}
+            <div class="ws-slider__title">{rec.title}</div>
+            {rec.sub && <div class="ws-slider__sub">{rec.sub}</div>}
+            {rec.cta && rec.cardType !== 'info' && (
+              <button class="ws-slider__cta" type="button" @click.stop="handleRecClick($el.closest('.ws-slider__card'))">{rec.cta}</button>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
-  </div>
+  </section>
 )}
 
 <!-- ─── BOTTOM TABS ───────────────────────────────────────────────────────── -->
@@ -401,27 +411,62 @@ const actions = allActions.map((a, i) => ({
     font-style: italic; font-weight: 300;
   }
 
-  /* ── Recommendation card ─────────────────────────────────────────────── */
-  .ws-rec {
-    margin: 16px 24px;
-    cursor: pointer;
-    display: flex; flex-direction: column; gap: 6px; position: relative;
+  /* ── Hero Slider ──────────────────────────────────────────────────────── */
+  .ws-slider { padding: 0 0 20px; }
+  .ws-slider__track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 4px 24px;
   }
-  .ws-rec__eyebrow { margin-bottom: 4px; }
-  .ws-rec__title {
+  .ws-slider__track::-webkit-scrollbar { display: none; }
+  .ws-slider__card {
+    flex: 0 0 80%;
+    scroll-snap-align: start;
+    min-height: 148px;
+    border-radius: var(--guest-radius);
+    background: var(--guest-bg-card);
+    border: 1px solid var(--guest-border);
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 120ms;
+  }
+  .ws-slider__card:active { opacity: 0.75; }
+  .ws-slider__img {
+    width: 100%; height: 116px; object-fit: cover;
+    display: block; flex-shrink: 0;
+  }
+  .ws-slider__body {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 14px 16px; flex: 1;
+  }
+  .ws-slider__eyebrow {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--guest-ink-muted); margin-bottom: 2px;
+  }
+  .ws-slider__title {
     font-family: var(--guest-font-display);
-    font-size: 20px; font-weight: var(--guest-display-weight);
+    font-size: 18px; font-weight: var(--guest-display-weight);
     font-style: var(--guest-display-style);
     letter-spacing: var(--guest-display-tracking);
-    color: var(--guest-ink); margin: 0;
-    line-height: 1.2;
+    color: var(--guest-ink); line-height: 1.2;
   }
-  .ws-rec__sub { font-size: 13px; }
-  .ws-rec__arrow {
-    position: absolute; top: 16px; right: 16px;
-    color: var(--guest-accent);
+  .ws-slider__sub {
+    font-size: 12px; color: var(--guest-ink-muted); line-height: 1.4;
   }
-  .ws-rec__arrow svg { width: 18px; height: 18px; }
+  .ws-slider__cta {
+    margin-top: auto; padding-top: 10px;
+    background: none; border: none; cursor: pointer;
+    font-family: var(--guest-font-mono);
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--guest-accent); text-align: left; padding-left: 0;
+  }
 
   /* ── Bottom tabs ─────────────────────────────────────────────────────── */
   .ws-tabs {
@@ -507,8 +552,9 @@ const actions = allActions.map((a, i) => ({
   :global([data-theme="editorial"]) .ws-action__arrow {
     font-size: 22px; font-style: italic; font-weight: 300;
   }
-  :global([data-theme="editorial"]) .ws-rec {
+  :global([data-theme="editorial"]) .ws-slider__card {
     background: var(--guest-accent-soft);
+    border-color: transparent;
   }
   :global([data-theme="editorial"]) .ws-tab--active::before {
     content: '';
@@ -547,7 +593,9 @@ const actions = allActions.map((a, i) => ({
     font-family: var(--guest-font-display);
     font-size: 16px; font-weight: 500; letter-spacing: 0.03em;
   }
-  :global([data-theme="maison"]) .ws-rec { border-color: var(--guest-accent); }
+  :global([data-theme="maison"]) .ws-slider__card { border-color: var(--guest-accent); }
+  :global([data-theme="maison"]) .ws-slider__eyebrow { letter-spacing: 0.2em; }
+  :global([data-theme="maison"]) .ws-slider__title { font-size: 20px; }
   :global([data-theme="maison"]) .ws-tab--active { color: var(--guest-accent); }
   :global([data-theme="maison"]) .ws-tab--active::before {
     content: '';
