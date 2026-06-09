@@ -72,17 +72,27 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       'wallet':     'wallet',
     };
 
+    const MODULE_DISPLAY_NAME: Record<string, string> = {
+      'eve':          'Eve Concierge',
+      'breakfast':    'Frühstück',
+      'service':      'Service',
+      'empfehlungen': 'Tipps & Orte',
+      'conference':   'Konferenz',
+      'wallet':       'Digital Wallet',
+    };
+
     let isInteractive   = false;
     let demoLoopTimer: ReturnType<typeof setTimeout> | null = null;
     let demoTileIndex   = 0;
-    let prevModules: Record<string, boolean> = {};
 
-    const phonePreview  = document.getElementById('phonePreview');
-    const frameWrap     = document.getElementById('phoneFrameWrap');
-    const demoBar       = document.getElementById('demoBar');
+    const phonePreview   = document.getElementById('phonePreview');
+    const phoneContent   = document.getElementById('phoneContent');
+    const zoomNotice     = document.getElementById('zoomNotice');
+    const zoomNoticeLabel = document.getElementById('zoomNoticeLabel');
+    const demoBar        = document.getElementById('demoBar');
     const interactiveBar = document.getElementById('interactiveBar');
     const interactiveBtn = document.getElementById('demoInteractiveBtn');
-    const demoBtn       = document.getElementById('demoDemoBtn');
+    const demoBtn        = document.getElementById('demoDemoBtn');
 
     // ── Utilities ──────────────────────────────────────────────────────────
 
@@ -104,26 +114,45 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       else                         tile.classList.add('toggle-pulse-off');
     }
 
-    function zoomToTile(tile: HTMLElement | null, scale: number) {
-      if (!frameWrap) return;
+    let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function showNotice(moduleKey: string) {
+      if (!zoomNotice || !zoomNoticeLabel) return;
+      const name = MODULE_DISPLAY_NAME[moduleKey] ?? moduleKey;
+      zoomNoticeLabel.textContent = name;
+      zoomNotice.setAttribute('data-active', 'true');
+      if (noticeTimer) clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => {
+        zoomNotice.setAttribute('data-active', 'false');
+      }, 1200);
+    }
+
+    function zoomToTile(tile: HTMLElement | null, scale: number, moduleKey?: string) {
+      if (!phoneContent) return;
       if (scale <= 1) {
-        frameWrap.classList.remove('is-zoomed');
-        frameWrap.style.transformOrigin = '';
-        frameWrap.style.transform = '';
+        phoneContent.classList.remove('is-zoomed');
+        phoneContent.style.transformOrigin = '';
+        phoneContent.style.transform = '';
         return;
       }
       if (tile) {
-        const frameRect = frameWrap.getBoundingClientRect();
-        const tileRect  = tile.getBoundingClientRect();
-        const ox = tileRect.left + tileRect.width  / 2 - frameRect.left;
-        const oy = tileRect.top  + tileRect.height / 2 - frameRect.top;
-        frameWrap.style.transformOrigin = `${ox}px ${oy}px`;
+        const contentRect = phoneContent.getBoundingClientRect();
+        const tileRect    = tile.getBoundingClientRect();
+        const ox = tileRect.left + tileRect.width  / 2 - contentRect.left;
+        const oy = tileRect.top  + tileRect.height / 2 - contentRect.top;
+        phoneContent.style.transformOrigin = `${ox}px ${oy}px`;
       }
-      frameWrap.classList.add('is-zoomed');
-      frameWrap.style.transform = '';
+      phoneContent.classList.add('is-zoomed');
+      phoneContent.style.transform = `scale(${scale})`;
+      if (moduleKey) showNotice(moduleKey);
     }
 
     // ── Demo-Loop ─────────────────────────────────────────────────────────
+
+    function tileToModuleKey(tile: HTMLElement): string | undefined {
+      const label = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
+      return LABEL_TO_MODULE[label];
+    }
 
     function startDemoLoop() {
       if (isInteractive) return;
@@ -132,11 +161,14 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 
       demoTileIndex = demoTileIndex % tiles.length;
       const tile    = tiles[demoTileIndex];
+      const key     = tileToModuleKey(tile);
 
       pulseTile(tile, 'demo');
+      zoomToTile(tile, 1.5, key);
 
       demoLoopTimer = setTimeout(() => {
         clearPulse(tile);
+        zoomToTile(null, 1);
         demoTileIndex = (demoTileIndex + 1) % tiles.length;
         startDemoLoop();
       }, 2200);
@@ -148,6 +180,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
         demoLoopTimer = null;
       }
       document.querySelectorAll<HTMLElement>('.gate-tile').forEach(t => clearPulse(t));
+      zoomToTile(null, 1);
     }
 
     // ── Zoom-on-Toggle ────────────────────────────────────────────────────
@@ -164,7 +197,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
         if (key === moduleKey) targetTile = tile;
       });
 
-      zoomToTile(targetTile, 1.35);
+      zoomToTile(targetTile, 1.5, moduleKey);
       if (targetTile) pulseTile(targetTile, newState ? 'on' : 'off');
 
       setTimeout(() => {

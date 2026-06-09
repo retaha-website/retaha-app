@@ -7,63 +7,78 @@ const personas = [
 ---
 
 <div class="persona-picker">
-  <div class="persona-picker__tabs">
-    {personas.map(p => (
+  {personas.map((p, i) => (
+    <>
+      {i > 0 && <span class="persona-arrow" aria-hidden="true">→</span>}
       <button
-        class:list={['persona-tab', { 'is-active': p.key === 'in_house' }]}
+        class:list={['persona-pill', { 'is-active': p.key === 'in_house' }]}
         data-persona={p.key}
         type="button"
         aria-pressed={p.key === 'in_house' ? 'true' : 'false'}
       >
         {p.label}
       </button>
-    ))}
-  </div>
+    </>
+  ))}
 </div>
 
 <style>
   .persona-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     width: 100%;
   }
-  .persona-picker__tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 4px;
-    background: var(--bg-deep);
+
+  .persona-pill {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 12px;
     border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 4px;
-  }
-  .persona-tab {
-    padding: 8px 6px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; font-weight: 500;
-    letter-spacing: 0.1em; text-transform: uppercase;
+    background: var(--surface);
+    text-align: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 400;
     color: var(--ink-muted);
-    background: transparent; border: 1px solid transparent;
-    border-radius: 6px; cursor: pointer;
-    transition: all 180ms ease;
-    white-space: nowrap; text-align: center;
+    cursor: pointer;
+    transition: all 200ms ease;
+    white-space: nowrap;
   }
-  .persona-tab:hover { color: var(--ink); background: var(--surface); }
-  .persona-tab.is-active {
-    color: var(--ink); background: var(--surface);
-    border-color: var(--border-medium);
+
+  .persona-pill:hover:not(.is-active) {
+    border-color: var(--te-yellow);
+    color: var(--ink);
+  }
+
+  .persona-pill.is-active {
+    background: var(--te-yellow);
+    border-color: var(--te-yellow);
+    color: #0A0A0A;
+    font-weight: 500;
+  }
+
+  .persona-arrow {
+    color: var(--ink-faint, var(--border));
+    font-size: 13px;
+    flex-shrink: 0;
+    user-select: none;
+    line-height: 1;
   }
 </style>
 
 <script>
   import { updateState } from '../../lib/gast-vorschau/state';
-  document.querySelectorAll<HTMLButtonElement>('.persona-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const persona = tab.dataset.persona as 'arrival' | 'in_house' | 'departure';
+  document.querySelectorAll<HTMLButtonElement>('.persona-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const persona = pill.dataset.persona as 'arrival' | 'in_house' | 'departure';
       if (!persona) return;
-      document.querySelectorAll('.persona-tab').forEach(t => {
-        t.classList.remove('is-active');
-        t.setAttribute('aria-pressed', 'false');
+      document.querySelectorAll('.persona-pill').forEach(p => {
+        p.classList.remove('is-active');
+        p.setAttribute('aria-pressed', 'false');
       });
-      tab.classList.add('is-active');
-      tab.setAttribute('aria-pressed', 'true');
+      pill.classList.add('is-active');
+      pill.setAttribute('aria-pressed', 'true');
       updateState({ persona });
     });
   });
