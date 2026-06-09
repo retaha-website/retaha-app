@@ -57,19 +57,19 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
     });
   });
 
-  // Vorschau-Button: Token on-demand generieren, echte Gäste-App öffnen
+  // Vorschau-Button: Fenster sofort öffnen (Safari-Popup-Fix), dann URL eintragen
   document.getElementById('open-guest-preview')?.addEventListener('click', async () => {
     const btn = document.getElementById('open-guest-preview') as HTMLButtonElement;
     btn.disabled = true;
     btn.textContent = '…';
+    // Fenster synchron im Click-Handler öffnen — Safari blockiert window.open nach await
+    const win = window.open('', '_retaha_preview');
     try {
       const res = await fetch('/api/admin/preview-url');
       const data = await res.json();
-      if (data?.url) {
-        window.open(data.url, '_retaha_preview');
-      }
+      if (win) win.location.href = data?.url ?? '/gast-vorschau';
     } catch {
-      window.open('/gast-vorschau', '_retaha_preview');
+      if (win) win.location.href = '/gast-vorschau';
     } finally {
       btn.disabled = false;
       btn.innerHTML = '→ In Gäste-App öffnen <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>';

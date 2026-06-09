@@ -45,12 +45,14 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       btn.disabled = true;
       const orig = btn.innerHTML;
       btn.textContent = '…';
+      // Fenster synchron im Click-Handler öffnen — Safari blockiert window.open nach await
+      const win = window.open('', '_retaha_preview');
       try {
         const res = await fetch('/api/admin/preview-url');
         const data = await res.json();
-        if (data?.url) window.open(data.url, '_retaha_preview');
+        if (win) win.location.href = data?.url ?? '/gast-vorschau';
       } catch {
-        window.open('/gast-vorschau', '_retaha_preview');
+        if (win) win.location.href = '/gast-vorschau';
       } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
