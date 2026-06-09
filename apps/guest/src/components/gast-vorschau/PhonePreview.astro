@@ -3,16 +3,117 @@ import PersonaPicker from './PersonaPicker.astro';
 import PhoneFrame from './PhoneFrame.astro';
 ---
 
-<div class="phone-preview">
+<div class="phone-preview" id="phonePreview">
   <PersonaPicker />
-  <PhoneFrame />
+  <div class="phone-preview__frame-wrap" id="phoneFrameWrap">
+    <PhoneFrame />
+  </div>
+
+  <div class="phone-preview__demo-bar" id="demoBar">
+    <span class="demo-bar__led" aria-hidden="true"></span>
+    <span class="demo-bar__label">Demo-Modus</span>
+    <button class="demo-bar__stop" id="demoInteractiveBtn" type="button">
+      Interaktiv erkunden
+    </button>
+  </div>
+
+  <div class="phone-preview__interactive-bar" id="interactiveBar" hidden>
+    <span class="interactive-bar__label">Interaktiv-Modus aktiv</span>
+    <button class="interactive-bar__back" id="demoDemoBtn" type="button">
+      ← Demo-Modus
+    </button>
+  </div>
 </div>
 
 <style>
   .phone-preview {
     position: sticky; top: 80px;
     align-self: start;
-    display: flex; flex-direction: column; gap: 16px; align-items: center;
+    display: flex; flex-direction: column; gap: 12px; align-items: center;
   }
   @media (max-width: 1000px) { .phone-preview { position: relative; top: 0; } }
+
+  .phone-preview__frame-wrap {
+    position: relative;
+    transition: transform 300ms ease-out;
+    transform-origin: center center;
+  }
+  .phone-preview__frame-wrap.is-zoomed {
+    transform: scale(1.35);
+    transition: transform 300ms ease-out;
+  }
+
+  /* Demo-Modus: Tiles non-interactive (default) */
+  .phone-preview:not(.is-interactive) :global(.phone-frame__screen-area) {
+    pointer-events: none;
+  }
+  .phone-preview.is-interactive :global(.phone-frame__screen-area) {
+    pointer-events: auto;
+  }
+
+  /* Tile-Pulse-Klassen (gesetzt via JS) */
+  :global(.gate-tile.demo-pulse) {
+    box-shadow: 0 0 24px 8px rgba(255, 230, 0, 0.7) !important;
+    transform: scale(1.06);
+    transition: box-shadow 200ms, transform 200ms;
+  }
+  :global(.gate-tile.toggle-pulse-on) {
+    box-shadow: 0 0 32px 12px rgba(255, 230, 0, 0.85) !important;
+    transform: scale(1.08);
+    transition: box-shadow 200ms, transform 200ms;
+  }
+  :global(.gate-tile.toggle-pulse-off) {
+    box-shadow: 0 0 32px 12px rgba(255, 74, 130, 0.75) !important;
+    opacity: 0.45 !important;
+    transition: box-shadow 200ms, opacity 200ms;
+  }
+
+  /* Demo-Bar */
+  .phone-preview__demo-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: 99px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; color: var(--ink-muted);
+  }
+  .demo-bar__led {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--sage);
+    box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
+    animation: led-pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes led-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(92,144,112,0.25); }
+    50% { box-shadow: 0 0 0 5px rgba(92,144,112,0.1); }
+  }
+  .demo-bar__label { text-transform: uppercase; letter-spacing: 0.14em; font-size: 9px; }
+  .demo-bar__stop {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--ink-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; cursor: pointer;
+    transition: all 150ms;
+  }
+  .demo-bar__stop:hover { background: var(--te-yellow); color: #0A0A0A; border-color: var(--te-yellow); }
+
+  /* Interactive-Bar */
+  .phone-preview__interactive-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    background: var(--te-yellow-soft); border: 1px solid var(--te-yellow);
+    border-radius: 99px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.1em; color: var(--ink); text-transform: uppercase;
+  }
+  .interactive-bar__label { flex: 1; }
+  .interactive-bar__back {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--ink-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; cursor: pointer;
+    transition: all 150ms;
+  }
+  .interactive-bar__back:hover { background: var(--ink); color: var(--bg); }
 </style>

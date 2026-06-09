@@ -1,0 +1,99 @@
+---
+import UserDropdown from './UserDropdown.astro';
+
+interface Props {
+  email: string;
+  hotelName?: string;
+}
+
+const { email, hotelName } = Astro.props;
+const firstInitial = email.charAt(0).toUpperCase();
+---
+
+<div class="user-menu" id="userMenu">
+  <button
+    class="user-avatar"
+    id="userAvatar"
+    aria-label="Account-Menü öffnen"
+    aria-haspopup="menu"
+    aria-expanded="false"
+  >
+    {firstInitial}
+  </button>
+
+  <UserDropdown email={email} hotelName={hotelName} />
+</div>
+
+<style>
+  .user-menu { position: relative; }
+
+  .user-avatar {
+    width: 32px; height: 32px;
+    background: var(--ink); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500;
+    border-radius: var(--r-sm);
+    cursor: pointer; border: none;
+    transition: all 200ms ease;
+    letter-spacing: 0;
+  }
+  .user-avatar:hover,
+  .user-avatar.is-open {
+    background: var(--te-yellow);
+    color: #0A0A0A;
+  }
+  .user-avatar.is-open::after {
+    content: '';
+    position: absolute; bottom: -10px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid var(--surface);
+    filter: drop-shadow(0 -1px 0 var(--border-medium));
+    z-index: 101;
+  }
+</style>
+
+<script>
+  const userMenu = document.getElementById('userMenu');
+  const avatar   = document.getElementById('userAvatar');
+  const dropdown = document.getElementById('userDropdown');
+
+  if (userMenu && avatar && dropdown) {
+    const open = () => {
+      document.dispatchEvent(new CustomEvent('retaha:menu-open', { detail: 'userMenu' }));
+      avatar.classList.add('is-open');
+      dropdown.classList.add('is-open');
+      avatar.setAttribute('aria-expanded', 'true');
+      dropdown.setAttribute('aria-hidden', 'false');
+    };
+    const close = () => {
+      avatar.classList.remove('is-open');
+      dropdown.classList.remove('is-open');
+      avatar.setAttribute('aria-expanded', 'false');
+      dropdown.setAttribute('aria-hidden', 'true');
+    };
+
+    avatar.addEventListener('click', e => {
+      e.stopPropagation();
+      avatar.classList.contains('is-open') ? close() : open();
+    });
+
+    document.addEventListener('click', e => {
+      if (!userMenu.contains(e.target as Node)) close();
+    });
+
+    document.addEventListener('retaha:menu-open', (e: Event) => {
+      if ((e as CustomEvent).detail !== 'userMenu') close();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && avatar.classList.contains('is-open')) {
+        close();
+        avatar.focus();
+      }
+    });
+  }
+</script>

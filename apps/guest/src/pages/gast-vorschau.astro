@@ -6,18 +6,14 @@ import DemoQrCard from '@retaha/ui/components/shared/DemoQrCard.astro';
 import { getUser, getUserHotels, getOrCreateShowcaseUrl } from '@retaha/auth';
 import { demoTags } from '../lib/gast-vorschau/demo-data';
 
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${backoffice}/admin/login`);
-}
+if (!user) return Astro.redirect(`${BACKOFFICE}/admin/login`);
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${backoffice}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
 
 const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 ---
@@ -62,6 +58,165 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
         btn.innerHTML = orig;
       }
     });
+  </script>
+
+  <script>
+    // ─── Demo-Loop + Zoom-on-Toggle + Interaktiv-Modus (Option C) ───────────
+
+    const LABEL_TO_MODULE: Record<string, string> = {
+      'eve':        'eve',
+      'frühstück':  'breakfast',
+      'service':    'service',
+      'tipps':      'empfehlungen',
+      'konferenz':  'conference',
+      'wallet':     'wallet',
+    };
+
+    let isInteractive   = false;
+    let demoLoopTimer: ReturnType<typeof setTimeout> | null = null;
+    let demoTileIndex   = 0;
+    let prevModules: Record<string, boolean> = {};
+
+    const phonePreview  = document.getElementById('phonePreview');
+    const frameWrap     = document.getElementById('phoneFrameWrap');
+    const demoBar       = document.getElementById('demoBar');
+    const interactiveBar = document.getElementById('interactiveBar');
+    const interactiveBtn = document.getElementById('demoInteractiveBtn');
+    const demoBtn       = document.getElementById('demoDemoBtn');
+
+    // ── Utilities ──────────────────────────────────────────────────────────
+
+    function getActiveTiles(): HTMLElement[] {
+      return Array.from(document.querySelectorAll<HTMLElement>('.gate-tile')).filter(tile => {
+        const opacity = parseFloat(tile.style.opacity ?? '1');
+        return !isNaN(opacity) ? opacity > 0.3 : true;
+      });
+    }
+
+    function clearPulse(tile: HTMLElement) {
+      tile.classList.remove('demo-pulse', 'toggle-pulse-on', 'toggle-pulse-off');
+    }
+
+    function pulseTile(tile: HTMLElement, variant: 'demo' | 'on' | 'off') {
+      clearPulse(tile);
+      if (variant === 'demo')      tile.classList.add('demo-pulse');
+      else if (variant === 'on')   tile.classList.add('toggle-pulse-on');
+      else                         tile.classList.add('toggle-pulse-off');
+    }
+
+    function zoomToTile(tile: HTMLElement | null, scale: number) {
+      if (!frameWrap) return;
+      if (scale <= 1) {
+        frameWrap.classList.remove('is-zoomed');
+        frameWrap.style.transformOrigin = '';
+        frameWrap.style.transform = '';
+        return;
+      }
+      if (tile) {
+        const frameRect = frameWrap.getBoundingClientRect();
+        const tileRect  = tile.getBoundingClientRect();
+        const ox = tileRect.left + tileRect.width  / 2 - frameRect.left;
+        const oy = tileRect.top  + tileRect.height / 2 - frameRect.top;
+        frameWrap.style.transformOrigin = `${ox}px ${oy}px`;
+      }
+      frameWrap.classList.add('is-zoomed');
+      frameWrap.style.transform = '';
+    }
+
+    // ── Demo-Loop ─────────────────────────────────────────────────────────
+
+    function startDemoLoop() {
+      if (isInteractive) return;
+      const tiles = getActiveTiles();
+      if (tiles.length === 0) return;
+
+      demoTileIndex = demoTileIndex % tiles.length;
+      const tile    = tiles[demoTileIndex];
+
+      pulseTile(tile, 'demo');
+
+      demoLoopTimer = setTimeout(() => {
+        clearPulse(tile);
+        demoTileIndex = (demoTileIndex + 1) % tiles.length;
+        startDemoLoop();
+      }, 2200);
+    }
+
+    function stopDemoLoop() {
+      if (demoLoopTimer !== null) {
+        clearTimeout(demoLoopTimer);
+        demoLoopTimer = null;
+      }
+      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(t => clearPulse(t));
+    }
+
+    // ── Zoom-on-Toggle ────────────────────────────────────────────────────
+
+    function onModuleToggle(moduleKey: string, newState: boolean) {
+      if (isInteractive) return;
+      stopDemoLoop();
+
+      // Find matching gate-tile by label text
+      let targetTile: HTMLElement | null = null;
+      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(tile => {
+        const labelText = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
+        const key = LABEL_TO_MODULE[labelText];
+        if (key === moduleKey) targetTile = tile;
+      });
+
+      zoomToTile(targetTile, 1.35);
+      if (targetTile) pulseTile(targetTile, newState ? 'on' : 'off');
+
+      setTimeout(() => {
+        zoomToTile(null, 1);
+        if (targetTile) clearPulse(targetTile);
+        setTimeout(startDemoLoop, 500);
+      }, 1200);
+    }
+
+    // ── Interaktiv-Modus ──────────────────────────────────────────────────
+
+    function setInteractive(state: boolean) {
+      isInteractive = state;
+      phonePreview?.classList.toggle('is-interactive', state);
+      if (demoBar)        demoBar.hidden        = state;
+      if (interactiveBar) interactiveBar.hidden = !state;
+      if (state) stopDemoLoop();
+      else { demoTileIndex = 0; setTimeout(startDemoLoop, 300); }
+    }
+
+    interactiveBtn?.addEventListener('click', () => setInteractive(true));
+    demoBtn?.addEventListener('click',        () => setInteractive(false));
+
+    // ── Module-Toggle-Listener ─────────────────────────────────────────────
+
+    document.addEventListener('click', e => {
+      const toggle = (e.target as HTMLElement).closest<HTMLButtonElement>('.module-toggle');
+      if (!toggle) return;
+      const key = toggle.dataset.moduleKey;
+      if (!key) return;
+      // Read new state from aria-pressed (set by ModulesSection script before this runs)
+      // Use a small delay so ModulesSection script updates aria-pressed first
+      setTimeout(() => {
+        const isOn = toggle.getAttribute('aria-pressed') === 'true';
+        onModuleToggle(key, isOn);
+      }, 20);
+    }, true); // capture phase so we see the click before preventDefault
+
+    // ── Init: wait for GuestPhoneView React hydration ────────────────────
+
+    function tryStartLoop() {
+      const tiles = document.querySelectorAll('.gate-tile');
+      if (tiles.length > 0) {
+        startDemoLoop();
+      } else {
+        // React not yet hydrated — retry
+        setTimeout(tryStartLoop, 300);
+      }
+    }
+
+    // Slight delay to let React hydrate
+    setTimeout(tryStartLoop, 800);
   </script>
 
   <div class="gast-layout">
