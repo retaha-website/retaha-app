@@ -65,7 +65,7 @@ if (token && isShowcaseToken(token)) {
     // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
     const sbSrInit = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, logo_dark, theme, design_identity, splash_background').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -391,6 +391,12 @@ const activeTheme = (hotelDesignIdentity && VALID_IDENTITIES.has(hotelDesignIden
   ? hotelDesignIdentity
   : resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
 
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandSecondary: string | null = (hotel as any).brand_secondary ?? null;
+const brandStyle = brandPrimary
+  ? `--user-brand-primary:${brandPrimary}${brandSecondary ? `;--user-brand-secondary:${brandSecondary}` : ''}`
+  : undefined;
+
 // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.
 // Cooldown (24h via localStorage) entscheidet danach Client-seitig, ob das
@@ -413,7 +419,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
 ---
 
 <!DOCTYPE html>
-<html lang={lang} dir={htmlDir} data-theme={activeTheme}>
+<html lang={lang} dir={htmlDir} data-theme={activeTheme} style={brandStyle}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
