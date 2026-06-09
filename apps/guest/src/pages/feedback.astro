@@ -1,21 +1,19 @@
 ---
-// Sprint Functional Modul C Phase 8 — Hotel-Rating Admin-View
-//
-// Hotelier sieht alle Post-Stay-Bewertungen (1-5 Sterne + optional Kommentar)
-// mit Durchschnitt, Verteilungsbalken und filterbarer Liste.
-//
-// Permission: operations.read
-
-import Layout from '../../layouts/Layout.astro';
+import HotelierLayout from '../layouts/HotelierLayout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
-import { getUserRole } from '@retaha/auth';
-import { hasPermission } from '@retaha/auth';
+import { getUserRole, hasPermission } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) return Astro.redirect('/admin/login');
+if (!user) {
+  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${b}/admin/login`);
+}
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+if (!hotel) {
+  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
+}
 
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!myRole || !hasPermission(myRole, 'operations.read')) {
@@ -24,11 +22,9 @@ if (!myRole || !hasPermission(myRole, 'operations.read')) {
 
 const url = new URL(Astro.request.url);
 const filterParam = url.searchParams.get('filter') || 'all';
-// 'all' | 'critical' (1-2) | 'positive' (4-5) | '1'..'5'
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-// Aggregat: avg + verteilung + total
 const { data: aggRows } = await client
   .from('stay_feedback')
   .select('rating')
@@ -43,7 +39,6 @@ for (const r of ratings) {
 }
 const maxBucket = Math.max(1, ...Object.values(distribution));
 
-// Liste mit Filter
 let query = client
   .from('stay_feedback')
   .select(`
@@ -74,7 +69,7 @@ function fmtStayRange(checkIn: string, checkOut: string) {
 }
 ---
 
-<Layout title="Gäste-Bewertungen" activeTab="backoffice">
+<HotelierLayout title="Gäste-Bewertungen" activeTab="gast" hotelName={hotel.name}>
   <div class="fb-page">
     <header class="fb-header">
       <p class="fb-eyebrow themed-eyebrow-flank">Aufenthalt · Bewertungen</p>
@@ -161,64 +156,45 @@ function fmtStayRange(checkIn: string, checkOut: string) {
   <style>
     .fb-page { max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
     .fb-header { margin: 20px 0 24px; }
-    .fb-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent); margin: 0 0 6px; }
+    .fb-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent, var(--te-pink)); margin: 0 0 6px; }
     .fb-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; letter-spacing: -0.01em; }
-    .fb-sub { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
-
-    .fb-empty { padding: 60px 24px; background: var(--theme-bg-primary); border: 1px dashed var(--theme-border); text-align: center; font-style: italic; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin-top: 20px; }
-
-    .fb-stats { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; margin: 20px 0 24px; background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 24px; }
+    .fb-sub { margin: 0; font-size: 14px; color: var(--ink-soft); }
+    .fb-empty { padding: 60px 24px; background: var(--surface); border: 1px dashed var(--border); text-align: center; font-style: italic; color: var(--ink-muted); margin-top: 20px; }
+    .fb-stats { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; margin: 20px 0 24px; background: var(--surface); border: 1px solid var(--border); padding: 24px; }
     @media (max-width: 640px) { .fb-stats { grid-template-columns: 1fr; } }
-    .fb-stat-card { padding-right: 24px; border-right: 1px solid var(--theme-border); }
-    @media (max-width: 640px) { .fb-stat-card { padding-right: 0; border-right: none; padding-bottom: 16px; border-bottom: 1px solid var(--theme-border); } }
-    .fb-stat-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
+    .fb-stat-card { padding-right: 24px; border-right: 1px solid var(--border); }
+    @media (max-width: 640px) { .fb-stat-card { padding-right: 0; border-right: none; padding-bottom: 16px; border-bottom: 1px solid var(--border); } }
+    .fb-stat-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
     .fb-stat-avg { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 4px; }
-    .fb-stat-number { font-size: 44px; font-weight: 300; line-height: 1; color: var(--theme-text-primary); }
-    /* Marken-DNA: Pink statt Gold-Stars — Bewertungs-Akzent ist Marken-Geste */
-    .fb-stat-stars { font-size: 18px; color: var(--theme-accent); letter-spacing: 2px; }
-    .fb-stat-meta { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
-
+    .fb-stat-number { font-size: 44px; font-weight: 300; line-height: 1; color: var(--ink); }
+    .fb-stat-stars { font-size: 18px; color: var(--te-pink, #FF4A82); letter-spacing: 2px; }
+    .fb-stat-meta { font-size: 12px; color: var(--ink-muted); }
     .fb-stat-bars { display: flex; flex-direction: column; gap: 6px; }
     .fb-bar-row { display: grid; grid-template-columns: 32px 1fr 100px; gap: 12px; align-items: center; text-decoration: none; color: inherit; padding: 4px 6px; transition: background 0.12s; }
-    .fb-bar-row:hover { background: rgba(var(--theme-accent-rgb), .06); }
-    .fb-bar-label { font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); font-variant-numeric: tabular-nums; }
-    .fb-bar-track { height: 8px; background: var(--theme-bg-tertiary); position: relative; overflow: hidden; }
-    .fb-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; background: var(--theme-bg-anthrazit); transition: width 0.3s ease; }
-    .fb-bar-count { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); text-align: right; font-variant-numeric: tabular-nums; }
-
-    .fb-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--theme-border); flex-wrap: wrap; }
-    .fb-tab { padding: 10px 14px; font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-    .fb-tab:hover { color: var(--theme-text-primary); }
-    .fb-tab.is-active { color: var(--theme-text-primary); border-bottom-color: var(--theme-accent); font-weight: 500; }
-    .fb-tab-c { color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); margin-left: 4px; font-size: 12px; }
-
+    .fb-bar-row:hover { background: var(--bg-deep); }
+    .fb-bar-label { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .fb-bar-track { height: 8px; background: var(--bg-deep); position: relative; overflow: hidden; }
+    .fb-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; background: var(--ink); transition: width 0.3s ease; }
+    .fb-bar-count { font-size: 12px; color: var(--ink-muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .fb-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .fb-tab { padding: 10px 14px; font-size: 13px; color: var(--ink-soft); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .fb-tab:hover { color: var(--ink); }
+    .fb-tab.is-active { color: var(--ink); border-bottom-color: var(--te-pink, #FF4A82); font-weight: 500; }
+    .fb-tab-c { color: var(--ink-muted); margin-left: 4px; font-size: 12px; }
     .fb-list { display: flex; flex-direction: column; gap: 12px; }
-    .fb-card { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 16px; border-left: 3px solid var(--theme-border-strong); }
-    /* Marken-DNA Rating-Status: positive = sage, mid = anthrazit-muted, negative = pink (NICHT rot) */
-    .fb-card--pos { border-left-color: var(--theme-success); }
-    .fb-card--mid { border-left-color: color-mix(in srgb, var(--theme-text-primary) 35%, transparent); }
-    .fb-card--neg { border-left-color: var(--theme-accent); }
+    .fb-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; border-left: 3px solid var(--border); }
+    .fb-card--pos { border-left-color: #4CAF50; }
+    .fb-card--mid { border-left-color: var(--ink-faint); }
+    .fb-card--neg { border-left-color: var(--te-pink, #FF4A82); }
     .fb-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
     .fb-rating { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 10px; }
-    .fb-rating--pos {
-      background: color-mix(in srgb, var(--theme-success) 10%, transparent);
-      color: var(--theme-success);
-      border: 1px solid color-mix(in srgb, var(--theme-success) 35%, transparent);
-    }
-    .fb-rating--mid {
-      background: color-mix(in srgb, var(--theme-text-primary) 6%, transparent);
-      color: color-mix(in srgb, var(--theme-text-primary) 80%, transparent);
-      border: 1px solid color-mix(in srgb, var(--theme-text-primary) 20%, transparent);
-    }
-    .fb-rating--neg {
-      background: rgba(var(--theme-accent-rgb), 0.08);
-      color: var(--theme-accent);
-      border: 1px solid rgba(var(--theme-accent-rgb), 0.35);
-    }
-    .fb-rating-stars { color: var(--theme-accent); font-size: 13px; letter-spacing: 1px; }
+    .fb-rating--pos { background: rgba(76,175,80,.1); color: #4CAF50; border: 1px solid rgba(76,175,80,.35); }
+    .fb-rating--mid { background: var(--bg-deep); color: var(--ink-soft); border: 1px solid var(--border); }
+    .fb-rating--neg { background: rgba(255,74,130,.08); color: var(--te-pink, #FF4A82); border: 1px solid rgba(255,74,130,.35); }
+    .fb-rating-stars { color: var(--te-pink, #FF4A82); font-size: 13px; letter-spacing: 1px; }
     .fb-rating-num { font-variant-numeric: tabular-nums; font-weight: 500; }
-    .fb-card-meta { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
-    .fb-comment { margin: 0; padding: 8px 12px; background: color-mix(in srgb, var(--theme-text-primary) .03, transparent); border-left: 3px solid color-mix(in srgb, var(--theme-text-primary) .2, transparent); font-size: 14px; line-height: 1.5; color: var(--theme-text-primary); font-style: italic; }
-    .fb-comment--empty { color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); font-style: italic; background: transparent; border-left-color: transparent; padding-left: 0; }
+    .fb-card-meta { font-size: 12px; color: var(--ink-muted); }
+    .fb-comment { margin: 0; padding: 8px 12px; background: var(--bg-deep); border-left: 3px solid var(--border); font-size: 14px; line-height: 1.5; color: var(--ink); font-style: italic; }
+    .fb-comment--empty { color: var(--ink-muted); font-style: italic; background: transparent; border-left-color: transparent; padding-left: 0; }
   </style>
-</Layout>
+</HotelierLayout>
