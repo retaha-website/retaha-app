@@ -33,69 +33,115 @@ const theme: GuestTheme = {
 
   type ModuleKey = keyof PreviewState['modules'];
 
-  // GuestPhoneView rendert .gate-tile Kacheln (GuestHomeScreen.astro)
-  // Label-Text → module-key
   const TILE_LABEL_MAP: Record<string, ModuleKey> = {
     'eve':        'eve',
     'frühstück':  'breakfast',
     'service':    'service',
   };
 
-  // .gp-tab[data-tab] → module-key (aus GuestPhoneView.astro)
   const TAB_KEY_MAP: Record<string, ModuleKey> = {
     'eve':     'eve',
     'tipps':   'empfehlungen',
     'service': 'service',
   };
 
-  // [data-screen] → module-key
   const SCREEN_KEY_MAP: Record<string, ModuleKey> = {
     'eve':     'eve',
     'tipps':   'empfehlungen',
     'service': 'service',
   };
 
+  // Persona-spezifische Demo-Daten für DOM-Manipulation
+  const PERSONA_DISPLAY = {
+    arrival: {
+      kicker:    'Willkommen, Maria',
+      greeting:  'Hallo, Maria',
+      sub:       'Noch 3 Tage bis zum Check-in.',
+      zimmer:    'Noch nicht vergeben',
+      aufenthalt:'Check-in in 3 Tagen',
+      // Welche Module in dieser Persona sichtbar?
+      tileOverride: { eve: false, breakfast: false, service: false, empfehlungen: false } as Partial<Record<ModuleKey, boolean>>,
+    },
+    in_house: {
+      kicker:    'Herzlich willkommen zurück',
+      greeting:  'Hallo, Maria',
+      sub:       'Tag 2 von 4.',
+      zimmer:    '101',
+      aufenthalt:'Tag 2 von 4',
+      tileOverride: null,  // user's module config gilt
+    },
+    departure: {
+      kicker:    'Wir hoffen, du hattest eine tolle Zeit',
+      greeting:  'Hallo, Maria',
+      sub:       'Check-out heute bis 12:00 Uhr.',
+      zimmer:    '101',
+      aufenthalt:'Heute: Check-out',
+      tileOverride: { eve: false, breakfast: false, service: false, empfehlungen: false, self_checkout: true } as Partial<Record<ModuleKey, boolean>>,
+    },
+  };
+
   subscribe(state => {
-    // 0 — Hero-Slider ein-/ausblenden
+    const persona = PERSONA_DISPLAY[state.persona];
+
+    // — Persona: Hero-Text-Update —
+    const kicker = document.querySelector<HTMLElement>('.gate-hero-kicker');
+    if (kicker) kicker.textContent = persona.kicker;
+
+    const greeting = document.querySelector<HTMLElement>('.gate-hero-greeting');
+    if (greeting) greeting.innerHTML = `${persona.greeting}<span class="dot">.</span>`;
+
+    const sub = document.querySelector<HTMLElement>('.gate-hero-sub');
+    if (sub) sub.textContent = persona.sub;
+
+    const stayBlocks = document.querySelectorAll<HTMLElement>('.gate-hero-stay-block');
+    const zimmerBlock = stayBlocks[0]?.querySelector<HTMLElement>('.value');
+    if (zimmerBlock) zimmerBlock.textContent = persona.zimmer;
+    const aufenthaltBlock = stayBlocks[1]?.querySelector<HTMLElement>('.value');
+    if (aufenthaltBlock) aufenthaltBlock.textContent = persona.aufenthalt;
+
+    // — Hero-Slider: nur anzeigen wenn action_cards aktiviert —
     document.querySelectorAll<HTMLElement>('.hero-slider').forEach(el => {
       el.style.display = state.modules.action_cards ? '' : 'none';
     });
 
-    // 1 — Action-Tiles ein-/ausblenden (.gate-tile in GuestHomeScreen)
+    // — Action-Tiles: persona-override + user-module-config —
     document.querySelectorAll<HTMLElement>('.gate-tile').forEach(tile => {
       const labelEl = tile.querySelector<HTMLElement>('.gate-tile-label');
       if (!labelEl) return;
       const labelKey = labelEl.textContent?.trim().toLowerCase() ?? '';
       const moduleKey = TILE_LABEL_MAP[labelKey];
-      if (moduleKey) {
-        const visible = state.modules[moduleKey];
-        tile.style.opacity = visible ? '1' : '0.2';
-        tile.style.pointerEvents = visible ? '' : 'none';
-      }
+      if (!moduleKey) return;
+      const visible = persona.tileOverride !== null && moduleKey in persona.tileOverride
+        ? persona.tileOverride[moduleKey]!
+        : state.modules[moduleKey];
+      tile.style.opacity = visible ? '1' : '0.2';
+      tile.style.pointerEvents = visible ? '' : 'none';
     });
 
-    // 2 — Bottom-Tabs dimmen (.gp-tab in GuestPhoneView)
+    // — Bottom-Tabs dimmen —
     document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(tab => {
       const key = tab.dataset.tab ?? '';
       const moduleKey = TAB_KEY_MAP[key];
-      if (moduleKey) {
-        const visible = state.modules[moduleKey];
-        tab.style.opacity = visible ? '1' : '0.25';
-        tab.style.pointerEvents = visible ? '' : 'none';
-      }
+      if (!moduleKey) return;
+      const visible = persona.tileOverride !== null && moduleKey in persona.tileOverride
+        ? persona.tileOverride[moduleKey]!
+        : state.modules[moduleKey];
+      tab.style.opacity = visible ? '1' : '0.25';
+      tab.style.pointerEvents = visible ? '' : 'none';
     });
 
-    // 3 — Screens ausblenden wenn Modul aus
+    // — Screens ausblenden wenn Modul aus —
     document.querySelectorAll<HTMLElement>('[data-screen]').forEach(screen => {
       const key = screen.dataset.screen ?? '';
       const moduleKey = SCREEN_KEY_MAP[key];
       if (!moduleKey) return;
-      if (!state.modules[moduleKey] && !screen.hidden) {
-        // Wenn aktiver Screen deaktiviert → zurück zu Home
+      const visible = persona.tileOverride !== null && moduleKey in persona.tileOverride
+        ? persona.tileOverride[moduleKey]!
+        : state.modules[moduleKey];
+      if (!visible && !screen.hidden) {
         screen.hidden = true;
         const homeScreen = document.querySelector<HTMLElement>('[data-screen="home"]');
         if (homeScreen) homeScreen.hidden = false;
-        // Home-Tab aktivieren
         document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(t => {
           t.classList.toggle('gp-tab--active', t.dataset.tab === 'home');
         });

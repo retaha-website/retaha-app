@@ -1,5 +1,5 @@
 export interface PreviewState {
-  scene: 'empfang' | 'zimmer_101' | 'spa';
+  persona: 'arrival' | 'in_house' | 'departure';
   view: 'home' | 'eve' | 'empfehlungen' | 'service';
   branding: { theme: 'coffee' | 'ocean' | 'forest' };
   modules: {
@@ -19,7 +19,7 @@ export interface PreviewState {
 }
 
 export const initialState: PreviewState = {
-  scene: 'empfang',
+  persona: 'in_house',
   view: 'home',
   branding: { theme: 'coffee' },
   modules: {

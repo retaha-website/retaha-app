@@ -1,0 +1,100 @@
+---
+const personas = [
+  {
+    key: 'arrival'   as const,
+    label: 'Anreise',
+    detail: 'Maria Schmidt · Check-in in 3 Tagen',
+    eyebrow: 'pre_arrival',
+  },
+  {
+    key: 'in_house'  as const,
+    label: 'Im Hotel',
+    detail: 'Maria Schmidt · Zi. 101 · Tag 2 von 4',
+    eyebrow: 'in_house',
+  },
+  {
+    key: 'departure' as const,
+    label: 'Abreise',
+    detail: 'Maria Schmidt · Check-out Heute',
+    eyebrow: 'checking_out',
+  },
+];
+---
+
+<div class="persona-picker">
+  <span class="persona-picker__label">— Persona wählen —</span>
+  <div class="persona-picker__pills">
+    {personas.map(p => (
+      <button
+        class:list={['persona-pill', { 'is-active': p.key === 'in_house' }]}
+        data-persona={p.key}
+        type="button"
+        aria-pressed={p.key === 'in_house' ? 'true' : 'false'}
+      >
+        <span class="persona-pill__eyebrow">{p.eyebrow}</span>
+        <span class="persona-pill__label">{p.label}</span>
+        <span class="persona-pill__detail">{p.detail}</span>
+      </button>
+    ))}
+  </div>
+</div>
+
+<style>
+  .persona-picker {
+    display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%;
+  }
+  .persona-picker__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em;
+    color: var(--ink-muted); text-transform: uppercase;
+  }
+  .persona-picker__pills {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: 100%;
+  }
+  .persona-pill {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 16px; min-width: 110px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink-muted);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sm); cursor: pointer;
+    transition: all 200ms ease;
+    text-align: center;
+  }
+  .persona-pill:hover {
+    background: var(--te-yellow-soft); color: var(--ink); border-color: var(--ink-faint);
+  }
+  .persona-pill.is-active {
+    background: var(--ink); color: var(--bg); border-color: var(--ink);
+  }
+  .persona-pill__eyebrow {
+    font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase;
+    opacity: 0.55;
+  }
+  .persona-pill__label {
+    font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .persona-pill__detail {
+    font-size: 9px; letter-spacing: 0.04em; text-transform: none;
+    opacity: 0.65; white-space: nowrap;
+  }
+  .persona-pill.is-active .persona-pill__eyebrow,
+  .persona-pill.is-active .persona-pill__detail { opacity: 0.6; }
+</style>
+
+<script>
+  import { updateState } from '../../lib/gast-vorschau/state';
+  document.querySelectorAll<HTMLButtonElement>('.persona-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const persona = pill.dataset.persona as 'arrival' | 'in_house' | 'departure';
+      if (!persona) return;
+      document.querySelectorAll('.persona-pill').forEach(p => {
+        p.classList.remove('is-active');
+        p.setAttribute('aria-pressed', 'false');
+      });
+      pill.classList.add('is-active');
+      pill.setAttribute('aria-pressed', 'true');
+      updateState({ persona });
+    });
+  });
+</script>
