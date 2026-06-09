@@ -385,11 +385,21 @@ const reservationEnabled = settings.features?.breakfast_reservation !== false;
 
 // Theme kommt ausschließlich aus hotel.design_identity — einzige Source of Truth.
 // Kein URL-Override, kein session.theme_override — hotel-level only.
+// Legacy-Mapping: 'classic'/null → 'bauhaus'; alte Sprint-H-IDs → neues System
+const IDENTITY_REMAP: Record<string, string> = {
+  classic: 'bauhaus',
+  bauhaus_manufaktur: 'bauhaus',
+  premium_anthrazit:  'maison',
+  warmes_burgund:     'editorial',
+};
 const VALID_IDENTITIES = new Set(['bauhaus', 'editorial', 'maison']);
-const hotelDesignIdentity = (hotel as any).design_identity ?? null;
-const activeTheme = (hotelDesignIdentity && VALID_IDENTITIES.has(hotelDesignIdentity))
-  ? hotelDesignIdentity
-  : resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
+const rawIdentity: string | null = (hotel as any).design_identity ?? null;
+const remappedIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : null;
+const hotelDesignIdentity = (remappedIdentity && VALID_IDENTITIES.has(remappedIdentity))
+  ? remappedIdentity
+  : null;
+const legacyTheme = resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
+const activeTheme = hotelDesignIdentity ?? (IDENTITY_REMAP[legacyTheme] ?? 'bauhaus');
 
 const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
 const brandSecondary: string | null = (hotel as any).brand_secondary ?? null;

@@ -61,7 +61,12 @@ if (!verified) {
   );
 }
 
-const { hotelId, identity } = verified;
+const { hotelId, identity: rawIdentity } = verified;
+const IDENTITY_REMAP: Record<string, string> = {
+  classic: 'bauhaus', bauhaus_manufaktur: 'bauhaus',
+  premium_anthrazit: 'maison', warmes_burgund: 'editorial',
+};
+const identity = IDENTITY_REMAP[rawIdentity] ?? rawIdentity;
 
 // ── Hotel-Daten laden ──────────────────────────────────────────────────────
 const sb = createSupabaseServiceRoleInstance();
