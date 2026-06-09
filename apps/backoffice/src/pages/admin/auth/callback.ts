@@ -6,7 +6,7 @@ import type { AdminLocale } from '../../../i18n/types';
 export const GET: APIRoute = async ({ cookies, request, redirect }) => {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const next = url.searchParams.get('next') || '/admin/dashboard';
+  const next = url.searchParams.get('next') || '/uebersicht';
 
   if (!code) {
     return redirect('/admin/login?error=no_code');
