@@ -18,6 +18,7 @@ export interface GuestHotel {
   city: string | null;
   default_language: string;
   logo_url: string | null;
+  logo_primary: string | null;
   logo_dark: string | null;
   splash_background: string | null;
   design_identity: 'bauhaus' | 'editorial' | 'maison' | null;
@@ -60,7 +61,7 @@ export async function fetchGuestContext(token: string): Promise<GuestContext | n
   const sb = createSupabaseServiceRoleInstance();
   const { data: extra } = await sb
     .from('hotels')
-    .select('design_identity, logo_dark, splash_background, latitude, longitude')
+    .select('design_identity, logo_primary, logo_dark, splash_background, latitude, longitude')
     .eq('id', ctx.hotel.id)
     .maybeSingle();
 
@@ -71,6 +72,7 @@ export async function fetchGuestContext(token: string): Promise<GuestContext | n
     hotel: {
       ...ctx.hotel,
       design_identity: (extra?.design_identity as GuestHotel['design_identity']) ?? null,
+      logo_primary: (extra?.logo_primary as string | null) ?? null,
       logo_dark: (extra?.logo_dark as string | null) ?? null,
       splash_background: (extra?.splash_background as string | null) ?? null,
       latitude: (extra?.latitude as number | null) ?? null,

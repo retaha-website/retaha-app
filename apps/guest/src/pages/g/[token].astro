@@ -65,7 +65,7 @@ if (token && isShowcaseToken(token)) {
     // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
     const sbSrInit = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_url, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -219,7 +219,7 @@ const initialEveMessages = (initialChatRows ?? [])
 
 // Sprint E2 Phase 7 — Places-Sheet-Daten: Picks + Nearby-Cache + hotel lat/lng
 const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = await Promise.all([
-  sbSr.from('hotels').select('latitude, longitude, logo_dark, splash_background').eq('id', hotel.id).maybeSingle(),
+  sbSr.from('hotels').select('latitude, longitude, logo_primary, logo_dark, splash_background').eq('id', hotel.id).maybeSingle(),
   sbSr.from('hotel_place_picks')
     .select('id, place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, cached_data, photo_references, sort_order')
     .eq('hotel_id', hotel.id)
@@ -233,7 +233,7 @@ const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = 
 const placesHotelLat = (hotelGeoRow?.latitude as number | null) ?? null;
 const placesHotelLng = (hotelGeoRow?.longitude as number | null) ?? null;
 const hotelHeroBg   = (hotelGeoRow?.splash_background as string | null) ?? (hotel as any).splash_background ?? null;
-const hotelLogoDark = (hotelGeoRow?.logo_dark as string | null) ?? (hotel as any).logo_dark ?? null;
+const hotelLogoDark = (hotelGeoRow?.logo_dark as string | null) ?? (hotelGeoRow?.logo_primary as string | null) ?? (hotel as any).logo_dark ?? (hotel as any).logo_primary ?? null;
 const placesPicks = (placePicksRows ?? []) as any[];
 const placesNearby = (nearbyRows ?? []) as any[];
 
