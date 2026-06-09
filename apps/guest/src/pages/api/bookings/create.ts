@@ -149,7 +149,7 @@ export const POST: APIRoute = async ({ request }) => {
           payload: {
             title: 'Neue Service-Anfrage',
             body,
-            url: `/admin/service?booking=${booking.id}`,
+            url: `/service?booking=${booking.id}`,
             tag: `booking-${booking.id}`,
           },
         });
