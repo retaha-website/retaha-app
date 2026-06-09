@@ -1,84 +1,101 @@
 ---
 const personas = [
-  { key: 'arrival'   as const, label: 'Anreise' },
-  { key: 'in_house'  as const, label: 'Im Hotel' },
-  { key: 'departure' as const, label: 'Abreise' },
+  { key: 'arrival'   as const, label: 'Anreise',  default: false },
+  { key: 'in_house'  as const, label: 'Im Hotel',  default: true  },
+  { key: 'departure' as const, label: 'Abreise',  default: false },
 ];
 ---
 
-<div class="persona-picker">
-  {personas.map((p, i) => (
-    <>
-      {i > 0 && <span class="persona-arrow" aria-hidden="true">→</span>}
-      <button
-        class:list={['persona-pill', { 'is-active': p.key === 'in_house' }]}
-        data-persona={p.key}
-        type="button"
-        aria-pressed={p.key === 'in_house' ? 'true' : 'false'}
-      >
-        {p.label}
-      </button>
-    </>
+<div class="persona-dots" role="tablist" aria-label="Gast-Situation">
+  {personas.map(p => (
+    <button
+      class="persona-dot"
+      data-active={p.default ? 'true' : 'false'}
+      data-persona={p.key}
+      type="button"
+      role="tab"
+      aria-label={p.label}
+      aria-selected={p.default ? 'true' : 'false'}
+    >
+      <span class="persona-dot__label">{p.label}</span>
+    </button>
   ))}
 </div>
 
 <style>
-  .persona-picker {
+  .persona-dots {
     display: flex;
+    gap: 10px;
+    justify-content: center;
     align-items: center;
-    gap: 6px;
-    width: 100%;
+    margin: 8px 0 20px;
+    padding-bottom: 18px;
+    position: relative;
   }
 
-  .persona-pill {
-    flex: 1;
-    padding: 8px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    text-align: center;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--ink-muted);
+  .persona-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: transparent;
     cursor: pointer;
-    transition: all 200ms ease;
-    white-space: nowrap;
+    transition: width 200ms ease, border-radius 200ms ease, background 200ms ease, border-color 200ms ease;
+    position: relative;
+    padding: 0;
+    flex-shrink: 0;
   }
 
-  .persona-pill:hover:not(.is-active) {
-    border-color: var(--te-yellow);
-    color: var(--ink);
-  }
-
-  .persona-pill.is-active {
+  .persona-dot[data-active="true"] {
+    width: 24px;
+    border-radius: 6px;
     background: var(--te-yellow);
     border-color: var(--te-yellow);
-    color: #0A0A0A;
-    font-weight: 500;
   }
 
-  .persona-arrow {
-    color: var(--ink-faint, var(--border));
-    font-size: 13px;
-    flex-shrink: 0;
-    user-select: none;
-    line-height: 1;
+  .persona-dot:hover:not([data-active="true"]) {
+    border-color: var(--te-yellow);
+    background: rgba(255, 230, 0, 0.15);
+  }
+
+  .persona-dot__label {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    color: var(--ink-muted);
+    opacity: 0;
+    transition: opacity 150ms ease;
+    pointer-events: none;
+  }
+
+  .persona-dot[data-active="true"] .persona-dot__label {
+    color: var(--ink);
+    opacity: 1;
+  }
+
+  .persona-dot:hover .persona-dot__label {
+    opacity: 1;
   }
 </style>
 
 <script>
   import { updateState } from '../../lib/gast-vorschau/state';
-  document.querySelectorAll<HTMLButtonElement>('.persona-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      const persona = pill.dataset.persona as 'arrival' | 'in_house' | 'departure';
+  document.querySelectorAll<HTMLButtonElement>('.persona-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const persona = dot.dataset.persona as 'arrival' | 'in_house' | 'departure';
       if (!persona) return;
-      document.querySelectorAll('.persona-pill').forEach(p => {
-        p.classList.remove('is-active');
-        p.setAttribute('aria-pressed', 'false');
+      document.querySelectorAll<HTMLButtonElement>('.persona-dot').forEach(d => {
+        d.dataset.active = 'false';
+        d.setAttribute('aria-selected', 'false');
       });
-      pill.classList.add('is-active');
-      pill.setAttribute('aria-pressed', 'true');
+      dot.dataset.active = 'true';
+      dot.setAttribute('aria-selected', 'true');
       updateState({ persona });
     });
   });

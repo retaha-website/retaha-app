@@ -61,195 +61,215 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   </script>
 
   <script>
-    // ─── Demo-Loop + Zoom-on-Toggle + Interaktiv-Modus (Option C) ───────────
+    // ─── Demo-Loop + Zoom + Interaktiv-Modus — Clean State Machine ──────────
 
     const LABEL_TO_MODULE: Record<string, string> = {
-      'eve':        'eve',
-      'frühstück':  'breakfast',
-      'service':    'service',
-      'tipps':      'empfehlungen',
-      'konferenz':  'conference',
-      'wallet':     'wallet',
+      'eve': 'eve', 'frühstück': 'breakfast', 'service': 'service',
+      'tipps': 'empfehlungen', 'konferenz': 'conference', 'wallet': 'wallet',
     };
-
     const MODULE_DISPLAY_NAME: Record<string, string> = {
-      'eve':          'Eve Concierge',
-      'breakfast':    'Frühstück',
-      'service':      'Service',
-      'empfehlungen': 'Tipps & Orte',
-      'conference':   'Konferenz',
-      'wallet':       'Digital Wallet',
+      'eve': 'Eve Concierge', 'breakfast': 'Frühstück', 'service': 'Service',
+      'empfehlungen': 'Tipps & Orte', 'conference': 'Konferenz', 'wallet': 'Wallet',
     };
 
-    let isInteractive   = false;
-    let demoLoopTimer: ReturnType<typeof setTimeout> | null = null;
-    let demoTileIndex   = 0;
-
-    const phonePreview   = document.getElementById('phonePreview');
-    const phoneContent   = document.getElementById('phoneContent');
-    const zoomNotice     = document.getElementById('zoomNotice');
+    // ── DOM refs ──────────────────────────────────────────────────────────
+    const phonePreview    = document.getElementById('phonePreview');
+    const phoneContent    = document.getElementById('phoneContent') as HTMLElement | null;
+    const zoomNotice      = document.getElementById('zoomNotice')   as HTMLElement | null;
     const zoomNoticeLabel = document.getElementById('zoomNoticeLabel');
-    const demoBar        = document.getElementById('demoBar');
-    const interactiveBar = document.getElementById('interactiveBar');
-    const interactiveBtn = document.getElementById('demoInteractiveBtn');
-    const demoBtn        = document.getElementById('demoDemoBtn');
+    const demoBar         = document.getElementById('demoBar');
+    const interactiveBar  = document.getElementById('interactiveBar');
+    const interactiveBtn  = document.getElementById('demoInteractiveBtn');
+    const demoBtn         = document.getElementById('demoDemoBtn');
 
-    // ── Utilities ──────────────────────────────────────────────────────────
+    // ── State ─────────────────────────────────────────────────────────────
+    let isInteractive = false;
+    let demoTileIndex = 0;
+    let demoActive    = false;
+    let zoomTimer:    ReturnType<typeof setTimeout> | null = null;
+    let demoTimer:    ReturnType<typeof setTimeout> | null = null;
+
+    // ── Utilities ─────────────────────────────────────────────────────────
 
     function getActiveTiles(): HTMLElement[] {
-      return Array.from(document.querySelectorAll<HTMLElement>('.gate-tile')).filter(tile => {
-        const opacity = parseFloat(tile.style.opacity ?? '1');
-        return !isNaN(opacity) ? opacity > 0.3 : true;
+      return Array.from(document.querySelectorAll<HTMLElement>('.gate-tile')).filter(t => {
+        const op = parseFloat(t.style.opacity ?? '1');
+        return !isNaN(op) ? op > 0.3 : true;
       });
+    }
+
+    function tileKey(tile: HTMLElement): string | undefined {
+      const label = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
+      return LABEL_TO_MODULE[label];
     }
 
     function clearPulse(tile: HTMLElement) {
       tile.classList.remove('demo-pulse', 'toggle-pulse-on', 'toggle-pulse-off');
     }
 
-    function pulseTile(tile: HTMLElement, variant: 'demo' | 'on' | 'off') {
+    function pulseTile(tile: HTMLElement, v: 'demo' | 'on' | 'off') {
       clearPulse(tile);
-      if (variant === 'demo')      tile.classList.add('demo-pulse');
-      else if (variant === 'on')   tile.classList.add('toggle-pulse-on');
-      else                         tile.classList.add('toggle-pulse-off');
+      tile.classList.add(v === 'demo' ? 'demo-pulse' : v === 'on' ? 'toggle-pulse-on' : 'toggle-pulse-off');
     }
 
-    let noticeTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function showNotice(moduleKey: string) {
-      if (!zoomNotice || !zoomNoticeLabel) return;
-      const name = MODULE_DISPLAY_NAME[moduleKey] ?? moduleKey;
-      zoomNoticeLabel.textContent = name;
-      zoomNotice.setAttribute('data-active', 'true');
-      if (noticeTimer) clearTimeout(noticeTimer);
-      noticeTimer = setTimeout(() => {
-        zoomNotice.setAttribute('data-active', 'false');
-      }, 1200);
+    function cancelAll() {
+      if (zoomTimer) { clearTimeout(zoomTimer); zoomTimer = null; }
+      if (demoTimer) { clearTimeout(demoTimer); demoTimer = null; }
     }
 
-    function zoomToTile(tile: HTMLElement | null, scale: number, moduleKey?: string) {
+    // ── Zoom helpers ─────────────────────────────────────────────────────
+
+    function resetZoom() {
       if (!phoneContent) return;
-      if (scale <= 1) {
-        phoneContent.classList.remove('is-zoomed');
-        phoneContent.style.transformOrigin = '';
-        phoneContent.style.transform = '';
-        return;
-      }
-      if (tile) {
-        const contentRect = phoneContent.getBoundingClientRect();
-        const tileRect    = tile.getBoundingClientRect();
-        const ox = tileRect.left + tileRect.width  / 2 - contentRect.left;
-        const oy = tileRect.top  + tileRect.height / 2 - contentRect.top;
-        phoneContent.style.transformOrigin = `${ox}px ${oy}px`;
-      }
-      phoneContent.classList.add('is-zoomed');
-      phoneContent.style.transform = `scale(${scale})`;
-      if (moduleKey) showNotice(moduleKey);
+      phoneContent.style.transition = '';        // re-enable CSS transition (smooth out)
+      phoneContent.style.transform  = '';
+      phoneContent.style.transformOrigin = '';
+      zoomNotice?.setAttribute('data-active', 'false');
     }
 
-    // ── Demo-Loop ─────────────────────────────────────────────────────────
+    function applyZoom(tile: HTMLElement) {
+      if (!phoneContent) return;
 
-    function tileToModuleKey(tile: HTMLElement): string | undefined {
-      const label = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
-      return LABEL_TO_MODULE[label];
+      // 1. Snap back instantly (no animation) so rects are accurate at scale=1
+      phoneContent.style.transition = 'none';
+      phoneContent.style.transform  = '';
+      phoneContent.style.transformOrigin = '';
+
+      // Force reflow — ensures getBoundingClientRect() returns unscaled values
+      void phoneContent.offsetHeight;
+
+      // 2. Compute positions while content is at scale=1
+      const cr = phoneContent.getBoundingClientRect();
+      const tr = tile.getBoundingClientRect();
+
+      const ox = tr.left + tr.width  / 2 - cr.left;
+      const oy = tr.top  + tr.height / 2 - cr.top;
+
+      // 3. Position notice at tile (inside phoneContent, scaled along with content)
+      if (zoomNotice && zoomNoticeLabel) {
+        const key  = tileKey(tile);
+        zoomNoticeLabel.textContent = MODULE_DISPLAY_NAME[key ?? ''] ?? '';
+
+        const tileCX = ox;
+        const tileTop = tr.top    - cr.top;
+        const tileBot = tr.bottom - cr.top;
+
+        zoomNotice.style.left = `${tileCX}px`;
+
+        if (tileTop < 50) {
+          // Tile near top — place notice below
+          zoomNotice.style.top = `${tileBot}px`;
+          zoomNotice.style.transform = 'translateX(-50%) translateY(8px)';
+          zoomNotice.classList.add('is-below');
+        } else {
+          // Place notice above tile
+          zoomNotice.style.top = `${tileTop}px`;
+          zoomNotice.style.transform = 'translateX(-50%) translateY(calc(-100% - 8px))';
+          zoomNotice.classList.remove('is-below');
+        }
+        zoomNotice.setAttribute('data-active', 'true');
+      }
+
+      // 4. Set origin and apply scale (no animation for zoom-in — avoids origin-jump spin)
+      phoneContent.style.transformOrigin = `${ox}px ${oy}px`;
+      phoneContent.style.transform = 'scale(1.5)';
     }
 
-    function startDemoLoop() {
+    // ── Demo Loop ─────────────────────────────────────────────────────────
+
+    function tickDemo() {
       if (isInteractive) return;
       const tiles = getActiveTiles();
-      if (tiles.length === 0) return;
+      if (!tiles.length) return;
+      demoActive = true;
 
       demoTileIndex = demoTileIndex % tiles.length;
-      const tile    = tiles[demoTileIndex];
-      const key     = tileToModuleKey(tile);
+      const tile = tiles[demoTileIndex];
 
       pulseTile(tile, 'demo');
-      zoomToTile(tile, 1.5, key);
+      applyZoom(tile);
 
-      demoLoopTimer = setTimeout(() => {
+      zoomTimer = setTimeout(() => {
         clearPulse(tile);
-        zoomToTile(null, 1);
+        resetZoom();
+        zoomTimer = null;
         demoTileIndex = (demoTileIndex + 1) % tiles.length;
-        startDemoLoop();
+        if (!isInteractive && demoActive) {
+          // Brief gap between tiles so zoom-out transition completes
+          demoTimer = setTimeout(tickDemo, 450);
+        }
       }, 2200);
     }
 
-    function stopDemoLoop() {
-      if (demoLoopTimer !== null) {
-        clearTimeout(demoLoopTimer);
-        demoLoopTimer = null;
-      }
-      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(t => clearPulse(t));
-      zoomToTile(null, 1);
+    function stopDemo() {
+      cancelAll();
+      demoActive = false;
+      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(clearPulse);
+      resetZoom();
     }
 
-    // ── Zoom-on-Toggle ────────────────────────────────────────────────────
+    // ── Toggle Handler ────────────────────────────────────────────────────
 
-    function onModuleToggle(moduleKey: string, newState: boolean) {
+    function onModuleToggle(moduleKey: string, isOn: boolean) {
       if (isInteractive) return;
-      stopDemoLoop();
+      cancelAll();
+      demoActive = false;
 
-      // Find matching gate-tile by label text
-      let targetTile: HTMLElement | null = null;
-      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(tile => {
-        const labelText = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
-        const key = LABEL_TO_MODULE[labelText];
-        if (key === moduleKey) targetTile = tile;
+      let target: HTMLElement | null = null;
+      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(t => {
+        if (tileKey(t) === moduleKey) target = t;
       });
 
-      zoomToTile(targetTile, 1.5, moduleKey);
-      if (targetTile) pulseTile(targetTile, newState ? 'on' : 'off');
+      if (target) {
+        pulseTile(target, isOn ? 'on' : 'off');
+        applyZoom(target);
+      }
 
-      setTimeout(() => {
-        zoomToTile(null, 1);
-        if (targetTile) clearPulse(targetTile);
-        setTimeout(startDemoLoop, 500);
+      zoomTimer = setTimeout(() => {
+        if (target) clearPulse(target);
+        resetZoom();
+        zoomTimer = null;
+        demoTimer = setTimeout(tickDemo, 500);
       }, 1200);
     }
 
-    // ── Interaktiv-Modus ──────────────────────────────────────────────────
+    // ── Interactive Mode ──────────────────────────────────────────────────
 
-    function setInteractive(state: boolean) {
-      isInteractive = state;
-      phonePreview?.classList.toggle('is-interactive', state);
-      if (demoBar)        demoBar.hidden        = state;
-      if (interactiveBar) interactiveBar.hidden = !state;
-      if (state) stopDemoLoop();
-      else { demoTileIndex = 0; setTimeout(startDemoLoop, 300); }
+    function setInteractive(on: boolean) {
+      isInteractive = on;
+      phonePreview?.classList.toggle('is-interactive', on);
+      if (demoBar)        demoBar.hidden        = on;
+      if (interactiveBar) interactiveBar.hidden = !on;
+      if (on) { stopDemo(); }
+      else    { demoTileIndex = 0; demoTimer = setTimeout(tickDemo, 300); }
     }
 
     interactiveBtn?.addEventListener('click', () => setInteractive(true));
     demoBtn?.addEventListener('click',        () => setInteractive(false));
 
-    // ── Module-Toggle-Listener ─────────────────────────────────────────────
+    // ── Module Toggle Listener ────────────────────────────────────────────
 
     document.addEventListener('click', e => {
       const toggle = (e.target as HTMLElement).closest<HTMLButtonElement>('.module-toggle');
       if (!toggle) return;
       const key = toggle.dataset.moduleKey;
       if (!key) return;
-      // Read new state from aria-pressed (set by ModulesSection script before this runs)
-      // Use a small delay so ModulesSection script updates aria-pressed first
       setTimeout(() => {
         const isOn = toggle.getAttribute('aria-pressed') === 'true';
         onModuleToggle(key, isOn);
       }, 20);
-    }, true); // capture phase so we see the click before preventDefault
+    }, true);
 
-    // ── Init: wait for GuestPhoneView React hydration ────────────────────
+    // ── Init: wait for React hydration ────────────────────────────────────
 
-    function tryStartLoop() {
-      const tiles = document.querySelectorAll('.gate-tile');
-      if (tiles.length > 0) {
-        startDemoLoop();
+    function tryStart() {
+      if (document.querySelectorAll('.gate-tile').length > 0) {
+        demoTimer = setTimeout(tickDemo, 800);
       } else {
-        // React not yet hydrated — retry
-        setTimeout(tryStartLoop, 300);
+        setTimeout(tryStart, 300);
       }
     }
-
-    // Slight delay to let React hydrate
-    setTimeout(tryStartLoop, 800);
+    setTimeout(tryStart, 800);
   </script>
 
   <div class="gast-layout">
