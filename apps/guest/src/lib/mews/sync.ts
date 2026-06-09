@@ -453,6 +453,7 @@ async function syncStaysFromReservations(
     const { data, error } = await supabase
       .from('stays')
       .select('mews_reservation_id')
+      .eq('hotel_id', hotelId)
       .in('mews_reservation_id', batch);
     if (error) throw new Error(`stays lookup failed: ${error.message}`);
     for (const row of (data ?? []) as Array<{ mews_reservation_id: string | null }>) {
@@ -528,6 +529,7 @@ async function syncStaysFromReservations(
     const { error } = await supabase
       .from('stays')
       .update(data)
+      .eq('hotel_id', hotelId)
       .eq('mews_reservation_id', id);
     if (error) throw new Error(`stays update failed for ${id}: ${error.message}`);
     processed++;
