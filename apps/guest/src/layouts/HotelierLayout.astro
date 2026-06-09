@@ -18,6 +18,7 @@ import '@retaha/ui/styles/components/settings.css';
 import '@retaha/ui/styles/components/status-markers.css';
 
 import HeaderTabs from '../components/header/HeaderTabs.astro';
+import KeyMenu from '../components/header/KeyMenu.astro';
 import { getUser, getUserHotels } from '@retaha/auth';
 
 interface Props {
@@ -29,18 +30,14 @@ interface Props {
 
 const { title, activeTab, hotelName, hotelLogoUrl } = Astro.props;
 
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${backoffice}/admin/login`);
-}
+if (!user) return Astro.redirect(`${BACKOFFICE}/admin/login`);
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${backoffice}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
 
 const displayName    = hotelName    ?? hotel.name;
 const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : (hotel.logo_primary ?? hotel.logo_dark ?? null);
@@ -75,6 +72,7 @@ const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : (hotel.logo_p
           </div>
 
           <div class="hl-head__controls">
+            <KeyMenu />
             <button class="hl-head__btn" id="hlThemeBtn" type="button" aria-label="Theme wechseln">
               <svg id="hlIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                    width="14" height="14" aria-hidden="true">
