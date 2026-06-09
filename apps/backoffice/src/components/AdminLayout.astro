@@ -99,6 +99,8 @@ const trialTexts = {
   testphaseLabel: t('notification_bell.testphase_label', userLocale),
   daysLabel:      t('notification_bell.days_label', userLocale),
 };
+
+const hotelLogoUrl = hotel.logo_primary ?? hotel.logo_dark ?? hotel.logo_url ?? null;
 ---
 
 <!DOCTYPE html>
@@ -127,9 +129,9 @@ const trialTexts = {
 
         <!-- MITTE: Hotel-Logo oder Fallback auf Hotel-Name -->
         <div class="justify-self-center min-w-0 max-w-md">
-          {(hotel.logo_primary ?? hotel.logo_dark ?? hotel.logo_url) ? (
+          {hotelLogoUrl ? (
             <img
-              src={hotel.logo_primary ?? hotel.logo_dark ?? hotel.logo_url!}
+              src={hotelLogoUrl}
               alt={hotel.name}
               class="h-7 w-auto object-contain"
               style="max-height: 28px;"
@@ -194,7 +196,8 @@ const trialTexts = {
           </form>
         </div>
 
-        <!-- Sprint E3 Phase 1 — Cross-Nav zum Operations-Dashboard (/app) -->
+        <!-- Sprint E3 Phase 1 — Cross-Nav zum Operations-Dashboard (/app)
+             Nach Sprint-F-Monorepo-Split: dashboard.retaha.de (Cross-Domain-Link) -->
         <a
           href="/app"
           class="menu-direct-link"
@@ -203,27 +206,13 @@ const trialTexts = {
           → Operations-Dashboard
         </a>
 
-        <!-- ÜBERSICHT — Dashboard + Gast-Vorschau + Branding -->
+        <!-- ÜBERSICHT — direkter Link, kein Akkordeon -->
         <a
           href="/admin/dashboard"
           class={`menu-direct-link${currentPath === '/admin/dashboard' ? ' is-active' : ''}`}
         >
           {currentPath === '/admin/dashboard' && <span class="active-dot" aria-hidden="true"></span>}
           {t('nav.overview', userLocale)}
-        </a>
-        <a
-          href="/admin/gast-vorschau"
-          class={`menu-direct-link${currentPath === '/admin/gast-vorschau' ? ' is-active' : ''}`}
-        >
-          {currentPath === '/admin/gast-vorschau' && <span class="active-dot" aria-hidden="true"></span>}
-          Gast-Vorschau
-        </a>
-        <a
-          href="/admin/branding"
-          class={`menu-direct-link${currentPath === '/admin/branding' ? ' is-active' : ''}`}
-        >
-          {currentPath === '/admin/branding' && <span class="active-dot" aria-hidden="true"></span>}
-          Branding
         </a>
 
         <!-- GRUPPE: GÄSTE -->
@@ -233,10 +222,6 @@ const trialTexts = {
             <span class="group-chevron" aria-hidden="true">+</span>
           </button>
           <div class="menu-group-items" x-show="expandedGroup === 'gaeste'">
-            <a href="/admin/guests" class={`menu-item${currentPath === '/admin/guests' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/guests' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.guests', userLocale)}
-            </a>
             <a href="/admin/concierge" class={`menu-item${currentPath === '/admin/concierge' ? ' is-active' : ''}`}>
               {currentPath === '/admin/concierge' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.concierge', userLocale)}
@@ -249,6 +234,10 @@ const trialTexts = {
               {currentPath?.startsWith('/admin/places') && <span class="active-dot" aria-hidden="true"></span>}
               Empfehlungen
             </a>
+            <a href="/admin/guests" class={`menu-item${currentPath === '/admin/guests' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/guests' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.guests', userLocale)}
+            </a>
             <a href="/admin/wallet" class={`menu-item${currentPath === '/admin/wallet' ? ' is-active' : ''}`}>
               {currentPath === '/admin/wallet' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.wallet', userLocale)}
@@ -256,20 +245,40 @@ const trialTexts = {
           </div>
         </div>
 
-        <!-- GRUPPE: BETRIEB -->
+        <!-- GRUPPE: BUCHUNGEN & SERVICES -->
         <div class="menu-group">
-          <button type="button" class="menu-group-header" @click="toggle('betrieb')" :class="{ 'is-expanded': expandedGroup === 'betrieb' }" :aria-expanded="expandedGroup === 'betrieb'">
-            <span class="group-label">Betrieb</span>
+          <button type="button" class="menu-group-header" @click="toggle('buchungen')" :class="{ 'is-expanded': expandedGroup === 'buchungen' }" :aria-expanded="expandedGroup === 'buchungen'">
+            <span class="group-label">{t('nav.group_buchungen', userLocale)}</span>
             <span class="group-chevron" aria-hidden="true">+</span>
           </button>
-          <div class="menu-group-items" x-show="expandedGroup === 'betrieb'">
+          <div class="menu-group-items" x-show="expandedGroup === 'buchungen'">
             <a href="/admin/checkins" class={`menu-item${currentPath === '/admin/checkins' ? ' is-active' : ''}`}>
               {currentPath === '/admin/checkins' && <span class="active-dot" aria-hidden="true"></span>}
               Check-ins
             </a>
+            <a href="/admin/feedback" class={`menu-item${currentPath === '/admin/feedback' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/feedback' && <span class="active-dot" aria-hidden="true"></span>}
+              Bewertungen
+            </a>
+            <a href="/admin/nfc-tags" class={`menu-item${currentPath === '/admin/nfc-tags' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/nfc-tags' && <span class="active-dot" aria-hidden="true"></span>}
+              NFC-Tags
+            </a>
+            <a href="/admin/showcase" class={`menu-item${currentPath === '/admin/showcase' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/showcase' && <span class="active-dot" aria-hidden="true"></span>}
+              Showcase
+            </a>
+            <a href="/app/bookings" class="menu-item" title="Im Operations-Dashboard">
+              {t('nav.bookings', userLocale)}
+              <span style="opacity: 0.4; margin-left: 4px; font-size: 10px;">↗</span>
+            </a>
             <a href="/admin/breakfast" class={`menu-item${currentPath === '/admin/breakfast' ? ' is-active' : ''}`}>
               {currentPath === '/admin/breakfast' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.breakfast', userLocale)}
+            </a>
+            <a href="/admin/menu" class={`menu-item${currentPath?.startsWith('/admin/menu') ? ' is-active' : ''}`}>
+              {currentPath?.startsWith('/admin/menu') && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.menu', userLocale)}
             </a>
             <a href="/admin/service" class={`menu-item${currentPath === '/admin/service' ? ' is-active' : ''}`}>
               {currentPath === '/admin/service' && <span class="active-dot" aria-hidden="true"></span>}
@@ -279,37 +288,13 @@ const trialTexts = {
               {currentPath === '/admin/conference' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.conference', userLocale)}
             </a>
-            <a href="/admin/self-checkout" class={`menu-item${currentPath === '/admin/self-checkout' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/self-checkout' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.self_checkout', userLocale)}
+            <a href="/admin/spa" class={`menu-item${currentPath === '/admin/spa' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/spa' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.spa', userLocale)}
             </a>
-            <a href="/admin/nfc-tags" class={`menu-item${currentPath === '/admin/nfc-tags' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/nfc-tags' && <span class="active-dot" aria-hidden="true"></span>}
-              NFC-Tags
-            </a>
-            <a href="/admin/feedback" class={`menu-item${currentPath === '/admin/feedback' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/feedback' && <span class="active-dot" aria-hidden="true"></span>}
-              Bewertungen
-            </a>
-            <a href="/admin/showcase" class={`menu-item${currentPath === '/admin/showcase' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/showcase' && <span class="active-dot" aria-hidden="true"></span>}
-              Showcase
-            </a>
-            <a href="/admin/booking-engine" class={`menu-item${currentPath === '/admin/booking-engine' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/booking-engine' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.booking_engine', userLocale)}
-            </a>
-            <a href="/admin/best-price" class={`menu-item${currentPath === '/admin/best-price' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/best-price' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.best_price', userLocale)}
-            </a>
-            <a href="/admin/booking-recovery" class={`menu-item${currentPath === '/admin/booking-recovery' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/booking-recovery' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.booking_recovery', userLocale)}
-            </a>
-            <a href="/admin/menu" class={`menu-item${currentPath?.startsWith('/admin/menu') ? ' is-active' : ''}`}>
-              {currentPath?.startsWith('/admin/menu') && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.menu', userLocale)}
+            <a href="/admin/restaurant" class={`menu-item${currentPath === '/admin/restaurant' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/restaurant' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.restaurant', userLocale)}
             </a>
           </div>
         </div>
@@ -374,7 +359,63 @@ const trialTexts = {
           </div>
         </div>
 
-        <!-- GRUPPE: EINSTELLUNGEN (inkl. Integrationen) -->
+        <!-- GRUPPE: VERKAUF -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('verkauf')" :class="{ 'is-expanded': expandedGroup === 'verkauf' }" :aria-expanded="expandedGroup === 'verkauf'">
+            <span class="group-label">{t('nav.group_verkauf', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'verkauf'">
+            <a href="/admin/booking-engine" class={`menu-item${currentPath === '/admin/booking-engine' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/booking-engine' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.booking_engine', userLocale)}
+            </a>
+            <a href="/admin/best-price" class={`menu-item${currentPath === '/admin/best-price' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/best-price' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.best_price', userLocale)}
+            </a>
+            <a href="/admin/booking-recovery" class={`menu-item${currentPath === '/admin/booking-recovery' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/booking-recovery' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.booking_recovery', userLocale)}
+            </a>
+            <a href="/admin/self-checkout" class={`menu-item${currentPath === '/admin/self-checkout' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/self-checkout' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.self_checkout', userLocale)}
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: INTEGRATIONEN -->
+        <div class="menu-group">
+          <button type="button" class="menu-group-header" @click="toggle('integrationen')" :class="{ 'is-expanded': expandedGroup === 'integrationen' }" :aria-expanded="expandedGroup === 'integrationen'">
+            <span class="group-label">{t('nav.group_integrationen', userLocale)}</span>
+            <span class="group-chevron" aria-hidden="true">+</span>
+          </button>
+          <div class="menu-group-items" x-show="expandedGroup === 'integrationen'">
+            <a href="/admin/whatsapp" class={`menu-item${currentPath === '/admin/whatsapp' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/whatsapp' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.whatsapp', userLocale)}
+            </a>
+            <a href="/admin/gmb" class={`menu-item${currentPath === '/admin/gmb' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/gmb' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.gmb', userLocale)}
+            </a>
+            <a href="/admin/wallet-keys" class={`menu-item${currentPath === '/admin/wallet-keys' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/wallet-keys' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.wallet_keys', userLocale)}
+            </a>
+            <a href="/admin/pms" class={`menu-item${currentPath === '/admin/pms' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/pms' && <span class="active-dot" aria-hidden="true"></span>}
+              {t('nav.pms', userLocale)}
+            </a>
+            <a href="/admin/email-domain" class={`menu-item${currentPath === '/admin/email-domain' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/email-domain' && <span class="active-dot" aria-hidden="true"></span>}
+              Email-Domain
+            </a>
+          </div>
+        </div>
+
+        <!-- GRUPPE: EINSTELLUNGEN -->
         <div class="menu-group">
           <button type="button" class="menu-group-header" @click="toggle('einstellungen')" :class="{ 'is-expanded': expandedGroup === 'einstellungen' }" :aria-expanded="expandedGroup === 'einstellungen'">
             <span class="group-label">{t('nav.group_einstellungen', userLocale)}</span>
@@ -389,33 +430,13 @@ const trialTexts = {
               {currentPath === '/admin/settings' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.settings', userLocale)}
             </a>
-            <a href="/admin/team" class={`menu-item${currentPath === '/admin/team' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/team' && <span class="active-dot" aria-hidden="true"></span>}
-              Team
-            </a>
-            <a href="/admin/pms" class={`menu-item${currentPath === '/admin/pms' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/pms' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.pms', userLocale)}
-            </a>
-            <a href="/admin/email-domain" class={`menu-item${currentPath === '/admin/email-domain' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/email-domain' && <span class="active-dot" aria-hidden="true"></span>}
-              Email-Domain
-            </a>
-            <a href="/admin/whatsapp" class={`menu-item${currentPath === '/admin/whatsapp' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/whatsapp' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.whatsapp', userLocale)}
-            </a>
-            <a href="/admin/gmb" class={`menu-item${currentPath === '/admin/gmb' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/gmb' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.gmb', userLocale)}
-            </a>
-            <a href="/admin/wallet-keys" class={`menu-item${currentPath === '/admin/wallet-keys' ? ' is-active' : ''}`}>
-              {currentPath === '/admin/wallet-keys' && <span class="active-dot" aria-hidden="true"></span>}
-              {t('nav.wallet_keys', userLocale)}
-            </a>
             <a href="/admin/subscription" class={`menu-item${currentPath === '/admin/subscription' ? ' is-active' : ''}`}>
               {currentPath === '/admin/subscription' && <span class="active-dot" aria-hidden="true"></span>}
               {t('nav.subscription', userLocale)}
+            </a>
+            <a href="/admin/team" class={`menu-item${currentPath === '/admin/team' ? ' is-active' : ''}`}>
+              {currentPath === '/admin/team' && <span class="active-dot" aria-hidden="true"></span>}
+              Team
             </a>
           </div>
         </div>

@@ -33,59 +33,68 @@ const theme: GuestTheme = {
 
   type ModuleKey = keyof PreviewState['modules'];
 
-  // Label → module-key mapping for .ws-action tiles
-  const ACTION_LABEL_MAP: Record<string, ModuleKey> = {
-    'frühstück':  'breakfast',
+  // GuestPhoneView rendert .gate-tile Kacheln (GuestHomeScreen.astro)
+  // Label-Text → module-key
+  const TILE_LABEL_MAP: Record<string, ModuleKey> = {
     'eve':        'eve',
+    'frühstück':  'breakfast',
     'service':    'service',
-    'tipps':      'empfehlungen',
-    'konferenz':  'conference',
-    'checkout':   'self_checkout',
   };
 
-  // Tab text → module-key mapping for .ws-tab bottom tabs
-  const TAB_TEXT_MAP: Record<string, ModuleKey> = {
+  // .gp-tab[data-tab] → module-key (aus GuestPhoneView.astro)
+  const TAB_KEY_MAP: Record<string, ModuleKey> = {
+    'eve':     'eve',
+    'tipps':   'empfehlungen',
+    'service': 'service',
+  };
+
+  // [data-screen] → module-key
+  const SCREEN_KEY_MAP: Record<string, ModuleKey> = {
     'eve':     'eve',
     'tipps':   'empfehlungen',
     'service': 'service',
   };
 
   subscribe(state => {
-    // 1 — Willkommenstext
-    document.querySelectorAll<HTMLElement>('[data-screen="home"] .gate-hero-sub').forEach(el => {
-      el.textContent = state.welcomeText;
-    });
-
-    // 2 — Action-Tiles ein-/ausblenden
-    document.querySelectorAll<HTMLElement>('.ws-action').forEach(tile => {
-      const labelEl = tile.querySelector<HTMLElement>('.ws-action__label');
+    // 1 — Action-Tiles ein-/ausblenden (.gate-tile in GuestHomeScreen)
+    document.querySelectorAll<HTMLElement>('.gate-tile').forEach(tile => {
+      const labelEl = tile.querySelector<HTMLElement>('.gate-tile-label');
       if (!labelEl) return;
       const labelKey = labelEl.textContent?.trim().toLowerCase() ?? '';
-      const moduleKey = ACTION_LABEL_MAP[labelKey];
+      const moduleKey = TILE_LABEL_MAP[labelKey];
       if (moduleKey) {
         const visible = state.modules[moduleKey];
-        tile.style.display = visible ? '' : 'none';
+        tile.style.opacity = visible ? '1' : '0.2';
+        tile.style.pointerEvents = visible ? '' : 'none';
       }
     });
 
-    // 3 — Bottom-Tabs dimmen (nicht verstecken — sonst bricht das Layout)
-    document.querySelectorAll<HTMLElement>('.ws-tab').forEach(tab => {
-      const spanText = tab.querySelector('span')?.textContent?.trim().toLowerCase() ?? '';
-      const moduleKey = TAB_TEXT_MAP[spanText];
+    // 2 — Bottom-Tabs dimmen (.gp-tab in GuestPhoneView)
+    document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(tab => {
+      const key = tab.dataset.tab ?? '';
+      const moduleKey = TAB_KEY_MAP[key];
       if (moduleKey) {
-        tab.style.opacity = state.modules[moduleKey] ? '1' : '0.3';
-        tab.style.pointerEvents = state.modules[moduleKey] ? '' : 'none';
+        const visible = state.modules[moduleKey];
+        tab.style.opacity = visible ? '1' : '0.25';
+        tab.style.pointerEvents = visible ? '' : 'none';
       }
     });
 
-    // 4 — Hero Slider
-    document.querySelectorAll<HTMLElement>('.ws-slider').forEach(slider => {
-      slider.style.display = state.modules.action_cards ? '' : 'none';
-    });
-
-    // 5 — Wallet-Pass (soft card falls vorhanden)
-    document.querySelectorAll<HTMLElement>('.ws-wallet, [data-module="wallet"]').forEach(el => {
-      el.style.display = state.modules.wallet ? '' : 'none';
+    // 3 — Screens ausblenden wenn Modul aus
+    document.querySelectorAll<HTMLElement>('[data-screen]').forEach(screen => {
+      const key = screen.dataset.screen ?? '';
+      const moduleKey = SCREEN_KEY_MAP[key];
+      if (!moduleKey) return;
+      if (!state.modules[moduleKey] && !screen.hidden) {
+        // Wenn aktiver Screen deaktiviert → zurück zu Home
+        screen.hidden = true;
+        const homeScreen = document.querySelector<HTMLElement>('[data-screen="home"]');
+        if (homeScreen) homeScreen.hidden = false;
+        // Home-Tab aktivieren
+        document.querySelectorAll<HTMLButtonElement>('.gp-tab').forEach(t => {
+          t.classList.toggle('gp-tab--active', t.dataset.tab === 'home');
+        });
+      }
     });
   });
 </script>
