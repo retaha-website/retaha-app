@@ -1,0 +1,210 @@
+---
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/tokens.css';
+import '@retaha/ui/styles/global.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui/styles/icons.css';
+import '@retaha/ui/styles/components/buttons.css';
+import '@retaha/ui/styles/components/settings.css';
+
+import HeaderTabs from '../components/header/HeaderTabs.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+interface Props {
+  title: string;
+  activeTab: 'gast' | 'backoffice' | 'admin';
+  hotelName?: string;
+  hotelLogoUrl?: string | null;
+}
+
+const { title, activeTab, hotelName, hotelLogoUrl } = Astro.props;
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) {
+  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${backoffice}/admin/login`);
+}
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) {
+  const backoffice = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+  return Astro.redirect(`${backoffice}/admin/login?error=no_hotel`);
+}
+
+const displayName    = hotelName    ?? hotel.name;
+const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : (hotel.logo_primary ?? hotel.logo_dark ?? null);
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FAFAF8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · retaha</title>
+  </head>
+  <body>
+    <header class="hl-head">
+      <div class="hl-head__inner">
+        <div class="hl-head__top">
+          <a href="https://backoffice.retaha.de/uebersicht" class="hl-head__brand" aria-label="retaha – Zur Übersicht">
+            <svg viewBox="0 0 80 24" fill="currentColor" width="64" height="19" aria-hidden="true">
+              <text x="0" y="18" font-family="'JetBrains Mono', monospace" font-size="16" font-weight="500"
+                    letter-spacing="0.08em" fill="currentColor">retaha</text>
+            </svg>
+          </a>
+
+          <div class="hl-head__hotel">
+            {displayLogoUrl ? (
+              <img class="hl-head__logo" src={displayLogoUrl} alt={displayName} />
+            ) : (
+              <span class="hl-head__hotel-name">{displayName}</span>
+            )}
+          </div>
+
+          <div class="hl-head__controls">
+            <button class="hl-head__btn" id="hlThemeBtn" type="button" aria-label="Theme wechseln">
+              <svg id="hlIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   width="14" height="14" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+              <svg id="hlIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   width="14" height="14" style="display:none;" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <HeaderTabs active={activeTab} />
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <script>
+      const stored = localStorage.getItem('v9-theme');
+      if (stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
+
+    <script>
+      const btn   = document.getElementById('hlThemeBtn');
+      const iconM = document.getElementById('hlIconMoon');
+      const iconS = document.getElementById('hlIconSun');
+      const html  = document.documentElement;
+
+      let theme = localStorage.getItem('v9-theme') || 'light';
+      html.setAttribute('data-theme', theme);
+      if (iconM && iconS) {
+        iconM.style.display = theme === 'light' ? 'block' : 'none';
+        iconS.style.display = theme === 'dark'  ? 'block' : 'none';
+      }
+
+      btn?.addEventListener('click', () => {
+        theme = theme === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', theme);
+        localStorage.setItem('v9-theme', theme);
+        if (iconM && iconS) {
+          iconM.style.display = theme === 'light' ? 'block' : 'none';
+          iconS.style.display = theme === 'dark'  ? 'block' : 'none';
+        }
+      });
+    </script>
+
+    <script>
+      import Alpine from 'alpinejs';
+      import collapse from '@alpinejs/collapse';
+      Alpine.plugin(collapse);
+      // @ts-expect-error
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+  </body>
+</html>
+
+<style>
+  .hl-head {
+    border-bottom: 1px solid var(--border-strong);
+    background: var(--surface);
+  }
+  .hl-head__inner {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .hl-head__top {
+    padding: 16px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .hl-head__top {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 16px 20px;
+      justify-items: start;
+    }
+  }
+  .hl-head__brand {
+    justify-self: start;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .hl-head__hotel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hl-head__logo {
+    max-height: 32px;
+    width: auto;
+  }
+  .hl-head__hotel-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+  }
+  .hl-head__controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-self: end;
+  }
+  .hl-head__btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 150ms ease;
+    border-radius: var(--r-sm);
+  }
+  .hl-head__btn:hover {
+    background: var(--te-yellow);
+    color: #0A0A0A;
+    border-color: var(--te-yellow);
+  }
+</style>

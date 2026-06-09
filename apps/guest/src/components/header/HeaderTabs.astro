@@ -1,0 +1,128 @@
+---
+type TabKey = 'gast' | 'backoffice' | 'admin';
+
+interface Props {
+  active: TabKey;
+}
+
+const { active } = Astro.props;
+
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+const DASHBOARD  = import.meta.env.DASHBOARD_URL  ?? 'https://dashboard.retaha.de';
+
+const tabs = [
+  { key: 'gast'       as const, label: 'gast-ansicht', href: '/gast-vorschau',           icon: 'phone'   },
+  { key: 'backoffice' as const, label: 'backoffice',   href: `${BACKOFFICE}/uebersicht`, icon: 'sliders' },
+  { key: 'admin'      as const, label: 'admin',        href: DASHBOARD,                   icon: 'grid'    },
+];
+---
+
+<nav class="header-tabs" aria-label="Hauptnavigation">
+  {tabs.map(tab => (
+    <a
+      href={tab.href}
+      class:list={['header-tabs__tab', { 'is-active': tab.key === active }]}
+      title={tab.key === active ? 'du bist hier' : `wechsle zu ${tab.label}`}
+      aria-current={tab.key === active ? 'page' : undefined}
+    >
+      {tab.key === active && (
+        <span class="header-tabs__led" aria-hidden="true"></span>
+      )}
+
+      {tab.icon === 'phone' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="2" width="12" height="20" rx="2"/>
+          <line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+      )}
+      {tab.icon === 'sliders' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="4"  y1="21" x2="4"  y2="14"/>
+          <line x1="4"  y1="10" x2="4"  y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/>
+          <line x1="12" y1="8"  x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/>
+          <line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1"  y1="14" x2="7"  y2="14"/>
+          <line x1="9"  y1="8"  x2="15" y2="8"/>
+          <line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+      )}
+      {tab.icon === 'grid' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3"  y="3"  width="7" height="9"/>
+          <rect x="14" y="3"  width="7" height="5"/>
+          <rect x="14" y="12" width="7" height="9"/>
+          <rect x="3"  y="16" width="7" height="5"/>
+        </svg>
+      )}
+      <span>{tab.label}</span>
+    </a>
+  ))}
+</nav>
+
+<style>
+  .header-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 32px;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .header-tabs::-webkit-scrollbar { display: none; }
+
+  @media (max-width: 900px) {
+    .header-tabs { padding: 8px 20px; }
+  }
+
+  .header-tabs__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--ink-muted);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: all 200ms ease;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .header-tabs__tab:hover {
+    color: var(--ink);
+    background: var(--bg-deep);
+  }
+  .header-tabs__tab.is-active {
+    color: var(--ink);
+    background: var(--sage-soft);
+    border-color: var(--sage);
+  }
+  .header-tabs__tab svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .header-tabs__led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sage);
+    box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
+    animation: led-pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes led-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(92,144,112,0.25); }
+    50%       { box-shadow: 0 0 0 5px rgba(92,144,112,0.10); }
+  }
+</style>
