@@ -28,7 +28,7 @@ const {
 
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
 const eveName   = settings.eve_name || 'Eve';
-const welcomeSub = settings.welcome_message_de || 'Schön, dass Sie da sind.';
+const welcomeSub = settings.welcome_message_de || 'Wir freuen uns auf deinen Aufenthalt.';
 const cityLine  = hotel.city || '';
 const hasService    = f.service      !== false && (settings.service_items?.length ?? 0) > 0;
 const hasConference = f.conference   !== false && (settings.conference_rooms?.length ?? 0) > 0;
@@ -140,7 +140,7 @@ const actions = allActions.map((a, i) => ({
   </div>
   <h1 class="ws-hero__title g-title">
     {guest?.first_name
-      ? <Fragment>{greetingName}<span class="ws-hero__comma">,</span><br /><em class="ws-hero__em">schön, dass Sie da sind.</em></Fragment>
+      ? <Fragment>Hallo, {guest.first_name}<span class="g-sig"></span></Fragment>
       : <Fragment>{greetingName}<span class="g-sig"></span></Fragment>
     }
   </h1>
@@ -172,8 +172,8 @@ const actions = allActions.map((a, i) => ({
 <!-- ─── ACTIONS ──────────────────────────────────────────────────────────── -->
 <section class="ws-actions">
   <div class="ws-actions__head">
-    <h2 class="ws-actions__title">Was Sie brauchen</h2>
-    <span class="ws-actions__count">0{actions.length} Wege</span>
+    <h2 class="ws-actions__title">Was du brauchst</h2>
+    <span class="ws-actions__count">{String(actions.length).padStart(2, '0')}</span>
   </div>
   <div class="ws-action-list">
     {actions.map(action => (
@@ -447,19 +447,46 @@ const actions = allActions.map((a, i) => ({
 
   /* ── BAUHAUS overrides ──────────────────────────────────────────────── */
   :global([data-theme="bauhaus"]) .ws-hero__title { font-size: 42px; }
+  :global([data-theme="bauhaus"]) .ws-stay {
+    border: 1px solid var(--guest-border);
+    padding: 14px 16px;
+    background: var(--guest-bg-card);
+    margin-bottom: 8px;
+  }
+  :global([data-theme="bauhaus"]) .ws-divider { display: none; }
+  :global([data-theme="bauhaus"]) .ws-action-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  :global([data-theme="bauhaus"]) .ws-action {
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 108px;
+    padding: 14px;
+    border: 1px solid var(--guest-border);
+    border-bottom: 1px solid var(--guest-border);
+    border-radius: 0;
+    background: var(--guest-bg-card);
+  }
+  :global([data-theme="bauhaus"]) .ws-action:last-child {
+    border-bottom: 1px solid var(--guest-border);
+  }
   :global([data-theme="bauhaus"]) .ws-action__num { display: none; }
-  :global([data-theme="bauhaus"]) .ws-action__icon { display: flex; }
+  :global([data-theme="bauhaus"]) .ws-action__icon {
+    display: flex;
+    align-self: flex-start;
+  }
+  :global([data-theme="bauhaus"]) .ws-action__body { margin-top: 8px; }
   :global([data-theme="bauhaus"]) .ws-action__label {
     font-family: var(--guest-font-mono);
     font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
   }
+  :global([data-theme="bauhaus"]) .ws-action__arrow { display: none; }
   :global([data-theme="bauhaus"]) .ws-action:hover {
     background: var(--guest-hover);
-    padding-left: 8px;
   }
-  :global([data-theme="bauhaus"]) .ws-mark__initial {
-    border-radius: 0;
-  }
+  :global([data-theme="bauhaus"]) .ws-mark__initial { border-radius: 0; }
   :global([data-theme="bauhaus"]) .ws-tab--active::before {
     content: '';
     position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
