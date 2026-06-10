@@ -1,0 +1,39 @@
+# .github/workflows/deploy-production.yml
+# Schema-Deploy nach Production beim Merge auf main.
+# Läuft NUR, wenn sich Migrationen ändern. Reine Doku-/Code-Commits triggern nichts.
+
+name: Deploy migrations to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+
+concurrency:
+  group: prod-db-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PROD_DB_PASSWORD }}
+      PROJECT_ID: twmzhrcadixzcdlupisd   # Production (eu-central-1)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Falls supabase/ NICHT im Repo-Root liegt: hier working-directory ergänzen.
+      - name: Link Production
+        run: supabase link --project-ref "$PROJECT_ID"
+
+      - name: Dry-run (nur Log-Transparenz)
+        run: supabase db push --dry-run
+
+      - name: Push migrations
+        run: supabase db push

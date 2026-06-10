@@ -1,0 +1,28 @@
+# .github/workflows/check-migrations-pr.yml
+# Schutzgate auf Pull Requests: baut die volle Migrationskette von Null neu auf.
+# Bricht eine Migration -> PR-Check rot -> kein Merge. In GitHub als "Required Check" markieren.
+# Läuft komplett lokal auf dem Runner (Docker ist auf GitHub-Runnern vorhanden) -> keine Secrets noetig.
+
+name: Validate migrations (PR)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local stack
+        run: supabase start
+
+      - name: Reset & apply all migrations from scratch
+        run: supabase db reset
