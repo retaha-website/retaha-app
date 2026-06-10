@@ -30,10 +30,10 @@ if (Astro.request.method === 'POST') {
       service_end_time: form.get('service_end_time')?.toString() || '22:00',
       updated_at: new Date().toISOString(),
     };
-    const { data: updatedRows, error } = await client
-      .from('hotel_settings').update(updates).eq('hotel_id', hotel.id).select('hotel_id');
+    const { error } = await client
+      .from('hotel_settings')
+      .upsert({ hotel_id: hotel.id, ...updates }, { onConflict: 'hotel_id' });
     if (error) message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-    else if (!updatedRows || updatedRows.length === 0) message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS)' };
     else message = { type: 'success', text: 'Service-Zeiten gespeichert.' };
 
   } else if (action === 'save_items') {
@@ -42,11 +42,10 @@ if (Astro.request.method === 'POST') {
       try {
         const items = JSON.parse(itemsJson);
         if (!Array.isArray(items)) throw new Error('Items müssen Array sein');
-        const { data: updatedRows, error } = await client
-          .from('hotel_settings').update({ service_items: items, updated_at: new Date().toISOString() })
-          .eq('hotel_id', hotel.id).select('hotel_id');
+        const { error } = await client
+          .from('hotel_settings')
+          .upsert({ hotel_id: hotel.id, service_items: items, updated_at: new Date().toISOString() }, { onConflict: 'hotel_id' });
         if (error) message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-        else if (!updatedRows || updatedRows.length === 0) message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS)' };
         else message = { type: 'success', text: 'Service-Items gespeichert.' };
       } catch (e: any) {
         message = { type: 'error', text: `Ungültige Daten: ${e.message || 'unbekannt'}` };

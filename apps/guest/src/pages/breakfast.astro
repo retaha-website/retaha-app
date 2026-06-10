@@ -77,16 +77,12 @@ if (Astro.request.method === 'POST') {
     updates.breakfast_included_de = includedDefault || null;
   }
 
-  const { data: updatedRows, error } = await client
+  const { error } = await client
     .from('hotel_settings')
-    .update(updates)
-    .eq('hotel_id', hotel.id)
-    .select('hotel_id');
+    .upsert({ hotel_id: hotel.id, ...updates }, { onConflict: 'hotel_id' });
 
   if (error) {
     message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-  } else if (!updatedRows || updatedRows.length === 0) {
-    message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS) oder Eintrag nicht gefunden' };
   } else {
     message = { type: 'success', text: 'Frühstücks-Einstellungen gespeichert.' };
   }
