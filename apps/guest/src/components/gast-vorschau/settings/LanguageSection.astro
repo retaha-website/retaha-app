@@ -50,6 +50,7 @@ const LANGUAGES = [
     })}
   </div>
   <p class="lang-hint">gäste können in der app zwischen diesen sprachen wechseln.</p>
+  <p id="langLimitMsg" class="lang-limit-msg" hidden>Maximal 6 Sprachen – bitte wähle eine ab, um eine weitere hinzuzufügen.</p>
 
   <div class="default-lang-row">
     <label class="default-lang-label" for="defaultLang">standard</label>
@@ -172,6 +173,16 @@ const LANGUAGES = [
   }
   .lang-save-status[data-state="saved"]  { color: #5C9070; } /* Sage */
   .lang-save-status[data-state="error"]  { color: #C0392B; }
+
+  .lang-limit-msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.06em;
+    color: #8C2128;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-left: 2px solid #8C2128;
+    background: rgba(140, 33, 40, 0.05);
+  }
 </style>
 
 <script>
@@ -182,6 +193,11 @@ const LANGUAGES = [
   const defaultSel  = document.getElementById('defaultLang') as HTMLSelectElement;
   const saveBtn     = document.getElementById('langSaveBtn') as HTMLButtonElement;
   const statusEl    = document.getElementById('langSaveStatus') as HTMLElement;
+  const limitMsg    = document.getElementById('langLimitMsg') as HTMLElement;
+
+  function showLimit(show: boolean) {
+    limitMsg.hidden = !show;
+  }
 
   const HOTEL_ID = saveBtn?.dataset.hotelId ?? '';
 
@@ -238,6 +254,12 @@ const LANGUAGES = [
       const active = getActive();
       // Mindestens 1 Sprache muss aktiv bleiben
       if (input.checked && active.length <= 1) return;
+      // Maximal 6 Sprachen
+      if (!input.checked && active.length >= 6) {
+        showLimit(true);
+        return;
+      }
+      showLimit(false);
 
       input.checked = !input.checked;
       pill.classList.toggle('is-active', input.checked);
@@ -283,7 +305,12 @@ const LANGUAGES = [
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[lang-section] save error', msg);
-      setStatus('error', `Fehler: ${msg}`);
+      const isLimit = msg.includes('check_enabled_languages_count') || msg.includes('violates check constraint') || msg.includes('Maximal 6');
+      if (isLimit) {
+        showLimit(true);
+      } else {
+        setStatus('error', `Fehler: ${msg}`);
+      }
       saveBtn.disabled = false;
     } finally {
       delete saveBtn.dataset.loading;

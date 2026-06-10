@@ -33,6 +33,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (!Array.isArray(enabledLanguages) || enabledLanguages.length === 0) {
     return json({ ok: false, error: 'Mindestens 1 Sprache erforderlich' }, 400);
   }
+  if (enabledLanguages.length > 6) {
+    return json({ ok: false, error: 'Maximal 6 Sprachen – bitte wähle eine ab, um eine weitere hinzuzufügen.' }, 400);
+  }
   if (enabledLanguages.some(l => !SUPPORTED.includes(l))) {
     return json({ ok: false, error: 'Ungültiger Sprachcode' }, 400);
   }

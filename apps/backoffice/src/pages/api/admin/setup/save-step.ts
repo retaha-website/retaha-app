@@ -46,7 +46,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       const def = String(data.default_language ?? 'de');
       const enabled = Array.isArray(data.enabled_languages) ? data.enabled_languages : ['de','en','fr','es'];
       if (!VALID_LANGS.includes(def)) return json({ ok: false, error: 'invalid_default_language' }, 400);
-      if (!enabled.includes(def) || enabled.length === 0 || enabled.length > 4) {
+      if (!enabled.includes(def) || enabled.length === 0 || enabled.length > 6) {
         return json({ ok: false, error: 'invalid_enabled_languages' }, 400);
       }
       await admin.from('hotels').update({ default_language: def, enabled_languages: enabled }).eq('id', hotel.id);
