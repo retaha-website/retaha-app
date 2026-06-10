@@ -28,16 +28,12 @@ if (Astro.request.method === 'POST') {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: updatedRows, error } = await client
+    const { error } = await client
       .from('hotel_settings')
-      .update(updates)
-      .eq('hotel_id', hotel.id)
-      .select('hotel_id');
+      .upsert({ hotel_id: hotel.id, ...updates }, { onConflict: 'hotel_id' });
 
     if (error) {
       message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-    } else if (!updatedRows || updatedRows.length === 0) {
-      message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS)' };
     } else {
       message = { type: 'success', text: 'Service-Zeiten gespeichert.' };
     }
@@ -48,16 +44,12 @@ if (Astro.request.method === 'POST') {
         const items = JSON.parse(itemsJson);
         if (!Array.isArray(items)) throw new Error('Items müssen Array sein');
 
-        const { data: updatedRows, error } = await client
+        const { error } = await client
           .from('hotel_settings')
-          .update({ service_items: items, updated_at: new Date().toISOString() })
-          .eq('hotel_id', hotel.id)
-          .select('hotel_id');
+          .upsert({ hotel_id: hotel.id, service_items: items, updated_at: new Date().toISOString() }, { onConflict: 'hotel_id' });
 
         if (error) {
           message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-        } else if (!updatedRows || updatedRows.length === 0) {
-          message = { type: 'error', text: 'Speichern fehlgeschlagen: keine Berechtigung (RLS)' };
         } else {
           message = { type: 'success', text: 'Service-Items gespeichert.' };
         }
