@@ -106,7 +106,13 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     )}
 
     <div class="ac-actions-row">
-      <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">+ Neue Karte</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">+ Neue Karte</button>
+        <button type="button" @click="loadExamples()" :disabled="isLoadingExamples" class="ac-btn ac-btn--ghost">
+          <span x-show="!isLoadingExamples">Beispiele laden</span>
+          <span x-show="isLoadingExamples" x-cloak>Lädt…</span>
+        </button>
+      </div>
       <span class="ac-counter">{cardList.length} {cardList.length === 1 ? 'Karte' : 'Karten'}</span>
     </div>
 
@@ -461,6 +467,24 @@ const CARD_TYPE_LABELS: Record<string, string> = {
         if (!data.ok) { this.showToast(data.error || 'Löschen fehlgeschlagen', 'error'); return; }
         this.showToast('Gelöscht.', 'success');
         setTimeout(() => window.location.reload(), 400);
+      },
+
+      isLoadingExamples: false,
+
+      async loadExamples() {
+        if (!confirm('3 Beispielkarten hinzufügen? (Frühstück, Tipps, Wallet-Pass — editierbar und löschbar)')) return;
+        this.isLoadingExamples = true;
+        try {
+          const res = await fetch('/api/admin/action-cards/seed-examples', { method: 'POST' });
+          const data = await res.json();
+          if (!data.ok) { this.showToast(data.error || 'Beispiele laden fehlgeschlagen', 'error'); return; }
+          this.showToast('3 Beispielkarten hinzugefügt.', 'success');
+          setTimeout(() => window.location.reload(), 600);
+        } catch (err: any) {
+          this.showToast(`Netzwerk-Fehler: ${err.message ?? err}`, 'error');
+        } finally {
+          this.isLoadingExamples = false;
+        }
       },
 
       showToast(text: string, type: 'success' | 'error') {
