@@ -52,6 +52,7 @@ const { data: cards, error: cardsError } = await client
 if (cardsError) console.error('[action-cards] hotel_action_cards query error', { hotelId: hotel.id, error: cardsError });
 const cardList = (cards ?? []) as any[];
 const overFive = cardList.length > 5;
+const hasDefaultCards = cardList.some((c: any) => c.is_default === true);
 
 // pickI18n-Helper inline (Hotelier-Default für Listen/Preview)
 function pickI18n(value: any, lang: string, fallbackLang: string = 'de'): string {
@@ -90,6 +91,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       hotelId: hotel.id,
       defaultLang: hotelDefaultLang,
       cards: cardList,
+      hasDefaultCards: hasDefaultCards,
       internalActions: INTERNAL_ACTIONS,
       cardClasses: CARD_CLASSES,
       typeLabels: CARD_TYPE_LABELS,
@@ -111,7 +113,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     <div class="ac-actions-row">
       <div style="display:flex;gap:8px;align-items:center">
         <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">+ Neue Karte</button>
-        <button type="button" @click="loadExamples()" :disabled="isLoadingExamples" class="ac-btn ac-btn--ghost">
+        <button type="button" @click="loadExamples()" :disabled="isLoadingExamples" x-show="!hasDefaultCards" class="ac-btn ac-btn--ghost">
           <span x-show="!isLoadingExamples">Beispiele laden</span>
           <span x-show="isLoadingExamples" x-cloak>Lädt…</span>
         </button>
@@ -336,6 +338,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       hotelId: initial.hotelId,
       defaultLang: initial.defaultLang as string,
       cards: initial.cards,
+      hasDefaultCards: initial.hasDefaultCards as boolean,
       internalActions: initial.internalActions,
       cardClasses: initial.cardClasses,
       typeLabels: initial.typeLabels,
@@ -481,8 +484,14 @@ const CARD_TYPE_LABELS: Record<string, string> = {
           const res = await fetch('/api/admin/action-cards/seed-examples', { method: 'POST' });
           const data = await res.json();
           if (!data.ok) { this.showToast(data.error || 'Beispiele laden fehlgeschlagen', 'error'); return; }
-          this.showToast('3 Beispielkarten hinzugefügt.', 'success');
-          setTimeout(() => window.location.reload(), 600);
+          const n: number = data.inserted ?? 0;
+          this.hasDefaultCards = true;
+          if (n > 0) {
+            this.showToast(`${n} Beispielkarten hinzugefügt.`, 'success');
+            setTimeout(() => window.location.reload(), 600);
+          } else {
+            this.showToast('Beispiele bereits vorhanden.', 'success');
+          }
         } catch (err: any) {
           this.showToast(`Netzwerk-Fehler: ${err.message ?? err}`, 'error');
         } finally {
