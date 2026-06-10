@@ -1,5 +1,6 @@
 ---
 import Sheet from '../Sheet.astro';
+import QRCode from 'qrcode';
 
 interface Props {
   hotelId: string;
@@ -9,6 +10,14 @@ interface Props {
   lang: 'de' | 'en' | 'fr' | 'es';
 }
 const { hotelId, ssid, password, speedMbits, lang } = Astro.props;
+
+// Generate QR inline — no separate API call needed
+const escapeWifi = (s: string) => s.replace(/([\\;,":])/g, '\\$1');
+const qrDataUrl: string | null = ssid ? await QRCode.toDataURL(
+  `WIFI:T:WPA;S:${escapeWifi(ssid)};P:${escapeWifi(password ?? '')};;`,
+  { errorCorrectionLevel: 'M', margin: 2, width: 200,
+    color: { dark: '#1A1A1A', light: '#FFFFFF' } }
+).catch(() => null) : null;
 
 const labels = {
   de: {
@@ -115,12 +124,14 @@ const l = labels[lang];
     </div>
 
     <!-- QR section -->
-    <div class="ws-wifi__qr">
-      <p class="ws-wifi__qr-hint">{l.qrHint}</p>
-      <div class="ws-wifi__qr-frame">
-        <img src={`/api/qr/wifi/${hotelId}`} alt="WiFi QR Code" width="160" height="160" />
+    {qrDataUrl && (
+      <div class="ws-wifi__qr">
+        <p class="ws-wifi__qr-hint">{l.qrHint}</p>
+        <div class="ws-wifi__qr-frame">
+          <img src={qrDataUrl} alt="WiFi QR Code" width="160" height="160" />
+        </div>
       </div>
-    </div>
+    )}
 
   </div>
 </Sheet>

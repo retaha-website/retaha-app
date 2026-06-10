@@ -322,7 +322,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     padding: 7px 11px;
     cursor: pointer;
     font-family: var(--bh-mono); font-size: 10px; letter-spacing: 0.08em;
-    transition: all 0.2s;
+    transition: all var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
   }
   .bh-root :global(.globe-btn:hover) { background: var(--hover); border-color: var(--hover); }
   .bh-root :global(.globe-btn svg) { width: 15px; height: 15px; }
@@ -434,11 +434,13 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     border-radius: var(--bh-radius);
     overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform var(--dur-fast, 240ms) var(--ease-spring, cubic-bezier(0.34,1.3,0.64,1)),
+                border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
     text-align: left;
     padding: 0;
   }
   .bh-hcard:hover { transform: translateY(-2px); border-color: var(--hover); }
+  .bh-hcard:active { transform: scale(0.97) !important; transition-duration: 90ms !important; }
 
   .bh-hcard__img {
     aspect-ratio: 4/3;
@@ -470,11 +472,15 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
   .bh-tile {
     background: var(--bh-surface); border: 1px solid var(--bh-border);
     border-radius: var(--bh-radius); padding: 14px 10px 12px;
-    cursor: pointer; transition: background 0.2s, border-color 0.2s;
+    cursor: pointer;
+    transition: background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
+                border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
+                transform var(--dur-fast, 240ms) var(--ease-spring, cubic-bezier(0.34,1.3,0.64,1));
     display: flex; flex-direction: column; gap: 8px; min-height: 84px;
     text-align: left;
   }
   .bh-tile:hover { background: var(--hover); border-color: var(--hover); }
+  .bh-tile:active { transform: scale(0.97) !important; transition-duration: 90ms !important; }
   .bh-tile__icon { width: 19px; height: 19px; display: flex; align-items: center; }
   .bh-tile__icon svg { width: 19px; height: 19px; stroke: var(--bh-ink); }
   .bh-tile__label {
@@ -570,5 +576,20 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     .bh-sun__rays i { animation: none; transform: rotate(var(--ray-rot, 0deg)) scaleY(1); }
     .bh-wxg-drift, .bh-wxg-drift1, .bh-wxg-drift2,
     .bh-wxg-drop, .bh-wxg-bolt, .bh-wxg-flake, .bh-wxg-fog { animation: none; opacity: 1; }
+    .bh-head, .bh-readout, .bh-readout-rule, .bh-greet, .bh-hero, .bh-grid,
+    .bh-sec-label { animation: none; opacity: 1; }
+  }
+
+  /* ── Page entrance — sections rise and fade in, staggered ──────────────── */
+  .bh-head        { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 0ms   both; }
+  .bh-readout,
+  .bh-readout-rule { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 60ms  both; }
+  .bh-greet       { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 120ms both; }
+  .bh-hero        { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 180ms both; }
+  .bh-sec-label,
+  .bh-grid        { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 240ms both; }
+  @keyframes bh-page-in {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
   }
 </style>

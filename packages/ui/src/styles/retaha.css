@@ -257,7 +257,7 @@ body.gate-guest {
   align-items: flex-end;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--dur-med, 420ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
   pointer-events: none;
 }
 .sheet-overlay.open {
@@ -274,13 +274,25 @@ body.gate-guest {
   padding: 0;
   position: relative;
   transform: translateY(100%);
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--dur-med, 420ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 .sheet-overlay.open .sheet {
   transform: translateY(0);
+}
+
+/* Sheet content choreography — header + body stagger in after sheet slides up */
+.sheet-overlay.open .sheet-header {
+  animation: sheet-content-in var(--dur-med, 420ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 80ms both;
+}
+.sheet-overlay.open .sheet-body {
+  animation: sheet-content-in var(--dur-med, 420ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 130ms both;
+}
+@keyframes sheet-content-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
 }
 .sheet.dragging {
   transition: none;
