@@ -1,0 +1,222 @@
+---
+import '../../styles/guest-base.css';
+import LanguageOverlay from './shared/LanguageOverlay.astro';
+import ContextLine from './shared/ContextLine.astro';
+import StayLine from './shared/StayLine.astro';
+import HeroSlider from '../HeroSlider.astro';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  checkInLabel: string;
+  checkOutLabel: string;
+  heroCards: any[];
+  f: any;
+  actions: any[];
+  weather?: { temp: number; emoji: string } | null;
+  persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, token, lang,
+  hotelEnabledLangs, checkInLabel, checkOutLabel,
+  heroCards = [], f, actions, weather, persona = 'in_house',
+} = Astro.props;
+
+const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
+const name = guest?.first_name ?? hotel.name;
+---
+
+<!-- HEADER -->
+<header class="ed-head">
+  <div class="ed-mark">
+    {hotelLogoDark ? (
+      <img class="ed-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+    ) : (
+      <span class="ed-mark__name">{hotel.name}</span>
+    )}
+  </div>
+  <LanguageOverlay lang={lang} hotelEnabledLangs={hotelEnabledLangs} token={token} />
+</header>
+
+<!-- DATELINE: italic city + date + weather -->
+<ContextLine date={new Date()} lang={lang} weather={weather} variant="dateline" city={hotel.city} />
+
+<!-- GREETING: Cormorant italic, offset -->
+<section class="ed-hero">
+  <h1 class="ed-hero__title">
+    <span class="ed-hero__hi">Hallo,</span>
+    <span class="ed-hero__name">{name}<span class="ed-hero__dot">.</span></span>
+  </h1>
+  <div class="ed-hero__stay-wrap">
+    <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} />
+    <div class="ed-hero__rule"></div>
+  </div>
+</section>
+
+<!-- HERO SLIDER: 1 large card per view -->
+{showHeroSlider && (
+  <div class="ed-slider-wrap">
+    <HeroSlider cards={heroCards} language={lang} />
+  </div>
+)}
+
+<!-- MODULE INDEX-LIST (Inhaltsverzeichnis-Stil) -->
+<section class="ed-index">
+  {actions.map(action => (
+    <button class="ed-index__item" type="button" @click={action.handler}>
+      <span class="ed-index__num">{action.num}</span>
+      <span class="ed-index__label">{action.label}</span>
+      <span class="ed-index__sub">{action.sub}</span>
+      <span class="ed-index__arrow">→</span>
+    </button>
+  ))}
+</section>
+
+<style>
+  /* ── Header ──────────────────────────────────────────────────────────── */
+  .ed-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px 10px;
+  }
+  .ed-mark { display: flex; align-items: center; }
+  .ed-mark__logo { height: 24px; width: auto; max-width: 100px; object-fit: contain; }
+  .ed-mark__name {
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--guest-ink);
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Greeting ────────────────────────────────────────────────────────── */
+  .ed-hero {
+    padding: 4px 24px 0;
+  }
+  .ed-hero__title {
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-weight: 400;
+    color: var(--guest-ink);
+    margin: 0 0 12px;
+    line-height: 1.05;
+  }
+  .ed-hero__hi {
+    display: block;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    color: var(--guest-ink-muted);
+    margin-bottom: 2px;
+  }
+  .ed-hero__name {
+    display: block;
+    font-size: 46px;
+    letter-spacing: -0.025em;
+    /* Asymmetrischer Versatz — Magazin-Headline-Stil */
+    margin-left: 18px;
+  }
+  .ed-hero__dot { color: var(--guest-accent); }
+  .ed-hero__stay-wrap {
+    margin-top: 2px;
+  }
+  .ed-hero__rule {
+    height: 1px;
+    background: var(--guest-border);
+    margin: 10px 0 0;
+    width: 60%;
+  }
+
+  /* ── Slider: 1 large card per view ──────────────────────────────────── */
+  .ed-slider-wrap {
+    margin: 20px 0 8px;
+  }
+  .ed-slider-wrap :global(.hero-slider__track) {
+    padding: 4px 24px;
+  }
+  .ed-slider-wrap :global(.hero-slider__card) {
+    flex: 0 0 85%;
+    border: none;
+    border-bottom: 1px solid var(--guest-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .ed-slider-wrap :global(.hero-slider__image) {
+    aspect-ratio: 16/9;
+  }
+  .ed-slider-wrap :global(.hero-slider__body) {
+    padding: 10px 4px 14px;
+  }
+  .ed-slider-wrap :global(.hero-slider__eyebrow) {
+    color: var(--guest-accent);
+    font-style: italic;
+  }
+  .ed-slider-wrap :global(.hero-slider__title) {
+    font-style: italic;
+    font-size: 19px;
+    font-weight: 400;
+  }
+
+  /* ── Index-Liste ─────────────────────────────────────────────────────── */
+  .ed-index {
+    padding: 8px 24px 40px;
+  }
+  .ed-index__item {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--guest-border);
+    cursor: pointer;
+    text-align: left;
+    transition: color 150ms;
+    color: var(--guest-ink);
+  }
+  .ed-index__item:last-child { border-bottom: none; }
+  .ed-index__item:hover .ed-index__label { color: var(--guest-accent); }
+  .ed-index__item:hover .ed-index__arrow { transform: translateX(4px); }
+  .ed-index__num {
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 16px;
+    color: var(--guest-accent);
+    min-width: 24px;
+    flex-shrink: 0;
+  }
+  .ed-index__label {
+    font-family: var(--guest-font-display);
+    font-size: 19px;
+    font-weight: 500;
+    font-style: italic;
+    letter-spacing: -0.005em;
+    flex: 1;
+    transition: color 150ms;
+  }
+  .ed-index__sub {
+    font-family: var(--guest-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--guest-ink-faint);
+    flex-shrink: 0;
+  }
+  .ed-index__arrow {
+    color: var(--guest-accent);
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-size: 20px;
+    flex-shrink: 0;
+    transition: transform 150ms;
+  }
+</style>

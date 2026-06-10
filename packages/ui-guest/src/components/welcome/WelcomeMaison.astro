@@ -1,0 +1,225 @@
+---
+import '../../styles/guest-base.css';
+import LanguageOverlay from './shared/LanguageOverlay.astro';
+import ContextLine from './shared/ContextLine.astro';
+import StayLine from './shared/StayLine.astro';
+import HeroSlider from '../HeroSlider.astro';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  checkInLabel: string;
+  checkOutLabel: string;
+  heroCards: any[];
+  f: any;
+  actions: any[];
+  weather?: { temp: number; emoji: string } | null;
+  persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, token, lang,
+  hotelEnabledLangs, checkInLabel, checkOutLabel,
+  heroCards = [], f, actions, weather, persona = 'in_house',
+} = Astro.props;
+
+const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
+const name = guest?.first_name ?? hotel.name;
+---
+
+<!-- HEADER: centered logo, globe top-right -->
+<header class="ma-head">
+  <div class="ma-head__globe-slot">
+    <LanguageOverlay lang={lang} hotelEnabledLangs={hotelEnabledLangs} token={token} />
+  </div>
+  <div class="ma-mark">
+    {hotelLogoDark ? (
+      <img class="ma-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+    ) : (
+      <div class="ma-mark__name">{hotel.name}</div>
+    )}
+  </div>
+</header>
+
+<!-- CONTEXT: 2 lines centered (invitation variant) -->
+<ContextLine date={new Date()} lang={lang} weather={weather} variant="invitation" />
+
+<!-- GOLD DIAMOND ORNAMENT -->
+<div class="ma-ornament" aria-hidden="true">◆</div>
+
+<!-- GREETING: uppercase, letter-spacing, centered -->
+<section class="ma-hero">
+  <h1 class="ma-hero__title">
+    <span class="ma-hero__hi">Willkommen</span>
+    <span class="ma-hero__name">{name}</span>
+  </h1>
+  <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} align="center" />
+</section>
+
+<!-- HERO SLIDER: 1 centered card with gold border -->
+{showHeroSlider && (
+  <div class="ma-slider-wrap">
+    <HeroSlider cards={heroCards} language={lang} />
+  </div>
+)}
+
+<!-- ACTION GRID: 2 columns, generous space -->
+<section class="ma-actions">
+  <div class="ma-grid">
+    {actions.map(action => (
+      <button class="ma-tile" type="button" @click={action.handler}>
+        <span class="ma-tile__num">{action.num}</span>
+        <span class="ma-tile__label">{action.label}</span>
+        <span class="ma-tile__sub">{action.sub}</span>
+      </button>
+    ))}
+  </div>
+</section>
+
+<style>
+  /* ── Header: centered + globe top-right ─────────────────────────────── */
+  .ma-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 24px 10px;
+    position: relative;
+  }
+  .ma-head__globe-slot {
+    position: absolute;
+    top: 14px;
+    right: 20px;
+  }
+  .ma-mark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+  }
+  .ma-mark__logo { height: 32px; width: auto; max-width: 110px; object-fit: contain; }
+  .ma-mark__name {
+    font-family: var(--guest-font-display);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--guest-ink);
+    text-align: center;
+  }
+
+  /* ── Gold diamond ornament ───────────────────────────────────────────── */
+  .ma-ornament {
+    text-align: center;
+    font-size: 10px;
+    color: var(--guest-accent);
+    letter-spacing: 0.2em;
+    padding: 0 0 8px;
+  }
+
+  /* ── Greeting: uppercase, letter-spacing, centered ──────────────────── */
+  .ma-hero {
+    text-align: center;
+    padding: 8px 24px 16px;
+  }
+  .ma-hero__title {
+    margin: 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .ma-hero__hi {
+    font-family: var(--guest-font-display);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--guest-ink-muted);
+  }
+  .ma-hero__name {
+    font-family: var(--guest-font-display);
+    font-size: 36px;
+    font-weight: var(--guest-display-weight);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--guest-ink);
+    line-height: 1.1;
+  }
+
+  /* ── Slider: 1 centered card, gold border ───────────────────────────── */
+  .ma-slider-wrap {
+    margin: 16px 0;
+  }
+  .ma-slider-wrap :global(.hero-slider__track) {
+    padding: 4px 24px;
+    justify-content: center;
+  }
+  .ma-slider-wrap :global(.hero-slider__card) {
+    flex: 0 0 88%;
+    border-color: var(--guest-accent);
+    text-align: center;
+  }
+  .ma-slider-wrap :global(.hero-slider__title) {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 16px;
+  }
+  .ma-slider-wrap :global(.hero-slider__cta)::before {
+    content: '◆ ';
+    font-size: 8px;
+  }
+
+  /* ── Action grid: 2 columns, generous space ─────────────────────────── */
+  .ma-actions {
+    padding: 16px 24px 40px;
+  }
+  .ma-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .ma-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 20px 12px;
+    border: 1px solid var(--guest-border);
+    background: var(--guest-bg-card);
+    border-radius: var(--guest-radius);
+    cursor: pointer;
+    text-align: center;
+    transition: background 200ms, border-color 200ms;
+    min-height: 90px;
+  }
+  .ma-tile:hover {
+    background: var(--guest-accent-soft);
+    border-color: var(--guest-accent);
+  }
+  .ma-tile__num {
+    font-family: var(--guest-font-display);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--guest-accent);
+  }
+  .ma-tile__label {
+    font-family: var(--guest-font-display);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--guest-ink);
+  }
+  .ma-tile__sub {
+    font-family: var(--guest-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--guest-ink-faint);
+    text-transform: uppercase;
+  }
+</style>

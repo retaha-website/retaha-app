@@ -2,6 +2,7 @@
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import WeatherIcon from '../../components/WeatherIcon.astro';
+import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
 import WifiSheet from '../../components/sheets/WifiSheet.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
@@ -240,6 +241,11 @@ const [{ data: hotelGeoRow }, { data: placePicksRows }, { data: nearbyRows }] = 
 const placesHotelLat = (hotelGeoRow?.latitude as number | null) ?? null;
 const placesHotelLng = (hotelGeoRow?.longitude as number | null) ?? null;
 const hotelHeroBg   = (hotelGeoRow?.splash_background as string | null) ?? (hotel as any).splash_background ?? null;
+
+// Weather — Open-Meteo (1h in-memory cache), Fallback null
+const weather = (placesHotelLat && placesHotelLng)
+  ? await fetchWeather(placesHotelLat, placesHotelLng)
+  : null;
 const hotelLogoDark = (hotelGeoRow?.logo_dark as string | null) ?? (hotelGeoRow?.logo_primary as string | null) ?? (hotel as any).logo_dark ?? (hotel as any).logo_primary ?? null;
 const placesPicks = (placePicksRows ?? []) as any[];
 const placesNearby = (nearbyRows ?? []) as any[];
@@ -362,11 +368,7 @@ const recs = (actionCardsRows ?? []).map((card: any) => ({
   icon: defaultIconForType(card.card_type),
 }));
 
-const weather = {
-  temperature: 21,
-  iconType: 'partly' as 'sun' | 'partly' | 'cloud' | 'rain' | 'night',
-  labelKey: 'weather.partly' as const,
-};
+// (weather placeholder removed — replaced by fetchWeather above)
 
 const f = (settings as any).features ?? {};
 
@@ -433,6 +435,12 @@ if (stayEnded) {
   hasStayFeedback = !!existingFb;
 }
 const showPostStay = stayEnded && !hasStayFeedback;
+
+// Stay-Persona für Welcome-Screen (pre_arrival / in_house / checking_out)
+const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
+  Date.parse(stay.check_in) > Date.now() ? 'pre_arrival' :
+  new Date(stay.check_out).toDateString() === new Date().toDateString() ? 'checking_out' :
+  'in_house';
 ---
 
 <!DOCTYPE html>
@@ -466,6 +474,8 @@ const showPostStay = stayEnded && !hasStayFeedback;
           f={f}
           walletAvailable={walletAvailable}
           roomLabel={t('hero.stay.room', lang as Lang)}
+          weather={weather}
+          persona={stayPersona}
         />
       )}
 
@@ -542,13 +552,14 @@ const showPostStay = stayEnded && !hasStayFeedback;
           <div class="gate-recommend-eyebrow themed-eyebrow-flank">{t('concierge.eyebrow', lang).replace('{name}', settings.eve_name || 'das Team')}</div>
           <p class="gate-recommend-text">{t('concierge.text.default', lang)}</p>
         </div>
-        <div class="gate-recommend-weather">
-          <WeatherIcon type={weather.iconType} />
-          <span class="weather-readout">
-            <span class="weather-readout-temp">{weather.temperature}°</span>
-            <span class="weather-readout-label">{t(weather.labelKey, lang)}</span>
-          </span>
-        </div>
+        {weather && (
+          <div class="gate-recommend-weather">
+            <span class="weather-readout">
+              <span class="weather-readout-temp">{weather.temp}°C</span>
+              <span class="weather-readout-label">{weather.emoji}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       <!-- RECOMMENDATION SLIDER -->

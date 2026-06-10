@@ -1,0 +1,49 @@
+---
+interface Props {
+  persona: 'pre_arrival' | 'in_house' | 'checking_out';
+  room: any;
+  checkInLabel: string;
+  checkOutLabel: string;
+  lang: string;
+  align?: 'left' | 'center';
+}
+
+const { persona, room, checkInLabel, checkOutLabel, lang, align = 'left' } = Astro.props;
+
+type L = 'de' | 'en' | 'fr' | 'es';
+const T: Record<string, Record<L, string>> = {
+  room:     { de: 'Zimmer', en: 'Room', fr: 'Chambre', es: 'Hab.' },
+  until:    { de: 'bis', en: 'until', fr: "jusqu'au", es: 'hasta' },
+  arrival:  { de: 'Anreise', en: 'Arrival', fr: 'Arrivée', es: 'Llegada' },
+  checkout: { de: 'Abreise heute', en: 'Checking out today', fr: 'Départ aujourd\'hui', es: 'Salida hoy' },
+};
+const l = (['de','en','fr','es'].includes(lang) ? lang : 'de') as L;
+
+let text = '';
+if (persona === 'pre_arrival') {
+  text = `${T.arrival[l]} ${checkInLabel}`;
+} else if (persona === 'checking_out') {
+  text = T.checkout[l];
+} else {
+  const roomPart = room?.room_number ? `${T.room[l]} ${room.room_number} · ` : '';
+  text = `${roomPart}${T.until[l]} ${checkOutLabel}`;
+}
+---
+
+<div class={`stay-line stay-line--${align}`}>
+  <span class="stay-line__text">{text}</span>
+</div>
+
+<style>
+  .stay-line {
+    padding: 0 24px;
+  }
+  .stay-line--center { text-align: center; }
+  .stay-line__text {
+    font-family: var(--guest-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--guest-ink-faint);
+  }
+</style>

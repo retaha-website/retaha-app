@@ -1,0 +1,150 @@
+---
+interface Props {
+  lang: string;
+  hotelEnabledLangs: string[];
+  token: string;
+}
+
+const { lang, hotelEnabledLangs, token } = Astro.props;
+
+const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
+const LANG_NAMES: Record<string, string> = {
+  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
+  it: 'Italiano', nl: 'Nederlands', pt: 'Português', pl: 'Polski',
+};
+---
+
+<button class="lang-globe" id="langGlobeBtn" type="button" aria-label="Sprache wählen" aria-expanded="false">
+  <svg class="lang-globe__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12 15.3 15.3 0 0 1 12 2z"/>
+  </svg>
+  <span class="lang-globe__code">{lang.toUpperCase()}</span>
+</button>
+
+<div class="lang-overlay" id="langOverlay" hidden aria-modal="true" role="dialog">
+  <div class="lang-overlay__backdrop" id="langOverlayBackdrop"></div>
+  <div class="lang-overlay__sheet">
+    <p class="lang-overlay__label">Sprache</p>
+    <div class="lang-overlay__grid">
+      {hotelEnabledLangs.map(l => (
+        <a
+          href={switchUrl(l)}
+          class={`lang-overlay__item ${lang === l ? 'is-active' : ''}`}
+          aria-current={lang === l ? 'true' : undefined}
+        >
+          <span class="lang-overlay__code">{l.toUpperCase()}</span>
+          <span class="lang-overlay__name">{LANG_NAMES[l] ?? l}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+</div>
+
+<script>
+  const btn     = document.getElementById('langGlobeBtn');
+  const overlay = document.getElementById('langOverlay');
+  const backdrop = document.getElementById('langOverlayBackdrop');
+
+  function open() {
+    overlay?.removeAttribute('hidden');
+    btn?.setAttribute('aria-expanded', 'true');
+  }
+  function close() {
+    overlay?.setAttribute('hidden', '');
+    btn?.setAttribute('aria-expanded', 'false');
+  }
+
+  btn?.addEventListener('click', open);
+  backdrop?.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+</script>
+
+<style>
+  .lang-globe {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: 1px solid var(--guest-border);
+    border-radius: var(--guest-radius-sm);
+    padding: 5px 8px;
+    cursor: pointer;
+    color: var(--guest-ink-muted);
+    transition: color 150ms, border-color 150ms, background 150ms;
+  }
+  .lang-globe:hover {
+    color: var(--guest-ink);
+    border-color: var(--guest-ink-muted);
+    background: var(--guest-bg-deep);
+  }
+  .lang-globe__icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .lang-globe__code {
+    font-family: var(--guest-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  .lang-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+  }
+  .lang-overlay[hidden] { display: none; }
+  .lang-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .lang-overlay__sheet {
+    position: relative;
+    width: 100%;
+    background: var(--guest-bg);
+    border-radius: var(--guest-radius) var(--guest-radius) 0 0;
+    padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+  }
+  .lang-overlay__label {
+    font-family: var(--guest-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--guest-ink-faint);
+    margin: 0 0 16px;
+  }
+  .lang-overlay__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .lang-overlay__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--guest-border);
+    border-radius: var(--guest-radius-sm);
+    text-decoration: none;
+    color: var(--guest-ink);
+    transition: background 150ms, border-color 150ms;
+  }
+  .lang-overlay__item:hover { background: var(--guest-bg-deep); }
+  .lang-overlay__item.is-active {
+    border-color: var(--guest-accent);
+    background: var(--guest-accent-soft);
+  }
+  .lang-overlay__code {
+    font-family: var(--guest-font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--guest-accent);
+    min-width: 28px;
+  }
+  .lang-overlay__name {
+    font-size: 13px;
+    color: var(--guest-ink-muted);
+  }
+</style>

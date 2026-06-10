@@ -1,0 +1,126 @@
+---
+interface WeatherResult { temp: number; emoji: string }
+
+interface Props {
+  date: Date;
+  lang: string;
+  weather?: WeatherResult | null;
+  variant: 'readout' | 'dateline' | 'invitation';
+  city?: string;
+}
+
+const { date, lang, weather, variant, city } = Astro.props;
+
+const DOW_SHORT: Record<string, string[]> = {
+  de: ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'],
+  en: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+  fr: ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'],
+  es: ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'],
+};
+const DOW_LONG: Record<string, string[]> = {
+  de: ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  fr: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+  es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+};
+const MONTH_SHORT: Record<string, string[]> = {
+  de: ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  fr: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+  es: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+};
+const MONTH_LONG: Record<string, string[]> = {
+  de: ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  fr: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
+  es: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+};
+
+const l = (lang in DOW_SHORT) ? lang : 'de';
+const dow = date.getDay();
+const day = date.getDate();
+const mon = date.getMonth();
+
+// readout: "MI 10.06 · 22°C ⛅"
+const readoutDate = `${DOW_SHORT[l][dow]} ${String(day).padStart(2, '0')}.${String(mon + 1).padStart(2, '0')}`;
+const weatherStr = weather ? ` · ${weather.temp}°C ${weather.emoji}` : '';
+const readoutText = `${readoutDate}${weatherStr}`;
+
+// dateline: "Berlin, Mittwoch 10. Juni · 22°C ⛅"
+const dateline = city
+  ? `${city}, ${DOW_LONG[l][dow]} ${day}. ${MONTH_SHORT[l][mon]}${weatherStr}`
+  : `${DOW_LONG[l][dow]}, ${day}. ${MONTH_SHORT[l][mon]}${weatherStr}`;
+
+// invitation: line1 = "Mittwoch, 10. Juni", line2 = "22°C ⛅" (or empty)
+const invLine1 = `${DOW_LONG[l][dow]}, ${day}. ${MONTH_LONG[l][mon]}`;
+const invLine2 = weather ? `${weather.temp}°C ${weather.emoji}` : '';
+---
+
+{variant === 'readout' && (
+  <div class="ctx-readout">
+    <span class="ctx-readout__text">{readoutText}</span>
+    <div class="ctx-readout__rule"></div>
+  </div>
+)}
+
+{variant === 'dateline' && (
+  <p class="ctx-dateline">{dateline}</p>
+)}
+
+{variant === 'invitation' && (
+  <div class="ctx-invitation">
+    <span class="ctx-invitation__date">{invLine1}</span>
+    {invLine2 && <span class="ctx-invitation__weather">{invLine2}</span>}
+  </div>
+)}
+
+<style>
+  /* readout — Bauhaus mono-style mit Linie */
+  .ctx-readout {
+    padding: 0 24px 12px;
+  }
+  .ctx-readout__text {
+    font-family: var(--guest-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--guest-ink-faint);
+    display: block;
+    margin-bottom: 10px;
+  }
+  .ctx-readout__rule {
+    height: 1px;
+    background: var(--guest-border);
+  }
+
+  /* dateline — Editorial italic */
+  .ctx-dateline {
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--guest-ink-muted);
+    letter-spacing: 0.01em;
+    margin: 0;
+    padding: 8px 24px 16px;
+  }
+
+  /* invitation — Maison centered 2-line */
+  .ctx-invitation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 24px 16px;
+  }
+  .ctx-invitation__date {
+    font-family: var(--guest-font-display);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--guest-ink);
+  }
+  .ctx-invitation__weather {
+    font-size: 12px;
+    color: var(--guest-ink-muted);
+    letter-spacing: 0.04em;
+  }
+</style>

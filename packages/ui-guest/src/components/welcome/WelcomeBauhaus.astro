@@ -1,0 +1,193 @@
+---
+import '../../styles/guest-base.css';
+import LanguageOverlay from './shared/LanguageOverlay.astro';
+import ContextLine from './shared/ContextLine.astro';
+import StayLine from './shared/StayLine.astro';
+import HeroSlider from '../HeroSlider.astro';
+
+interface Props {
+  hotel: any;
+  hotelLogoDark: string | null;
+  guest: any;
+  room: any;
+  token: string;
+  lang: string;
+  hotelEnabledLangs: string[];
+  checkInLabel: string;
+  checkOutLabel: string;
+  heroCards: any[];
+  f: any;
+  actions: any[];
+  weather?: { temp: number; emoji: string } | null;
+  persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+}
+
+const {
+  hotel, hotelLogoDark, guest, room, token, lang,
+  hotelEnabledLangs, checkInLabel, checkOutLabel,
+  heroCards = [], f, actions, weather, persona = 'in_house',
+} = Astro.props;
+
+const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
+const name = guest?.first_name ?? hotel.name;
+---
+
+<!-- HEADER -->
+<header class="bh-head">
+  <div class="bh-mark">
+    {hotelLogoDark ? (
+      <img class="bh-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+    ) : (
+      <div class="bh-mark__initial">{hotel.name.charAt(0)}</div>
+    )}
+  </div>
+  <LanguageOverlay lang={lang} hotelEnabledLangs={hotelEnabledLangs} token={token} />
+</header>
+
+<!-- CONTEXT LINE: Mono-Readout + Linie -->
+<ContextLine date={new Date()} lang={lang} weather={weather} variant="readout" />
+
+<!-- GREETING -->
+<section class="bh-hero">
+  <h1 class="bh-hero__title">
+    Hallo, {name}<span class="bh-hero__dot">.</span>
+  </h1>
+  <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} />
+</section>
+
+<!-- HERO SLIDER: 2 cards/view -->
+{showHeroSlider && (
+  <div class="bh-slider-wrap">
+    <HeroSlider cards={heroCards} language={lang} />
+  </div>
+)}
+
+<!-- ACTION GRID: 3 columns, compact switches -->
+<section class="bh-actions">
+  <div class="bh-actions__head">
+    <span class="bh-actions__label">Module</span>
+    <span class="bh-actions__count">{String(actions.length).padStart(2, '0')}</span>
+  </div>
+  <div class="bh-grid">
+    {actions.map(action => (
+      <button class="bh-tile" type="button" @click={action.handler}>
+        <span class="bh-tile__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" set:html={action.icon} />
+        </span>
+        <span class="bh-tile__label">{action.label}</span>
+      </button>
+    ))}
+  </div>
+</section>
+
+<style>
+  /* ── Header ──────────────────────────────────────────────────────────── */
+  .bh-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px 14px;
+  }
+  .bh-mark { display: flex; align-items: center; }
+  .bh-mark__logo { height: 26px; width: auto; max-width: 90px; object-fit: contain; }
+  .bh-mark__initial {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--guest-ink); color: var(--guest-bg);
+    font-family: var(--guest-font-mono); font-size: 13px; font-weight: 700;
+    /* Bauhaus: no border-radius */
+  }
+
+  /* ── Greeting ────────────────────────────────────────────────────────── */
+  .bh-hero {
+    padding: 20px 24px 8px;
+  }
+  .bh-hero__title {
+    font-family: var(--guest-font-display);
+    font-size: 38px;
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--guest-ink);
+    margin: 0 0 10px;
+    text-align: left;
+  }
+  .bh-hero__dot {
+    color: var(--guest-accent);
+  }
+
+  /* ── Slider: 2 cards per view ────────────────────────────────────────── */
+  .bh-slider-wrap {
+    margin: 16px 0;
+  }
+  /* override HeroSlider card width for 2-per-view */
+  .bh-slider-wrap :global(.hero-slider__track) {
+    padding: 4px 24px;
+    gap: 10px;
+  }
+  .bh-slider-wrap :global(.hero-slider__card) {
+    flex: 0 0 calc(50% - 5px);
+    border-radius: 12px;
+  }
+  .bh-slider-wrap :global(.hero-slider__body) {
+    padding: 10px 12px;
+  }
+  .bh-slider-wrap :global(.hero-slider__title) { font-size: 14px; }
+  .bh-slider-wrap :global(.hero-slider__sub)   { display: none; }
+
+  /* ── Action grid: 3 columns ─────────────────────────────────────────── */
+  .bh-actions {
+    padding: 16px 24px 32px;
+  }
+  .bh-actions__head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .bh-actions__label {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--guest-ink-faint);
+  }
+  .bh-actions__count {
+    font-family: var(--guest-font-mono);
+    font-size: 9px; letter-spacing: 0.1em; color: var(--guest-ink-faint);
+  }
+  .bh-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .bh-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 10px;
+    border: 1px solid var(--guest-border);
+    background: var(--guest-bg-card);
+    border-radius: 4px; /* Bauhaus: minimal radius */
+    cursor: pointer;
+    min-height: 80px;
+    transition: background 150ms, border-color 150ms;
+    text-align: left;
+  }
+  .bh-tile:hover {
+    background: var(--guest-hover);
+    border-color: var(--guest-accent);
+  }
+  .bh-tile__icon {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .bh-tile__icon svg { width: 16px; height: 16px; color: var(--guest-ink); }
+  .bh-tile__label {
+    font-family: var(--guest-font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--guest-ink);
+    line-height: 1.3;
+  }
+</style>
