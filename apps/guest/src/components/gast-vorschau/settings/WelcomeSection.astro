@@ -1,45 +1,89 @@
 ---
-interface Props { hotelName?: string }
-const { hotelName = 'Ihrem Hotel' } = Astro.props;
-const defaultText = `Willkommen im ${hotelName}`;
+interface Props {
+  hotelName?: string;
+  welcomeText?: string;
+  eyebrowText?: string;
+  formality?: 'du' | 'sie';
+}
+const {
+  hotelName  = 'Ihrem Hotel',
+  welcomeText = '',
+  eyebrowText = '',
+  formality   = 'du',
+} = Astro.props;
+
+const initWelcome = welcomeText || `Willkommen im ${hotelName}`;
+const initEyebrow = eyebrowText || '';
 ---
 
-<section class="settings-section">
+<section
+  class="settings-section"
+  id="welcomeSection"
+  data-baseline={JSON.stringify({ welcomeText: initWelcome, eyebrowText: initEyebrow, formality })}
+>
   <div class="settings-section__head">
     <span class="settings-section__title">— Willkommen & Ansprache —</span>
-    <span class="settings-section__hint" id="welcomeCount">{defaultText.length} / 120</span>
+  </div>
+
+  <!-- Eyebrow / Kicker -->
+  <div class="ws-field">
+    <label class="ws-label" for="eyebrowInput">eyebrow</label>
+    <input
+      id="eyebrowInput"
+      class="ws-input"
+      type="text"
+      maxlength="60"
+      placeholder={`z.B. ${hotelName} · Hamburg`}
+      value={initEyebrow}
+      autocomplete="off"
+    />
+    <p class="ws-hint">kurzer tag oben im hero (stadt, motto, o.ä.) — max. 60 Zeichen.</p>
   </div>
 
   <!-- Willkommenstext -->
-  <textarea
-    class="welcome-textarea"
-    id="welcomeTextarea"
-    maxlength="120"
-    placeholder={`z.B. Willkommen im ${hotelName}`}
-    aria-label="Willkommenstext für Gäste"
-  >{defaultText}</textarea>
-  <p class="welcome-hint">wird ganz oben im gast-app angezeigt.</p>
+  <div class="ws-field">
+    <label class="ws-label" for="welcomeTextarea">
+      willkommenstext
+      <span id="welcomeCount" class="ws-counter">{initWelcome.length} / 120</span>
+    </label>
+    <textarea
+      class="ws-textarea"
+      id="welcomeTextarea"
+      maxlength="120"
+      placeholder={`z.B. Willkommen im ${hotelName}`}
+      aria-label="Willkommenstext für Gäste"
+    >{initWelcome}</textarea>
+    <p class="ws-hint">wird ganz oben im gast-app angezeigt.</p>
+  </div>
 
   <!-- Du/Sie Toggle -->
   <div class="ansprache-row">
     <span class="ansprache-label">ansprache</span>
     <div class="ansprache-cards" role="radiogroup" aria-label="Ansprache wählen">
       <button
-        class="ansprache-card is-active"
+        class={`ansprache-card${formality === 'du' ? ' is-active' : ''}`}
         data-value="du"
         role="radio"
-        aria-checked="true"
+        aria-checked={formality === 'du' ? 'true' : 'false'}
         type="button"
       >du-form</button>
       <button
-        class="ansprache-card"
+        class={`ansprache-card${formality === 'sie' ? ' is-active' : ''}`}
         data-value="sie"
         role="radio"
-        aria-checked="false"
+        aria-checked={formality === 'sie' ? 'true' : 'false'}
         type="button"
       >sie-form</button>
     </div>
     <span class="ansprache-hint">gilt in gäste-app, emails und allen texten</span>
+  </div>
+
+  <!-- Save row -->
+  <div class="ws-save-row">
+    <button id="welcomeSaveBtn" class="v9-btn" type="button" disabled>
+      Speichern
+    </button>
+    <span id="welcomeSaveStatus" class="ws-save-status" aria-live="polite"></span>
   </div>
 </section>
 
@@ -49,32 +93,48 @@ const defaultText = `Willkommen im ${hotelName}`;
     border-radius: var(--r); padding: 24px 28px;
   }
   .settings-section__head {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
   }
   .settings-section__title {
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase;
   }
-  .settings-section__hint {
+
+  /* ── Field layout ───────────────────────────────────────────── */
+  .ws-field { margin-bottom: 18px; }
+  .ws-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
+    margin-bottom: 8px;
+  }
+  .ws-counter {
     font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted);
   }
-  .welcome-textarea {
+  .ws-input {
+    width: 100%; padding: 10px 14px;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: var(--r-sm); outline: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--ink); transition: border-color 200ms ease;
+  }
+  .ws-input:focus { border-color: var(--ink); }
+  .ws-textarea {
     width: 100%; min-height: 70px; padding: 12px 14px;
     background: var(--bg-deep); border: 1px solid var(--border);
-    border-radius: var(--r-sm); resize: vertical;
+    border-radius: var(--r-sm); resize: vertical; outline: none;
     font-family: 'Space Grotesk', sans-serif; font-size: 14px;
-    color: var(--ink); line-height: 1.5; outline: none;
-    transition: border-color 200ms ease;
+    color: var(--ink); line-height: 1.5; transition: border-color 200ms ease;
   }
-  .welcome-textarea:focus { border-color: var(--ink); }
-  .welcome-hint {
+  .ws-textarea:focus { border-color: var(--ink); }
+  .ws-hint {
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     color: var(--ink-muted); margin-top: 6px; letter-spacing: 0.04em;
   }
 
-  /* Ansprache */
+  /* ── Ansprache ──────────────────────────────────────────────── */
   .ansprache-row {
-    margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border);
+    margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--border);
     display: flex; flex-direction: column; gap: 10px;
   }
   .ansprache-label {
@@ -95,27 +155,68 @@ const defaultText = `Willkommen im ${hotelName}`;
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     color: var(--ink-muted); letter-spacing: 0.04em;
   }
+
+  /* ── Save row ───────────────────────────────────────────────── */
+  .ws-save-row {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .ws-save-status {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+  }
+  .ws-save-status[data-state="saved"] { color: #5C9070; }
+  .ws-save-status[data-state="error"] { color: #C0392B; }
+  .ws-save-status[data-state="loading"] { color: var(--ink-muted); }
 </style>
 
 <script>
   import { updateState } from '../../../lib/gast-vorschau/state';
 
-  // Willkommenstext
-  const textarea = document.getElementById('welcomeTextarea') as HTMLTextAreaElement;
-  const counter  = document.getElementById('welcomeCount');
-  function updateCount() {
-    if (counter) counter.textContent = `${textarea.value.length} / 120`;
+  const section    = document.getElementById('welcomeSection');
+  const textarea   = document.getElementById('welcomeTextarea')  as HTMLTextAreaElement;
+  const eyebrowEl  = document.getElementById('eyebrowInput')     as HTMLInputElement;
+  const counter    = document.getElementById('welcomeCount')     as HTMLElement;
+  const cards      = document.querySelectorAll<HTMLButtonElement>('.ansprache-card');
+  const saveBtn    = document.getElementById('welcomeSaveBtn')   as HTMLButtonElement;
+  const statusEl   = document.getElementById('welcomeSaveStatus') as HTMLElement;
+
+  // ── Baseline (initial server-rendered values) ─────────────────
+  type Baseline = { welcomeText: string; eyebrowText: string; formality: 'du' | 'sie' };
+  let baseline: Baseline = JSON.parse(section?.dataset.baseline ?? '{}') as Baseline;
+  let currentFormality = baseline.formality ?? 'du';
+
+  // ── Preview state sync ────────────────────────────────────────
+  updateState({ welcomeText: textarea.value, formality: currentFormality });
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function isDirty(): boolean {
+    return textarea.value  !== baseline.welcomeText
+        || eyebrowEl.value !== baseline.eyebrowText
+        || currentFormality !== baseline.formality;
   }
-  updateCount();
-  // Initial state sync — phone screen zeigt sofort den korrekten Hotel-Namen
-  updateState({ welcomeText: textarea.value });
+
+  function setStatus(state: 'saved' | 'error' | 'loading' | '', msg: string) {
+    statusEl.dataset.state = state;
+    statusEl.textContent   = msg;
+  }
+
+  function updateSaveBtn() { saveBtn.disabled = !isDirty(); }
+
+  // ── Welcome textarea ──────────────────────────────────────────
   textarea?.addEventListener('input', () => {
+    if (counter) counter.textContent = `${textarea.value.length} / 120`;
     updateState({ welcomeText: textarea.value });
-    updateCount();
+    setStatus('', '');
+    updateSaveBtn();
   });
 
-  // Du/Sie Toggle — jetzt anklickbar
-  const cards = document.querySelectorAll<HTMLButtonElement>('.ansprache-card');
+  // ── Eyebrow input ─────────────────────────────────────────────
+  eyebrowEl?.addEventListener('input', () => {
+    setStatus('', '');
+    updateSaveBtn();
+  });
+
+  // ── Du/Sie Toggle ─────────────────────────────────────────────
   cards.forEach(card => {
     card.addEventListener('click', () => {
       const value = card.dataset.value as 'du' | 'sie';
@@ -125,7 +226,48 @@ const defaultText = `Willkommen im ${hotelName}`;
       });
       card.classList.add('is-active');
       card.setAttribute('aria-checked', 'true');
+      currentFormality = value;
       updateState({ formality: value });
+      setStatus('', '');
+      updateSaveBtn();
     });
+  });
+
+  // ── Save ──────────────────────────────────────────────────────
+  saveBtn?.addEventListener('click', async () => {
+    if (!isDirty() || saveBtn.disabled) return;
+    saveBtn.dataset.loading = 'true';
+    saveBtn.disabled = true;
+    setStatus('loading', 'Übersetze in alle Sprachen …');
+
+    try {
+      const res = await fetch('/api/hotel/save-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          welcomeText:  textarea.value,
+          eyebrowText:  eyebrowEl.value,
+          formality:    currentFormality,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+      baseline = {
+        welcomeText:  textarea.value,
+        eyebrowText:  eyebrowEl.value,
+        formality:    currentFormality,
+      };
+      setStatus('saved', 'Gespeichert');
+      setTimeout(() => setStatus('', ''), 3000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[welcome-section] save error', msg);
+      setStatus('error', `Fehler: ${msg}`);
+      saveBtn.disabled = false;
+    } finally {
+      delete saveBtn.dataset.loading;
+      updateSaveBtn();
+    }
   });
 </script>
