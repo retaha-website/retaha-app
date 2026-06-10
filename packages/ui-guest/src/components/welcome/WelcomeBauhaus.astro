@@ -1,9 +1,8 @@
 ---
 import '../../styles/guest-base.css';
 import LanguageOverlay from './shared/LanguageOverlay.astro';
-import ContextLine from './shared/ContextLine.astro';
 import StayLine from './shared/StayLine.astro';
-import HeroSlider from '../HeroSlider.astro';
+import CraftFooter from './CraftFooter.astro';
 
 interface Props {
   hotel: any;
@@ -27,180 +26,353 @@ const {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
-  greeting = { hi: 'Hallo,', sub: '' },
+  greeting = { hi: 'Willkommen,', sub: '' },
 } = Astro.props;
 
-const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
 const name = guest?.first_name ?? hotel.name;
+
+// i18n text extraction for hero cards
+function pickText(i18n: any, fallback: string): string {
+  if (i18n && typeof i18n === 'object') {
+    const v = (i18n[lang] ?? i18n['de'])?.value;
+    if (v) return v;
+  }
+  return fallback || '';
+}
+
+// Hero card click handler string
+function heroHandler(card: any): string {
+  const t = (card.action_target || '').replace(/'/g, "\\'");
+  switch (card.card_type) {
+    case 'external_link': return `window.open('${t}','_blank')`;
+    case 'phone':  return `window.location='tel:${t}'`;
+    case 'email':  return `window.location='mailto:${t}'`;
+    case 'internal_action': return `openSheet('${t}')`;
+    default: return '';
+  }
+}
+
+// Hero label per persona
+const heroLabel: Record<string, string> = {
+  pre_arrival:  'Vorab planen',
+  in_house:     'Heute im Haus',
+  checking_out: 'Bis zum nächsten Mal',
+};
+
+// Grid label per persona
+const gridLabel: Record<string, string> = {
+  pre_arrival:  'Ihre Anreise',
+  in_house:     'Services',
+  checking_out: 'Ihre Abreise',
+};
+
+// Is weather sunny? (show animated sun vs emoji)
+const isSunny = weather?.emoji === '☀️';
+const weatherLabel = weather ? `${weather.temp}°C ${(hotel.city || '').toUpperCase()}` : (hotel.city || '').toUpperCase();
+
+// Published hero cards only (already filtered by server, but guard here too)
+const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
+
+// Days until check-in (for pre_arrival subtitle in stayline)
+const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
 ---
 
-<!-- HEADER -->
-<header class="bh-head">
-  <div class="bh-mark">
-    {hotelLogoDark ? (
-      <img class="bh-mark__logo" src={hotelLogoDark} alt={hotel.name} />
-    ) : (
-      <div class="bh-mark__initial">{hotel.name.charAt(0)}</div>
-    )}
+<div class="bh-root">
+  <!-- HEADER -->
+  <header class="bh-head">
+    <div class="bh-mark">
+      {hotelLogoDark
+        ? <img class="bh-mark__logo" src={hotelLogoDark} alt={hotel.name} />
+        : <div class="bh-mark__sq">{hotel.name.charAt(0).toUpperCase()}</div>
+      }
+    </div>
+    <LanguageOverlay lang={lang} hotelEnabledLangs={hotelEnabledLangs} token={token} />
+  </header>
+
+  <!-- READOUT: date · weather · city + ink line -->
+  <div class="bh-readout">
+    <span class="bh-readout__date">{checkInLabel ? '' : ''}{new Date().toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase()}</span>
+    <span class="bh-readout__wx">
+      {weather && (
+        <>
+          {isSunny
+            ? (
+              <span class="bh-sun" aria-hidden="true">
+                <span class="bh-sun__rays">
+                  {SUN_RAYS.map(deg => <i style={`transform:rotate(${deg}deg)`}></i>)}
+                </span>
+                <span class="bh-sun__core"></span>
+              </span>
+            )
+            : <span class="bh-wx-emoji">{weather.emoji}</span>
+          }
+          <span class="bh-readout__temp">{weatherLabel}</span>
+        </>
+      )}
+      {!weather && hotel.city && <span class="bh-readout__temp">{hotel.city.toUpperCase()}</span>}
+    </span>
   </div>
-  <LanguageOverlay lang={lang} hotelEnabledLangs={hotelEnabledLangs} token={token} />
-</header>
+  <div class="bh-readout-rule"></div>
 
-<!-- CONTEXT LINE: Mono-Readout + Linie -->
-<ContextLine date={new Date()} lang={lang} weather={weather} variant="readout" />
+  <!-- GREETING -->
+  <section class="bh-greet">
+    <h1 class="bh-greet__h1">
+      {greeting.hi}<br />{name}<span class="bh-dot">.</span>
+    </h1>
+    <StayLine
+      persona={persona}
+      room={room}
+      checkInLabel={checkInLabel}
+      checkOutLabel={checkOutLabel}
+      lang={lang}
+    />
+    {greeting.sub && <p class="bh-greet__sub">{greeting.sub}</p>}
+  </section>
 
-<!-- GREETING -->
-<section class="bh-hero">
-  <h1 class="bh-hero__title">
-    <span class="bh-hero__hi">{greeting.hi}</span> {name}<span class="bh-hero__dot">.</span>
-  </h1>
-  {greeting.sub && <p class="bh-hero__sub">{greeting.sub}</p>}
-  <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} />
-</section>
+  <!-- HERO SLIDER -->
+  {f.action_cards !== false && visibleCards.length > 0 && (
+    <section class="bh-hero">
+      <p class="bh-sec-label">{heroLabel[persona] ?? 'Angebote'}</p>
+      <div class="bh-hero__track">
+        {visibleCards.map((card: any) => {
+          const title   = pickText(card.title_i18n,    card.title_de    || '');
+          const sub     = pickText(card.subtitle_i18n, card.subtitle_de || '');
+          const eyebrow = pickText(card.eyebrow_i18n,  card.eyebrow_de  || '');
+          const handler = heroHandler(card);
+          const hasImg  = !!card.image_url;
+          return (
+            <button
+              type="button"
+              class="bh-hcard"
+              onclick={handler || undefined}
+              style={!handler ? 'cursor:default' : undefined}
+            >
+              <div
+                class="bh-hcard__img"
+                style={hasImg
+                  ? `background-image:linear-gradient(rgba(10,10,10,.08),rgba(10,10,10,.2)),url('${card.image_url}');background-color:#3A3A35`
+                  : `background-color:#3A3A35`
+                }
+              >
+                {eyebrow && <span class="bh-hcard__eyebrow">{eyebrow}</span>}
+              </div>
+              <div class="bh-hcard__body">
+                <h3 class="bh-hcard__title">{title}</h3>
+                {sub && <p class="bh-hcard__sub">{sub}</p>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  )}
 
-<!-- HERO SLIDER: 2 cards/view -->
-{showHeroSlider && (
-  <div class="bh-slider-wrap">
-    <HeroSlider cards={heroCards} language={lang} />
-  </div>
-)}
-
-<!-- ACTION GRID: 3 columns, compact switches -->
-<section class="bh-actions">
-  <div class="bh-actions__head">
-    <span class="bh-actions__label">Module</span>
-    <span class="bh-actions__count">{String(actions.length).padStart(2, '0')}</span>
-  </div>
+  <!-- ACTION GRID -->
+  <p class="bh-sec-label" style="margin-top:26px">{gridLabel[persona] ?? 'Services'}</p>
   <div class="bh-grid">
-    {actions.map(action => (
+    {actions.map((action: any) => (
       <button class="bh-tile" type="button" @click={action.handler}>
         <span class="bh-tile__icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" set:html={action.icon} />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
         </span>
         <span class="bh-tile__label">{action.label}</span>
       </button>
     ))}
   </div>
-</section>
+
+  <!-- CRAFT FOOTER -->
+  <CraftFooter hotelLogoUrl={hotelLogoDark} hotelName={hotel.name} />
+</div>
 
 <style>
+  /* ── Tokens (match prototype exactly) ─────────────────────────────────── */
+  .bh-root {
+    --bh-bg: #FAFAF6;
+    --bh-surface: #FFFFFF;
+    --bh-ink: #0A0A0A;
+    --bh-ink-muted: #6B6B66;
+    --bh-ink-faint: #A8A8A2;
+    --bh-border: #E3E1DA;
+    --bh-pink: #FF4A82;
+    --bh-yellow: #FFE600;
+    --bh-radius: 12px;
+    --bh-mono: 'JetBrains Mono', monospace;
+    --bh-display: 'Space Grotesk', sans-serif;
+    font-family: var(--bh-display);
+    color: var(--bh-ink);
+    padding: 0 22px 110px;
+  }
+
   /* ── Header ──────────────────────────────────────────────────────────── */
   .bh-head {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding: 16px 24px 14px;
+    align-items: center;
+    padding: 26px 0 4px;
   }
   .bh-mark { display: flex; align-items: center; }
-  .bh-mark__logo { height: 26px; width: auto; max-width: 90px; object-fit: contain; }
-  .bh-mark__initial {
-    width: 30px; height: 30px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--guest-ink); color: var(--guest-bg);
-    font-family: var(--guest-font-mono); font-size: 13px; font-weight: 700;
-    /* Bauhaus: no border-radius */
+  .bh-mark__logo { height: 28px; width: auto; max-width: 100px; object-fit: contain; }
+  .bh-mark__sq {
+    width: 34px; height: 34px;
+    border: 1.5px solid var(--bh-ink); border-radius: 9px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 15px;
+    font-family: var(--bh-display);
+  }
+
+  /* Globe-button (from LanguageOverlay) — override to match prototype */
+  .bh-root :global(.globe-btn) {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--bh-border);
+    background: var(--bh-surface);
+    border-radius: var(--bh-radius);
+    padding: 7px 11px;
+    cursor: pointer;
+    font-family: var(--bh-mono); font-size: 10px; letter-spacing: 0.08em;
+    transition: all 0.2s;
+  }
+  .bh-root :global(.globe-btn:hover) { background: var(--bh-yellow); border-color: var(--bh-yellow); }
+  .bh-root :global(.globe-btn svg) { width: 15px; height: 15px; }
+
+  /* ── Context readout ─────────────────────────────────────────────────── */
+  .bh-readout {
+    margin-top: 22px;
+    font-family: var(--bh-mono); font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--bh-ink-muted);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .bh-readout__wx { display: flex; align-items: center; gap: 7px; }
+  .bh-wx-emoji { font-size: 14px; }
+
+  /* Animated sun */
+  .bh-sun { width: 18px; height: 18px; position: relative; flex-shrink: 0; }
+  .bh-sun__core {
+    position: absolute; inset: 4px;
+    background: var(--bh-yellow); border: 1.5px solid var(--bh-ink); border-radius: 50%;
+  }
+  .bh-sun__rays {
+    position: absolute; inset: 0;
+    animation: bh-spin 14s linear infinite;
+  }
+  .bh-sun__rays i {
+    position: absolute; left: 50%; top: 0;
+    width: 1.5px; height: 4px;
+    background: var(--bh-ink);
+    transform-origin: 50% 9px;
+    border-radius: 1px;
+  }
+  @keyframes bh-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .bh-sun__rays { animation: none; } }
+
+  .bh-readout-rule {
+    height: 2px; background: var(--bh-ink);
+    margin-top: 8px; position: relative;
+  }
+  .bh-readout-rule::after {
+    content: ''; position: absolute;
+    right: 0; top: -2px;
+    width: 6px; height: 6px;
+    background: var(--bh-pink); border-radius: 50%;
   }
 
   /* ── Greeting ────────────────────────────────────────────────────────── */
-  .bh-hero {
-    padding: 20px 24px 8px;
+  .bh-greet { margin-top: 26px; }
+  .bh-greet__h1 {
+    font-size: 34px; line-height: 1.08;
+    font-weight: 700; letter-spacing: -0.02em; margin: 0;
+    font-family: var(--bh-display);
   }
-  .bh-hero__title {
-    font-family: var(--guest-font-display);
-    font-size: 38px;
-    font-weight: 700;
-    font-style: normal;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    color: var(--guest-ink);
-    margin: 0 0 10px;
-    text-align: left;
-  }
-  .bh-hero__hi {
-    color: var(--guest-ink-muted);
-    font-weight: 400;
-  }
-  .bh-hero__dot {
-    color: var(--guest-accent);
-  }
-  .bh-hero__sub {
-    font-size: 13px;
-    color: var(--guest-ink-muted);
-    margin: 4px 0 10px;
-    font-family: var(--guest-font-body);
+  .bh-dot { color: var(--bh-pink); }
+  .bh-greet__sub {
+    margin: 8px 0 0;
+    font-size: 13px; color: var(--bh-ink-muted);
+    font-family: var(--bh-display);
   }
 
-  /* ── Slider: 2 cards per view ────────────────────────────────────────── */
-  .bh-slider-wrap {
-    margin: 16px 0;
+  /* StayLine override */
+  .bh-root :global(.stay-line) {
+    margin-top: 10px;
+    font-family: var(--bh-mono); font-size: 11px;
+    letter-spacing: 0.06em; color: var(--bh-ink-muted);
   }
-  /* override HeroSlider card width for 2-per-view */
-  .bh-slider-wrap :global(.hero-slider__track) {
-    padding: 4px 24px;
-    gap: 10px;
+  .bh-root :global(.stay-line b), .bh-root :global(.stay-line strong) {
+    color: var(--bh-ink); font-weight: 500;
   }
-  .bh-slider-wrap :global(.hero-slider__card) {
+
+  /* ── Section labels ──────────────────────────────────────────────────── */
+  .bh-sec-label {
+    font-family: var(--bh-mono); font-size: 9px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--bh-ink-faint);
+    margin: 26px 0 10px;
+  }
+
+  /* ── Hero slider ─────────────────────────────────────────────────────── */
+  .bh-hero { margin: 0; }
+  .bh-hero__track {
+    display: flex; gap: 10px;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -22px; padding: 0 22px;
+  }
+  .bh-hero__track::-webkit-scrollbar { display: none; }
+
+  .bh-hcard {
     flex: 0 0 calc(50% - 5px);
-    border-radius: 12px;
+    scroll-snap-align: start;
+    background: var(--bh-surface);
+    border: 1px solid var(--bh-border);
+    border-radius: var(--bh-radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+    text-align: left;
+    padding: 0;
   }
-  .bh-slider-wrap :global(.hero-slider__body) {
-    padding: 10px 12px;
-  }
-  .bh-slider-wrap :global(.hero-slider__title) { font-size: 14px; }
-  .bh-slider-wrap :global(.hero-slider__sub)   { display: none; }
+  .bh-hcard:hover { transform: translateY(-2px); border-color: var(--bh-yellow); }
 
-  /* ── Action grid: 3 columns ─────────────────────────────────────────── */
-  .bh-actions {
-    padding: 16px 24px 32px;
+  .bh-hcard__img {
+    aspect-ratio: 4/3;
+    position: relative;
+    background-size: cover; background-position: center;
   }
-  .bh-actions__head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 12px;
+  .bh-hcard__eyebrow {
+    position: absolute; top: 8px; left: 8px;
+    background: var(--bh-yellow);
+    font-family: var(--bh-mono); font-size: 8px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 3px; font-weight: 500;
+    color: var(--bh-ink);
   }
-  .bh-actions__label {
-    font-family: var(--guest-font-mono);
-    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--guest-ink-faint);
+  .bh-hcard__body { padding: 10px 12px 12px; }
+  .bh-hcard__title {
+    font-size: 14px; font-weight: 700;
+    letter-spacing: -0.01em; margin: 0;
+    color: var(--bh-ink); font-family: var(--bh-display);
   }
-  .bh-actions__count {
-    font-family: var(--guest-font-mono);
-    font-size: 9px; letter-spacing: 0.1em; color: var(--guest-ink-faint);
+  .bh-hcard__sub {
+    font-size: 11px; color: var(--bh-ink-muted); margin: 3px 0 0;
   }
+
+  /* ── Action grid ─────────────────────────────────────────────────────── */
   .bh-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px;
   }
   .bh-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 12px 10px;
-    border: 1px solid var(--guest-border);
-    background: var(--guest-bg-card);
-    border-radius: 4px; /* Bauhaus: minimal radius */
-    cursor: pointer;
-    min-height: 80px;
-    transition: background 150ms, border-color 150ms;
+    background: var(--bh-surface); border: 1px solid var(--bh-border);
+    border-radius: var(--bh-radius); padding: 14px 10px 12px;
+    cursor: pointer; transition: background 0.2s, border-color 0.2s;
+    display: flex; flex-direction: column; gap: 8px; min-height: 84px;
     text-align: left;
   }
-  .bh-tile:hover {
-    background: var(--guest-hover);
-    border-color: var(--guest-accent);
-  }
-  .bh-tile__icon {
-    width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .bh-tile__icon svg { width: 16px; height: 16px; color: var(--guest-ink); }
+  .bh-tile:hover { background: var(--bh-yellow); border-color: var(--bh-yellow); }
+  .bh-tile__icon { width: 19px; height: 19px; display: flex; align-items: center; }
+  .bh-tile__icon svg { width: 19px; height: 19px; stroke: var(--bh-ink); }
   .bh-tile__label {
-    font-family: var(--guest-font-mono);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--guest-ink);
-    line-height: 1.3;
+    font-family: var(--bh-mono); font-size: 9px;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    font-weight: 500; line-height: 1.35;
+    color: var(--bh-ink);
   }
 </style>

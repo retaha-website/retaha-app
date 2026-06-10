@@ -9,7 +9,7 @@ import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
-import CookieBanner from '../../components/CookieBanner.astro';
+import ConsentModule from '@retaha/ui-guest/ConsentModule';
 import PlacesSheet from '../../components/sheets/PlacesSheet.astro';
 import PlaceDetailSheet from '../../components/sheets/PlaceDetailSheet.astro';
 import PostStaySheet from '../../components/sheets/PostStaySheet.astro';
@@ -830,8 +830,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       )}
     </main>
 
-    {/* Sprint Legal Phase 2 — Cookie-Banner (zeigt sich nur beim ersten Besuch) */}
-    <CookieBanner stayToken={token} />
+    <ConsentModule stayToken={token} />
 
     <script>
       import Alpine from 'alpinejs';
@@ -842,6 +841,14 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet ggf. anzeigen
           if (typeof (this as any)._initPostStay === 'function') {
             (this as any)._initPostStay();
+          }
+          // Consent-Modul: zeigen wenn noch keine Entscheidung gespeichert
+          const POLICY = '2026-06-01';
+          const flagKey = `retaha_consent_v${POLICY}`;
+          if (localStorage.getItem(flagKey)) {
+            this.consentGiven = true;
+          } else {
+            setTimeout(() => { this.consentOpen = true; }, 900);
           }
         },
         recSlideIndex: 0,
@@ -937,6 +944,31 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           document.addEventListener('touchmove', onMove, { passive: true });
           document.addEventListener('touchend', onEnd);
           document.addEventListener('touchcancel', onEnd);
+        },
+
+        // Consent state
+        consentOpen: false,
+        consentGiven: false,
+        cmExpanded: false,
+        cmStats: false,
+        cmComfort: true,
+
+        cmDecide(type: 'all' | 'necessary' | 'custom') {
+          const POLICY = '2026-06-01';
+          const flagKey = `retaha_consent_v${POLICY}`;
+          const payload = {
+            type: type === 'all' ? 'all' : (this.cmStats ? 'necessary' : 'rejected'),
+            analytics: type === 'all' || (type === 'custom' && this.cmStats),
+            comfort:   type === 'all' || (type === 'custom' && this.cmComfort),
+            at: Date.now(),
+          };
+          try { localStorage.setItem(flagKey, JSON.stringify(payload)); } catch (_) {}
+          try {
+            const blob = new Blob([JSON.stringify({ token: null, consent_type: type, consent_given: type !== 'necessary' })], { type: 'application/json' });
+            navigator.sendBeacon('/api/g/consent', blob);
+          } catch (_) {}
+          this.consentOpen = false;
+          this.consentGiven = true;
         },
 
         // Sheet state
