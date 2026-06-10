@@ -1,4 +1,11 @@
 ---
+interface Props {
+  hotelId: string;
+  enabledLanguages: string[];
+  defaultLanguage: string;
+}
+const { hotelId, enabledLanguages, defaultLanguage } = Astro.props;
+
 const LANGUAGES = [
   { code: 'de', label: 'deutsch',    flag: '🇩🇪' },
   { code: 'en', label: 'english',    flag: '🇬🇧' },
@@ -19,18 +26,28 @@ const LANGUAGES = [
   </div>
 
   <div class="lang-grid" id="langGrid">
-    {LANGUAGES.map(lang => (
-      <label class={`lang-pill ${['de','en'].includes(lang.code) ? 'is-active' : ''}`}>
-        <input
-          type="checkbox"
-          value={lang.code}
-          checked={['de','en'].includes(lang.code)}
-          aria-label={lang.label}
-        />
-        <span class="lang-pill__flag">{lang.flag}</span>
-        <span class="lang-pill__label">{lang.label}</span>
-      </label>
-    ))}
+    {LANGUAGES.map(lang => {
+      const isActive  = enabledLanguages.includes(lang.code);
+      const isDefault = lang.code === defaultLanguage;
+      return (
+        <label
+          class={`lang-pill ${isActive ? 'is-active' : ''} ${isDefault ? 'is-default' : ''}`}
+          title={isDefault ? 'Standardsprache — nicht abwählbar' : undefined}
+        >
+          <input
+            type="checkbox"
+            value={lang.code}
+            checked={isActive}
+            disabled={isDefault}
+            aria-label={lang.label}
+            data-is-default={isDefault ? 'true' : undefined}
+          />
+          <span class="lang-pill__flag">{lang.flag}</span>
+          <span class="lang-pill__label">{lang.label}</span>
+          {isDefault && <span class="lang-pill__badge">std</span>}
+        </label>
+      );
+    })}
   </div>
   <p class="lang-hint">gäste können in der app zwischen diesen sprachen wechseln.</p>
 
@@ -38,11 +55,31 @@ const LANGUAGES = [
     <label class="default-lang-label" for="defaultLang">standard</label>
     <select id="defaultLang" class="default-lang-select">
       {LANGUAGES.map(lang => (
-        <option value={lang.code} selected={lang.code === 'de'}>
+        <option
+          value={lang.code}
+          selected={lang.code === defaultLanguage}
+          disabled={!enabledLanguages.includes(lang.code)}
+        >
           {lang.flag} {lang.label}
         </option>
       ))}
     </select>
+  </div>
+
+  <!-- Speichern-Zeile -->
+  <div class="lang-save-row">
+    <button
+      id="langSaveBtn"
+      class="lang-save-btn"
+      type="button"
+      disabled
+      data-hotel-id={hotelId}
+      data-initial-langs={JSON.stringify(enabledLanguages)}
+      data-initial-default={defaultLanguage}
+    >
+      SPEICHERN
+    </button>
+    <span id="langSaveStatus" class="lang-save-status" aria-live="polite"></span>
   </div>
 </section>
 
@@ -69,11 +106,24 @@ const LANGUAGES = [
     border-radius: var(--r-sm); transition: all 150ms ease;
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.04em; text-transform: lowercase; color: var(--ink-muted);
+    user-select: none;
   }
   .lang-pill input { display: none; }
-  .lang-pill:hover { background: var(--te-yellow-soft); color: var(--ink); }
+  .lang-pill:not(.is-default):hover { background: var(--te-yellow-soft); color: var(--ink); }
   .lang-pill.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  /* Default-Sprache: nicht anklickbar, aber trotzdem aktiv dargestellt */
+  .lang-pill.is-default { cursor: default; opacity: 0.9; }
   .lang-pill__flag { font-size: 14px; }
+  .lang-pill__badge {
+    margin-left: auto;
+    font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--bg); color: var(--ink); border-radius: 4px;
+    padding: 1px 5px; line-height: 1.4;
+    border: 1px solid var(--border);
+  }
+  .lang-pill.is-active .lang-pill__badge {
+    background: var(--surface); color: var(--ink);
+  }
 
   .lang-hint {
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
@@ -97,45 +147,147 @@ const LANGUAGES = [
     transition: border-color 150ms;
   }
   .default-lang-select:focus { border-color: var(--ink); }
+
+  /* Speichern-Zeile */
+  .lang-save-row {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .lang-save-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 10px 20px;
+    background: var(--ink); color: var(--bg);
+    border: none; border-radius: var(--r-sm);
+    cursor: pointer; transition: opacity 160ms ease;
+  }
+  .lang-save-btn:hover:not(:disabled) { opacity: 0.8; }
+  .lang-save-btn:disabled { opacity: 0.28; cursor: default; }
+  .lang-save-btn[data-loading] { opacity: 0.6; cursor: wait; }
+
+  .lang-save-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.08em;
+  }
+  .lang-save-status[data-state="saved"]  { color: #5C9070; } /* Sage */
+  .lang-save-status[data-state="error"]  { color: #C0392B; }
 </style>
 
 <script>
   import { updateState } from '../../../lib/gast-vorschau/state';
 
-  const pills = document.querySelectorAll<HTMLLabelElement>('#langGrid .lang-pill');
-  const defaultSelect = document.getElementById('defaultLang') as HTMLSelectElement;
+  const grid        = document.getElementById('langGrid');
+  const pills       = grid?.querySelectorAll<HTMLLabelElement>('.lang-pill');
+  const defaultSel  = document.getElementById('defaultLang') as HTMLSelectElement;
+  const saveBtn     = document.getElementById('langSaveBtn') as HTMLButtonElement;
+  const statusEl    = document.getElementById('langSaveStatus') as HTMLElement;
+
+  const HOTEL_ID = saveBtn?.dataset.hotelId ?? '';
+
+  // Mutable baseline — wird nach erfolgreichem Speichern aktualisiert
+  let baseline = {
+    langs:       JSON.parse(saveBtn?.dataset.initialLangs ?? '[]') as string[],
+    defaultLang: saveBtn?.dataset.initialDefault ?? 'de',
+  };
+
+  let currentLangs   = [...baseline.langs];
+  let currentDefault = baseline.defaultLang;
+
+  function isDirty(): boolean {
+    if (currentDefault !== baseline.defaultLang) return true;
+    if (currentLangs.length !== baseline.langs.length) return true;
+    const sorted     = [...currentLangs].sort();
+    const initSorted = [...baseline.langs].sort();
+    return sorted.some((l, i) => l !== initSorted[i]);
+  }
+
+  function setStatus(state: 'saved' | 'error' | '', msg: string) {
+    statusEl.dataset.state = state;
+    statusEl.textContent = msg;
+  }
+
+  function updateSaveBtn() {
+    saveBtn.disabled = !isDirty();
+  }
 
   function getActive(): string[] {
-    return Array.from(pills)
+    return Array.from(pills ?? [])
       .filter(p => p.querySelector('input')?.checked)
       .map(p => p.querySelector('input')!.value);
   }
 
-  // Pill toggle
-  pills.forEach(pill => {
-    const input = pill.querySelector('input') as HTMLInputElement;
-    pill.addEventListener('click', () => {
-      input.checked = !input.checked;
-      pill.classList.toggle('is-active', input.checked);
-      const active = getActive();
-      updateState({ activeLanguages: active });
-      // Nur aktive Sprachen im Default-Select anzeigen
-      syncDefaultOptions(active);
-    });
-  });
-
   function syncDefaultOptions(active: string[]) {
-    const current = defaultSelect.value;
-    Array.from(defaultSelect.options).forEach(opt => {
+    const current = defaultSel.value;
+    Array.from(defaultSel.options).forEach(opt => {
       opt.disabled = !active.includes(opt.value);
     });
     if (!active.includes(current) && active.length > 0) {
-      defaultSelect.value = active[0];
+      defaultSel.value = active[0];
+      currentDefault = active[0];
       updateState({ defaultLanguage: active[0] });
     }
   }
 
-  defaultSelect?.addEventListener('change', () => {
-    updateState({ defaultLanguage: defaultSelect.value });
+  // Pill toggle — default-Sprache nicht anklickbar
+  pills?.forEach(pill => {
+    const input = pill.querySelector('input') as HTMLInputElement;
+    if (input?.dataset.isDefault) return; // nicht abwählbar
+
+    pill.addEventListener('click', () => {
+      const active = getActive();
+      // Mindestens 1 Sprache muss aktiv bleiben
+      if (input.checked && active.length <= 1) return;
+
+      input.checked = !input.checked;
+      pill.classList.toggle('is-active', input.checked);
+      const newActive = getActive();
+      currentLangs = newActive;
+      updateState({ activeLanguages: newActive });
+      syncDefaultOptions(newActive);
+      setStatus('', '');
+      updateSaveBtn();
+    });
+  });
+
+  defaultSel?.addEventListener('change', () => {
+    currentDefault = defaultSel.value;
+    updateState({ defaultLanguage: defaultSel.value });
+    setStatus('', '');
+    updateSaveBtn();
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    if (!isDirty() || saveBtn.disabled) return;
+    saveBtn.dataset.loading = 'true';
+    saveBtn.disabled = true;
+    setStatus('', '');
+
+    try {
+      const res = await fetch('/api/hotel/update-languages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabledLanguages: currentLangs,
+          defaultLanguage:  currentDefault,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      // Erfolg: Baseline auf gespeicherten Zustand setzen
+      baseline = { langs: [...currentLangs], defaultLang: currentDefault };
+      setStatus('saved', 'Gespeichert');
+      setTimeout(() => setStatus('', ''), 3000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[lang-section] save error', msg);
+      setStatus('error', `Fehler: ${msg}`);
+      saveBtn.disabled = false;
+    } finally {
+      delete saveBtn.dataset.loading;
+      updateSaveBtn();
+    }
   });
 </script>

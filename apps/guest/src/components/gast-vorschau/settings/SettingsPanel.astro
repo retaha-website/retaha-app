@@ -5,8 +5,14 @@ import BrandLinkCard from './BrandLinkCard.astro';
 import ModulesSection from './ModulesSection.astro';
 import ActionsSection from './ActionsSection.astro';
 import type { NfcTag } from '../../../lib/gast-vorschau/demo-data';
-interface Props { tags: NfcTag[]; hotelName?: string }
-const { tags, hotelName = 'Ihr Hotel' } = Astro.props;
+interface Props {
+  tags: NfcTag[];
+  hotelName?: string;
+  hotelId: string;
+  enabledLanguages: string[];
+  defaultLanguage: string;
+}
+const { tags, hotelName = 'Ihr Hotel', hotelId, enabledLanguages, defaultLanguage } = Astro.props;
 
 const tabDefs = [
   { key: 'module',     label: 'Module' },
@@ -46,7 +52,11 @@ const tabDefs = [
   <div x-show="tab === 'sprachen'" x-cloak>
     <WelcomeSection hotelName={hotelName} />
     <div style="margin-top:16px">
-      <LanguageSection />
+      <LanguageSection
+        hotelId={hotelId}
+        enabledLanguages={enabledLanguages}
+        defaultLanguage={defaultLanguage}
+      />
     </div>
   </div>
 

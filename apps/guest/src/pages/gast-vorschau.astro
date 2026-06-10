@@ -3,7 +3,7 @@ import HotelierLayout from '../layouts/HotelierLayout.astro';
 import PhonePreview from '../components/gast-vorschau/PhonePreview.astro';
 import SettingsPanel from '../components/gast-vorschau/settings/SettingsPanel.astro';
 import DemoQrCard from '@retaha/ui/components/shared/DemoQrCard.astro';
-import { getUser, getUserHotels, getOrCreateShowcaseUrl } from '@retaha/auth';
+import { getUser, getUserHotels, getOrCreateShowcaseUrl, createSupabaseServerInstance } from '@retaha/auth';
 import { demoTags } from '../lib/gast-vorschau/demo-data';
 
 const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
@@ -16,6 +16,19 @@ const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
 
 const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
+
+// Sprachdaten aus DB laden (getUserHotels selektiert enabled_languages nicht)
+const sb = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const { data: hotelLang, error: hotelLangError } = await sb
+  .from('hotels')
+  .select('default_language, enabled_languages')
+  .eq('id', hotel.id)
+  .maybeSingle();
+if (hotelLangError) console.error('[gast-vorschau] hotel lang fetch error', hotelLangError);
+const hotelDefaultLang: string = hotelLang?.default_language ?? 'de';
+const hotelEnabledLangs: string[] = Array.isArray(hotelLang?.enabled_languages)
+  ? hotelLang.enabled_languages
+  : ['de', 'en', 'fr', 'es'];
 ---
 
 <HotelierLayout
@@ -165,7 +178,13 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   <div class="gast-layout">
     <PhonePreview showcaseUrl={demoUrl ?? ''} />
     <div class="gast-sidebar">
-      <SettingsPanel tags={demoTags} hotelName={hotel.name} />
+      <SettingsPanel
+        tags={demoTags}
+        hotelName={hotel.name}
+        hotelId={hotel.id}
+        enabledLanguages={hotelEnabledLangs}
+        defaultLanguage={hotelDefaultLang}
+      />
       <DemoQrCard demoUrl={demoUrl} />
     </div>
   </div>
