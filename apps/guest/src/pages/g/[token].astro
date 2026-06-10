@@ -309,8 +309,8 @@ const checkOutDate = new Date(stay.check_out);
 const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
 
 const fmtShort = (d: Date) => d.toLocaleDateString(localeMap[lang], {
-  weekday: 'short', day: '2-digit', month: 'short',
-});
+  weekday: 'short', day: 'numeric', month: 'long',
+}).replace(/,\s*,/, ',');
 
 const checkInLabel = fmtShort(checkInDate);
 const checkOutLabel = fmtShort(checkOutDate);
@@ -370,6 +370,9 @@ const recs = (actionCardsRows ?? []).map((card: any) => ({
 // (weather placeholder removed — replaced by fetchWeather above)
 
 const f = (settings as any).features ?? {};
+const wifiSsid: string | null = settings.wifi_ssid || (isShowcase ? 'Demo-Hotel-WLAN' : null);
+const wifiPassword: string = settings.wifi_password || (isShowcase ? 'gast2026' : '');
+const wifiConfigured = !!wifiSsid;
 
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
 
@@ -471,6 +474,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           recs={recs}
           heroCards={actionCardsRows ?? []}
           f={f}
+          wifiConfigured={wifiConfigured}
           walletAvailable={walletAvailable}
           roomLabel={t('hero.stay.room', lang as Lang)}
           weather={weather}
@@ -744,8 +748,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       <!-- SHEETS (rendered as overlays, alle Themes) -->
       <WifiSheet
         hotelId={hotel.id}
-        ssid={settings.wifi_ssid || 'Gate-Guest'}
-        password={settings.wifi_password || ''}
+        ssid={wifiSsid ?? '—'}
+        password={wifiPassword}
         speedMbits={settings.wifi_speed_mbits || 320}
         lang={lang}
       />
@@ -811,7 +815,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
       {f.eve !== false && (
         <>
-          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang })};`} />
+          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang, guestName: guest?.first_name ?? null, eveName: settings.eve_name || 'Eve' })};window.__RETAHA_META__ = ${JSON.stringify({ isShowcase })};`} />
           <EveChatSheet
             lang={lang}
             eveName={settings.eve_name || 'Eve'}
@@ -845,7 +849,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           // Consent-Modul: zeigen wenn noch keine Entscheidung gespeichert
           const POLICY = '2026-06-01';
           const flagKey = `retaha_consent_v${POLICY}`;
-          if (localStorage.getItem(flagKey)) {
+          const _cs = this._isShowcase ? sessionStorage : localStorage;
+          if (_cs.getItem(flagKey)) {
             this.consentGiven = true;
           } else {
             setTimeout(() => { this.consentOpen = true; }, 900);
@@ -962,7 +967,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             comfort:   type === 'all' || (type === 'custom' && this.cmComfort),
             at: Date.now(),
           };
-          try { localStorage.setItem(flagKey, JSON.stringify(payload)); } catch (_) {}
+          const _cs = this._isShowcase ? sessionStorage : localStorage;
+          try { _cs.setItem(flagKey, JSON.stringify(payload)); } catch (_) {}
           try {
             const blob = new Blob([JSON.stringify({ token: null, consent_type: type, consent_given: type !== 'necessary' })], { type: 'application/json' });
             navigator.sendBeacon('/api/g/consent', blob);
@@ -990,6 +996,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         _eveLastConversation: '' as string,  // für Audit-Context
         _eveWelcomeTried: false,  // Phase 10: idempotenter Welcome-Trigger
         _eveLang: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.lang) || 'de',
+        _isShowcase: typeof window !== 'undefined' ? !!(window as any).__RETAHA_META__?.isShowcase : false,
 
         // Sprint E2 Phase 8 — Place-Detail-Sheet (layered über PlacesSheet)
         activeDetailPlaceId: null as string | null,
@@ -1175,28 +1182,35 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           if (this._eveWelcomeTried) return;
           if (this.eveMessages.length > 0) return;
           this._eveWelcomeTried = true;
-
           this.eveTyping = true;
-          try {
-            const res = await fetch('/api/eve/welcome', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lang: this._eveLang }),
-            });
-            if (!res.ok) {
-              console.warn('[eve/welcome] HTTP', res.status);
-              return;
-            }
-            const body = await res.json();
-            if (body.ok && body.welcome) {
-              this.eveMessages.push({ role: 'assistant', content: body.welcome, streaming: false });
-              this._scrollEveBottom();
-            }
-          } catch (err) {
-            console.warn('[eve/welcome] failed', err);
-          } finally {
-            this.eveTyping = false;
-          }
+          await new Promise(r => setTimeout(r, 850));
+          this.eveTyping = false;
+          const init = typeof window !== 'undefined' ? (window as any).__EVE_INITIAL__ : null;
+          const guestName: string | null = init?.guestName ?? null;
+          const eveName: string = init?.eveName || 'Eve';
+          const lang: string = init?.lang || 'de';
+          const hour = typeof window !== 'undefined' ? new Date().getHours() : 12;
+          const GREET: Record<string, { time: (h: number) => string; body: (n: string | null, e: string) => string }> = {
+            de: {
+              time: h => h < 12 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend',
+              body: (n, e) => `${n ? `Schön, dass du hier bist, ${n}. ` : ''}Ich bin ${e}, dein persönlicher Concierge — frag mich nach Empfehlungen, WLAN, Reservierungen oder was auch immer deinen Aufenthalt besser macht.`,
+            },
+            en: {
+              time: h => h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening',
+              body: (n, e) => `${n ? `Great to have you, ${n}. ` : ''}I'm ${e}, your personal concierge — ask me about recommendations, Wi-Fi, reservations, or anything to make your stay better.`,
+            },
+            fr: {
+              time: h => h < 12 ? 'Bonjour' : h < 18 ? 'Bon après-midi' : 'Bonsoir',
+              body: (n, e) => `${n ? `Ravi de vous accueillir, ${n}. ` : ''}Je suis ${e}, votre concierge — n'hésitez pas à demander des recommandations, le Wi-Fi ou des réservations.`,
+            },
+            es: {
+              time: h => h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches',
+              body: (n, e) => `${n ? `Encantado de tenerte aquí, ${n}. ` : ''}Soy ${e}, tu concierge personal — pregúntame recomendaciones, Wi-Fi o reservas.`,
+            },
+          };
+          const g = GREET[lang] ?? GREET.de;
+          this.eveMessages.push({ role: 'assistant', content: `${g.time(hour)}! ${g.body(guestName, eveName)}`, streaming: false });
+          this._scrollEveBottom();
         },
 
         _scrollEveBottom() {
