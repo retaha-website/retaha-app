@@ -20,12 +20,14 @@ interface Props {
   actions: any[];
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+  greeting?: { hi: string; sub: string };
 }
 
 const {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
+  greeting = { hi: 'Hallo,', sub: '' },
 } = Astro.props;
 
 const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
@@ -50,8 +52,9 @@ const name = guest?.first_name ?? hotel.name;
 <!-- GREETING -->
 <section class="bh-hero">
   <h1 class="bh-hero__title">
-    Hallo, {name}<span class="bh-hero__dot">.</span>
+    <span class="bh-hero__hi">{greeting.hi}</span> {name}<span class="bh-hero__dot">.</span>
   </h1>
+  {greeting.sub && <p class="bh-hero__sub">{greeting.sub}</p>}
   <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} />
 </section>
 
@@ -113,8 +116,18 @@ const name = guest?.first_name ?? hotel.name;
     margin: 0 0 10px;
     text-align: left;
   }
+  .bh-hero__hi {
+    color: var(--guest-ink-muted);
+    font-weight: 400;
+  }
   .bh-hero__dot {
     color: var(--guest-accent);
+  }
+  .bh-hero__sub {
+    font-size: 13px;
+    color: var(--guest-ink-muted);
+    margin: 4px 0 10px;
+    font-family: var(--guest-font-body);
   }
 
   /* ── Slider: 2 cards per view ────────────────────────────────────────── */

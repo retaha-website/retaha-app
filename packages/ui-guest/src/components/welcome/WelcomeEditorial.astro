@@ -20,12 +20,14 @@ interface Props {
   actions: any[];
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+  greeting?: { hi: string; sub: string };
 }
 
 const {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
+  greeting = { hi: 'Hallo,', sub: '' },
 } = Astro.props;
 
 const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
@@ -50,9 +52,10 @@ const name = guest?.first_name ?? hotel.name;
 <!-- GREETING: Cormorant italic, offset -->
 <section class="ed-hero">
   <h1 class="ed-hero__title">
-    <span class="ed-hero__hi">Hallo,</span>
+    <span class="ed-hero__hi">{greeting.hi}</span>
     <span class="ed-hero__name">{name}<span class="ed-hero__dot">.</span></span>
   </h1>
+  {greeting.sub && <p class="ed-hero__sub">{greeting.sub}</p>}
   <div class="ed-hero__stay-wrap">
     <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} />
     <div class="ed-hero__rule"></div>
@@ -124,6 +127,13 @@ const name = guest?.first_name ?? hotel.name;
     margin-left: 18px;
   }
   .ed-hero__dot { color: var(--guest-accent); }
+  .ed-hero__sub {
+    font-family: var(--guest-font-display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--guest-ink-muted);
+    margin: 2px 0 8px 18px;
+  }
   .ed-hero__stay-wrap {
     margin-top: 2px;
   }

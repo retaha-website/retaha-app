@@ -20,12 +20,14 @@ interface Props {
   actions: any[];
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+  greeting?: { hi: string; sub: string };
 }
 
 const {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
+  greeting = { hi: 'Willkommen,', sub: '' },
 } = Astro.props;
 
 const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
@@ -55,9 +57,10 @@ const name = guest?.first_name ?? hotel.name;
 <!-- GREETING: uppercase, letter-spacing, centered -->
 <section class="ma-hero">
   <h1 class="ma-hero__title">
-    <span class="ma-hero__hi">Willkommen</span>
+    <span class="ma-hero__hi">{greeting.hi.replace(/,$/, '').toUpperCase()}</span>
     <span class="ma-hero__name">{name}</span>
   </h1>
+  {greeting.sub && <p class="ma-hero__sub">{greeting.sub}</p>}
   <StayLine persona={persona} room={room} checkInLabel={checkInLabel} checkOutLabel={checkOutLabel} lang={lang} align="center" />
 </section>
 
@@ -148,6 +151,15 @@ const name = guest?.first_name ?? hotel.name;
     text-transform: uppercase;
     color: var(--guest-ink);
     line-height: 1.1;
+  }
+  .ma-hero__sub {
+    font-family: var(--guest-font-display);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--guest-ink-muted);
+    margin: 0 0 12px;
   }
 
   /* ── Slider: 1 centered card, gold border ───────────────────────────── */

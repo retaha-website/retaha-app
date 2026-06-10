@@ -31,16 +31,54 @@ const {
   f, heroCards = [], weather, persona = 'in_house',
 } = Astro.props;
 
+type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet';
+type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
+
+// Module-Reihenfolge und Sichtbarkeit pro Mode
+const MODULE_ORDER: Record<StayMode, ModuleKey[]> = {
+  pre_arrival:  ['wifi', 'breakfast', 'eve', 'places', 'wallet'],
+  in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'checkout', 'wallet'],
+  checking_out: ['checkout', 'eve', 'wallet', 'breakfast', 'places'],
+};
+const visibleKeys = new Set(MODULE_ORDER[persona]);
+
 const theme = (hotel as any).design_identity ?? 'bauhaus';
 const eveName = settings.eve_name || 'Eve';
 const cityLine = hotel.city || '';
 const hasService    = f.service    !== false && (settings.service_items?.length ?? 0) > 0;
 const hasConference = f.conference !== false && (settings.conference_rooms?.length ?? 0) > 0;
+const welcomeSub = settings.welcome_message_de || '';
 
-// Build actions array — shared across all 3 layout variants
-type ActionItem = { num: string; icon: string; label: string; sub: string; handler: string };
-const allActions: ActionItem[] = [
+// i18n Begrüßung pro Mode
+type Lang = 'de' | 'en' | 'fr' | 'es';
+const l = (['de','en','fr','es'].includes(lang) ? lang : 'de') as Lang;
+const MODE_GREETING: Record<StayMode, Record<Lang, { hi: string; sub: string }>> = {
+  pre_arrival: {
+    de: { hi: 'Willkommen,', sub: 'Wir freuen uns auf deinen Besuch.' },
+    en: { hi: 'Welcome,',    sub: 'We look forward to your stay.' },
+    fr: { hi: 'Bienvenue,',  sub: 'Nous avons hâte de vous accueillir.' },
+    es: { hi: 'Bienvenido,', sub: 'Esperamos con entusiasmo su visita.' },
+  },
+  in_house: {
+    de: { hi: 'Hallo,',   sub: welcomeSub || 'Schön, dass du da bist.' },
+    en: { hi: 'Hello,',   sub: welcomeSub || 'Glad to have you here.' },
+    fr: { hi: 'Bonjour,', sub: welcomeSub || 'Ravi de vous avoir parmi nous.' },
+    es: { hi: 'Hola,',    sub: welcomeSub || 'Encantado de tenerte aquí.' },
+  },
+  checking_out: {
+    de: { hi: 'Schön, dass du da warst,', sub: 'Vielen Dank für deinen Aufenthalt.' },
+    en: { hi: 'Goodbye,',                  sub: 'Thank you for staying with us.' },
+    fr: { hi: 'Au revoir,',                sub: 'Merci pour votre séjour.' },
+    es: { hi: 'Hasta pronto,',             sub: 'Gracias por su estancia.' },
+  },
+};
+const greeting = MODE_GREETING[persona][l];
+
+// Actions-Pool — alle möglichen Module mit Key
+type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string };
+const ACTION_POOL: ActionItem[] = [
   {
+    key: 'wifi',
     num: '01',
     icon: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
     label: 'WLAN',
@@ -48,6 +86,7 @@ const allActions: ActionItem[] = [
     handler: "openSheet('wifi')",
   },
   {
+    key: 'breakfast',
     num: '02',
     icon: '<path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>',
     label: 'Frühstück',
@@ -55,6 +94,7 @@ const allActions: ActionItem[] = [
     handler: "openSheet('breakfast')",
   },
   {
+    key: 'eve',
     num: '03',
     icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
     label: eveName,
@@ -63,6 +103,7 @@ const allActions: ActionItem[] = [
     visible: f.eve !== false,
   } as any,
   {
+    key: 'service',
     num: '04',
     icon: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>',
     label: 'Service',
@@ -71,6 +112,7 @@ const allActions: ActionItem[] = [
     visible: hasService,
   } as any,
   {
+    key: 'places',
     num: '05',
     icon: '<circle cx="12" cy="12" r="10"/><polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"/>',
     label: 'Tipps',
@@ -79,6 +121,7 @@ const allActions: ActionItem[] = [
     visible: f.recommendations !== false,
   } as any,
   {
+    key: 'conference',
     num: '06',
     icon: '<rect x="3" y="7" width="18" height="13"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
     label: 'Konferenz',
@@ -87,6 +130,7 @@ const allActions: ActionItem[] = [
     visible: hasConference,
   } as any,
   {
+    key: 'checkout',
     num: '07',
     icon: '<path d="M5 12L10 17L19 7"/>',
     label: 'Checkout',
@@ -94,14 +138,21 @@ const allActions: ActionItem[] = [
     handler: `window.location='/g/${token}/checkout'`,
     visible: f.self_checkout !== false,
   } as any,
-].filter((a: any) => a.visible !== false);
+];
 
-const actions = allActions.map((a, i) => ({ ...a, num: String(i + 1).padStart(2, '0') }));
+// 1. Feature-Toggle-Filter (hotel_settings)
+// 2. Mode-Filter (Reihenfolge aus MODULE_ORDER)
+// 3. Umnummerieren
+const featureFiltered = ACTION_POOL.filter((a: any) => a.visible !== false);
+const actions = MODULE_ORDER[persona]
+  .map(key => featureFiltered.find(a => a.key === key))
+  .filter(Boolean)
+  .map((a, i) => ({ ...a!, num: String(i + 1).padStart(2, '0') }));
 
 const sharedProps = {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
-  heroCards, f, actions, weather, persona,
+  heroCards, f, actions, weather, persona, greeting,
 };
 ---
 
