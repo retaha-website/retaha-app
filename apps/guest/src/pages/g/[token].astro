@@ -66,15 +66,25 @@ if (token && isShowcaseToken(token)) {
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
-      // Demo-Daten: check_in = heute, check_out = morgen 11:00
+      // Persona-aware demo dates (nur für showcase_ tokens)
+      const _persona = new URL(Astro.request.url).searchParams.get('persona') ?? 'in_house';
       const now = new Date();
-      const todayStart = new Date(now); todayStart.setUTCHours(14, 0, 0, 0);
-      const tomorrowCheckout = new Date(todayStart); tomorrowCheckout.setUTCDate(tomorrowCheckout.getUTCDate() + 1); tomorrowCheckout.setUTCHours(11, 0, 0, 0);
+      let _checkIn: Date, _checkOut: Date;
+      if (_persona === 'arrival') {
+        _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() + 3);  _checkIn.setUTCHours(14, 0, 0, 0);
+        _checkOut = new Date(_checkIn); _checkOut.setUTCDate(_checkOut.getUTCDate() + 2); _checkOut.setUTCHours(11, 0, 0, 0);
+      } else if (_persona === 'departure') {
+        _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 2); _checkIn.setUTCHours(14, 0, 0, 0);
+        _checkOut = new Date(now); _checkOut.setUTCHours(23, 59, 59, 0);
+      } else {
+        _checkIn  = new Date(now); _checkIn.setUTCHours(14, 0, 0, 0);
+        _checkOut = new Date(_checkIn); _checkOut.setUTCDate(_checkOut.getUTCDate() + 1); _checkOut.setUTCHours(11, 0, 0, 0);
+      }
       ctx = {
         stay: {
           id: showcaseSession.id,
-          check_in: todayStart.toISOString(),
-          check_out: tomorrowCheckout.toISOString(),
+          check_in: _checkIn.toISOString(),
+          check_out: _checkOut.toISOString(),
           is_active: true,
         },
         guest: {
@@ -626,7 +636,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           </button>
 
           {f.eve !== false && (
-            <button class="gate-tile" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+            <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
               </span>
@@ -635,7 +645,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
             </button>
           )}
 
-          <button class="gate-tile" type="button" @click="openSheet('breakfast')">
+          <button class="gate-tile" data-tile="breakfast" type="button" @click="openSheet('breakfast')">
             <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
             <span class="gate-tile-icon">
               <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
@@ -645,7 +655,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           </button>
 
           {f.conference !== false && settings.conference_rooms && settings.conference_rooms.length > 0 && (
-            <button class="gate-tile" type="button" @click="openSheet('conference')">
+            <button class="gate-tile" data-tile="conference" type="button" @click="openSheet('conference')">
               <span class="gate-tile-badge">{t('tile.conference.badge', lang)}</span>
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="12"/></svg>
@@ -656,7 +666,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           )}
 
           {f.service !== false && settings.service_items && settings.service_items.length > 0 && (
-            <button class="gate-tile" type="button" @click="openSheet('service')">
+            <button class="gate-tile" data-tile="service" type="button" @click="openSheet('service')">
               <span class="gate-tile-badge orange">{t('tile.service.badge', lang)}</span>
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
@@ -667,7 +677,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           )}
 
           {f.recommendations !== false && (
-            <button class="gate-tile" type="button" @click="openSheet('places')">
+            <button class="gate-tile" data-tile="empfehlungen" type="button" @click="openSheet('places')">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
               </span>
@@ -677,7 +687,7 @@ const showPostStay = stayEnded && !hasStayFeedback;
           )}
 
           {f.self_checkout !== false && (
-            <button class="gate-tile tile-checkout" type="button" onclick={`window.location='/g/${token}/checkout'`}>
+            <button class="gate-tile tile-checkout" data-tile="self_checkout" type="button" onclick={`window.location='/g/${token}/checkout'`}>
               <div class="checkout-left">
                 <span class="check-icon">
                   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12 L10 17 L19 7"/></svg>
@@ -1899,6 +1909,41 @@ const showPostStay = stayEnded && !hasStayFeedback;
 
       Alpine.start();
     </script>
+
+    {isShowcase && (
+      <>
+        <style is:inline>{`
+          @keyframes tile-pulse-on {
+            0%   { box-shadow: 0 0 0 0 rgba(255,230,0,0);       transform: scale(1); }
+            30%  { box-shadow: 0 0 20px 8px rgba(255,230,0,0.8); transform: scale(1.05); }
+            100% { box-shadow: 0 0 0 0 rgba(255,230,0,0);       transform: scale(1); }
+          }
+          @keyframes tile-pulse-off {
+            0%   { box-shadow: 0 0 0 0 rgba(255,74,130,0);       opacity: 1; }
+            30%  { box-shadow: 0 0 20px 8px rgba(255,74,130,0.8); opacity: 0.6; }
+            100% { box-shadow: 0 0 0 0 rgba(255,74,130,0);       opacity: 1; }
+          }
+          .gate-tile.pulse-on  { animation: tile-pulse-on  800ms ease-out; }
+          .gate-tile.pulse-off { animation: tile-pulse-off 800ms ease-out; }
+        `}</style>
+        <script is:inline>
+          window.addEventListener('message', function(e) {
+            if (e.origin !== window.location.origin) return;
+            var d = e.data;
+            if (!d || d.type !== 'highlight-module') return;
+            var tile = document.querySelector('.gate-tile[data-tile="' + d.module + '"]');
+            if (!tile) return;
+            tile.classList.remove('pulse-on', 'pulse-off');
+            void tile.offsetWidth;
+            tile.classList.add(d.state === 'off' ? 'pulse-off' : 'pulse-on');
+            clearTimeout(tile._pulseTimer);
+            tile._pulseTimer = setTimeout(function() {
+              tile.classList.remove('pulse-on', 'pulse-off');
+            }, 800);
+          });
+        </script>
+      </>
+    )}
 
     <!-- Sprint i18n Phase 7 — Sprach-Wechsel-Persistenz via sendBeacon -->
     <script is:inline>

@@ -61,138 +61,45 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   </script>
 
   <script>
-    // ─── CSS-Pulse Animation (kein Zoom) ─────────────────────────────────
+    // ─── iframe-basierter Demo-Modus ──────────────────────────────────────
 
-    const LABEL_TO_MODULE: Record<string, string> = {
-      'eve': 'eve', 'frühstück': 'breakfast', 'service': 'service',
-      'tipps': 'empfehlungen', 'konferenz': 'conference', 'wallet': 'wallet',
-    };
-    const MODULE_DISPLAY_NAME: Record<string, string> = {
-      'eve': 'Eve Concierge', 'breakfast': 'Frühstück', 'service': 'Service',
-      'empfehlungen': 'Tipps & Orte', 'conference': 'Konferenz', 'wallet': 'Wallet',
-    };
+    const DEMO_MODULES = ['eve', 'breakfast', 'conference', 'service', 'empfehlungen', 'self_checkout'];
 
-    const phonePreview    = document.getElementById('phonePreview');
-    const phoneContent    = document.getElementById('phoneContent') as HTMLElement | null;
-    const zoomNotice      = document.getElementById('zoomNotice')   as HTMLElement | null;
-    const zoomNoticeLabel = document.getElementById('zoomNoticeLabel');
-    const demoBar         = document.getElementById('demoBar');
-    const interactiveBar  = document.getElementById('interactiveBar');
+    const iframe        = document.getElementById('guestPreview') as HTMLIFrameElement | null;
+    const phonePreview  = document.getElementById('phonePreview');
+    const demoBar       = document.getElementById('demoBar');
+    const interactiveBar = document.getElementById('interactiveBar');
 
-    let isInteractive  = false;
-    let demoTileIndex  = 0;
-    let demoTimer:     ReturnType<typeof setTimeout> | null = null;
-    let noticeTimer:   ReturnType<typeof setTimeout> | null = null;
+    const baseUrl = iframe?.dataset.baseUrl ?? '';
 
-    // ── Tile helpers ──────────────────────────────────────────────────────
+    let isInteractive   = false;
+    let demoModuleIndex = 0;
+    let demoTimer:      ReturnType<typeof setTimeout> | null = null;
 
-    function getActiveTiles(): HTMLElement[] {
-      return Array.from(document.querySelectorAll<HTMLElement>('.gate-tile')).filter(t => {
-        const op = parseFloat(t.style.opacity ?? '1');
-        return !isNaN(op) ? op > 0.3 : true;
-      });
-    }
+    // ── postMessage helper ────────────────────────────────────────────────
 
-    function tileKey(tile: HTMLElement): string | undefined {
-      const label = tile.querySelector('.gate-tile-label')?.textContent?.trim().toLowerCase() ?? '';
-      return LABEL_TO_MODULE[label];
-    }
-
-    function findTileByKey(key: string): HTMLElement | null {
-      let found: HTMLElement | null = null;
-      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(t => {
-        if (tileKey(t) === key) found = t;
-      });
-      return found;
-    }
-
-    // ── Pulse ────────────────────────────────────────────────────────────
-
-    function pulse(tile: HTMLElement, variant: 'on' | 'off') {
-      tile.classList.remove('pulse-on', 'pulse-off');
-      void tile.offsetWidth; // force reflow so animation restarts
-      tile.classList.add(variant === 'on' ? 'pulse-on' : 'pulse-off');
-    }
-
-    function clearPulse(tile: HTMLElement) {
-      tile.classList.remove('pulse-on', 'pulse-off');
-    }
-
-    // ── Notice ────────────────────────────────────────────────────────────
-
-    function showNotice(tile: HTMLElement, key: string) {
-      if (!zoomNotice || !zoomNoticeLabel || !phoneContent) return;
-      zoomNoticeLabel.textContent = MODULE_DISPLAY_NAME[key] ?? key;
-
-      const cr = phoneContent.getBoundingClientRect();
-      const tr = tile.getBoundingClientRect();
-      const cx = tr.left + tr.width / 2 - cr.left;
-      const ty = tr.top  - cr.top;
-      const by = tr.bottom - cr.top;
-
-      zoomNotice.style.left = `${cx}px`;
-      if (ty < 50) {
-        zoomNotice.style.top       = `${by}px`;
-        zoomNotice.style.transform = 'translateX(-50%) translateY(8px)';
-        zoomNotice.classList.add('is-below');
-      } else {
-        zoomNotice.style.top       = `${ty}px`;
-        zoomNotice.style.transform = 'translateX(-50%) translateY(calc(-100% - 8px))';
-        zoomNotice.classList.remove('is-below');
-      }
-      zoomNotice.setAttribute('data-active', 'true');
-    }
-
-    function hideNotice() {
-      zoomNotice?.setAttribute('data-active', 'false');
+    function sendHighlight(module: string, state: 'on' | 'off' | 'demo') {
+      if (!iframe?.contentWindow) return;
+      iframe.contentWindow.postMessage(
+        { type: 'highlight-module', module, state },
+        window.location.origin,
+      );
     }
 
     // ── Demo Loop ─────────────────────────────────────────────────────────
 
     function tickDemo() {
       if (isInteractive) return;
-      const tiles = getActiveTiles();
-      if (!tiles.length) return;
-
-      demoTileIndex = demoTileIndex % tiles.length;
-      const tile = tiles[demoTileIndex];
-      const key  = tileKey(tile);
-
-      pulse(tile, 'on');
-      if (key) showNotice(tile, key);
-
+      const module = DEMO_MODULES[demoModuleIndex % DEMO_MODULES.length];
+      sendHighlight(module, 'demo');
       demoTimer = setTimeout(() => {
-        clearPulse(tile);
-        hideNotice();
-        demoTileIndex = (demoTileIndex + 1) % tiles.length;
+        demoModuleIndex = (demoModuleIndex + 1) % DEMO_MODULES.length;
         if (!isInteractive) demoTimer = setTimeout(tickDemo, 400);
       }, 1200);
     }
 
     function stopDemo() {
       if (demoTimer) { clearTimeout(demoTimer); demoTimer = null; }
-      document.querySelectorAll<HTMLElement>('.gate-tile').forEach(clearPulse);
-      hideNotice();
-    }
-
-    // ── Toggle Handler ────────────────────────────────────────────────────
-
-    function onModuleToggle(moduleKey: string, isOn: boolean) {
-      if (isInteractive) return;
-      const tile = findTileByKey(moduleKey);
-      if (!tile) return;
-
-      // Cancel previous notice timer
-      if (noticeTimer) { clearTimeout(noticeTimer); noticeTimer = null; }
-
-      pulse(tile, isOn ? 'on' : 'off');
-      showNotice(tile, moduleKey);
-
-      noticeTimer = setTimeout(() => {
-        clearPulse(tile);
-        hideNotice();
-        noticeTimer = null;
-      }, 800);
     }
 
     // ── Interactive Mode ──────────────────────────────────────────────────
@@ -200,16 +107,33 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     function setInteractive(on: boolean) {
       isInteractive = on;
       phonePreview?.classList.toggle('is-interactive', on);
-      if (demoBar)       demoBar.hidden       = on;
+      if (demoBar)        demoBar.hidden        = on;
       if (interactiveBar) interactiveBar.hidden = !on;
       if (on) stopDemo();
-      else    { demoTileIndex = 0; demoTimer = setTimeout(tickDemo, 300); }
+      else    { demoModuleIndex = 0; demoTimer = setTimeout(tickDemo, 300); }
     }
 
     document.getElementById('demoInteractiveBtn')?.addEventListener('click', () => setInteractive(true));
     document.getElementById('demoDemoBtn')?.addEventListener('click',        () => setInteractive(false));
 
-    // ── Module Toggle Listener ────────────────────────────────────────────
+    // ── Persona Switching ─────────────────────────────────────────────────
+
+    document.querySelectorAll<HTMLButtonElement>('.persona-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        const persona = dot.dataset.persona;
+        if (!persona || !iframe || !baseUrl) return;
+        stopDemo();
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        iframe.src = `${baseUrl}${sep}persona=${persona}`;
+        iframe.onload = () => {
+          demoModuleIndex = 0;
+          if (!isInteractive) demoTimer = setTimeout(tickDemo, 800);
+          iframe.onload = null;
+        };
+      });
+    });
+
+    // ── Module Toggle → postMessage ───────────────────────────────────────
 
     document.addEventListener('click', e => {
       const toggle = (e.target as HTMLElement).closest<HTMLButtonElement>('.module-toggle');
@@ -218,24 +142,23 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       if (!key) return;
       setTimeout(() => {
         const isOn = toggle.getAttribute('aria-pressed') === 'true';
-        onModuleToggle(key, isOn);
+        sendHighlight(key, isOn ? 'on' : 'off');
       }, 20);
     }, true);
 
-    // ── Init ─────────────────────────────────────────────────────────────
+    // ── Init — warte bis iframe geladen ───────────────────────────────────
 
-    function tryStart() {
-      if (document.querySelectorAll('.gate-tile').length > 0) {
-        demoTimer = setTimeout(tickDemo, 800);
-      } else {
-        setTimeout(tryStart, 300);
-      }
+    if (iframe) {
+      iframe.addEventListener('load', () => {
+        if (!isInteractive && !demoTimer) {
+          demoTimer = setTimeout(tickDemo, 600);
+        }
+      }, { once: true });
     }
-    setTimeout(tryStart, 800);
   </script>
 
   <div class="gast-layout">
-    <PhonePreview />
+    <PhonePreview showcaseUrl={demoUrl ?? ''} />
     <div class="gast-sidebar">
       <SettingsPanel tags={demoTags} hotelName={hotel.name} />
       <DemoQrCard demoUrl={demoUrl} />

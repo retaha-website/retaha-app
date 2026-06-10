@@ -1,16 +1,20 @@
 ---
-import PhoneScreen from './PhoneScreen.astro';
+interface Props {
+  showcaseUrl: string;
+}
+const { showcaseUrl } = Astro.props;
 ---
 
 <div class="phone-frame" aria-label="Telefon-Vorschau">
   <div class="phone-frame__notch" aria-hidden="true"></div>
   <div class="phone-frame__screen-area">
-    <div class="phone-frame__content" id="phoneContent">
-      <div class="zoom-notice" id="zoomNotice" data-active="false">
-        <strong class="zoom-notice__label" id="zoomNoticeLabel"></strong>
-      </div>
-      <PhoneScreen />
-    </div>
+    <iframe
+      id="guestPreview"
+      src={showcaseUrl}
+      data-base-url={showcaseUrl}
+      title="Gäste-Vorschau"
+      class="phone-frame__iframe"
+    ></iframe>
   </div>
   <div class="phone-frame__home-bar" aria-hidden="true"></div>
 </div>
@@ -44,47 +48,11 @@ import PhoneScreen from './PhoneScreen.astro';
     width: 100%; height: 100%;
     background: white; border-radius: 27px; overflow: hidden; position: relative;
   }
-  .phone-frame__content {
-    width: 100%; height: 100%;
-    position: relative;
-    /* No transform — frame and content are fully static */
-  }
-
-  /* Zoom-Notice — speech bubble anchored at tile via JS */
-  .zoom-notice {
-    position: absolute;
-    padding: 4px 10px;
-    background: rgba(10, 10, 10, 0.88);
-    color: #FAFAF8;
-    border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 180ms ease;
-    pointer-events: none;
-    z-index: 100;
-  }
-  .zoom-notice[data-active="true"] { opacity: 1; }
-
-  /* Arrow pointing DOWN (notice above tile) */
-  .zoom-notice::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 4px solid transparent;
-    border-top-color: rgba(10, 10, 10, 0.88);
-  }
-  /* Arrow pointing UP (notice below tile) */
-  .zoom-notice.is-below::after {
-    top: auto;
-    bottom: 100%;
-    border-top-color: transparent;
-    border-bottom-color: rgba(10, 10, 10, 0.88);
+  .phone-frame__iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
   }
   .phone-frame__home-bar {
     position: absolute; bottom: 6px; left: 50%;
