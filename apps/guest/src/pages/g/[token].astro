@@ -16,7 +16,7 @@ import PostStaySheet from '../../components/sheets/PostStaySheet.astro';
 import WalletAddSheet from '../../components/sheets/WalletAddSheet.astro';
 import { isWalletConfigured } from '@retaha/wallet';
 import { buildPhotoUrl } from '../../lib/places/google-client';
-import { setStaySessionCookie, getStaySession } from '@retaha/auth';
+import { setStaySessionCookie, getStaySession, computeBrandPalette } from '@retaha/auth';
 import { getEveSuggestions } from '@retaha/eve';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@retaha/ui/styles/themes.css';
@@ -62,7 +62,7 @@ if (token && isShowcaseToken(token)) {
     // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
     const sbSrInit = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary, brand_secondary').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary').eq('id', showcaseSession.hotel_id).single(),
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -413,10 +413,11 @@ const legacyTheme = resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl:
 const activeTheme = hotelDesignIdentity ?? (IDENTITY_REMAP[legacyTheme] ?? 'bauhaus');
 
 const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
-const brandSecondary: string | null = (hotel as any).brand_secondary ?? null;
-const brandStyle = brandPrimary
-  ? `--user-brand-primary:${brandPrimary}${brandSecondary ? `;--user-brand-secondary:${brandSecondary}` : ''}`
-  : undefined;
+const brandStyle = (() => {
+  if (!brandPrimary) return undefined;
+  const p = computeBrandPalette(brandPrimary);
+  return `--user-brand-primary:${brandPrimary};--user-brand-hover:${p.hover};--user-brand-soft:${p.soft};--user-brand-on-accent:${p.onAccent}`;
+})();
 
 // Sprint Functional Modul C Phase 8 — Post-Stay-Sheet-Gate
 // Render-Bedingung: check_out liegt in der Vergangenheit + noch kein Feedback.

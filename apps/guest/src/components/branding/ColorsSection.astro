@@ -2,12 +2,13 @@
 import BrandSection from './BrandSection.astro';
 import ColorPicker from './ColorPicker.astro';
 import type { BrandingData } from '@retaha/auth';
+import { computeBrandPalette } from '@retaha/auth';
 
 interface Props { branding: BrandingData; }
 const { branding } = Astro.props;
 
-const primary   = branding.brand_primary   ?? '#FF4A82';
-const secondary = branding.brand_secondary ?? '';
+const primary = branding.brand_primary ?? '#FF4A82';
+const palette = computeBrandPalette(primary);
 ---
 
 <BrandSection title="Brand-Farben" num="02">
@@ -23,28 +24,28 @@ const secondary = branding.brand_secondary ?? '';
         <ColorPicker targetId="brand-primary" value={primary} ariaLabel="Farbwähler Primärfarbe" />
       </div>
     </div>
-    <p class="field__hint">Hauptakzentfarbe der Gäste-App (CTAs, Eve-Chat, Action-Karten)</p>
+    <p class="field__hint">Hauptakzentfarbe — alle weiteren Rollen werden automatisch abgeleitet</p>
 
-    <!-- Secondary -->
-    <div class="field field--row">
-      <label class="field__label" for="brand-secondary">Sekundärfarbe</label>
-      <div class="color-row">
-        <input type="text" id="brand-secondary" name="brand_secondary" class="s-input color-hex"
-          value={secondary} placeholder="Optional · #8C2128" maxlength="7" />
-        <ColorPicker targetId="brand-secondary" value={secondary || '#8C2128'} ariaLabel="Farbwähler Sekundärfarbe" />
-      </div>
-    </div>
-
-    <!-- Auto-Varianten -->
+    <!-- Palette-Rollen -->
     <div class="variants">
-      <span class="variants__label">Auto-Varianten</span>
+      <span class="variants__label">Abgeleitete Palette</span>
       <div class="variant-grid" id="variantGrid">
-        {[['10%','Hover-Tint'],['25%','Weich'],['60%','Gedimmt'],['100%','Primär']].map(([pct, hint]) => (
-          <div class="variant-chip variant-chip--auto">
-            <span class="variant-chip__pct">{pct}</span>
-            <span class="variant-chip__hint">{hint}</span>
-          </div>
-        ))}
+        <div class="variant-chip" id="chip-accent" style={`background:${primary}`}>
+          <span class="variant-chip__role">Akzent</span>
+          <span class="variant-chip__hex" id="chip-accent-hex">{primary}</span>
+        </div>
+        <div class="variant-chip" id="chip-hover" style={`background:${palette.hover}`}>
+          <span class="variant-chip__role">Hover</span>
+          <span class="variant-chip__hex" id="chip-hover-hex">{palette.hover}</span>
+        </div>
+        <div class="variant-chip" id="chip-soft" style={`background:${palette.soft}`}>
+          <span class="variant-chip__role">Soft</span>
+          <span class="variant-chip__hex" id="chip-soft-hex">{palette.soft}</span>
+        </div>
+        <div class="variant-chip" id="chip-on" style={`background:${palette.onAccent}`}>
+          <span class="variant-chip__role">Text-auf-Akzent</span>
+          <span class="variant-chip__hex" id="chip-on-hex">{palette.onAccent}</span>
+        </div>
       </div>
     </div>
 
@@ -92,8 +93,11 @@ const secondary = branding.brand_secondary ?? '';
     display: flex; flex-direction: column; justify-content: space-between;
     border: 1px solid var(--border);
   }
-  .variant-chip__pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; color: var(--ink); }
-  .variant-chip__hint { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); }
+  .variant-chip__role {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+    color: var(--ink); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .variant-chip__hex { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); }
   .s-card__footer { margin-top: 8px; display: flex; justify-content: flex-end; }
   .s-btn {
     background: var(--ink); color: var(--bg); padding: 10px 24px; border: none;
@@ -104,31 +108,48 @@ const secondary = branding.brand_secondary ?? '';
 </style>
 
 <script>
-  function updateVariants(hex: string) {
-    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
-    const chips = document.querySelectorAll('.variant-chip--auto');
-    const alphas = ['1A', '40', '99', 'FF'];
-    chips.forEach((chip, i) => {
-      (chip as HTMLElement).style.background = `${hex}${alphas[i]}`;
-    });
+  function computePalette(hex: string) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return null;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    function mixWhite(t: number) {
+      const mr = Math.round(r + (255 - r) * t);
+      const mg = Math.round(g + (255 - g) * t);
+      const mb = Math.round(b + (255 - b) * t);
+      return `#${mr.toString(16).padStart(2,'0')}${mg.toString(16).padStart(2,'0')}${mb.toString(16).padStart(2,'0')}`;
+    }
+    function sRGB(c: number) { const v = c/255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }
+    const lum = 0.2126*sRGB(r) + 0.7152*sRGB(g) + 0.0722*sRGB(b);
+    return { accent: hex, hover: mixWhite(0.65), soft: mixWhite(0.90), onAccent: lum > 0.179 ? '#0A0A0A' : '#FFFFFF' };
+  }
+
+  function updateChips(hex: string) {
+    const p = computePalette(hex);
+    if (!p) return;
+    const setChip = (id: string, color: string) => {
+      const el = document.getElementById(id) as HTMLElement | null;
+      if (el) { el.style.background = color; const hx = el.querySelector('.variant-chip__hex') as HTMLElement | null; if (hx) hx.textContent = color; }
+    };
+    setChip('chip-accent', p.accent);
+    setChip('chip-hover',  p.hover);
+    setChip('chip-soft',   p.soft);
+    setChip('chip-on',     p.onAccent);
   }
 
   function syncFromHex(hexInput: HTMLInputElement) {
     const hex = hexInput.value.trim();
     if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
-
     if (hexInput.id === 'brand-primary') {
-      updateVariants(hex);
-      // Mini-Phone-Preview live updaten — jede Theme-Preview hat eigene Accent-Var
+      updateChips(hex);
       document.querySelector<HTMLElement>('.bh-wrap')?.style.setProperty('--pink', hex);
       document.querySelector<HTMLElement>('.ed-wrap')?.style.setProperty('--olive', hex);
       document.querySelector<HTMLElement>('.ms-wrap')?.style.setProperty('--gold', hex);
     }
   }
 
-  // Hex-Input (direkte Eingabe) → Varianten
   document.querySelectorAll<HTMLInputElement>('.color-hex').forEach(input => {
     input.addEventListener('input', () => syncFromHex(input));
-    syncFromHex(input); // Initialer Sync
+    syncFromHex(input);
   });
 </script>

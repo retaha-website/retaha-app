@@ -37,8 +37,8 @@ export {
 } from './cross-subdomain-cookie';
 
 // Branding-Data Helper
-export { getBranding } from './branding';
-export type { BrandingData } from './branding';
+export { getBranding, computeBrandPalette } from './branding';
+export type { BrandingData, BrandPalette } from './branding';
 
 // Showcase-Session Helper
 export { getOrCreateShowcaseUrl } from './showcase';

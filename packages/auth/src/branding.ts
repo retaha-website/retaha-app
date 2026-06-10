@@ -1,6 +1,38 @@
 import type { AstroCookies } from 'astro';
 import { getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 
+export interface BrandPalette {
+  hover:    string;
+  soft:     string;
+  onAccent: string;
+}
+
+/** Deterministisch aus Primärfarbe abgeleitet — keine DB-Spalte nötig. */
+export function computeBrandPalette(hex: string): BrandPalette {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return { hover: '#FFE600', soft: '#FFF9CC', onAccent: '#0A0A0A' };
+  }
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  function mixWhite(t: number) {
+    const mr = Math.round(r + (255 - r) * t);
+    const mg = Math.round(g + (255 - g) * t);
+    const mb = Math.round(b + (255 - b) * t);
+    return `#${mr.toString(16).padStart(2, '0')}${mg.toString(16).padStart(2, '0')}${mb.toString(16).padStart(2, '0')}`;
+  }
+
+  function sRGB(c: number) { const v = c / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  const lum = 0.2126 * sRGB(r) + 0.7152 * sRGB(g) + 0.0722 * sRGB(b);
+
+  return {
+    hover:    mixWhite(0.65),
+    soft:     mixWhite(0.90),
+    onAccent: lum > 0.179 ? '#0A0A0A' : '#FFFFFF',
+  };
+}
+
 export interface BrandingData {
   hotel_id: string;
   // Logos
@@ -12,7 +44,6 @@ export interface BrandingData {
   logo_spacing:    'tight' | 'normal' | 'loose';
   // Farben
   brand_primary:   string;
-  brand_secondary: string | null;
   // Theme (legacy)
   brand_theme:     'coffee' | 'ocean' | 'forest' | 'custom';
   // Design-Identität
@@ -37,7 +68,7 @@ export async function getBranding(
     .select(`
       id,
       logo_primary, logo_icon, logo_wordmark, logo_dark, logo_print, logo_spacing,
-      brand_primary, brand_secondary,
+      brand_primary,
       brand_theme, design_identity,
       splash_background, wallet_pass_bg, email_header
     `)
@@ -55,7 +86,6 @@ export async function getBranding(
     logo_print:        (d.logo_print as string) ?? null,
     logo_spacing:      ((d.logo_spacing as string) ?? 'normal') as 'tight' | 'normal' | 'loose',
     brand_primary:     (d.brand_primary as string) ?? '#FF4A82',
-    brand_secondary:   (d.brand_secondary as string) ?? null,
     brand_theme:       ((d.brand_theme as string) ?? 'coffee') as 'coffee' | 'ocean' | 'forest' | 'custom',
     design_identity:   ((d.design_identity as string) ?? 'classic') as 'classic' | 'bauhaus' | 'editorial',
     splash_background: (d.splash_background as string) ?? null,
