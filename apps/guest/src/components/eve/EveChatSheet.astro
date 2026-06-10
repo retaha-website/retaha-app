@@ -91,23 +91,6 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
 
   <!-- Messages -->
   <div class="eve-sheet-messages" x-ref="eveMessagesEl">
-    <!-- Suggestion-Chips (nur wenn noch keine Messages) -->
-    <template x-if="!eveMessages.some(m => m.role === 'user')">
-      <div class="eve-chips">
-        <p class="eve-chips-label">{suggestionsLabel}</p>
-        {defaultChips.map(chip => (
-          <button
-            type="button"
-            class="eve-chip"
-            data-chip-text={chip.text}
-            @click={`eveSend('${chip.text.replace(/'/g, "\\'")}')`}
-          >
-            {chip.text}
-          </button>
-        ))}
-      </div>
-    </template>
-
     <!-- Messages -->
     <template x-for="(msg, idx) in eveMessages" :key="idx">
       <div
@@ -183,6 +166,24 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
     <div class="eve-error" x-show="eveError" style="display: none;">
       <p x-text="eveError"></p>
     </div>
+  </div>
+
+  <!-- Suggestion-Chips (wenn noch kein User-Message, zwischen Messages und Input) -->
+  <div
+    class="eve-chips-bar"
+    x-show="!eveMessages.some(m => m.role === 'user')"
+    style="display: none;"
+  >
+    {defaultChips.map(chip => (
+      <button
+        type="button"
+        class="eve-chip"
+        data-chip-text={chip.text}
+        @click={`eveSend('${chip.text.replace(/'/g, "\\'")}')`}
+      >
+        {chip.text}
+      </button>
+    ))}
   </div>
 
   <!-- Input -->
@@ -298,6 +299,31 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
     border-radius: 4px;
   }
 
+  /* Chips bar (between messages and input) */
+  .eve-chips-bar {
+    flex-shrink: 0;
+    display: flex; flex-wrap: wrap; gap: 7px;
+    padding: 10px 16px 8px;
+    border-top: 1px solid var(--theme-border);
+    background: var(--theme-bg-primary);
+  }
+  .eve-chip {
+    display: inline-flex; align-items: center;
+    padding: 7px 13px;
+    border: 1px solid var(--theme-border);
+    border-radius: 20px;
+    background: var(--theme-bg-secondary);
+    color: var(--theme-text-secondary);
+    font-size: 13px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .eve-chip:hover {
+    background: var(--theme-bg-primary);
+    border-color: var(--accent);
+    color: var(--theme-text-primary);
+  }
+
   /* Input */
   .eve-sheet-input-row {
     flex-shrink: 0;
@@ -398,13 +424,13 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
     border-radius: 12px; font-family: 'Space Grotesk', sans-serif;
   }
   [data-theme="bauhaus"] .eve-sheet-input:focus {
-    outline: none; border-color: #FF4A82; background: #FFFFFF;
+    outline: none; border-color: var(--accent, #FF4A82); background: #FFFFFF;
   }
   [data-theme="bauhaus"] .eve-sheet-send {
     border-radius: 12px; background: #0A0A0A;
   }
   [data-theme="bauhaus"] .eve-sheet-send:hover:not(:disabled) {
-    background: #FF4A82; transform: none;
+    background: var(--accent, #FF4A82); transform: none;
   }
   [data-theme="bauhaus"] .eve-chip {
     background: #FFFFFF; border: 1.5px solid #E3E1DA;
@@ -413,7 +439,7 @@ const suggestionsLabel = t('eve.suggestions_label', lang);
     font-size: 10px; letter-spacing: 0.05em; color: #0A0A0A;
     transition: background 0.15s, border-color 0.15s;
   }
-  [data-theme="bauhaus"] .eve-chip:hover { background: #FFE600; border-color: #FFE600; }
+  [data-theme="bauhaus"] .eve-chip:hover { background: var(--hover, #FFE600); border-color: var(--hover, #FFE600); }
 
   /* ── EDITORIAL ───────────────────────────────────────────────────────── */
   [data-theme="editorial"] .eve-sheet-header-name {
