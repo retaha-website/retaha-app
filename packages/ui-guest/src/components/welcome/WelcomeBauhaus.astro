@@ -66,8 +66,20 @@ const gridLabel: Record<string, string> = {
   checking_out: 'Ihre Abreise',
 };
 
-// Is weather sunny? (show animated sun vs emoji)
-const isSunny = weather?.emoji === '☀️';
+// Weather condition mapping
+type WxCondition = 'sunny' | 'partly_cloudy' | 'cloudy' | 'rain' | 'thunder' | 'snow' | 'fog';
+function getWxCondition(emoji: string): WxCondition {
+  const e = emoji.trim();
+  if (e === '☀️') return 'sunny';
+  if (e === '🌤️' || e === '⛅' || e === '🌥️') return 'partly_cloudy';
+  if (e === '☁️') return 'cloudy';
+  if (e === '🌧️' || e === '🌦️') return 'rain';
+  if (e === '⛈️' || e === '🌩️') return 'thunder';
+  if (e === '❄️' || e === '🌨️') return 'snow';
+  if (e === '🌫️' || e === '🌁') return 'fog';
+  return 'sunny';
+}
+const wxCondition: WxCondition | null = weather ? getWxCondition(weather.emoji) : null;
 const weatherLabel = weather ? `${weather.temp}°C ${(hotel.city || '').toUpperCase()}` : (hotel.city || '').toUpperCase();
 
 // Published hero cards only (already filtered by server, but guard here too)
@@ -95,17 +107,93 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     <span class="bh-readout__wx">
       {weather && (
         <>
-          {isSunny
-            ? (
-              <span class="bh-sun" aria-hidden="true">
-                <span class="bh-sun__rays">
-                  {SUN_RAYS.map(deg => <i style={`transform:rotate(${deg}deg)`}></i>)}
-                </span>
-                <span class="bh-sun__core"></span>
+          {wxCondition === 'sunny' && (
+            <span class="bh-wx bh-sun" aria-hidden="true">
+              <span class="bh-sun__rays">
+                {SUN_RAYS.map(deg => <i style={`transform:rotate(${deg}deg)`}></i>)}
               </span>
-            )
-            : <span class="bh-wx-emoji">{weather.emoji}</span>
-          }
+              <span class="bh-sun__core"></span>
+            </span>
+          )}
+          {wxCondition === 'partly_cloudy' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <circle cx="5.5" cy="6" r="2.5"/>
+                <line x1="5.5" y1="2" x2="5.5" y2="2.8"/>
+                <line x1="8" y1="3.6" x2="7.5" y2="4.1"/>
+                <g class="bh-wxg-drift">
+                  <rect x="2" y="10" width="14" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="5" y="7" width="8" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="2" y="10" width="14" height="5" rx="2.5"/>
+                  <rect x="5" y="7" width="8" height="5" rx="2.5"/>
+                </g>
+              </svg>
+            </span>
+          )}
+          {wxCondition === 'cloudy' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <g class="bh-wxg-drift2" opacity="0.55">
+                  <rect x="4" y="4" width="12" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="7" y="2" width="6" height="4" rx="2" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="4" y="4" width="12" height="5" rx="2.5"/>
+                  <rect x="7" y="2" width="6" height="4" rx="2"/>
+                </g>
+                <g class="bh-wxg-drift1">
+                  <rect x="1" y="10" width="14" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="3" y="7" width="9" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                  <rect x="1" y="10" width="14" height="5" rx="2.5"/>
+                  <rect x="3" y="7" width="9" height="5" rx="2.5"/>
+                </g>
+              </svg>
+            </span>
+          )}
+          {wxCondition === 'rain' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <rect x="2" y="4" width="14" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="4" y="1" width="9" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="2" y="4" width="14" height="5" rx="2.5"/>
+                <rect x="4" y="1" width="9" height="5" rx="2.5"/>
+                <line x1="5" y1="11" x2="4.2" y2="15.5" class="bh-wxg-drop bh-wxg-drop--1"/>
+                <line x1="9" y1="11" x2="8.2" y2="15.5" class="bh-wxg-drop bh-wxg-drop--2"/>
+                <line x1="13" y1="11" x2="12.2" y2="15.5" class="bh-wxg-drop bh-wxg-drop--3"/>
+              </svg>
+            </span>
+          )}
+          {wxCondition === 'thunder' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="14" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="4" y="1" width="9" height="4" rx="2" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="2" y="3" width="14" height="5" rx="2.5"/>
+                <rect x="4" y="1" width="9" height="4" rx="2"/>
+                <polyline points="10,10 8,13.5 11,13.5 9,17" class="bh-wxg-bolt" stroke="var(--accent,#FF4A82)" stroke-width="1.5" fill="none"/>
+              </svg>
+            </span>
+          )}
+          {wxCondition === 'snow' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <rect x="2" y="4" width="14" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="4" y="1" width="9" height="5" rx="2.5" fill="var(--bh-bg,#FAFAF6)"/>
+                <rect x="2" y="4" width="14" height="5" rx="2.5"/>
+                <rect x="4" y="1" width="9" height="5" rx="2.5"/>
+                <circle cx="5" cy="13" r="1" class="bh-wxg-flake bh-wxg-flake--1" fill="currentColor" stroke="none"/>
+                <circle cx="9" cy="13" r="1" class="bh-wxg-flake bh-wxg-flake--2" fill="currentColor" stroke="none"/>
+                <circle cx="13" cy="13" r="1" class="bh-wxg-flake bh-wxg-flake--3" fill="currentColor" stroke="none"/>
+              </svg>
+            </span>
+          )}
+          {wxCondition === 'fog' && (
+            <span class="bh-wx" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <line x1="2" y1="5" x2="16" y2="5" class="bh-wxg-fog bh-wxg-fog--1"/>
+                <line x1="3" y1="9" x2="15" y2="9" class="bh-wxg-fog bh-wxg-fog--2"/>
+                <line x1="2" y1="13" x2="16" y2="13" class="bh-wxg-fog bh-wxg-fog--3"/>
+              </svg>
+            </span>
+          )}
           <span class="bh-readout__temp">{weatherLabel}</span>
         </>
       )}
@@ -181,7 +269,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
   </div>
 
   <!-- CRAFT FOOTER -->
-  <CraftFooter hotelLogoUrl={hotelLogoDark} hotelName={hotel.name} />
+  <CraftFooter />
 </div>
 
 <style>
@@ -195,6 +283,9 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     --bh-border: #E3E1DA;
     --bh-pink: #FF4A82;
     --bh-yellow: #FFE600;
+    /* Brand overrides: --user-brand-primary/secondary set on <html> when hotel has branding */
+    --accent: var(--user-brand-primary, var(--bh-pink));
+    --hover:  var(--user-brand-secondary, var(--bh-yellow));
     --bh-radius: 12px;
     --bh-mono: 'JetBrains Mono', monospace;
     --bh-display: 'Space Grotesk', sans-serif;
@@ -231,7 +322,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     font-family: var(--bh-mono); font-size: 10px; letter-spacing: 0.08em;
     transition: all 0.2s;
   }
-  .bh-root :global(.globe-btn:hover) { background: var(--bh-yellow); border-color: var(--bh-yellow); }
+  .bh-root :global(.globe-btn:hover) { background: var(--hover); border-color: var(--hover); }
   .bh-root :global(.globe-btn svg) { width: 15px; height: 15px; }
 
   /* ── Context readout ─────────────────────────────────────────────────── */
@@ -273,7 +364,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     content: ''; position: absolute;
     right: 0; top: -2px;
     width: 6px; height: 6px;
-    background: var(--bh-pink); border-radius: 50%;
+    background: var(--accent); border-radius: 50%;
   }
 
   /* ── Greeting ────────────────────────────────────────────────────────── */
@@ -283,7 +374,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     font-weight: 700; letter-spacing: -0.02em; margin: 0;
     font-family: var(--bh-display);
   }
-  .bh-dot { color: var(--bh-pink); }
+  .bh-dot { color: var(--accent); }
   .bh-greet__sub {
     margin: 8px 0 0;
     font-size: 13px; color: var(--bh-ink-muted);
@@ -293,6 +384,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
   /* StayLine override */
   .bh-root :global(.stay-line) {
     margin-top: 10px;
+    padding: 0;
     font-family: var(--bh-mono); font-size: 11px;
     letter-spacing: 0.06em; color: var(--bh-ink-muted);
   }
@@ -330,7 +422,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     text-align: left;
     padding: 0;
   }
-  .bh-hcard:hover { transform: translateY(-2px); border-color: var(--bh-yellow); }
+  .bh-hcard:hover { transform: translateY(-2px); border-color: var(--hover); }
 
   .bh-hcard__img {
     aspect-ratio: 4/3;
@@ -339,7 +431,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
   }
   .bh-hcard__eyebrow {
     position: absolute; top: 8px; left: 8px;
-    background: var(--bh-yellow);
+    background: var(--hover);
     font-family: var(--bh-mono); font-size: 8px;
     letter-spacing: 0.1em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 3px; font-weight: 500;
@@ -366,7 +458,7 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     display: flex; flex-direction: column; gap: 8px; min-height: 84px;
     text-align: left;
   }
-  .bh-tile:hover { background: var(--bh-yellow); border-color: var(--bh-yellow); }
+  .bh-tile:hover { background: var(--hover); border-color: var(--hover); }
   .bh-tile__icon { width: 19px; height: 19px; display: flex; align-items: center; }
   .bh-tile__icon svg { width: 19px; height: 19px; stroke: var(--bh-ink); }
   .bh-tile__label {
@@ -374,5 +466,80 @@ const SUN_RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
     letter-spacing: 0.07em; text-transform: uppercase;
     font-weight: 500; line-height: 1.35;
     color: var(--bh-ink);
+  }
+
+  /* ── Weather icons base ──────────────────────────────────────────────── */
+  .bh-wx {
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: var(--bh-ink-muted);
+    overflow: visible;
+  }
+  .bh-wx svg { width: 18px; height: 18px; overflow: visible; }
+
+  /* Partly cloudy: cloud drifts */
+  .bh-wxg-drift { animation: bh-wx-drift 7s ease-in-out infinite; }
+  @keyframes bh-wx-drift {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+
+  /* Cloudy: two layers drift offset */
+  .bh-wxg-drift1 { animation: bh-wx-d1 9s ease-in-out infinite; }
+  .bh-wxg-drift2 { animation: bh-wx-d2 12s ease-in-out infinite; }
+  @keyframes bh-wx-d1 {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(2px); }
+  }
+  @keyframes bh-wx-d2 {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-2px); }
+  }
+
+  /* Rain: drops fall */
+  .bh-wxg-drop { animation: bh-wx-fall 1.3s linear infinite; }
+  .bh-wxg-drop--1 { animation-delay: 0s; }
+  .bh-wxg-drop--2 { animation-delay: -0.45s; }
+  .bh-wxg-drop--3 { animation-delay: -0.9s; }
+  @keyframes bh-wx-fall {
+    0%   { transform: translateY(-3px); opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translateY(4px);  opacity: 0; }
+  }
+
+  /* Thunder: bolt flashes every ~4s in accent color */
+  .bh-wxg-bolt { opacity: 0; animation: bh-wx-flash 4s ease-in-out infinite; }
+  @keyframes bh-wx-flash {
+    0%, 85%, 100% { opacity: 0; }
+    90%            { opacity: 1; }
+    95%            { opacity: 0.3; }
+    97%            { opacity: 1; }
+  }
+
+  /* Snow: flakes drift down */
+  .bh-wxg-flake { animation: bh-wx-snow 2.8s ease-in-out infinite; }
+  .bh-wxg-flake--1 { animation-delay: 0s; }
+  .bh-wxg-flake--2 { animation-delay: -0.95s; }
+  .bh-wxg-flake--3 { animation-delay: -1.9s; }
+  @keyframes bh-wx-snow {
+    0%   { transform: translateY(-2px) translateX(0);    opacity: 0; }
+    20%  { opacity: 1; }
+    55%  { transform: translateY(2px)  translateX(1.5px); opacity: 1; }
+    100% { transform: translateY(5px)  translateX(0);    opacity: 0; }
+  }
+
+  /* Fog: lines pulse */
+  .bh-wxg-fog { animation: bh-wx-fog 3.2s ease-in-out infinite; }
+  .bh-wxg-fog--1 { animation-delay: 0s; }
+  .bh-wxg-fog--2 { animation-delay: -1.1s; }
+  .bh-wxg-fog--3 { animation-delay: -2.1s; }
+  @keyframes bh-wx-fog {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 0.9; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bh-wxg-drift, .bh-wxg-drift1, .bh-wxg-drift2,
+    .bh-wxg-drop, .bh-wxg-bolt, .bh-wxg-flake, .bh-wxg-fog { animation: none; opacity: 1; }
   }
 </style>
