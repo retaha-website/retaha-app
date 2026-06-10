@@ -571,11 +571,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         <section class="rec-slider-section">
           <div class="rec-slider-eyebrow themed-eyebrow-flank">{t('rec.eyebrow', lang)}</div>
           <div class="rec-slider"
-               @pointerdown="startRecSwipe($event)"
-               @touchstart.passive="startRecSwipeTouch($event)">
-            <div class="rec-slider-track"
-                 :style="`transform: translateX(calc(-${recSlideIndex * 100}% + ${recDragOffset}px))`"
-                 :class="{ dragging: recIsDragging }">
+               @scroll.passive="recSlideIndex = Math.round($el.scrollLeft / 332)">
+            <div class="rec-slider-track">
               {recs.map((rec) => (
                 <div class="rec-slide">
                   <div
@@ -858,98 +855,11 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           }
         },
         recSlideIndex: 0,
-        recDragOffset: 0,
-        recIsDragging: false,
-        _swipeStart: 0,
-        _swipeStartTime: 0,
-
-        get slideCount() {
-          return document.querySelectorAll('.rec-slide').length;
-        },
 
         setRecSlide(i: number) {
+          const slider = document.querySelector<HTMLElement>('.rec-slider');
+          if (slider) slider.scrollTo({ left: i * 332, behavior: 'smooth' });
           this.recSlideIndex = i;
-        },
-
-        startRecSwipe(event: PointerEvent) {
-          const target = event.target as HTMLElement;
-          if (target.closest('button')) return;
-          event.preventDefault();
-          this._swipeStart = event.clientX;
-          this._swipeStartTime = Date.now();
-          this.recIsDragging = true;
-          this.recDragOffset = 0;
-
-          const onMove = (e: PointerEvent) => {
-            const delta = e.clientX - this._swipeStart;
-            const max = this.slideCount - 1;
-            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
-              this.recDragOffset = delta * 0.3;
-            } else {
-              this.recDragOffset = delta;
-            }
-          };
-          const onEnd = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onEnd);
-            document.removeEventListener('pointercancel', onEnd);
-            this.recIsDragging = false;
-            const delta = this.recDragOffset;
-            const elapsed = Date.now() - this._swipeStartTime;
-            const velocity = Math.abs(delta) / elapsed;
-            const threshold = 60;
-            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
-            const max = this.slideCount - 1;
-            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
-              this.recSlideIndex++;
-            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
-              this.recSlideIndex--;
-            }
-            this.recDragOffset = 0;
-          };
-          document.addEventListener('pointermove', onMove);
-          document.addEventListener('pointerup', onEnd);
-          document.addEventListener('pointercancel', onEnd);
-        },
-
-        startRecSwipeTouch(event: TouchEvent) {
-          const target = event.target as HTMLElement;
-          if (target.closest('button')) return;
-          this._swipeStart = event.touches[0].clientX;
-          this._swipeStartTime = Date.now();
-          this.recIsDragging = true;
-          this.recDragOffset = 0;
-
-          const onMove = (e: TouchEvent) => {
-            const delta = e.touches[0].clientX - this._swipeStart;
-            const max = this.slideCount - 1;
-            if ((this.recSlideIndex === 0 && delta > 0) || (this.recSlideIndex === max && delta < 0)) {
-              this.recDragOffset = delta * 0.3;
-            } else {
-              this.recDragOffset = delta;
-            }
-          };
-          const onEnd = () => {
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onEnd);
-            document.removeEventListener('touchcancel', onEnd);
-            this.recIsDragging = false;
-            const delta = this.recDragOffset;
-            const elapsed = Date.now() - this._swipeStartTime;
-            const velocity = Math.abs(delta) / elapsed;
-            const threshold = 60;
-            const fastSwipe = velocity > 0.4 && Math.abs(delta) > 20;
-            const max = this.slideCount - 1;
-            if ((delta < -threshold || (fastSwipe && delta < 0)) && this.recSlideIndex < max) {
-              this.recSlideIndex++;
-            } else if ((delta > threshold || (fastSwipe && delta > 0)) && this.recSlideIndex > 0) {
-              this.recSlideIndex--;
-            }
-            this.recDragOffset = 0;
-          };
-          document.addEventListener('touchmove', onMove, { passive: true });
-          document.addEventListener('touchend', onEnd);
-          document.addEventListener('touchcancel', onEnd);
         },
 
         // Consent state
