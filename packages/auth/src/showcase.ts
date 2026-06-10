@@ -11,7 +11,7 @@ function makeToken(): string {
 function buildGuestUrl(hotelSlug: string | null | undefined, token: string): string {
   const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
   if (hotelSlug) {
-    return `https://${hotelSlug}.${domain}/${token}`;
+    return `https://${hotelSlug}.${domain}/g/${token}`;
   }
   return `https://app.${domain}/g/${token}`;
 }
