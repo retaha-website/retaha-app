@@ -46,22 +46,19 @@ import PhoneFrame from './PhoneFrame.astro';
     pointer-events: auto;
   }
 
-  /* Tile-Pulse-Klassen (gesetzt via JS) */
-  :global(.gate-tile.demo-pulse) {
-    box-shadow: 0 0 24px 8px rgba(255, 230, 0, 0.7) !important;
-    transform: scale(1.06);
-    transition: box-shadow 200ms, transform 200ms;
+  /* CSS-Pulse-Animationen (kein Zoom, kein Transform auf Content) */
+  @keyframes tile-pulse-on {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 230, 0, 0);   transform: scale(1); }
+    30%  { box-shadow: 0 0 20px 8px rgba(255, 230, 0, 0.8); transform: scale(1.05); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 230, 0, 0);   transform: scale(1); }
   }
-  :global(.gate-tile.toggle-pulse-on) {
-    box-shadow: 0 0 32px 12px rgba(255, 230, 0, 0.85) !important;
-    transform: scale(1.08);
-    transition: box-shadow 200ms, transform 200ms;
+  @keyframes tile-pulse-off {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 74, 130, 0);    opacity: 1; }
+    30%  { box-shadow: 0 0 20px 8px rgba(255, 74, 130, 0.8); opacity: 0.6; }
+    100% { box-shadow: 0 0 0 0 rgba(255, 74, 130, 0);    opacity: 1; }
   }
-  :global(.gate-tile.toggle-pulse-off) {
-    box-shadow: 0 0 32px 12px rgba(255, 74, 130, 0.75) !important;
-    opacity: 0.45 !important;
-    transition: box-shadow 200ms, opacity 200ms;
-  }
+  :global(.gate-tile.pulse-on)  { animation: tile-pulse-on  800ms ease-out; }
+  :global(.gate-tile.pulse-off) { animation: tile-pulse-off 800ms ease-out; }
 
   /* Demo-Bar */
   .phone-preview__demo-bar {
