@@ -7,32 +7,39 @@ interface Props {
 const { hotelId, enabledLanguages, defaultLanguage } = Astro.props;
 
 const LANGUAGES = [
-  { code: 'de', label: 'deutsch',    flag: '🇩🇪' },
-  { code: 'en', label: 'english',    flag: '🇬🇧' },
-  { code: 'fr', label: 'français',   flag: '🇫🇷' },
-  { code: 'es', label: 'español',    flag: '🇪🇸' },
-  { code: 'it', label: 'italiano',   flag: '🇮🇹' },
-  { code: 'pt', label: 'português',  flag: '🇵🇹' },
-  { code: 'nl', label: 'nederlands', flag: '🇳🇱' },
-  { code: 'ru', label: 'русский',    flag: '🇷🇺' },
-  { code: 'ar', label: 'العربية',     flag: '🇸🇦' },
-  { code: 'zh', label: '中文',        flag: '🇨🇳' },
+  { code: 'de', iso: 'DE', label: 'deutsch' },
+  { code: 'en', iso: 'EN', label: 'english' },
+  { code: 'fr', iso: 'FR', label: 'français' },
+  { code: 'es', iso: 'ES', label: 'español' },
+  { code: 'it', iso: 'IT', label: 'italiano' },
+  { code: 'pt', iso: 'PT', label: 'português' },
+  { code: 'nl', iso: 'NL', label: 'nederlands' },
+  { code: 'ru', iso: 'RU', label: 'русский' },
+  { code: 'ar', iso: 'AR', label: 'العربية' },
+  { code: 'zh', iso: 'ZH', label: '中文' },
 ];
+
+const atCapSSR  = enabledLanguages.length >= 6;
+const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0];
 ---
 
 <section class="settings-section">
   <div class="settings-section__head">
     <span class="settings-section__title">— sprachen für gäste —</span>
+    <span id="langCounter" class="lang-counter" data-at-cap={atCapSSR ? '' : undefined}>
+      {enabledLanguages.length} / 6
+    </span>
   </div>
 
   <div class="lang-grid" id="langGrid">
     {LANGUAGES.map(lang => {
-      const isActive  = enabledLanguages.includes(lang.code);
-      const isDefault = lang.code === defaultLanguage;
+      const isActive      = enabledLanguages.includes(lang.code);
+      const isDefault     = lang.code === defaultLanguage;
+      const isCapDisabled = !isActive && atCapSSR;
       return (
         <label
-          class={`lang-pill ${isActive ? 'is-active' : ''} ${isDefault ? 'is-default' : ''}`}
-          title={isDefault ? 'Standardsprache — nicht abwählbar' : undefined}
+          class={`lang-pill${isActive ? ' is-active' : ''}${isDefault ? ' is-default' : ''}${isCapDisabled ? ' is-cap-disabled' : ''}`}
+          title={isDefault ? 'Standardsprache — nicht abwählbar' : (isCapDisabled ? 'Maximal 6 Sprachen – wähle eine ab' : undefined)}
         >
           <input
             type="checkbox"
@@ -40,11 +47,10 @@ const LANGUAGES = [
             checked={isActive}
             disabled={isDefault}
             aria-label={lang.label}
-            data-is-default={isDefault ? 'true' : undefined}
           />
-          <span class="lang-pill__flag">{lang.flag}</span>
-          <span class="lang-pill__label">{lang.label}</span>
-          {isDefault && <span class="lang-pill__badge">std</span>}
+          <span class="lang-pill__iso">{lang.iso}</span>
+          <span class="lang-pill__name">{lang.label}</span>
+          <span class="lang-pill__dot" aria-hidden="true"></span>
         </label>
       );
     })}
@@ -53,21 +59,19 @@ const LANGUAGES = [
   <p id="langLimitMsg" class="lang-limit-msg" hidden>Maximal 6 Sprachen – bitte wähle eine ab, um eine weitere hinzuzufügen.</p>
 
   <div class="default-lang-row">
-    <label class="default-lang-label" for="defaultLang">standard</label>
-    <select id="defaultLang" class="default-lang-select">
-      {LANGUAGES.map(lang => (
-        <option
-          value={lang.code}
-          selected={lang.code === defaultLanguage}
-          disabled={!enabledLanguages.includes(lang.code)}
-        >
-          {lang.flag} {lang.label}
-        </option>
-      ))}
-    </select>
+    <span class="default-lang-label">standard</span>
+    <div class="dd-wrap" id="defaultDdWrap">
+      <button id="defaultDdBtn" class="dd-btn" type="button">
+        <span class="dd-btn__inner">
+          <span class="dd-btn__iso" id="ddBtnIso">{defLang.iso}</span>
+          <span class="dd-btn__name" id="ddBtnName">{defLang.label}</span>
+        </span>
+        <span class="dd-chevron">▾</span>
+      </button>
+      <div id="defaultDdPanel" class="dd-panel" hidden></div>
+    </div>
   </div>
 
-  <!-- Speichern-Zeile -->
   <div class="lang-save-row">
     <button
       id="langSaveBtn"
@@ -89,48 +93,76 @@ const LANGUAGES = [
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r); padding: 24px 28px;
   }
-  .settings-section__head { margin-bottom: 16px; }
+  .settings-section__head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
   .settings-section__title {
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase;
   }
-
-  .lang-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 8px;
+  .lang-counter {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+    color: var(--ink-muted); letter-spacing: 0.02em;
   }
+  .lang-counter[data-at-cap] { color: var(--ink); }
+
+  /* ── Pills ─────────────────────────────────────────────────── */
+  .lang-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
   .lang-pill {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 12px; cursor: pointer;
+    padding: 10px 14px; cursor: pointer; user-select: none;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-sm); transition: all 150ms ease;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.04em; text-transform: lowercase; color: var(--ink-muted);
-    user-select: none;
+    border-radius: 10px; transition: background 130ms ease, border-color 130ms ease;
   }
   .lang-pill input { display: none; }
-  .lang-pill:not(.is-default):hover { background: var(--te-yellow-soft); color: var(--ink); }
-  .lang-pill.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  /* Default-Sprache: nicht anklickbar, aber trotzdem aktiv dargestellt */
-  .lang-pill.is-default { cursor: default; opacity: 0.9; }
-  .lang-pill__flag { font-size: 14px; }
-  .lang-pill__badge {
-    margin-left: auto;
-    font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
-    background: var(--bg); color: var(--ink); border-radius: 4px;
-    padding: 1px 5px; line-height: 1.4;
-    border: 1px solid var(--border);
+
+  .lang-pill__iso {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.04em; color: var(--ink-muted);
   }
-  .lang-pill.is-active .lang-pill__badge {
-    background: var(--surface); color: var(--ink);
+  .lang-pill__name {
+    font-size: 14px; font-weight: 500; color: var(--ink);
+  }
+  .lang-pill__dot {
+    display: none; width: 6px; height: 6px;
+    border-radius: 50%; background: #FFE600; flex-shrink: 0;
   }
 
+  /* Active */
+  .lang-pill.is-active { background: var(--ink); border-color: var(--ink); }
+  .lang-pill.is-active .lang-pill__iso { color: rgba(255,255,255,0.55); }
+  .lang-pill.is-active .lang-pill__name { color: #fff; }
+
+  /* Default — shows dot, no cursor */
+  .lang-pill.is-default { cursor: default; }
+  .lang-pill.is-default .lang-pill__dot { display: block; }
+
+  /* Hover — not on default or cap-disabled */
+  .lang-pill:not(.is-default):not(.is-cap-disabled):hover {
+    background: #FFE600; border-color: #FFE600;
+  }
+  .lang-pill:not(.is-default):not(.is-cap-disabled):hover .lang-pill__iso,
+  .lang-pill:not(.is-default):not(.is-cap-disabled):hover .lang-pill__name {
+    color: #0A0A0A;
+  }
+
+  /* Cap disabled */
+  .lang-pill.is-cap-disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+
+  /* ── Hint + Limit ───────────────────────────────────────────── */
   .lang-hint {
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     color: var(--ink-muted); margin-top: 10px; letter-spacing: 0.04em;
   }
+  .lang-limit-msg {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+    color: #8C2128; margin-top: 8px; padding: 6px 10px;
+    border-left: 2px solid #8C2128; background: rgba(140,33,40,0.05);
+  }
 
+  /* ── Default-Dropdown ──────────────────────────────────────── */
   .default-lang-row {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
     display: flex; align-items: center; gap: 16px;
@@ -140,82 +172,122 @@ const LANGUAGES = [
     letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
     white-space: nowrap;
   }
-  .default-lang-select {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-sm); padding: 8px 12px;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: var(--ink); outline: none; cursor: pointer;
-    transition: border-color 150ms;
+  .dd-wrap { position: relative; min-width: 180px; }
+  .dd-btn {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; font-family: inherit; transition: border-color 150ms;
   }
-  .default-lang-select:focus { border-color: var(--ink); }
+  .dd-btn:hover   { background: rgba(255,230,0,0.22); }
+  .dd-btn.is-open { border-color: var(--ink); }
+  .dd-btn__inner  { display: inline-flex; align-items: center; gap: 8px; }
+  .dd-btn__iso {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 700; color: var(--ink-muted);
+  }
+  .dd-btn__name {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink);
+  }
+  .dd-chevron {
+    font-size: 11px; color: var(--ink-muted); line-height: 1; transition: transform 150ms;
+  }
+  .dd-btn.is-open .dd-chevron { transform: rotate(180deg); }
 
-  /* Speichern-Zeile */
+  .dd-panel {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 14px 36px rgba(10,10,10,0.13);
+    padding: 6px; z-index: 30;
+    animation: ddPop 0.15s cubic-bezier(0.2,0.8,0.2,1);
+  }
+  @keyframes ddPop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .dd-item {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px; border-radius: 8px; border: none;
+    background: transparent; cursor: pointer; font-family: inherit;
+    text-align: left; transition: background 100ms;
+  }
+  .dd-item:hover      { background: rgba(255,230,0,0.22); }
+  .dd-item.is-current { background: rgba(10,10,10,0.05); }
+  .dd-item__iso {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 700; color: var(--ink-muted); min-width: 22px;
+  }
+  .dd-item__name {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink); flex: 1;
+  }
+  .dd-item__dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #FFE600; flex-shrink: 0; margin-left: auto;
+  }
+
+  /* ── Save row ───────────────────────────────────────────────── */
   .lang-save-row {
     margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
     display: flex; align-items: center; gap: 12px;
   }
   .lang-save-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 10px 20px;
-    background: var(--ink); color: var(--bg);
-    border: none; border-radius: var(--r-sm);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 20px;
+    background: var(--ink); color: var(--bg); border: none; border-radius: var(--r-sm);
     cursor: pointer; transition: opacity 160ms ease;
   }
   .lang-save-btn:hover:not(:disabled) { opacity: 0.8; }
-  .lang-save-btn:disabled { opacity: 0.28; cursor: default; }
-  .lang-save-btn[data-loading] { opacity: 0.6; cursor: wait; }
-
+  .lang-save-btn:disabled             { opacity: 0.28; cursor: default; }
+  .lang-save-btn[data-loading]        { opacity: 0.6;  cursor: wait; }
   .lang-save-status {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.08em;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
   }
-  .lang-save-status[data-state="saved"]  { color: #5C9070; } /* Sage */
-  .lang-save-status[data-state="error"]  { color: #C0392B; }
-
-  .lang-limit-msg {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.06em;
-    color: #8C2128;
-    margin-top: 8px;
-    padding: 6px 10px;
-    border-left: 2px solid #8C2128;
-    background: rgba(140, 33, 40, 0.05);
-  }
+  .lang-save-status[data-state="saved"] { color: #5C9070; }
+  .lang-save-status[data-state="error"] { color: #C0392B; }
 </style>
 
 <script>
   import { updateState } from '../../../lib/gast-vorschau/state';
 
-  const grid        = document.getElementById('langGrid');
-  const pills       = grid?.querySelectorAll<HTMLLabelElement>('.lang-pill');
-  const defaultSel  = document.getElementById('defaultLang') as HTMLSelectElement;
-  const saveBtn     = document.getElementById('langSaveBtn') as HTMLButtonElement;
-  const statusEl    = document.getElementById('langSaveStatus') as HTMLElement;
-  const limitMsg    = document.getElementById('langLimitMsg') as HTMLElement;
+  const LANG_MAP: Record<string, { label: string; iso: string }> = {
+    de: { label: 'deutsch',    iso: 'DE' },
+    en: { label: 'english',    iso: 'EN' },
+    fr: { label: 'français',   iso: 'FR' },
+    es: { label: 'español',    iso: 'ES' },
+    it: { label: 'italiano',   iso: 'IT' },
+    pt: { label: 'português',  iso: 'PT' },
+    nl: { label: 'nederlands', iso: 'NL' },
+    ru: { label: 'русский',    iso: 'RU' },
+    ar: { label: 'العربية',     iso: 'AR' },
+    zh: { label: '中文',        iso: 'ZH' },
+  };
 
-  function showLimit(show: boolean) {
-    limitMsg.hidden = !show;
-  }
+  const grid      = document.getElementById('langGrid');
+  const pills     = grid?.querySelectorAll<HTMLLabelElement>('.lang-pill');
+  const saveBtn   = document.getElementById('langSaveBtn')   as HTMLButtonElement;
+  const statusEl  = document.getElementById('langSaveStatus') as HTMLElement;
+  const limitMsg  = document.getElementById('langLimitMsg')  as HTMLElement;
+  const counter   = document.getElementById('langCounter')   as HTMLElement;
+  const ddWrap    = document.getElementById('defaultDdWrap') as HTMLElement;
+  const ddBtn     = document.getElementById('defaultDdBtn')  as HTMLButtonElement;
+  const ddPanel   = document.getElementById('defaultDdPanel') as HTMLElement;
+  const ddBtnIso  = document.getElementById('ddBtnIso')      as HTMLElement;
+  const ddBtnName = document.getElementById('ddBtnName')     as HTMLElement;
 
-  const HOTEL_ID = saveBtn?.dataset.hotelId ?? '';
-
-  // Mutable baseline — wird nach erfolgreichem Speichern aktualisiert
   let baseline = {
     langs:       JSON.parse(saveBtn?.dataset.initialLangs ?? '[]') as string[],
     defaultLang: saveBtn?.dataset.initialDefault ?? 'de',
   };
-
   let currentLangs   = [...baseline.langs];
   let currentDefault = baseline.defaultLang;
+
+  // ── Helpers ──────────────────────────────────────────────────
 
   function isDirty(): boolean {
     if (currentDefault !== baseline.defaultLang) return true;
     if (currentLangs.length !== baseline.langs.length) return true;
-    const sorted     = [...currentLangs].sort();
-    const initSorted = [...baseline.langs].sort();
-    return sorted.some((l, i) => l !== initSorted[i]);
+    const a = [...currentLangs].sort(), b = [...baseline.langs].sort();
+    return a.some((l, i) => l !== b[i]);
   }
 
   function setStatus(state: 'saved' | 'error' | '', msg: string) {
@@ -223,42 +295,126 @@ const LANGUAGES = [
     statusEl.textContent = msg;
   }
 
-  function updateSaveBtn() {
-    saveBtn.disabled = !isDirty();
-  }
+  function showLimit(show: boolean) { limitMsg.hidden = !show; }
+
+  function updateSaveBtn() { saveBtn.disabled = !isDirty(); }
 
   function getActive(): string[] {
     return Array.from(pills ?? [])
-      .filter(p => p.querySelector('input')?.checked)
-      .map(p => p.querySelector('input')!.value);
+      .filter(p => (p.querySelector('input') as HTMLInputElement)?.checked)
+      .map(p => (p.querySelector('input') as HTMLInputElement).value);
   }
 
-  function syncDefaultOptions(active: string[]) {
-    const current = defaultSel.value;
-    Array.from(defaultSel.options).forEach(opt => {
-      opt.disabled = !active.includes(opt.value);
+  function updateCounter(count: number) {
+    counter.textContent = `${count} / 6`;
+    if (count >= 6) counter.setAttribute('data-at-cap', '');
+    else counter.removeAttribute('data-at-cap');
+  }
+
+  function updateCapState(active: string[]) {
+    const atCap = active.length >= 6;
+    pills?.forEach(pill => {
+      const input = pill.querySelector('input') as HTMLInputElement;
+      if (input?.value === currentDefault) return;
+      if (!input?.checked) {
+        pill.classList.toggle('is-cap-disabled', atCap);
+        if (atCap) pill.setAttribute('title', 'Maximal 6 Sprachen – wähle eine ab');
+        else       pill.removeAttribute('title');
+      } else {
+        pill.classList.remove('is-cap-disabled');
+      }
     });
-    if (!active.includes(current) && active.length > 0) {
-      defaultSel.value = active[0];
-      currentDefault = active[0];
-      updateState({ defaultLanguage: active[0] });
-    }
   }
 
-  // Pill toggle — default-Sprache nicht anklickbar
+  function updateDefaultPills(newDefault: string) {
+    pills?.forEach(pill => {
+      const input = pill.querySelector('input') as HTMLInputElement;
+      const isNow = input?.value === newDefault;
+      pill.classList.toggle('is-default', isNow);
+      input.disabled = isNow;
+    });
+  }
+
+  // ── Custom Dropdown ──────────────────────────────────────────
+
+  function buildDropdown(active: string[], def: string) {
+    ddPanel.innerHTML = '';
+    active.forEach(code => {
+      const lang = LANG_MAP[code];
+      if (!lang) return;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'dd-item' + (code === def ? ' is-current' : '');
+
+      const iso = document.createElement('span');
+      iso.className = 'dd-item__iso';
+      iso.textContent = lang.iso;
+
+      const name = document.createElement('span');
+      name.className = 'dd-item__name';
+      name.textContent = lang.label;
+
+      item.appendChild(iso);
+      item.appendChild(name);
+
+      if (code === def) {
+        const dot = document.createElement('span');
+        dot.className = 'dd-item__dot';
+        dot.setAttribute('aria-hidden', 'true');
+        item.appendChild(dot);
+      }
+
+      item.addEventListener('click', () => {
+        selectDefault(code);
+        closeDropdown();
+      });
+      ddPanel.appendChild(item);
+    });
+  }
+
+  function openDropdown() {
+    buildDropdown(currentLangs, currentDefault);
+    ddPanel.hidden = false;
+    ddBtn.classList.add('is-open');
+  }
+
+  function closeDropdown() {
+    ddPanel.hidden = true;
+    ddBtn.classList.remove('is-open');
+  }
+
+  function selectDefault(code: string) {
+    currentDefault = code;
+    const lang = LANG_MAP[code];
+    if (!lang) return;
+    ddBtnIso.textContent  = lang.iso;
+    ddBtnName.textContent = lang.label;
+    updateDefaultPills(code);
+    updateState({ defaultLanguage: code });
+    setStatus('', '');
+    updateSaveBtn();
+  }
+
+  ddBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    ddPanel.hidden ? openDropdown() : closeDropdown();
+  });
+
+  document.addEventListener('click', e => {
+    if (ddWrap && !ddWrap.contains(e.target as Node)) closeDropdown();
+  });
+
+  // ── Pill toggles ─────────────────────────────────────────────
+
   pills?.forEach(pill => {
     const input = pill.querySelector('input') as HTMLInputElement;
-    if (input?.dataset.isDefault) return; // nicht abwählbar
+    const code  = input?.value ?? '';
 
     pill.addEventListener('click', () => {
+      if (code === currentDefault) return;
       const active = getActive();
-      // Mindestens 1 Sprache muss aktiv bleiben
       if (input.checked && active.length <= 1) return;
-      // Maximal 6 Sprachen
-      if (!input.checked && active.length >= 6) {
-        showLimit(true);
-        return;
-      }
+      if (!input.checked && active.length >= 6) { showLimit(true); return; }
       showLimit(false);
 
       input.checked = !input.checked;
@@ -266,18 +422,14 @@ const LANGUAGES = [
       const newActive = getActive();
       currentLangs = newActive;
       updateState({ activeLanguages: newActive });
-      syncDefaultOptions(newActive);
+      updateCapState(newActive);
+      updateCounter(newActive.length);
       setStatus('', '');
       updateSaveBtn();
     });
   });
 
-  defaultSel?.addEventListener('change', () => {
-    currentDefault = defaultSel.value;
-    updateState({ defaultLanguage: defaultSel.value });
-    setStatus('', '');
-    updateSaveBtn();
-  });
+  // ── Save ─────────────────────────────────────────────────────
 
   saveBtn?.addEventListener('click', async () => {
     if (!isDirty() || saveBtn.disabled) return;
@@ -289,28 +441,21 @@ const LANGUAGES = [
       const res = await fetch('/api/hotel/update-languages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabledLanguages: currentLangs,
-          defaultLanguage:  currentDefault,
-        }),
+        body: JSON.stringify({ enabledLanguages: currentLangs, defaultLanguage: currentDefault }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
-      // Erfolg: Baseline auf gespeicherten Zustand setzen
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       baseline = { langs: [...currentLangs], defaultLang: currentDefault };
       setStatus('saved', 'Gespeichert');
       setTimeout(() => setStatus('', ''), 3000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[lang-section] save error', msg);
-      const isLimit = msg.includes('check_enabled_languages_count') || msg.includes('violates check constraint') || msg.includes('Maximal 6');
-      if (isLimit) {
-        showLimit(true);
-      } else {
-        setStatus('error', `Fehler: ${msg}`);
-      }
+      const isLimit = msg.includes('check_enabled_languages_count')
+        || msg.includes('violates check constraint')
+        || msg.includes('Maximal 6');
+      if (isLimit) showLimit(true);
+      else setStatus('error', `Fehler: ${msg}`);
       saveBtn.disabled = false;
     } finally {
       delete saveBtn.dataset.loading;
