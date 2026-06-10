@@ -41,6 +41,8 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   </section>
 
   <script>
+    import { getState } from '../lib/gast-vorschau/state';
+
     document.getElementById('open-live-preview')?.addEventListener('click', async () => {
       const btn = document.getElementById('open-live-preview') as HTMLButtonElement;
       btn.disabled = true;
@@ -50,7 +52,10 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       try {
         const res = await fetch('/api/admin/preview-url');
         const data = await res.json();
-        if (win) win.location.href = data?.url ?? '/gast-vorschau';
+        const base: string = data?.url ?? '/gast-vorschau';
+        const persona = getState().persona;
+        const sep = base.includes('?') ? '&' : '?';
+        if (win) win.location.href = `${base}${sep}persona=${persona}`;
       } catch {
         if (win) win.location.href = '/gast-vorschau';
       } finally {
