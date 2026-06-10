@@ -9,32 +9,38 @@ const { lang, hotelEnabledLangs, token } = Astro.props;
 
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
 const LANG_NAMES: Record<string, string> = {
-  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
+  de: 'Deutsch', en: 'English',  fr: 'Français', es: 'Español',
   it: 'Italiano', nl: 'Nederlands', pt: 'Português', pl: 'Polski',
+  ru: 'Русский',  ar: 'العربية',   zh: '中文',
 };
 ---
 
-<button class="lang-globe" id="langGlobeBtn" type="button" aria-label="Sprache wählen" aria-expanded="false">
-  <svg class="lang-globe__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="10"/>
-    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12 15.3 15.3 0 0 1 12 2z"/>
-  </svg>
-  <span class="lang-globe__code">{lang.toUpperCase()}</span>
-</button>
+<div class="lp-wrap">
+  <button
+    class="lp-trigger"
+    type="button"
+    aria-label="Sprache wählen"
+    aria-expanded="false"
+    aria-haspopup="listbox"
+  >
+    <svg class="lp-trigger__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12 15.3 15.3 0 0 1 12 2z"/>
+    </svg>
+    <span class="lp-trigger__code">{lang.toUpperCase()}</span>
+  </button>
 
-<div class="lang-overlay" id="langOverlay" hidden aria-modal="true" role="dialog">
-  <div class="lang-overlay__backdrop" id="langOverlayBackdrop"></div>
-  <div class="lang-overlay__sheet">
-    <p class="lang-overlay__label">Sprache</p>
-    <div class="lang-overlay__grid">
+  <div class="lp-panel" role="listbox" aria-label="Sprache auswählen" hidden>
+    <div class="lp-grid">
       {hotelEnabledLangs.map(l => (
         <a
           href={switchUrl(l)}
-          class={`lang-overlay__item ${lang === l ? 'is-active' : ''}`}
-          aria-current={lang === l ? 'true' : undefined}
+          class={`lp-item ${lang === l ? 'is-active' : ''}`}
+          role="option"
+          aria-selected={lang === l ? 'true' : 'false'}
         >
-          <span class="lang-overlay__code">{l.toUpperCase()}</span>
-          <span class="lang-overlay__name">{LANG_NAMES[l] ?? l}</span>
+          <span class="lp-item__code">{l.toUpperCase()}</span>
+          <span class="lp-item__name">{LANG_NAMES[l] ?? l}</span>
         </a>
       ))}
     </div>
@@ -42,122 +48,143 @@ const LANG_NAMES: Record<string, string> = {
 </div>
 
 <script>
-  const btn     = document.getElementById('langGlobeBtn');
-  const overlay = document.getElementById('langOverlay');
-  const backdrop = document.getElementById('langOverlayBackdrop');
+  const wrap    = document.querySelector<HTMLElement>('.lp-wrap');
+  const trigger = wrap?.querySelector<HTMLButtonElement>('.lp-trigger');
+  const panel   = wrap?.querySelector<HTMLElement>('.lp-panel');
 
   function open() {
-    overlay?.removeAttribute('hidden');
-    btn?.setAttribute('aria-expanded', 'true');
+    panel?.removeAttribute('hidden');
+    trigger?.setAttribute('aria-expanded', 'true');
   }
   function close() {
-    overlay?.setAttribute('hidden', '');
-    btn?.setAttribute('aria-expanded', 'false');
+    panel?.setAttribute('hidden', '');
+    trigger?.setAttribute('aria-expanded', 'false');
+  }
+  function toggle() {
+    panel?.hasAttribute('hidden') ? open() : close();
   }
 
-  btn?.addEventListener('click', open);
-  backdrop?.addEventListener('click', close);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  trigger?.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+  document.addEventListener('click', () => { if (!panel?.hasAttribute('hidden')) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  panel?.addEventListener('click', close);
 </script>
 
 <style>
-  .lang-globe {
+  /* Trigger wrapper — provides anchor for absolute panel */
+  .lp-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  /* Trigger button */
+  .lp-trigger {
     display: flex;
     align-items: center;
     gap: 5px;
     background: none;
-    border: 1px solid var(--guest-border);
-    border-radius: var(--guest-radius-sm);
+    border: 1px solid var(--guest-border, #E3E1DA);
+    border-radius: var(--guest-radius-sm, 8px);
     padding: 5px 8px;
     cursor: pointer;
-    color: var(--guest-ink-muted);
+    color: var(--guest-ink-muted, #6B6B66);
     transition: color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
                 border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
                 background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
     outline: none;
   }
-  .lang-globe:focus-visible {
-    outline: 2px solid var(--guest-accent, var(--accent, #FF4A82));
+  .lp-trigger:hover {
+    color: var(--guest-ink, #0A0A0A);
+    border-color: var(--guest-ink-muted, #6B6B66);
+    background: var(--guest-bg-deep, #F4F4F0);
+  }
+  .lp-trigger:focus-visible {
+    outline: 2px solid var(--accent, var(--guest-accent, #FF4A82));
     outline-offset: 2px;
   }
-  .lang-globe:hover {
-    color: var(--guest-ink);
-    border-color: var(--guest-ink-muted);
-    background: var(--guest-bg-deep);
-  }
-  .lang-globe__icon { width: 14px; height: 14px; flex-shrink: 0; }
-  .lang-globe__code {
-    font-family: var(--guest-font-mono);
+  .lp-trigger__icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .lp-trigger__code {
+    font-family: var(--guest-font-mono, monospace);
     font-size: 9px;
     letter-spacing: 0.1em;
     font-weight: 600;
   }
 
-  .lang-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    align-items: flex-end;
-  }
-  .lang-overlay[hidden] { display: none; }
-  .lang-overlay__backdrop {
+  /* Dropdown panel — opens below trigger, right-aligned */
+  .lp-panel {
     position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 300;
+    background: var(--guest-bg, #FAFAF6);
+    border: 1px solid var(--guest-border, #E3E1DA);
+    border-radius: 12px;
+    padding: 10px;
+    min-width: 220px;
+    max-width: calc(100vw - 40px);
+    max-height: min(60vh, 420px);
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    transform-origin: top right;
+    animation: lp-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  .lang-overlay__sheet {
-    position: relative;
-    width: 100%;
-    background: var(--guest-bg);
-    border-radius: var(--guest-radius) var(--guest-radius) 0 0;
-    padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+  .lp-panel[hidden] { display: none; }
+
+  @keyframes lp-in {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
   }
-  .lang-overlay__label {
-    font-family: var(--guest-font-mono);
-    font-size: 9px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--guest-ink-faint);
-    margin: 0 0 16px;
+  @media (prefers-reduced-motion: reduce) {
+    .lp-panel { animation: none; }
   }
-  .lang-overlay__grid {
+
+  /* Language grid */
+  .lp-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
   }
-  .lang-overlay__item {
+
+  /* Language tile */
+  .lp-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border: 1px solid var(--guest-border);
-    border-radius: var(--guest-radius-sm);
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     text-decoration: none;
-    color: var(--guest-ink);
-    transition: background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
-                border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
+    color: var(--guest-ink, #0A0A0A);
+    transition: background 150ms, border-color 150ms;
     outline: none;
   }
-  .lang-overlay__item:focus-visible {
-    outline: 2px solid var(--guest-accent, var(--accent, #FF4A82));
+  .lp-item:hover {
+    background: rgba(255, 230, 0, 0.18);
+    border-color: rgba(255, 230, 0, 0.4);
+  }
+  .lp-item.is-active {
+    border-color: var(--accent, #FF4A82);
+    background: rgba(255, 74, 130, 0.06);
+  }
+  .lp-item:focus-visible {
+    outline: 2px solid var(--accent, #FF4A82);
     outline-offset: 2px;
   }
-  .lang-overlay__item:hover { background: var(--guest-bg-deep); }
-  .lang-overlay__item.is-active {
-    border-color: var(--guest-accent);
-    background: var(--guest-accent-soft);
-  }
-  .lang-overlay__code {
-    font-family: var(--guest-font-mono);
+
+  .lp-item__code {
+    font-family: var(--guest-font-mono, monospace);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
-    color: var(--guest-accent);
-    min-width: 28px;
+    color: var(--accent, #FF4A82);
+    min-width: 26px;
+    flex-shrink: 0;
   }
-  .lang-overlay__name {
+  .lp-item__name {
     font-size: 13px;
-    color: var(--guest-ink-muted);
+    color: var(--guest-ink-muted, #6B6B66);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>
