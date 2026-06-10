@@ -23,14 +23,21 @@ const LANG_NAMES: Record<string, string> = {
     aria-expanded="false"
     aria-haspopup="listbox"
   >
-    <svg class="lp-trigger__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10A15.3 15.3 0 0 1 8 12 15.3 15.3 0 0 1 12 2z"/>
+    <!-- Globe -->
+    <svg class="lp-trigger__globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>
     </svg>
+    <!-- Current language code -->
     <span class="lp-trigger__code">{lang.toUpperCase()}</span>
+    <!-- Chevron — rotates 180° when open -->
+    <svg class="lp-trigger__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6"/>
+    </svg>
   </button>
 
   <div class="lp-panel" role="listbox" aria-label="Sprache auswählen" hidden>
+    <div class="lp-panel__label">Sprache wählen</div>
     <div class="lp-grid">
       {hotelEnabledLangs.map(l => (
         <a
@@ -55,10 +62,12 @@ const LANG_NAMES: Record<string, string> = {
   function open() {
     panel?.removeAttribute('hidden');
     trigger?.setAttribute('aria-expanded', 'true');
+    trigger?.classList.add('is-open');
   }
   function close() {
     panel?.setAttribute('hidden', '');
     trigger?.setAttribute('aria-expanded', 'false');
+    trigger?.classList.remove('is-open');
   }
   function toggle() {
     panel?.hasAttribute('hidden') ? open() : close();
@@ -71,91 +80,110 @@ const LANG_NAMES: Record<string, string> = {
 </script>
 
 <style>
-  /* Trigger wrapper — provides anchor for absolute panel */
+  /* Wrapper — provides anchor for absolute panel */
   .lp-wrap {
     position: relative;
     display: inline-flex;
   }
 
-  /* Trigger button */
+  /* Trigger */
   .lp-trigger {
     display: flex;
     align-items: center;
-    gap: 5px;
-    background: none;
-    border: 1px solid var(--guest-border, #E3E1DA);
-    border-radius: var(--guest-radius-sm, 8px);
-    padding: 5px 8px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--guest-border, #E4E1D9);
+    background: var(--guest-bg-deep, #FAFAF8);
     cursor: pointer;
-    color: var(--guest-ink-muted, #6B6B66);
-    transition: color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
-                border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
-                background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1));
+    color: var(--guest-ink, #0A0A0A);
+    transition: border-color 140ms ease, background 140ms ease;
     outline: none;
   }
-  .lp-trigger:hover {
-    color: var(--guest-ink, #0A0A0A);
-    border-color: var(--guest-ink-muted, #6B6B66);
-    background: var(--guest-bg-deep, #F4F4F0);
+  .lp-trigger:hover,
+  .lp-trigger.is-open {
+    border-color: var(--guest-ink, #0A0A0A);
+    background: #fff;
   }
   .lp-trigger:focus-visible {
-    outline: 2px solid var(--accent, var(--guest-accent, #FF4A82));
+    outline: 2px solid var(--accent, #FF4A82);
     outline-offset: 2px;
   }
-  .lp-trigger__icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+  .lp-trigger__globe  { width: 16px; height: 16px; flex-shrink: 0; }
   .lp-trigger__code {
-    font-family: var(--guest-font-mono, monospace);
-    font-size: 9px;
-    letter-spacing: 0.1em;
+    font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+    font-size: 13px;
     font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .lp-trigger__chevron {
+    width: 14px; height: 14px; flex-shrink: 0;
+    transition: transform 160ms ease;
+  }
+  .lp-trigger.is-open .lp-trigger__chevron {
+    transform: rotate(180deg);
   }
 
-  /* Dropdown panel — opens below trigger, right-aligned */
+  /* Dropdown panel */
   .lp-panel {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     z-index: 300;
-    background: var(--guest-bg, #FAFAF6);
-    border: 1px solid var(--guest-border, #E3E1DA);
-    border-radius: 12px;
-    padding: 10px;
-    min-width: 220px;
+    width: 320px;
     max-width: calc(100vw - 40px);
     max-height: min(60vh, 420px);
     overflow-y: auto;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    background: #fff;
+    border: 1px solid var(--guest-border, #E4E1D9);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 12px 32px rgba(10,10,10,0.12);
     transform-origin: top right;
-    animation: lp-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: lp-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
   .lp-panel[hidden] { display: none; }
 
   @keyframes lp-in {
-    from { transform: scale(0.85); opacity: 0; }
-    to   { transform: scale(1);    opacity: 1; }
+    from { opacity: 0; transform: scale(0.96) translateY(-6px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
   }
   @media (prefers-reduced-motion: reduce) {
     .lp-panel { animation: none; }
+    .lp-trigger__chevron { transition: none; }
+  }
+
+  /* Panel label */
+  .lp-panel__label {
+    font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--guest-ink-faint, #9A968C);
+    padding: 2px 4px 10px;
   }
 
   /* Language grid */
   .lp-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 8px;
   }
 
   /* Language tile */
   .lp-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 10px 12px;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 12px;
     text-decoration: none;
-    color: var(--guest-ink, #0A0A0A);
-    transition: background 150ms, border-color 150ms;
+    background: var(--guest-bg-deep, #FAFAF8);
+    transition: background 140ms ease, border-color 140ms ease;
     outline: none;
   }
   .lp-item:hover {
@@ -171,18 +199,26 @@ const LANG_NAMES: Record<string, string> = {
     outline-offset: 2px;
   }
 
+  /* Code: pink only when active, ink otherwise */
   .lp-item__code {
-    font-family: var(--guest-font-mono, monospace);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--accent, #FF4A82);
-    min-width: 26px;
+    font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--guest-ink, #0A0A0A);
+    min-width: 22px;
     flex-shrink: 0;
   }
+  .lp-item.is-active .lp-item__code {
+    color: var(--accent, #FF4A82);
+  }
+
+  /* Name: display font */
   .lp-item__name {
-    font-size: 13px;
-    color: var(--guest-ink-muted, #6B6B66);
+    font-family: var(--guest-font-display, 'Space Grotesk', sans-serif);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--guest-ink, #0A0A0A);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
