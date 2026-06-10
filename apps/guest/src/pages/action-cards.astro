@@ -17,9 +17,10 @@ if (!hotel) {
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-const { data: hotelLangRow } = await client
+const { data: hotelLangRow, error: langError } = await client
   .from('hotels').select('default_language, enabled_languages')
   .eq('id', hotel.id).maybeSingle();
+if (langError) console.error('[action-cards] hotels lang query error', { hotelId: hotel.id, error: langError });
 const hotelDefaultLang = (hotelLangRow?.default_language as string | undefined) ?? 'de';
 const hotelEnabledLangs: string[] = Array.isArray(hotelLangRow?.enabled_languages)
   ? hotelLangRow.enabled_languages : ['de','en','fr','es'];
@@ -31,12 +32,14 @@ const LANG_LABELS: Record<string, string> = {
 const otherEnabled = hotelEnabledLangs.filter(l => l !== hotelDefaultLang);
 const otherEnabledLabel = otherEnabled.map(l => LANG_LABELS[l] || l).join(', ');
 
-const { data: cards } = await client
+if (!hotel.id) console.error('[action-cards] hotel.id is undefined — cards query will return empty', { hotel });
+const { data: cards, error: cardsError } = await client
   .from('hotel_action_cards')
   .select('*')
   .eq('hotel_id', hotel.id)
   .order('sort_order', { ascending: true });
 
+if (cardsError) console.error('[action-cards] hotel_action_cards query error', { hotelId: hotel.id, error: cardsError });
 const cardList = (cards ?? []) as any[];
 const overFive = cardList.length > 5;
 
