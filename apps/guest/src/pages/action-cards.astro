@@ -395,6 +395,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
+            if (!res.ok) { this.saveError = `API ${res.status}: ${res.statusText}`; return; }
             const data = await res.json();
             if (!data.ok) { this.saveError = data.error || 'Speichern fehlgeschlagen.'; return; }
 
@@ -403,6 +404,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
               fd.append('card_id', data.id);
               fd.append('image', this.editor.imageFile);
               const upRes = await fetch('/api/action-cards/upload-image', { method: 'POST', body: fd });
+              if (!upRes.ok) { this.saveError = `Bild-Upload API ${upRes.status}: ${upRes.statusText}`; return; }
               const upData = await upRes.json();
               if (!upData.ok) { this.saveError = `Bild-Upload: ${upData.error}`; return; }
             }
@@ -421,6 +423,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, direction }),
           });
+          if (!res.ok) { this.showToast(`API ${res.status}: ${res.statusText}`, 'error'); return; }
           const data = await res.json();
           if (!data.ok) { this.showToast(data.error || 'Sortieren fehlgeschlagen', 'error'); return; }
           if (!data.noop) window.location.reload();
@@ -432,6 +435,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id }),
           });
+          if (!res.ok) { this.showToast(`API ${res.status}: ${res.statusText}`, 'error'); return; }
           const data = await res.json();
           if (!data.ok) { this.showToast(data.error || 'Löschen fehlgeschlagen', 'error'); return; }
           this.showToast('Gelöscht.', 'success');
