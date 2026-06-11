@@ -93,8 +93,8 @@ const winCondition: WinCond = !weather ? 'clear'
   : wxCondition === 'fog' ? 'cloudy'
   : (wxCondition as WinCond);
 
-// Particles — deterministic pseudo-random (size=22 → n=4, fall=32px)
-const WIN_N    = 4;
+// Particles — deterministic pseudo-random (pill 56×22 → n=7, fall=32px)
+const WIN_N    = 7;
 const WIN_FALL = 32;
 function sv(i: number, salt: number): number { return ((i * 173 + salt * 97) % 100) / 100; }
 const WIN_RAIN = Array.from({ length: WIN_N }, (_, i) => ({
@@ -466,10 +466,10 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     color: var(--bh-ink);
   }
 
-  /* ── 22px ambient weather window ────────────────────────────────────────── */
+  /* ── 56×22px ambient weather pill ───────────────────────────────────────── */
   .bh-win {
     position: relative;
-    width: 22px; height: 22px;
+    width: 56px; height: 22px;
     border-radius: 6px;
     overflow: hidden;
     flex-shrink: 0;
@@ -479,25 +479,25 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
 
   /* Background gradient per condition */
   .bh-win--clear  { background: linear-gradient(160deg,#FFE9AE,#FFF6E2); }
-  .bh-win--cloudy { background: linear-gradient(160deg,#DFE3E7,#EEF1F3); }
-  .bh-win--rain   { background: linear-gradient(160deg,#C2CCD4,#E0E6EB); }
+  .bh-win--cloudy { background: linear-gradient(160deg,#C5CFD9,#9AA7B4); }
+  .bh-win--rain   { background: linear-gradient(160deg,#8FA0B0,#B8C8D4); }
   .bh-win--snow   { background: linear-gradient(160deg,#DCE6EE,#F2F6FA); }
-  .bh-win--storm  { background: linear-gradient(160deg,#9AA4AE,#C4CCD3); }
+  .bh-win--storm  { background: linear-gradient(160deg,#6A757E,#9AA4AE); }
   .bh-win--night  { background: linear-gradient(160deg,#1A2030,#2A3450); }
 
-  /* Sun: pulsing glow + slow spinning rays */
+  /* Sun: fixed px sizes anchored to right side of pill */
   .bh-win__glow {
     position: absolute;
-    top: -30%; right: -30%;
-    width: 90%; height: 90%;
+    top: -3px; right: -3px;
+    width: 26px; height: 26px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(255,230,0,.8), rgba(255,230,0,0) 70%);
     animation: bh-win-glow 6s ease-in-out infinite;
   }
   .bh-win__sun-rays {
     position: absolute;
-    top: 6%; right: 6%;
-    width: 72%; height: 72%;
+    top: 1px; right: 2px;
+    width: 18px; height: 18px;
     transform-origin: 50% 50%;
     animation: bh-win-spin 50s linear infinite;
   }
@@ -507,11 +507,11 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
   }
   @keyframes bh-win-spin { to { transform: rotate(360deg); } }
 
-  /* Moon */
+  /* Moon: fixed px, right side */
   .bh-win__moon {
     position: absolute;
-    top: 14%; right: 14%;
-    width: 34%; height: 34%;
+    top: 3px; right: 6px;
+    width: 10px; height: 10px;
     border-radius: 50%;
     background: radial-gradient(circle at 38% 38%, #FBFBF2, #C9CBB8);
   }
@@ -528,7 +528,7 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     50%     { opacity: 1; }
   }
 
-  /* Cloud blobs */
+  /* Cloud blobs — drift across full pill width */
   .bh-win__cloud {
     position: absolute;
     border-radius: 50%;
@@ -536,16 +536,19 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     filter: blur(3px);
     animation: bh-win-cloud ease-in-out infinite;
   }
-  .bh-win--storm .bh-win__cloud { background: #5A636E; }
-  .bh-win--snow  .bh-win__cloud { background: #FBFCFD; }
+  /* Cloudy: near-white clouds, crisp contrast on blue-gray sky */
+  .bh-win--cloudy .bh-win__cloud { background: #EFF4F7; filter: blur(2px); }
+  .bh-win--storm  .bh-win__cloud { background: #5A636E; }
+  .bh-win--snow   .bh-win__cloud { background: #FBFCFD; }
 
-  .bh-win__cloud--1 { width: 120%; height: 70%; left: -30%; top: -22%; opacity: .95; animation-duration: 24s; animation-delay:  0s; }
-  .bh-win__cloud--2 { width:  90%; height: 56%; left:  55%; top: -30%; opacity: .85; animation-duration: 30s; animation-delay: -9s; }
-  .bh-win__cloud--3 { width:  80%; height: 52%; left:  18%; top: -14%; opacity: .9;  animation-duration: 20s; animation-delay: -6s; }
+  /* Pill-optimised cloud positions — 3 blobs spread across 56px */
+  .bh-win__cloud--1 { width: 58%; height: 70%; left:  4%; top: -18%; opacity: .95; animation-duration: 10s; animation-delay:  0s; }
+  .bh-win__cloud--2 { width: 48%; height: 55%; left: 46%; top: -26%; opacity: .88; animation-duration: 13s; animation-delay: -5s; }
+  .bh-win__cloud--3 { width: 38%; height: 50%; left: -3%; top: -10%; opacity: .90; animation-duration:  9s; animation-delay: -3s; }
 
   @keyframes bh-win-cloud {
     0%,100% { transform: translateX(0); }
-    50%     { transform: translateX(8px); }
+    50%     { transform: translateX(18px); }
   }
 
   /* Rain */
