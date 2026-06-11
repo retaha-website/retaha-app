@@ -86,7 +86,6 @@ type LK = 'de' | 'en' | 'fr' | 'es';
 const lk = (['de','en','fr','es'].includes(lang) ? lang : 'de') as LK;
 const labels: Record<LK, {
   pageTitle: string;
-  back: string;
   eyebrow: string;
   title: string;
   titleAccent: string;
@@ -100,7 +99,6 @@ const labels: Record<LK, {
 }> = {
   de: {
     pageTitle: `${hotel.name} · WLAN`,
-    back: '← Zurück',
     eyebrow: '— Verbindung —',
     title: 'WLAN ist',
     titleAccent: 'bereit.',
@@ -114,7 +112,6 @@ const labels: Record<LK, {
   },
   en: {
     pageTitle: `${hotel.name} · Wi-Fi`,
-    back: '← Back',
     eyebrow: '— Connection —',
     title: 'Wi-Fi is',
     titleAccent: 'ready.',
@@ -128,7 +125,6 @@ const labels: Record<LK, {
   },
   fr: {
     pageTitle: `${hotel.name} · Wi-Fi`,
-    back: '← Retour',
     eyebrow: '— Connexion —',
     title: 'Wi-Fi est',
     titleAccent: 'prêt.',
@@ -142,7 +138,6 @@ const labels: Record<LK, {
   },
   es: {
     pageTitle: `${hotel.name} · Wi-Fi`,
-    back: '← Volver',
     eyebrow: '— Conexión —',
     title: 'Wi-Fi está',
     titleAccent: 'listo.',
@@ -188,28 +183,32 @@ const l = labels[lk];
         font-family: var(--display);
         min-height: 100dvh;
         -webkit-font-smoothing: antialiased;
+        position: relative;
       }
 
       .page {
         max-width: 480px;
         margin: 0 auto;
-        padding: 0 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
       }
 
-      /* ── Back link ────────────────────────────────────────────────── */
-      .back {
-        display: inline-flex;
-        align-items: center;
-        padding: calc(env(safe-area-inset-top, 0px) + 20px) 0 0;
-        font-family: var(--mono);
-        font-size: 10px;
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
-        color: var(--ink-muted);
+      /* ── Close button (✕ top-right) ──────────────────────────────── */
+      .close-btn {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 16px);
+        right: 20px;
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: #EFEDE8;
+        display: grid;
+        place-items: center;
         text-decoration: none;
-        gap: 6px;
+        color: var(--ink);
+        flex-shrink: 0;
+        transition: background 0.14s ease;
       }
-      .back:hover { color: var(--ink); }
+      .close-btn:hover { background: #E0DDD7; }
+      .close-btn svg { width: 16px; height: 16px; }
 
       /* ── Hero ─────────────────────────────────────────────────────── */
       .hero { padding: 28px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 28px; }
@@ -218,7 +217,7 @@ const l = labels[lk];
         font-size: 10px;
         letter-spacing: 0.16em;
         font-weight: 500;
-        color: var(--ink-faint);
+        color: var(--accent);
         margin: 0 0 14px;
         display: block;
       }
@@ -321,9 +320,14 @@ const l = labels[lk];
     </style>
   </head>
   <body>
-    <div class="page">
-      <a class="back" href={backHref} data-astro-reload>{l.back}</a>
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </a>
 
+    <div class="page">
       <div class="hero">
         <span class="eyebrow">{l.eyebrow}</span>
         <h1 class="title">{l.title} <span class="accent">{l.titleAccent}</span></h1>
