@@ -9,6 +9,18 @@ function json(data: unknown, status = 200) {
   });
 }
 
+function parseEuro(raw: string | undefined): number | null {
+  const s = (raw ?? '').trim().replace(',', '.');
+  if (!s) return null;
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return Math.round(n * 100);
+}
+
+function parseEuroFee(raw: string | undefined): number {
+  return parseEuro(raw) ?? 0;
+}
+
 const ALLOWED = ['times', 'location', 'included', 'price', 'room_service_fee', 'module', 'room_service'] as const;
 
 export const POST: APIRoute = async ({ cookies, request }) => {
@@ -68,16 +80,14 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     }
 
     if (section === 'price') {
-      const raw = String(body.breakfast_price_cents ?? '').trim();
-      const priceCents = raw !== '' ? (parseInt(raw) ?? null) : null;
+      const priceCents = parseEuro(body.breakfast_price_cents as string | undefined);
       const { error } = await ups({ breakfast_price_cents: priceCents });
       if (error) { console.error('[breakfast/section price]', error); return json({ ok: false, error: error.message }, 500); }
       return json({ ok: true });
     }
 
     if (section === 'room_service_fee') {
-      const raw = String(body.breakfast_room_service_fee_cents ?? '').trim();
-      const fee = raw !== '' ? (parseInt(raw) || 0) : 0;
+      const fee = parseEuroFee(body.breakfast_room_service_fee_cents as string | undefined);
       const { error } = await ups({ breakfast_room_service_fee_cents: fee });
       if (error) { console.error('[breakfast/section room_service_fee]', error); return json({ ok: false, error: error.message }, 500); }
       return json({ ok: true });
@@ -94,8 +104,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
     if (section === 'room_service') {
       const enabled = body.breakfast_room_service_enabled === 'true';
-      const raw = String(body.breakfast_room_service_fee_cents ?? '').trim();
-      const fee = raw !== '' ? (parseInt(raw) || 0) : 0;
+      const fee = parseEuroFee(body.breakfast_room_service_fee_cents as string | undefined);
       const { error } = await ups({ breakfast_room_service_enabled: enabled, breakfast_room_service_fee_cents: fee });
       if (error) { console.error('[breakfast/section room_service]', error); return json({ ok: false, error: error.message }, 500); }
       return json({ ok: true });

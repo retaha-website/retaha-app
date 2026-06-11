@@ -124,6 +124,7 @@ if (url.searchParams.get('deleted') === '1' && !message) {
 }
 
 const allergenInit = EU_ALLERGENS.map(a => ({ key: a.key, label_de: a.label_de }));
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 ---
 
 <Layout title="Frühstück" activeTab="backoffice">
@@ -189,11 +190,6 @@ textarea.s-input { resize: vertical; min-height: 72px; }
 .bp-modal-section { padding: 20px 24px; border-bottom: 1px solid var(--border); }
 .bp-modal-section:last-child { border-bottom: none; }
 .bp-modal-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
-.bp-modal-section--warn { background: #FFF9F0; border-bottom-color: #E8D5A0; }
-.bp-warn-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-.bp-warn-icon { color: #8C6A20; flex-shrink: 0; margin-top: 2px; }
-.bp-warn-title { font-size: 14px; font-weight: 500; color: #6A4E1A; }
-.bp-warn-sub { font-size: 12px; color: #8C6A20; margin-top: 3px; line-height: 1.5; }
 .bp-allergen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
 .bp-allergen-row { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
 .bp-allergen-row:hover { background: rgba(140,106,32,0.08); }
@@ -240,24 +236,15 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <h2 class="s-card__title">Frühstücksmodul</h2>
           <span class="s-card__num">01</span>
         </div>
-        <div x-data={`sectionSave({ initial: ${JSON.stringify({ features_breakfast: breakfastOn ? 'true' : 'false' })}, section: 'module' })`}>
-          <div class="s-card__body">
-            <p class="field__hint">Schaltet das gesamte Frühstücks-Feature in der Gäste-App ein oder aus.</p>
-            <label class="toggle-row">
-              <input type="checkbox"
-                :checked="data.features_breakfast === 'true'"
-                @change="data.features_breakfast = $event.target.checked ? 'true' : 'false'"
-                class="sr-only" />
-              <span class="bt-visual" :class="{'is-checked': data.features_breakfast === 'true'}">
-                <span class="bt-knob"></span>
-              </span>
-              <span class="toggle-label">Frühstück in Gäste-App sichtbar</span>
-            </label>
-          </div>
-          <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+        <div class="s-card__body">
+          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            {breakfastOn ? (
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--sage);font-weight:500">✓ Modul aktiv</span>
+            ) : (
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--ink-muted)">○ Modul inaktiv</span>
+            )}
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
           </div>
         </div>
       </section>
@@ -352,16 +339,16 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <h2 class="s-card__title">Pauschalpreis</h2>
           <span class="s-card__num">05</span>
         </div>
-        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_price_cents: priceCents !== null ? String(priceCents) : '' })}, section: 'price' })`}>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_price_cents: priceCents !== null ? (priceCents / 100).toFixed(2).replace('.', ',') : '' })}, section: 'price' })`}>
           <div class="s-card__body">
             <div class="field field--row">
-              <label class="field__label" for="bf-price">Preis in Cent</label>
+              <label class="field__label" for="bf-price">Preis in Euro</label>
               <div class="field__input-wrap">
-                <input type="number" id="bf-price" name="breakfast_price_cents"
+                <input type="text" id="bf-price" name="breakfast_price_cents"
                   x-model="data.breakfast_price_cents"
-                  min="0" step="50" placeholder="leer = kein Preis anzeigen"
-                  class="s-input" inputmode="numeric" style="max-width:220px" />
-                <span class="field__hint">z.B. 1500 = €15,00 · 0 = im Paket enthalten · leer = kein Preis</span>
+                  inputmode="decimal" placeholder="leer = kein Preis"
+                  class="s-input" style="max-width:220px" />
+                <span class="field__hint">z.B. 15 oder 15,50 · 0,00 = im Buffet enthalten · leer = kein Preis</span>
               </div>
             </div>
           </div>
@@ -379,7 +366,7 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <h2 class="s-card__title">Zimmerservice</h2>
           <span class="s-card__num">06</span>
         </div>
-        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_enabled: roomServiceOn ? 'true' : 'false', breakfast_room_service_fee_cents: String(roomServiceFee) })}, section: 'room_service' })`}>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_enabled: roomServiceOn ? 'true' : 'false', breakfast_room_service_fee_cents: (roomServiceFee / 100).toFixed(2).replace('.', ',') })}, section: 'room_service' })`}>
           <div class="s-card__body">
             <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
             <label class="toggle-row">
@@ -397,10 +384,11 @@ textarea.s-input { resize: vertical; min-height: 72px; }
               <div class="field field--row">
                 <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
                 <div class="field__input-wrap">
-                  <input type="number" id="rs-fee" name="breakfast_room_service_fee_cents"
+                  <input type="text" id="rs-fee" name="breakfast_room_service_fee_cents"
                     x-model="data.breakfast_room_service_fee_cents"
-                    min="0" step="50" class="s-input" inputmode="numeric" style="max-width:220px" />
-                  <span class="field__hint">0 = kein Aufschlag · z.B. 300 = €3,00</span>
+                    inputmode="decimal" class="s-input" style="max-width:220px"
+                    placeholder="0,00" />
+                  <span class="field__hint">z.B. 3,00 · 0,00 = kein Aufschlag</span>
                 </div>
               </div>
             </div>
@@ -543,15 +531,15 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         </div>
 
         <!-- 14 Allergene -->
-        <div class="bp-modal-section bp-modal-section--warn">
-          <div class="bp-warn-head">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="bp-warn-icon">
-              <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+        <div class="bp-modal-section">
+          <div class="s-warning-row" style="margin-bottom:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 width="16" height="16" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
             </svg>
-            <div>
-              <div class="bp-warn-title">14 EU-Hauptallergene (LMIV Art. 9)</div>
-              <div class="bp-warn-sub">Alle enthaltenen Allergene ankreuzen. Bei Rezeptur-Änderungen sofort aktualisieren.</div>
-            </div>
+            <span><strong>14 EU-Hauptallergene (LMIV Art. 9)</strong> — Alle enthaltenen Allergene ankreuzen. Bei Rezeptur-Änderungen sofort aktualisieren.</span>
           </div>
           <div class="bp-allergen-grid">
             <template x-for="a in allergens" :key="a.key">
