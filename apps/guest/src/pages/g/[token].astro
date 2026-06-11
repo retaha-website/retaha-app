@@ -3,7 +3,7 @@ import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import WifiSheet from '../../components/sheets/WifiSheet.astro';
+import WifiPanel from '../../components/panels/WifiPanel.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
@@ -639,7 +639,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         </div>
 
         <div class="gate-grid">
-          <button class="gate-tile" type="button" @click="openSheet('wifi')">
+          <button class="gate-tile" type="button" @click="openWifiPanel()">
             <span class="gate-tile-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5 a16 16 0 0 1 20 0"/><path d="M5 12 a11 11 0 0 1 14 0"/><path d="M8.5 15.5 a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
             </span>
@@ -744,8 +744,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       )}
 
       <!-- SHEETS (rendered as overlays, alle Themes) -->
-      <WifiSheet
-        hotelId={hotel.id}
+      <WifiPanel
         ssid={wifiSsid ?? '—'}
         password={wifiPassword}
         speedMbits={settings.wifi_speed_mbits || 320}
@@ -903,6 +902,12 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         sheetIsDragging: false,
         _sheetDragStart: 0,
         _bgColor: '#ffffff',
+
+        // WiFi Full-Panel state (R16 — opakes Vollflächen-Panel)
+        wifiPanelOpen: false,
+        wifiPanelDragOffset: 0,
+        wifiPanelDragging: false,
+        _wifiPanelDragStart: 0,
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
@@ -1334,6 +1339,60 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = null;
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
+        },
+
+        // WiFi Full-Panel (R16 — opakes Panel, kein Body-Hack)
+        openWifiPanel() {
+          this.wifiPanelOpen = true;
+          this.wifiPanelDragOffset = 0;
+          document.body.style.overflow = 'hidden';
+        },
+
+        closeWifiPanel() {
+          this.wifiPanelOpen = false;
+          this.wifiPanelDragOffset = 0;
+          document.body.style.overflow = '';
+        },
+
+        startWifiPanelDrag(event: PointerEvent) {
+          event.preventDefault();
+          this._wifiPanelDragStart = event.clientY;
+          this.wifiPanelDragging = true;
+          this.wifiPanelDragOffset = 0;
+          const onMove = (e: PointerEvent) => {
+            this.wifiPanelDragOffset = Math.max(0, e.clientY - this._wifiPanelDragStart);
+          };
+          const onEnd = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onEnd);
+            document.removeEventListener('pointercancel', onEnd);
+            this.wifiPanelDragging = false;
+            if (this.wifiPanelDragOffset > 120) this.closeWifiPanel();
+            else this.wifiPanelDragOffset = 0;
+          };
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+          document.addEventListener('pointercancel', onEnd);
+        },
+
+        startWifiPanelDragTouch(event: TouchEvent) {
+          this._wifiPanelDragStart = event.touches[0].clientY;
+          this.wifiPanelDragging = true;
+          this.wifiPanelDragOffset = 0;
+          const onMove = (e: TouchEvent) => {
+            this.wifiPanelDragOffset = Math.max(0, e.touches[0].clientY - this._wifiPanelDragStart);
+          };
+          const onEnd = () => {
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+            document.removeEventListener('touchcancel', onEnd);
+            this.wifiPanelDragging = false;
+            if (this.wifiPanelDragOffset > 120) this.closeWifiPanel();
+            else this.wifiPanelDragOffset = 0;
+          };
+          document.addEventListener('touchmove', onMove, { passive: true });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
         },
 
         copyText(text: string, event: Event) {

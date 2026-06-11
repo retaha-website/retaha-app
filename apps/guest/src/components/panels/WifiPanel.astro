@@ -1,0 +1,371 @@
+---
+// R16 — Opakes Vollflächen-Panel. Kein Overlay, kein Backdrop.
+// position:fixed; inset:0 — immer opak hell → Safari sampelt immer hell.
+// Öffnen/Schließen via transform:translateY, x-show für display:none beim Schließen.
+
+import QRCode from 'qrcode';
+
+interface Props {
+  ssid: string;
+  password: string;
+  speedMbits: number;
+  lang: string;
+}
+const { ssid, password, speedMbits, lang: rawLang } = Astro.props;
+const lang = ['de','en','fr','es'].includes(rawLang) ? rawLang as 'de'|'en'|'fr'|'es' : 'en';
+
+const escapeWifi = (s: string) => s.replace(/([\\;,":])/g, '\\$1');
+const qrDataUrl: string | null = ssid && ssid !== '—' ? await QRCode.toDataURL(
+  `WIFI:T:WPA;S:${escapeWifi(ssid)};P:${escapeWifi(password ?? '')};;`,
+  { errorCorrectionLevel: 'M', margin: 2, width: 200,
+    color: { dark: '#1A1A1A', light: '#FFFFFF' } }
+).catch(() => null) : null;
+
+const labels = {
+  de: {
+    eyebrow: '— Verbindung —',
+    title: 'WLAN ist',
+    titleAccent: 'bereit.',
+    subtitle: 'Schnell verbunden — direkt loslegen.',
+    networkLabel: 'Netzwerk',
+    passwordLabel: 'Passwort',
+    speedLabel: 'Geschwindigkeit',
+    copy: 'Kopieren',
+    qrHint: 'Mit Handy-Kamera scannen für automatische Verbindung.',
+    close: 'Schließen',
+  },
+  en: {
+    eyebrow: '— Connection —',
+    title: 'Wi-Fi is',
+    titleAccent: 'ready.',
+    subtitle: 'Connect fast — get started.',
+    networkLabel: 'Network',
+    passwordLabel: 'Password',
+    speedLabel: 'Speed',
+    copy: 'Copy',
+    qrHint: 'Scan with phone camera to auto-connect.',
+    close: 'Close',
+  },
+  fr: {
+    eyebrow: '— Connexion —',
+    title: 'Wi-Fi est',
+    titleAccent: 'prêt.',
+    subtitle: 'Connexion rapide — c\'est parti.',
+    networkLabel: 'Réseau',
+    passwordLabel: 'Mot de passe',
+    speedLabel: 'Vitesse',
+    copy: 'Copier',
+    qrHint: 'Scannez avec la caméra pour vous connecter automatiquement.',
+    close: 'Fermer',
+  },
+  es: {
+    eyebrow: '— Conexión —',
+    title: 'Wi-Fi está',
+    titleAccent: 'listo.',
+    subtitle: 'Conéctate rápido — empieza ya.',
+    networkLabel: 'Red',
+    passwordLabel: 'Contraseña',
+    speedLabel: 'Velocidad',
+    copy: 'Copiar',
+    qrHint: 'Escanea con la cámara para conectar automáticamente.',
+    close: 'Cerrar',
+  },
+};
+const l = labels[lang];
+---
+
+<template x-teleport="body">
+  <div
+    class="wifi-panel"
+    x-show="wifiPanelOpen"
+    x-transition:enter-start="wifi-panel--hidden"
+    x-transition:leave-end="wifi-panel--hidden"
+    :class="{ 'wifi-panel--dragging': wifiPanelDragging }"
+    :style="wifiPanelDragOffset > 0 ? `transform: translateY(${wifiPanelDragOffset}px)` : ''"
+    role="dialog"
+    aria-modal="true"
+    aria-label={l.close}
+  >
+    <!-- Grab handle: swipe-down-to-close -->
+    <div
+      class="wifi-panel__handle-area"
+      @pointerdown="startWifiPanelDrag($event)"
+      @touchstart.passive="startWifiPanelDragTouch($event)"
+    >
+      <div class="wifi-panel__handle"></div>
+    </div>
+
+    <!-- Header -->
+    <div class="wifi-panel__header">
+      <div class="wifi-panel__eyebrow">{l.eyebrow}</div>
+      <div class="wifi-panel__title-row">
+        <h2 class="wifi-panel__title">
+          {l.title} <span class="wifi-panel__accent">{l.titleAccent}</span>
+        </h2>
+        <button
+          class="wifi-panel__close"
+          type="button"
+          @click="closeWifiPanel()"
+          :aria-label="`${${JSON.stringify(l.close)}}`"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <p class="wifi-panel__subtitle">{l.subtitle}</p>
+    </div>
+
+    <!-- Content card -->
+    <div class="wifi-panel__body">
+      <div class="wifi-panel__card">
+
+        <!-- Network -->
+        <div class="wifi-panel__row">
+          <div class="wifi-panel__col">
+            <div class="wifi-panel__label">{l.networkLabel}</div>
+            <div class="wifi-panel__value">{ssid}</div>
+          </div>
+          <button
+            class="wifi-panel__copy"
+            type="button"
+            @click={`copyText(${JSON.stringify(ssid)}, $event)`}
+            aria-label={l.copy}
+          >
+            <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Password -->
+        <div class="wifi-panel__row">
+          <div class="wifi-panel__col">
+            <div class="wifi-panel__label">{l.passwordLabel}</div>
+            <div class="wifi-panel__value wifi-panel__value--pw">{password}</div>
+          </div>
+          <button
+            class="wifi-panel__copy"
+            type="button"
+            @click={`copyText(${JSON.stringify(password)}, $event)`}
+            aria-label={l.copy}
+          >
+            <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Speed -->
+        <div class="wifi-panel__row wifi-panel__row--last">
+          <div class="wifi-panel__col">
+            <div class="wifi-panel__label">{l.speedLabel}</div>
+            <div class="wifi-panel__value">{speedMbits} Mbit/s</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- QR Code -->
+      {qrDataUrl && (
+        <div class="wifi-panel__qr">
+          <p class="wifi-panel__qr-hint">{l.qrHint}</p>
+          <div class="wifi-panel__qr-frame">
+            <img src={qrDataUrl} alt="WiFi QR Code" width="160" height="160" />
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</template>
+
+<style>
+/* ── Panel-Grundstruktur ─────────────────────────────────────────────── */
+.wifi-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--color-white);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Slide-Animation */
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.wifi-panel--hidden  { transform: translateY(100%); }
+.wifi-panel--dragging { transition: none; }
+
+/* ── Grab-Handle ─────────────────────────────────────────────────────── */
+.wifi-panel__handle-area {
+  display: flex;
+  justify-content: center;
+  /* safe-area + extra Abstand unter Statusbar */
+  padding: calc(env(safe-area-inset-top) + 10px) 0 12px;
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+}
+.wifi-panel__handle-area:active { cursor: grabbing; }
+.wifi-panel__handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-anthrazit) 20%, transparent);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.wifi-panel__header {
+  padding: 4px 22px 22px;
+  flex-shrink: 0;
+}
+.wifi-panel__eyebrow {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--guest-ink-muted, #888);
+  margin-bottom: 10px;
+}
+.wifi-panel__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.wifi-panel__title {
+  font-family: var(--guest-font-display, 'Space Grotesk', system-ui, sans-serif);
+  font-size: clamp(26px, 7vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+  color: var(--guest-ink, #0F1115);
+}
+.wifi-panel__accent { color: var(--guest-accent); }
+.wifi-panel__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--color-anthrazit) 8%, transparent);
+  color: var(--guest-ink, #0F1115);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 4px;
+  transition: background 0.15s ease;
+}
+.wifi-panel__close:hover {
+  background: color-mix(in srgb, var(--color-anthrazit) 14%, transparent);
+}
+.wifi-panel__close svg { width: 16px; height: 16px; }
+.wifi-panel__subtitle {
+  font-family: var(--guest-font-body, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  color: var(--guest-ink-muted, #888);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ── Body / Card ─────────────────────────────────────────────────────── */
+.wifi-panel__body {
+  padding: 0 22px calc(env(safe-area-inset-bottom) + 48px);
+  flex: 1;
+}
+.wifi-panel__card {
+  background: var(--guest-bg-card, #fff);
+  border: 1px solid var(--guest-border);
+  border-radius: var(--guest-radius, 12px);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.wifi-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--guest-border);
+}
+.wifi-panel__row--last { border-bottom: none; }
+.wifi-panel__col { flex: 1; min-width: 0; }
+.wifi-panel__label {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--guest-ink-faint, #aaa);
+  margin-bottom: 3px;
+}
+.wifi-panel__value {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--guest-ink, #0F1115);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wifi-panel__value--pw { letter-spacing: 0.03em; }
+
+/* Copy-Button — ausschließlich accent-Töne, kein Gelb/Pink */
+.wifi-panel__copy {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--guest-border);
+  background: color-mix(in srgb, var(--guest-accent) 10%, transparent);
+  color: var(--guest-accent);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wifi-panel__copy svg { width: 15px; height: 15px; }
+.wifi-panel__copy .icon-check { display: none; }
+.wifi-panel__copy:hover {
+  background: color-mix(in srgb, var(--guest-accent) 18%, transparent);
+  border-color: var(--guest-accent);
+}
+:global(.wifi-panel__copy.copied) {
+  background: var(--guest-accent);
+  border-color: var(--guest-accent);
+  color: #fff;
+}
+:global(.wifi-panel__copy.copied) .icon-copy  { display: none; }
+:global(.wifi-panel__copy.copied) .icon-check { display: block; }
+
+/* ── QR ─────────────────────────────────────────────────────────────── */
+.wifi-panel__qr { text-align: center; }
+.wifi-panel__qr-hint {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--guest-ink-muted, #888);
+  margin: 0 0 14px;
+}
+.wifi-panel__qr-frame {
+  display: inline-block;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--guest-border);
+  border-radius: var(--guest-radius-sm, 8px);
+}
+.wifi-panel__qr-frame img { display: block; width: 160px; height: 160px; }
+</style>
