@@ -72,13 +72,13 @@ export async function getOnboardingChecklist(
     { key: 'hotel_basics',     label: 'Hotel-Basics',          description: 'Name + Standardsprache',                 href: '/admin/settings', done: hasBasics || !!state.step_hotel_basics, required: true },
     { key: 'address',          label: 'Adresse',               description: 'Mit Geocoding für Empfehlungen',          href: '/admin/settings', done: (hasAddress && hasGeocode) || !!state.step_address, required: true },
     { key: 'languages',        label: 'Sprachen',              description: 'Welche Sprachen sehen Gäste?',            href: '/admin/settings', done: hasLanguages || !!state.step_languages, required: true },
-    { key: 'mews',             label: 'Mews verknüpft',        description: 'PMS-Sync für Stays + Gäste',              href: '/admin/pms',      done: !!state.step_mews, required: false },
+    { key: 'mews',             label: 'Mews verknüpft',        description: 'PMS-Sync für Stays + Gäste',              href: '/pms',            done: !!state.step_mews, required: false },
     { key: 'wifi',             label: 'WLAN-Daten',            description: 'SSID + Passwort',                         href: '/admin/settings', done: hasWifi || !!state.step_wifi, required: true },
-    { key: 'breakfast',        label: 'Frühstücks-Items',      description: 'Was kann der Gast buchen?',               href: '/admin/breakfast', done: hasBreakfast || !!state.step_breakfast, required: false },
+    { key: 'breakfast',        label: 'Frühstücks-Items',      description: 'Was kann der Gast buchen?',               href: '/breakfast',       done: hasBreakfast || !!state.step_breakfast, required: false },
     { key: 'eve_knowledge',    label: 'Eve-Wissen (3+ FAQs)',  description: 'FAQs, Hausregeln, Tipps',                 href: '/admin/eve/knowledge', done: hasKnowledge, required: true },
     { key: 'action_cards',     label: 'Hero-Karten (1+)',      description: 'Konfigurierbare Cards im Gast-Hero',      href: '/admin/action-cards', done: hasActionCards, required: true },
     { key: 'place_picks',      label: 'Empfehlungs-Picks (3+)', description: 'Restaurants, Cafés, Aktivitäten',         href: '/admin/places',   done: hasPlacePicks, required: false },
-    { key: 'team',             label: 'Team-Mitglied einladen', description: 'Manager oder Mitarbeiter',                href: '/admin/team',     done: hasTeam || !!state.step_team_invited, required: false },
+    { key: 'team',             label: 'Team-Mitglied einladen', description: 'Manager oder Mitarbeiter',                href: '/team',           done: hasTeam || !!state.step_team_invited, required: false },
   ];
 
   const doneCount = items.filter(i => i.done).length;

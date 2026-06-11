@@ -1,0 +1,731 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import {
+  getUser,
+  getUserHotels,
+  createSupabaseServiceRoleInstance,
+} from '@retaha/auth';
+import { loadBreakfastItems, EU_ALLERGENS } from '@retaha/db';
+import { getMewsClientForHotel } from '../../lib/mews/factory';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const supabase = createSupabaseServiceRoleInstance();
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString() || 'save_settings';
+
+  // ── Mews import ──────────────────────────────────────────────────────────────
+  if (action === 'mews_import') {
+    const mews = await getMewsClientForHotel(hotel.id);
+    if (!mews) {
+      message = { type: 'error', text: 'Mews-Integration nicht verbunden. Zuerst unter PMS verbinden.' };
+    } else {
+      try {
+        const resp = await mews.getProducts({ Limitation: { Count: 100 } });
+        const products = resp.Products ?? [];
+        if (products.length === 0) {
+          message = { type: 'error', text: 'Mews hat keine Produkte zurückgegeben.' };
+        } else {
+          let imported = 0;
+          let skipped = 0;
+          for (const p of products) {
+            const mewsId = p.Id as string | undefined;
+            if (!mewsId) continue;
+
+            const names = (p.Names ?? p.ExternalNames ?? {}) as Record<string, string>;
+            const descs = (p.Descriptions ?? {}) as Record<string, unknown>;
+            const priceObj = (p.Price ?? p.DefaultPrice ?? {}) as Record<string, unknown>;
+            const priceValue = (priceObj.Value ?? priceObj.GrossValue ?? priceObj.NetValue ?? 0) as number;
+
+            const payload: Record<string, unknown> = {
+              hotel_id: hotel.id,
+              mews_product_id: mewsId,
+              name_de: names['de-DE'] || names['en-US'] || names[Object.keys(names)[0]] || mewsId,
+              name_en: names['en-US'] || names['en-GB'] || null,
+              name_fr: names['fr-FR'] || null,
+              name_es: names['es-ES'] || null,
+              description_de: (descs['de-DE'] || descs['en-US'] || null) as string | null,
+              description_en: (descs['en-US'] || descs['en-GB'] || null) as string | null,
+              description_fr: (descs['fr-FR'] || null) as string | null,
+              description_es: (descs['es-ES'] || null) as string | null,
+              price_cents: Math.round(priceValue * 100),
+              is_active: (p.IsActive as boolean | undefined) !== false,
+              display_order: 0,
+              updated_at: new Date().toISOString(),
+            };
+
+            const { error } = await supabase
+              .from('breakfast_items')
+              .upsert(payload, { onConflict: 'hotel_id,mews_product_id' });
+
+            if (error) {
+              skipped++;
+            } else {
+              imported++;
+            }
+          }
+          message = { type: 'success', text: `Mews-Import: ${imported} Produkt${imported === 1 ? '' : 'e'} importiert${skipped > 0 ? `, ${skipped} übersprungen` : ''}.` };
+        }
+      } catch (err) {
+        message = { type: 'error', text: `Mews-Import fehlgeschlagen: ${(err as Error).message}` };
+      }
+    }
+  }
+
+  // Settings sections now save via AJAX (/api/admin/breakfast/section)
+}
+
+const { data: settings } = await supabase
+  .from('hotel_settings')
+  .select(`
+    features,
+    breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
+    breakfast_location_i18n, breakfast_included_i18n,
+    breakfast_price_cents,
+    breakfast_room_service_enabled, breakfast_room_service_fee_cents
+  `)
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+
+const s = settings || ({} as Record<string, any>);
+const features        = ((s.features as Record<string, unknown>) ?? {});
+const breakfastOn     = features.breakfast !== false;
+const startTime       = ((s.breakfast_start_time as string | undefined) || '07:30').substring(0, 5);
+const endTime         = ((s.breakfast_end_time   as string | undefined) || '10:30').substring(0, 5);
+const slotMinutes     = (s.breakfast_slot_minutes as number | undefined) || 30;
+const locationDe      = (s.breakfast_location_i18n as any)?.de?.value || '';
+const includedDe      = (s.breakfast_included_i18n as any)?.de?.value || '';
+const priceCents      = (s.breakfast_price_cents   as number | null | undefined) ?? null;
+const roomServiceOn   = (s.breakfast_room_service_enabled as boolean | undefined) === true;
+const roomServiceFee  = (s.breakfast_room_service_fee_cents as number | undefined) || 0;
+
+const items = await loadBreakfastItems(hotel.id);
+
+// Check Mews integration for import button
+const { data: mewsRow } = await supabase
+  .from('mews_integrations')
+  .select('mews_products_count')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+const hasMews = !!mewsRow;
+
+const url = new URL(Astro.request.url);
+if (url.searchParams.get('deleted') === '1' && !message) {
+  message = { type: 'success', text: 'Speise gelöscht.' };
+}
+
+const allergenInit = EU_ALLERGENS.map(a => ({ key: a.key, label_de: a.label_de }));
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+---
+
+<Layout title="Frühstück" activeTab="backoffice">
+
+<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit } }}>
+  window._bfInit = _bfInit;
+</script>
+
+<style is:global>
+[x-cloak] { display: none !important; }
+
+/* textarea resize (not in admin-page.css) */
+textarea.s-input { resize: vertical; min-height: 72px; }
+
+/* iPad touch targets (CC-ADDENDUM) */
+.settings-page .toggle-row { min-height: 44px; }
+
+/* v9-btn variants + disabled */
+.v9-btn:active:not(:disabled) { background: var(--te-yellow, #FFE600) !important; color: #0A0A0A !important; }
+.v9-btn--ghost { background: transparent; color: var(--ink); border: 1px solid var(--border-medium, #D0CCC5); }
+.v9-btn--ghost:hover:not(:disabled) { background: var(--bg-deep, #EDECEA); color: var(--ink); }
+.v9-btn--burg { background: #8C2128; color: white; border: none; }
+.v9-btn--burg:hover:not(:disabled), .v9-btn--burg:active:not(:disabled) { background: #6E1920 !important; color: white !important; }
+.v9-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* breakfast-specific */
+.bp-time-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .bp-time-grid { grid-template-columns: 1fr 1fr; } }
+.bp-fee-section { padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* items list */
+.bp-item-group { margin-bottom: 4px; }
+.bp-item-cat { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted); padding: 14px 4px 4px; }
+.bp-item-list { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; }
+.bp-item-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; background: none; border: none; border-bottom: 1px solid var(--border); cursor: pointer; text-align: left; min-height: 52px; transition: background 120ms; }
+.bp-item-row:last-child { border-bottom: none; }
+.bp-item-row:hover { background: var(--bg-deep, #F5F4F2); }
+.bp-item-row:active { background: var(--te-yellow-soft, #FDFAE8); }
+.bp-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-medium); flex-shrink: 0; }
+.bp-item-dot--on { background: #4CAF50; }
+.bp-item-info { flex: 1; min-width: 0; }
+.bp-item-name { display: block; font-size: 14px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-item-desc { display: block; font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.bp-item-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.bp-badge { font-size: 10px; background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; white-space: nowrap; }
+.bp-item-price { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+.bp-item-edit { font-size: 11px; color: var(--ink-muted); white-space: nowrap; margin-left: 4px; flex-shrink: 0; }
+.bp-item-row:hover .bp-item-edit { color: var(--pink, #E8A6BB); }
+.bp-empty { text-align: center; padding: 48px 32px; color: var(--ink-muted); font-size: 14px; font-style: italic; }
+
+/* LMIV notice */
+.bp-lmiv { display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; padding: 12px 16px; background: var(--bg-deep, #F5F4F2); border: 1px solid var(--border); border-radius: var(--r-sm, 4px); }
+.bp-lmiv p { font-size: 12px; color: var(--ink-muted); line-height: 1.6; }
+
+/* modal (CC-ADDENDUM: display:none close, no will-change, overscroll-behavior on scroller) */
+.bp-modal-bd { position: fixed; inset: 0; z-index: 900; background: rgba(10,10,10,0.45); display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+.bp-modal { background: var(--surface, #FAFAF8); border: 1px solid var(--border); border-radius: var(--r, 8px); width: 100%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.18); }
+.bp-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.bp-modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
+.bp-modal-x { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted); min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--r-sm, 4px); flex-shrink: 0; }
+.bp-modal-x:hover { background: var(--bg-deep); color: var(--ink); }
+.bp-modal-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.bp-modal-section { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.bp-modal-section:last-child { border-bottom: none; }
+.bp-modal-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.bp-allergen-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.bp-allergen-row { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 8px; cursor: pointer; border-radius: 4px; }
+.bp-allergen-row:hover { background: rgba(140,106,32,0.08); }
+.bp-allergen-row:active { background: rgba(140,106,32,0.15); }
+.bp-allergen-cb { width: 18px; height: 18px; accent-color: #8C6A20; cursor: pointer; flex-shrink: 0; }
+.bp-allergen-row span { font-size: 13px; color: #5A3E0A; }
+.bp-diet-flags { display: flex; flex-direction: column; gap: 4px; }
+.bp-modal-foot { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--surface); border-radius: 0 0 var(--r, 8px) var(--r, 8px); }
+
+/* toast */
+.bp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14); white-space: nowrap; pointer-events: none; }
+.bp-toast--ok { background: #0A0A0A; color: white; }
+.bp-toast--err { background: #8C2128; color: white; }
+
+@media (max-width: 834px) { .bp-modal { max-height: 92vh; } .bp-modal-grid-4 { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 600px) { .bp-allergen-grid { grid-template-columns: repeat(3, 1fr); } }
+</style>
+
+<div class="settings-page" x-data="bfPage()">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">Frühstück</span>
+  </nav>
+
+  <section class="settings-hero">
+    <span class="settings-hero__eyebrow">Frühstücksmodul</span>
+    <h1 class="settings-hero__title">Frühstücks-Einstellungen<span class="dot-pink">.</span></h1>
+    <p class="settings-hero__sub">Zeiten, Ort, Preis, Zimmerservice und Speisekarte — alles auf einer Seite.</p>
+  </section>
+
+  {message && (
+    <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
+      {message.text}
+    </div>
+  )}
+
+  <div class="settings-sections">
+
+      <!-- 01 Modul -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Frühstücksmodul</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <div class="s-card__body">
+          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            {breakfastOn ? (
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--sage);font-weight:500">✓ Modul aktiv</span>
+            ) : (
+              <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--ink-muted)">○ Modul inaktiv</span>
+            )}
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 Zeiten -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Frühstückszeiten</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_start_time: startTime, breakfast_end_time: endTime, breakfast_slot_minutes: String(slotMinutes) })}, section: 'times' })`}>
+          <div class="s-card__body">
+            <p class="field__hint">Bestimmt die buchbaren Slots in der Gäste-App.</p>
+            <div class="bp-time-grid">
+              <div class="field">
+                <label class="field__label" for="bf-start">Beginn</label>
+                <input type="time" id="bf-start" name="breakfast_start_time" x-model="data.breakfast_start_time" class="s-input" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="bf-end">Ende</label>
+                <input type="time" id="bf-end" name="breakfast_end_time" x-model="data.breakfast_end_time" class="s-input" />
+              </div>
+              <div class="field">
+                <label class="field__label" for="bf-slot">Slot-Länge (Min)</label>
+                <input type="number" id="bf-slot" name="breakfast_slot_minutes" x-model="data.breakfast_slot_minutes" min="5" max="120" step="5" class="s-input" inputmode="numeric" />
+              </div>
+            </div>
+            <p class="field__hint">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 Ort -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Frühstücksort</h2>
+          <span class="s-card__num">03</span>
+        </div>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ location_de: locationDe })}, section: 'location' })`}>
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label" for="bf-location">Deutsch</label>
+              <div class="field__input-wrap">
+                <input type="text" id="bf-location" name="location_de" x-model="data.location_de"
+                  placeholder="z.B. im Wintergarten" class="s-input" />
+                <span class="field__hint">Wird in der Gäste-App angezeigt — automatisch übersetzt.</span>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 Inklusiv -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Was inkludiert ist</h2>
+          <span class="s-card__num">04</span>
+        </div>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ included_de: includedDe })}, section: 'included' })`}>
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label" for="bf-included">Deutsch</label>
+              <div class="field__input-wrap">
+                <textarea id="bf-included" name="included_de" rows="3" x-model="data.included_de"
+                  placeholder="z.B. Frische Backwaren, regionaler Honig, Bio-Eier, …"
+                  class="s-input"></textarea>
+                <span class="field__hint">Wird automatisch übersetzt.</span>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 Preis -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Pauschalpreis</h2>
+          <span class="s-card__num">05</span>
+        </div>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_price_cents: priceCents !== null ? (priceCents / 100).toFixed(2).replace('.', ',') : '' })}, section: 'price' })`}>
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label" for="bf-price">Preis in Euro</label>
+              <div class="field__input-wrap">
+                <input type="text" id="bf-price" name="breakfast_price_cents"
+                  x-model="data.breakfast_price_cents"
+                  inputmode="decimal" placeholder="leer = kein Preis"
+                  class="s-input" style="max-width:220px" />
+                <span class="field__hint">z.B. 15 oder 15,50 · 0,00 = im Buffet enthalten · leer = kein Preis</span>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06 Zimmerservice -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Zimmerservice</h2>
+          <span class="s-card__num">06</span>
+        </div>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_enabled: roomServiceOn ? 'true' : 'false', breakfast_room_service_fee_cents: (roomServiceFee / 100).toFixed(2).replace('.', ',') })}, section: 'room_service' })`}>
+          <div class="s-card__body">
+            <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
+            <label class="toggle-row">
+              <input type="checkbox"
+                :checked="data.breakfast_room_service_enabled === 'true'"
+                @change="data.breakfast_room_service_enabled = $event.target.checked ? 'true' : 'false'"
+                class="sr-only" />
+              <span class="bt-visual" :class="{'is-checked': data.breakfast_room_service_enabled === 'true'}">
+                <span class="bt-knob"></span>
+              </span>
+              <span class="toggle-label">Room-Service aktiv</span>
+            </label>
+            <div x-show="data.breakfast_room_service_enabled === 'true'" class="bp-fee-section"
+                 style={roomServiceOn ? '' : 'display:none'}>
+              <div class="field field--row">
+                <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
+                <div class="field__input-wrap">
+                  <input type="text" id="rs-fee" name="breakfast_room_service_fee_cents"
+                    x-model="data.breakfast_room_service_fee_cents"
+                    inputmode="decimal" class="s-input" style="max-width:220px"
+                    placeholder="0,00" />
+                  <span class="field__hint">z.B. 3,00 · 0,00 = kein Aufschlag</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
+          </div>
+        </div>
+      </section>
+
+  </div>
+
+  <!-- ── Speisekarte ──────────────────────────────────────────────────────── -->
+  <section class="s-card" id="speisekarte" style="margin-top:20px">
+    <div class="s-card__head" style="align-items:center">
+      <div>
+        <span class="s-card__num" style="display:block;margin-bottom:6px">Speisekarte</span>
+        <h2 class="s-card__title">Frühstücks-Items<span class="dot-pink">.</span></h2>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+        {hasMews && (
+          <form method="POST" style="display:inline">
+            <input type="hidden" name="_action" value="mews_import" />
+            <button type="submit"
+              onclick="return confirm('Mews-Produkte importieren? Bestehende Items mit gleicher Mews-ID werden aktualisiert.')"
+              class="v9-btn v9-btn--ghost" style="font-size:10px;padding:8px 16px">
+              Aus Mews
+            </button>
+          </form>
+        )}
+        <button type="button" @click="openNew()" class="v9-btn">+ Neue Speise</button>
+      </div>
+    </div>
+
+    <div class="s-card__body">
+      <template x-if="groupedItems.length === 0">
+        <div class="bp-empty">
+          <p>Noch keine Speisen angelegt.</p>
+          <button type="button" @click="openNew()" class="v9-btn" style="margin-top:14px">Erste Speise anlegen</button>
+        </div>
+      </template>
+      <template x-if="groupedItems.length > 0">
+        <div>
+          <template x-for="group in groupedItems" :key="group.cat">
+            <div class="bp-item-group">
+              <div class="bp-item-cat" x-text="group.cat"></div>
+              <div class="bp-item-list">
+                <template x-for="item in group.items" :key="item.id">
+                  <button type="button" class="bp-item-row" @click="openEdit(item)">
+                    <span class="bp-item-dot" :class="item.is_active ? 'bp-item-dot--on' : ''"></span>
+                    <div class="bp-item-info">
+                      <span class="bp-item-name" x-text="item.name_de"></span>
+                      <span class="bp-item-desc" x-show="item.description_de" x-text="item.description_de || ''"></span>
+                    </div>
+                    <div class="bp-item-meta">
+                      <template x-if="item.is_vegan"><span class="bp-badge">vegan</span></template>
+                      <template x-if="!item.is_vegan && item.is_vegetarian"><span class="bp-badge">veg</span></template>
+                      <template x-if="item.is_organic"><span class="bp-badge">bio</span></template>
+                      <span x-show="item.price_cents > 0" class="bp-item-price" x-text="formatEur(item.price_cents)"></span>
+                    </div>
+                    <span class="bp-item-edit">bearbeiten →</span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div class="bp-lmiv">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px">
+        <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+      </svg>
+      <p><strong>Allergen-Angaben:</strong> Als Hotelbetreiber bist du nach LMIV Art. 9 für die Richtigkeit verantwortlich. Bei Rezeptur-Änderungen sofort aktualisieren.</p>
+    </div>
+  </section>
+
+  <!-- ── Modal Backdrop ──────────────────────────────────────────────────── -->
+  <div x-show="modalOpen" x-cloak class="bp-modal-bd" @click.self="closeModal()">
+    <div class="bp-modal" role="dialog" aria-modal="true" @click.stop>
+
+      <div class="bp-modal-head">
+        <h3 class="bp-modal-title" x-text="modalIsNew ? 'Neue Speise' : (modalItem.name_de || 'Speise bearbeiten')"></h3>
+        <button type="button" @click="closeModal()" class="bp-modal-x" aria-label="Schließen">✕</button>
+      </div>
+
+      <div class="bp-modal-body">
+
+        <div x-show="modalError" x-cloak style="padding:12px 24px 0">
+          <div class="s-flash s-flash--err" style="margin-bottom:0" x-text="modalError"></div>
+        </div>
+
+        <!-- Allgemein -->
+        <div class="bp-modal-section">
+          <div class="bp-modal-grid-4">
+            <div class="field">
+              <span class="field__label">Kategorie</span>
+              <input type="text" x-model="modalItem.category" placeholder="z.B. Brot, Warm" class="s-input" />
+            </div>
+            <div class="field">
+              <span class="field__label">Preis (EUR)</span>
+              <input type="number" x-model="modalItem.price_eur" min="0" step="0.01" placeholder="0,00" class="s-input" inputmode="decimal" />
+              <span class="field__hint">0,00 = im Buffet</span>
+            </div>
+            <div class="field">
+              <span class="field__label">Reihenfolge</span>
+              <input type="number" x-model.number="modalItem.display_order" class="s-input" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <span class="field__label">Aktiv</span>
+              <label class="toggle-row" style="margin-top:2px">
+                <input type="checkbox" x-model="modalItem.is_active" class="sr-only" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Name -->
+        <div class="bp-modal-section">
+          <div class="field">
+            <span class="field__label">Name (Deutsch) *</span>
+            <input type="text" x-model="modalItem.name_de" placeholder="z.B. Roggen-Sauerteigbrot" class="s-input" />
+            <span class="field__hint">Wird automatisch in alle aktiven Sprachen übersetzt.</span>
+          </div>
+        </div>
+
+        <!-- Beschreibung -->
+        <div class="bp-modal-section">
+          <div class="field">
+            <span class="field__label">Beschreibung (optional)</span>
+            <textarea x-model="modalItem.description_de" rows="2"
+              placeholder="z.B. Hausgemacht aus regionalen Zutaten"
+              class="s-input"></textarea>
+            <span class="field__hint">Nur Deutsch — wird automatisch übersetzt.</span>
+          </div>
+        </div>
+
+        <!-- 14 Allergene -->
+        <div class="bp-modal-section">
+          <div class="s-warning-row" style="margin-bottom:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 width="16" height="16" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+            </svg>
+            <span><strong>14 EU-Hauptallergene (LMIV Art. 9)</strong> — Alle enthaltenen Allergene ankreuzen. Bei Rezeptur-Änderungen sofort aktualisieren.</span>
+          </div>
+          <div class="bp-allergen-grid">
+            <template x-for="a in allergens" :key="a.key">
+              <label class="bp-allergen-row">
+                <input type="checkbox" x-model="modalItem['contains_' + a.key]" class="bp-allergen-cb" />
+                <span x-text="a.label_de"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- Diät-Flags -->
+        <div class="bp-modal-section">
+          <span class="field__label" style="display:block;margin-bottom:8px">Diät-Flags</span>
+          <div class="bp-diet-flags">
+            <label class="toggle-row">
+              <input type="checkbox" x-model="modalItem.is_vegetarian" class="sr-only" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Vegetarisch</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" x-model="modalItem.is_vegan" class="sr-only" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Vegan</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" x-model="modalItem.is_organic" class="sr-only" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Bio</span>
+            </label>
+          </div>
+        </div>
+
+      </div><!-- .bp-modal-body -->
+
+      <div class="bp-modal-foot">
+        <div>
+          <button type="button" x-show="!modalIsNew" x-cloak @click="deleteItem()"
+            :disabled="modalSaving" class="v9-btn v9-btn--burg">Löschen</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" @click="closeModal()" class="v9-btn v9-btn--ghost">Abbrechen</button>
+          <button type="button" @click="saveItem()" :disabled="modalSaving" class="v9-btn">
+            <span x-show="!modalSaving">Speichern</span>
+            <span x-show="modalSaving" x-cloak>Speichert …</span>
+          </button>
+        </div>
+      </div>
+
+    </div><!-- .bp-modal -->
+  </div><!-- .bp-modal-bd -->
+
+  <!-- Toast -->
+  <div x-show="toast" x-cloak :class="'bp-toast bp-toast--' + toastKind" x-text="toast"></div>
+
+</div><!-- .settings-page -->
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('bfPage', () => ({
+      items: (window._bfInit || {}).items || [],
+      allergens: (window._bfInit || {}).allergens || [],
+      modalOpen: false,
+      modalIsNew: false,
+      modalItem: {},
+      modalSaving: false,
+      modalError: '',
+      toast: '',
+      toastKind: 'ok',
+      _toastTimer: null,
+
+      get groupedItems() {
+        const groups = {};
+        for (const item of this.items) {
+          const cat = item.category || 'Ohne Kategorie';
+          if (!groups[cat]) groups[cat] = [];
+          groups[cat].push(item);
+        }
+        return Object.keys(groups).map(cat => ({ cat, items: groups[cat] }));
+      },
+
+      formatEur(cents) {
+        return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+      },
+
+      openNew() {
+        this.modalIsNew = true;
+        const defaults = {};
+        this.allergens.forEach(a => { defaults['contains_' + a.key] = false; });
+        this.modalItem = Object.assign({
+          id: null, name_de: '', description_de: '', category: '',
+          price_eur: '0.00', display_order: this.items.length,
+          is_active: true, is_vegetarian: false, is_vegan: false, is_organic: false,
+        }, defaults);
+        this.modalError = '';
+        this.modalOpen = true;
+      },
+
+      openEdit(item) {
+        this.modalIsNew = false;
+        this.modalItem = Object.assign({}, item, {
+          price_eur: ((item.price_cents != null ? item.price_cents : 0) / 100).toFixed(2),
+        });
+        this.modalError = '';
+        this.modalOpen = true;
+      },
+
+      closeModal() {
+        this.modalOpen = false;
+      },
+
+      async saveItem() {
+        const nameDe = this.modalItem.name_de ? this.modalItem.name_de.trim() : '';
+        if (!nameDe) { this.modalError = 'Name (Deutsch) ist Pflichtfeld'; return; }
+        this.modalSaving = true;
+        this.modalError = '';
+        try {
+          const priceVal = parseFloat(String(this.modalItem.price_eur).replace(',', '.') || '0');
+          const priceCents = Math.max(0, isNaN(priceVal) ? 0 : Math.round(priceVal * 100));
+          const allergens = {};
+          this.allergens.forEach(a => { allergens['contains_' + a.key] = !!this.modalItem['contains_' + a.key]; });
+          const payload = Object.assign({
+            name_de: nameDe,
+            description_de: (this.modalItem.description_de || '').trim() || null,
+            category: (this.modalItem.category || '').trim() || null,
+            price_cents: priceCents,
+            display_order: Number(this.modalItem.display_order) || 0,
+            is_active: !!this.modalItem.is_active,
+            is_vegetarian: !!this.modalItem.is_vegetarian,
+            is_vegan: !!this.modalItem.is_vegan,
+            is_organic: !!this.modalItem.is_organic,
+          }, allergens);
+          if (!this.modalIsNew) payload.id = this.modalItem.id;
+          const res = await fetch('/api/admin/breakfast/item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!data.ok) { this.modalError = data.error || 'Speichern fehlgeschlagen'; return; }
+          if (this.modalIsNew) {
+            this.items.push(data.item);
+          } else {
+            const idx = this.items.findIndex(i => i.id === data.item.id);
+            if (idx >= 0) this.items.splice(idx, 1, data.item);
+            else this.items.push(data.item);
+          }
+          this.closeModal();
+          this.showToast(this.modalIsNew ? 'Speise angelegt.' : 'Speise gespeichert.', 'ok');
+        } catch (err) {
+          this.modalError = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+        } finally {
+          this.modalSaving = false;
+        }
+      },
+
+      async deleteItem() {
+        if (!confirm('Speise wirklich löschen?')) return;
+        this.modalSaving = true;
+        this.modalError = '';
+        try {
+          const res = await fetch('/api/admin/breakfast/item', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: this.modalItem.id }),
+          });
+          const data = await res.json();
+          if (!data.ok) { this.modalError = data.error || 'Löschen fehlgeschlagen'; return; }
+          this.items = this.items.filter(i => i.id !== this.modalItem.id);
+          this.closeModal();
+          this.showToast('Speise gelöscht.', 'ok');
+        } catch (err) {
+          this.modalError = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+        } finally {
+          this.modalSaving = false;
+        }
+      },
+
+      showToast(msg, kind) {
+        this.toast = msg;
+        this.toastKind = kind || 'ok';
+        if (this._toastTimer) clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
+      },
+    }));
+  });
+</script>
+
+</Layout>

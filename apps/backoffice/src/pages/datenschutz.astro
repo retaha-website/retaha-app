@@ -1,0 +1,151 @@
+---
+// Sprint Legal/DSGVO Phase 4 — Datenschutzerklärung Backoffice (B2B)
+//
+// VORLAGE — anwaltlich prüfen vor Production-Pilot.
+// Standard-DSGVO-Struktur, kein Ersatz für Rechtsberatung.
+//
+// Rollenverteilung B2B (unterscheidet sich von Gast-Datenschutz!):
+//   retaha GmbH = VERANTWORTLICHER für Hotelier-Account-Daten
+//   (Login, Hotel-Config, Billing-Daten)
+//
+// Datenkategorien (aus Phase-0-Discovery):
+//   - user_profiles: first_name, last_name
+//   - Supabase Auth: email, password_hash, session
+//   - hotels: name, address_*, stripe_customer_id, stripe_subscription_id
+//   - hotel_settings: notification_email
+//   - Vercel/Supabase technische Logs
+
+import { POLICY_VERSION } from '../../lib/legal/consent';
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Datenschutz · retaha Hospitality</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      @import '@retaha/ui/styles/global.css';
+      @import '@retaha/ui/styles/components/legal.css';
+    </style>
+  </head>
+  <body class="font-sans antialiased text-anthrazit bg-white min-h-screen">
+    <main class="legal-page">
+      <a href="/admin" class="legal-page-back">← zurück zum Backoffice</a>
+
+      <p class="legal-page-eyebrow themed-eyebrow-flank">Datenschutz Backoffice</p>
+      <h1 class="legal-page-headline">
+        Was wir über<br />
+        <span class="legal-page-headline-bold">dich als Hotelier speichern<span class="legal-page-headline-punkt">.</span></span>
+      </h1>
+
+      <div class="legal-page-content">
+        <p><em>Stand: {POLICY_VERSION} · gültig für das retaha-Hospitality-Backoffice</em></p>
+
+        <h2>1. Verantwortlich für diese Backoffice-Datenverarbeitung</h2>
+        <p>
+          Verantwortlich im Sinne der DSGVO für die Verarbeitung deiner Hotelier-Account-Daten ist die
+          <strong>retaha GmbH</strong>, Weinsteige 31, 74676 Niedernhall, Geschäftsführer Taha Mustafa Ünal.
+          Kontakt: <a href="mailto:hallo@retaha.de">hallo@retaha.de</a>, Tel +49 7131 3824635.
+        </p>
+        <p>
+          <strong>Wichtiger Unterschied zur Gast-App:</strong> Für die Daten deiner Hotelgäste bist <em>du</em>
+          (das Hotel) der Verantwortliche — retaha agiert dort nur als Auftragsverarbeiter (siehe AVV).
+          Diese Datenschutzerklärung betrifft <strong>nur deine eigenen Backoffice-Account-Daten</strong>.
+        </p>
+
+        <h2>2. Welche Hotelier-Daten wir verarbeiten</h2>
+        <ul>
+          <li><strong>Account-Daten</strong>: E-Mail-Adresse, Vor- und Nachname, gehashtes Passwort (via Supabase Auth)</li>
+          <li><strong>Hotel-Profil</strong>: Hotel-Name, Adresse, Stadt, Land, Default-Sprache, enabled-Sprachen</li>
+          <li><strong>Einstellungen</strong>: Eve-Persönlichkeit, WLAN, Frühstück, Konferenz, Service-Konfiguration, Benachrichtigungs-Email</li>
+          <li><strong>Inhaltsdaten</strong>: Hero-Karten, Empfehlungs-Picks, Eve-Wissens-Einträge — die du selbst pflegst</li>
+          <li><strong>Abrechnungsdaten</strong>: Stripe-Customer-ID, Subscription-Status (Pseudonym-IDs, KEINE Kartendaten — die liegen ausschließlich bei Stripe)</li>
+          <li><strong>Mews-Integration</strong>: API-Credentials (verschlüsselt), Sync-Status</li>
+          <li><strong>Technische Logs</strong>: Login-Zeitpunkte, Aufrufte IP (gehasht), Browser, Aktionen im Backoffice (für Audit)</li>
+        </ul>
+
+        <h2>3. Rechtsgrundlagen + Zwecke</h2>
+        <ul>
+          <li><strong>Vertragserfüllung</strong> (Art. 6 Abs. 1 lit. b): Bereitstellung der SaaS-Plattform, Authentifizierung, Abrechnung</li>
+          <li><strong>Berechtigtes Interesse</strong> (Art. 6 Abs. 1 lit. f): Sicherheits-Logs, Missbrauchsvermeidung, Produktverbesserung</li>
+          <li><strong>Gesetzliche Pflicht</strong> (Art. 6 Abs. 1 lit. c): Buchhaltungsaufbewahrung (10 Jahre), Steuerrecht</li>
+          <li><strong>Einwilligung</strong> (Art. 6 Abs. 1 lit. a): freiwillige Newsletter, Produkt-Updates (separat opt-in)</li>
+        </ul>
+
+        <h2>4. Auftragsverarbeiter (Backoffice)</h2>
+        <p>Wir setzen folgende Dienstleister ein:</p>
+        <ul>
+          <li><strong>Supabase</strong> (Server EU/Frankfurt) — Auth, Datenbank</li>
+          <li><strong>Vercel</strong> (USA, mit EU-Standardvertragsklauseln) — Hosting</li>
+          <li><strong>Stripe</strong> (Irland/USA, mit EU-Standardvertragsklauseln) — Abrechnung</li>
+          <li><strong>Resend</strong> (USA, mit EU-Standardvertragsklauseln) — transaktionale E-Mails an dich</li>
+          <li><strong>Anthropic</strong> (USA, mit EU-Standardvertragsklauseln) — nur wenn du Eve nutzt; betrifft Gast-Daten (siehe Gast-Datenschutz)</li>
+          <li><strong>Google Ireland</strong> (Dublin, EU) — Places-Daten für Empfehlungen</li>
+          <li><strong>Mews Systems</strong> (Tschechien/EU) — PMS-Integration auf deinen Wunsch</li>
+        </ul>
+
+        <h2>5. Speicherdauer</h2>
+        <ul>
+          <li><strong>Account aktiv</strong>: solange dein Vertrag läuft</li>
+          <li><strong>Account beendet</strong>: Account-Daten werden 30 Tage nach Kündigung gelöscht; Buchhaltungsrelevantes (Rechnungen, Stripe-Refs) gemäß § 147 AO 10 Jahre</li>
+          <li><strong>Sicherheits-Logs</strong>: bis zu 90 Tage</li>
+          <li><strong>Backups</strong>: technisch redundant, in der Regel 30 Tage Retention bei Supabase</li>
+        </ul>
+
+        <h2>6. Deine Rechte</h2>
+        <p>Als Betroffener hast du jederzeit das Recht auf:</p>
+        <ul>
+          <li>Auskunft (Art. 15) — was haben wir gespeichert</li>
+          <li>Berichtigung (Art. 16) — falls etwas falsch ist</li>
+          <li>Löschung (Art. 17) — nach Vertragsende</li>
+          <li>Einschränkung der Verarbeitung (Art. 18)</li>
+          <li>Datenübertragbarkeit (Art. 20)</li>
+          <li>Widerspruch (Art. 21) gegen Verarbeitung auf Basis berechtigter Interessen</li>
+        </ul>
+        <p>
+          Schreib uns einfach: <a href="mailto:hallo@retaha.de">hallo@retaha.de</a>.
+          Wir antworten innerhalb von 30 Tagen (DSGVO-Frist).
+        </p>
+
+        <h2>7. Beschwerderecht</h2>
+        <p>
+          Du hast das Recht, dich bei einer Aufsichtsbehörde zu beschweren — für die retaha GmbH zuständig ist:
+        </p>
+        <p>
+          <strong>Landesbeauftragter für den Datenschutz und die Informationsfreiheit Baden-Württemberg</strong><br />
+          Königstraße 10a, 70173 Stuttgart<br />
+          <a href="https://www.baden-wuerttemberg.datenschutz.de" target="_blank" rel="noopener">baden-wuerttemberg.datenschutz.de</a>
+        </p>
+
+        <h2>8. Cookies + Tracking im Backoffice</h2>
+        <p>Wir nutzen im Backoffice:</p>
+        <ul>
+          <li><strong>Auth-Session-Cookie</strong> (technisch notwendig) — damit du eingeloggt bleibst</li>
+          <li><strong>Spracheinstellung</strong> (Komfort, anonym)</li>
+          <li><strong>Notification-Bell-Read-State</strong> (lokaler Browser-Speicher, anonym)</li>
+        </ul>
+        <p>
+          <strong>Kein externes Tracking</strong> (kein Google Analytics, Hotjar, Pixel etc.) im Backoffice.
+        </p>
+
+        <h2>9. Kontakt</h2>
+        <p>
+          <strong>retaha GmbH</strong><br />
+          Weinsteige 31, 74676 Niedernhall<br />
+          Geschäftsführer: Taha Mustafa Ünal<br />
+          E-Mail: <a href="mailto:hallo@retaha.de">hallo@retaha.de</a> · Tel: +49 7131 3824635<br />
+          Registergericht: Amtsgericht Stuttgart, HRB 786739 · USt-ID: DE356391706
+        </p>
+
+        <p style="margin-top: 40px; font-size: 13px;">
+          <a href="/admin/agb">→ Allgemeine Geschäftsbedingungen (AGB)</a> ·
+          <a href="/admin/impressum">→ Impressum</a>
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
