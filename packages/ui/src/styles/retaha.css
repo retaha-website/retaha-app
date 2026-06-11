@@ -250,9 +250,14 @@ html { transition: background-color 250ms ease; }
    ============================================ */
 
 /* Sheet-Dim-Regler: Grundfarbe für Backdrop + iOS-Statusbar-Sampler.
-   INVARIANTE: --sheet-dim MUSS mit body/html-Toggle in openSheet() übereinstimmen.
    Heller → #5a5a5a; dunkler → #404040. Overlay-Alpha (.55) separat anpassbar. */
 :root { --sheet-dim: #505050; }
+
+/* R13: Statusbar-Sampler deklarativ — kein JS-Inline-Farb-Write.
+   x-effect in guestPage koppelt .sheet-open an activeSheet;
+   CSS übernimmt body+html-Hintergrund. Safari 15.4+ (:has). */
+body.gate-guest.sheet-open { background-color: var(--sheet-dim) !important; }
+html:has(body.gate-guest.sheet-open) { background-color: var(--sheet-dim) !important; }
 
 .sheet-overlay {
   position: fixed;
