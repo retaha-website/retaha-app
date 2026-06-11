@@ -73,11 +73,6 @@ body.gate-guest {
   color: var(--color-anthrazit);
 }
 
-/* iOS status-bar: explicit white baseline so Safari never samples transparent.
-   Without this, html bg = rgba(0,0,0,0) after sheet-close → statusbar stays dark. */
-html:has(body.gate-guest) { background-color: var(--color-white); }
-/* smooth sheet open/close bg transition */
-html { transition: background-color 250ms ease; }
 
 [x-cloak] { display: none !important; }
 
@@ -252,19 +247,18 @@ html { transition: background-color 250ms ease; }
    SHEETS — Modal slide-up panels
    ============================================ */
 
-/* Sheet-Dim-Regler: Grundfarbe für Backdrop + iOS-Statusbar-Sampler.
+/* Sheet-Dim-Regler: Grundfarbe für Backdrop.
    Heller → #5a5a5a; dunkler → #404040. Overlay-Alpha (.55) separat anpassbar. */
 :root { --sheet-dim: #505050; }
 
-/* R13: Statusbar-Sampler deklarativ — kein JS-Inline-Farb-Write.
-   x-effect in guestPage koppelt .sheet-open an activeSheet;
-   CSS übernimmt body+html-Hintergrund. Safari 15.4+ (:has). */
-body.gate-guest.sheet-open { background-color: var(--sheet-dim) !important; }
-html:has(body.gate-guest.sheet-open) { background-color: var(--sheet-dim) !important; }
-
+/* R16: Overlay beginnt UNTERHALB der Safe-Area-Oberkante.
+   html/body bleiben immer hell — kein Statusbar-Farbwechsel, kein Re-Sample nötig. */
 .sheet-overlay {
   position: fixed;
-  inset: 0;
+  top: env(safe-area-inset-top);
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: color-mix(in srgb, var(--sheet-dim) 55%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);

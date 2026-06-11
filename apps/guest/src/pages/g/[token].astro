@@ -455,7 +455,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
     <title>{hotel.name} · {greetingName}</title>
   </head>
   <body class={`gate-guest gate-theme-${activeTheme}`}>
-    <main x-data="guestPage" x-cloak x-effect="document.body.classList.toggle('sheet-open', !!activeSheet)">
+    <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
       {(activeTheme === 'bauhaus' || activeTheme === 'editorial' || activeTheme === 'maison') && (
@@ -1334,16 +1334,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = null;
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
-          // R15: Force iOS 26 Safari to re-sample statusbar color after bg transition.
-          // CSS transition = 250ms; node-replace + scroll-nudge trigger re-sample.
-          setTimeout(() => {
-            const tc = document.querySelector('meta[name="theme-color"]');
-            if (tc?.parentNode) tc.parentNode.replaceChild(tc.cloneNode(true), tc);
-            requestAnimationFrame(() => {
-              window.scrollBy(0, 1);
-              requestAnimationFrame(() => window.scrollBy(0, -1));
-            });
-          }, 260);
         },
 
         copyText(text: string, event: Event) {
