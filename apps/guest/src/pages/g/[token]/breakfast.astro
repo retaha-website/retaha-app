@@ -1,0 +1,1070 @@
+---
+import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const url = new URL(Astro.request.url);
+const persona = url.searchParams.get('persona') ?? 'in_house';
+const langParam = url.searchParams.get('lang');
+
+// Showcase- oder Echtdaten laden
+let ctx: any = null;
+let showcaseMode = false;
+if (isShowcaseToken(token)) {
+  showcaseMode = true;
+  const showcase = await findShowcaseSessionByToken(token);
+  if (showcase) {
+    const sbSr = createSupabaseServiceRoleInstance();
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary').eq('id', showcase.hotel_id).single(),
+      sbSr.from('hotel_settings').select('*').eq('hotel_id', showcase.hotel_id).single(),
+    ]);
+    if (hotelRow) {
+      const now = new Date();
+      const checkIn = new Date(now);
+      checkIn.setUTCHours(14, 0, 0, 0);
+      const checkOut = new Date(checkIn);
+      checkOut.setUTCDate(checkOut.getUTCDate() + 1);
+      checkOut.setUTCHours(11, 0, 0, 0);
+      ctx = {
+        stay: {
+          id: showcase.id,
+          check_in: checkIn.toISOString(),
+          check_out: checkOut.toISOString(),
+        },
+        guest: { language: hotelRow.default_language ?? 'de' },
+        hotel: hotelRow,
+        settings: settingsRow ?? {},
+      };
+    }
+  }
+} else {
+  const loaded = token ? await loadStayByToken(token) : null;
+  if (loaded) {
+    const existingSession = await getStaySession(Astro.cookies);
+    if (!existingSession || existingSession.stay_id !== loaded.stay.id) {
+      await setStaySessionCookie(Astro.cookies, {
+        stay_id: loaded.stay.id,
+        hotel_id: loaded.hotel.id,
+        check_out_utc: loaded.stay.check_out,
+        is_showcase: false,
+      });
+    }
+    ctx = loaded;
+  }
+}
+
+if (!ctx) return Astro.redirect(`/g/${token}`);
+
+const { stay, guest, hotel, settings } = ctx;
+
+// Sprach-Resolution
+const lang: Lang = normalizeLang(
+  langParam ?? (guest as any)?.language ?? (hotel as any).default_language ?? 'de'
+) as Lang;
+type LK = 'de' | 'en' | 'fr' | 'es';
+const lk = (['de','en','fr','es'].includes(lang) ? lang : 'de') as LK;
+
+// Breakfast-Einstellungen
+const startTime: string = (settings as any).breakfast_start_time || '07:30:00';
+const endTime: string   = (settings as any).breakfast_end_time   || '10:30:00';
+const slotMinutes: number = (settings as any).breakfast_slot_minutes || 30;
+const reservationEnabled: boolean = (settings as any).features?.breakfast_reservation !== false;
+
+const breakfastLocationMap: Record<LK, string | null> = {
+  de: (settings as any).breakfast_location_de,
+  en: (settings as any).breakfast_location_en,
+  fr: (settings as any).breakfast_location_fr,
+  es: (settings as any).breakfast_location_es,
+};
+const location = breakfastLocationMap[lk] || (settings as any).breakfast_location_de || 'im Wintergarten';
+
+const breakfastIncludedMap: Record<LK, string | null> = {
+  de: (settings as any).breakfast_included_de,
+  en: (settings as any).breakfast_included_en,
+  fr: (settings as any).breakfast_included_fr,
+  es: (settings as any).breakfast_included_es,
+};
+const includedText = breakfastIncludedMap[lk] || (settings as any).breakfast_included_de || '';
+const conciergeName: string = (settings as any).eve_name || 'das Team';
+
+// Menu-Items + existingBooking laden
+const [menuItemsRaw, existingBookings] = await Promise.all([
+  loadActiveBreakfastItems(hotel.id),
+  showcaseMode ? Promise.resolve([]) : loadBookingsForStay(stay.id, 'breakfast'),
+]);
+const existingBooking = existingBookings[0] || null;
+
+// Brand-Palette
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandStyle = brandPrimary
+  ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
+  : undefined;
+
+// Zurück-Link
+const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
+
+// Helper: stay range dates (für Slot-Picker)
+const toLocalIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+const stayRangeDates: { iso: string }[] = [];
+{
+  const cursor = new Date(stay.check_in);
+  const stayEnd = new Date(stay.check_out);
+  while (cursor <= stayEnd) {
+    stayRangeDates.push({ iso: toLocalIso(cursor) });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+function generateSlots(start: string, end: string, step: number): string[] {
+  const slots: string[] = [];
+  const [sH, sM] = start.substring(0,5).split(':').map(Number);
+  const [eH, eM] = end.substring(0,5).split(':').map(Number);
+  const startMin = sH * 60 + sM;
+  const endMin   = eH * 60 + eM;
+  for (let t = startMin; t <= endMin - step; t += step) {
+    slots.push(`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`);
+  }
+  return slots;
+}
+const allSlots = generateSlots(startTime, endTime, slotMinutes);
+
+// Allergen-Keys + Labels
+const ALLERGEN_KEYS = ['gluten','crustaceans','eggs','fish','peanuts','soy','milk','nuts','celery','mustard','sesame','sulfites','lupins','molluscs'];
+const allergenLabels: Record<string, string> = {
+  gluten:      { de: 'Gluten',      en: 'Gluten',         fr: 'Gluten',          es: 'Gluten'       }[lk],
+  crustaceans: { de: 'Krebstiere',  en: 'Crustaceans',    fr: 'Crustacés',       es: 'Crustáceos'   }[lk],
+  eggs:        { de: 'Eier',        en: 'Eggs',           fr: 'Œufs',            es: 'Huevos'       }[lk],
+  fish:        { de: 'Fisch',       en: 'Fish',           fr: 'Poisson',         es: 'Pescado'      }[lk],
+  peanuts:     { de: 'Erdnüsse',    en: 'Peanuts',        fr: 'Arachides',       es: 'Cacahuetes'   }[lk],
+  soy:         { de: 'Soja',        en: 'Soy',            fr: 'Soja',            es: 'Soja'         }[lk],
+  milk:        { de: 'Milch',       en: 'Milk',           fr: 'Lait',            es: 'Leche'        }[lk],
+  nuts:        { de: 'Nüsse',       en: 'Tree nuts',      fr: 'Fruits à coque',  es: 'Frutos secos' }[lk],
+  celery:      { de: 'Sellerie',    en: 'Celery',         fr: 'Céleri',          es: 'Apio'         }[lk],
+  mustard:     { de: 'Senf',        en: 'Mustard',        fr: 'Moutarde',        es: 'Mostaza'      }[lk],
+  sesame:      { de: 'Sesam',       en: 'Sesame',         fr: 'Sésame',          es: 'Sésamo'       }[lk],
+  sulfites:    { de: 'Sulfite',     en: 'Sulphites',      fr: 'Sulfites',        es: 'Sulfitos'     }[lk],
+  lupins:      { de: 'Lupinen',     en: 'Lupin',          fr: 'Lupin',           es: 'Altramuces'   }[lk],
+  molluscs:    { de: 'Weichtiere',  en: 'Molluscs',       fr: 'Mollusques',      es: 'Moluscos'     }[lk],
+};
+
+const localizedItems = menuItemsRaw.map((item: any) => ({
+  id: item.id,
+  category: item.category || 'Allgemein',
+  name: item[`name_${lk}`] || item.name_de,
+  description: item[`description_${lk}`] || item.description_de || '',
+  allergens: ALLERGEN_KEYS.filter(key => item[`contains_${key}`]),
+  isVegetarian: item.is_vegetarian,
+  isVegan: item.is_vegan,
+  isOrganic: item.is_organic,
+}));
+
+// i18n
+const labels = {
+  de: {
+    pageTitle: `${hotel.name} · Frühstück`,
+    eyebrow: '— Frühstück —',
+    title: reservationEnabled ? 'Tisch ' : 'Frühstück ',
+    titleAccent: reservationEnabled ? 'reservieren.' : 'bei uns.',
+    subtitle: reservationEnabled ? `Wir freuen uns auf dich — ${location}.` : `Komm einfach vorbei — kein Tisch nötig.`,
+    whenLabel: 'Wann?',
+    today: 'Heute', tomorrow: 'Morgen', dayAfter: 'Übermorgen',
+    peopleLabel: 'Wie viele Personen?',
+    timeLabel: 'Welche Uhrzeit?',
+    tableLabel: 'Tisch-Wunsch?',
+    tableInside: 'Drinnen', tableOutside: 'Draußen', tableGarden: 'Im Garten', tableAny: 'Egal',
+    notesLabel: 'Etwas, das wir wissen sollten?',
+    notesPlaceholder: 'Z.B. glutenfrei, Geburtstag, …',
+    submit: 'Tisch reservieren', submitting: 'Wird reserviert…',
+    errorPrefix: 'Fehler',
+    pendingTitle: 'Wir haben deine Anfrage.', pendingSub: `${conciergeName} meldet sich gleich mit der Bestätigung.`,
+    confirmedTitle: 'Reservierung bestätigt.', confirmedSub: 'Wir freuen uns auf dich.',
+    cancelledTitle: 'Reservierung abgelehnt.', cancelledSub: 'Bitte sprich mit dem Empfang.',
+    bookingDate: 'Tag', bookingTime: 'Uhrzeit', bookingPeople: 'Personen', bookingTable: 'Tisch',
+    cancelBtn: 'Zurücknehmen', rebookBtn: 'Neuen Tisch reservieren',
+    noSlotsAvailable: 'Heute keine freien Plätze mehr — wir freuen uns auf dich morgen.',
+    infoTimeLabel: 'Wann', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Ort', infoIncludedLabel: 'Was dich erwartet',
+    menuTabReservation: 'Reservieren', menuTabInfo: 'Frühstück', menuTabMenu: 'Karte',
+    menuFilterTitle: '— Allergene anzeigen —',
+    menuFilterHint: 'Wähle deine Allergene aus — Speisen mit diesen Zutaten werden markiert.',
+    menuFilterHideShow: 'Filter zurücksetzen',
+    menuWarningPrefix: 'Enthält',
+    menuFlagVegetarian: 'vegetarisch', menuFlagVegan: 'vegan', menuFlagOrganic: 'bio',
+    menuAllergensPrefix: 'Allergene:', menuEmpty: 'Noch keine Speisen im Angebot.',
+    menuDisclaimer: 'Angaben durch das Hotel — bei Unsicherheit bitte direkt mit dem Service sprechen.',
+  },
+  en: {
+    pageTitle: `${hotel.name} · Breakfast`,
+    eyebrow: '— Breakfast —',
+    title: reservationEnabled ? 'Reserve a ' : 'Breakfast ',
+    titleAccent: reservationEnabled ? 'table.' : 'with us.',
+    subtitle: reservationEnabled ? `Looking forward to having you — ${location}.` : 'Just drop by — no table needed.',
+    whenLabel: 'When?', today: 'Today', tomorrow: 'Tomorrow', dayAfter: 'Day after',
+    peopleLabel: 'How many people?',
+    timeLabel: 'What time?',
+    tableLabel: 'Table preference?',
+    tableInside: 'Inside', tableOutside: 'Outside', tableGarden: 'In the garden', tableAny: 'No preference',
+    notesLabel: 'Anything we should know?', notesPlaceholder: 'E.g. gluten-free, birthday, …',
+    submit: 'Reserve table', submitting: 'Reserving…', errorPrefix: 'Error',
+    pendingTitle: 'We got your request.', pendingSub: `${conciergeName} will confirm shortly.`,
+    confirmedTitle: 'Reservation confirmed.', confirmedSub: 'See you soon.',
+    cancelledTitle: 'Reservation declined.', cancelledSub: 'Please speak with the front desk.',
+    bookingDate: 'Day', bookingTime: 'Time', bookingPeople: 'People', bookingTable: 'Table',
+    cancelBtn: 'Cancel', rebookBtn: 'Book a new table',
+    noSlotsAvailable: 'No slots left today — see you tomorrow.',
+    infoTimeLabel: 'When', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Where', infoIncludedLabel: 'What to expect',
+    menuTabReservation: 'Reserve', menuTabInfo: 'Breakfast', menuTabMenu: 'Menu',
+    menuFilterTitle: '— Show allergens —',
+    menuFilterHint: 'Select your allergens — dishes with these ingredients will be marked.',
+    menuFilterHideShow: 'Clear filter', menuWarningPrefix: 'Contains',
+    menuFlagVegetarian: 'vegetarian', menuFlagVegan: 'vegan', menuFlagOrganic: 'organic',
+    menuAllergensPrefix: 'Allergens:', menuEmpty: 'No dishes available yet.',
+    menuDisclaimer: 'Information provided by the hotel — please ask service for any uncertainty.',
+  },
+  fr: {
+    pageTitle: `${hotel.name} · Petit-déjeuner`,
+    eyebrow: '— Petit-déjeuner —',
+    title: reservationEnabled ? 'Réserver une ' : 'Petit-déjeuner ',
+    titleAccent: reservationEnabled ? 'table.' : 'chez nous.',
+    subtitle: reservationEnabled ? `Au plaisir de vous accueillir — ${location}.` : 'Passez nous voir — pas besoin de table.',
+    whenLabel: 'Quand ?', today: "Aujourd'hui", tomorrow: 'Demain', dayAfter: 'Après-demain',
+    peopleLabel: 'Combien de personnes ?', timeLabel: 'À quelle heure ?', tableLabel: 'Préférence de table ?',
+    tableInside: 'Intérieur', tableOutside: 'Extérieur', tableGarden: 'Au jardin', tableAny: 'Peu importe',
+    notesLabel: 'Quelque chose à savoir ?', notesPlaceholder: 'P. ex. sans gluten, anniversaire, …',
+    submit: 'Réserver', submitting: 'Réservation…', errorPrefix: 'Erreur',
+    pendingTitle: 'Nous avons votre demande.', pendingSub: `${conciergeName} confirme bientôt.`,
+    confirmedTitle: 'Réservation confirmée.', confirmedSub: 'À très vite.',
+    cancelledTitle: 'Réservation refusée.', cancelledSub: 'Merci de voir la réception.',
+    bookingDate: 'Jour', bookingTime: 'Heure', bookingPeople: 'Personnes', bookingTable: 'Table',
+    cancelBtn: 'Annuler', rebookBtn: 'Nouvelle réservation',
+    noSlotsAvailable: "Plus de créneaux aujourd'hui — à demain.",
+    infoTimeLabel: 'Quand', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Où', infoIncludedLabel: 'Ce qui vous attend',
+    menuTabReservation: 'Réserver', menuTabInfo: 'Petit-déjeuner', menuTabMenu: 'Carte',
+    menuFilterTitle: '— Allergènes —',
+    menuFilterHint: 'Sélectionnez vos allergènes — les plats concernés seront marqués.',
+    menuFilterHideShow: 'Réinitialiser', menuWarningPrefix: 'Contient',
+    menuFlagVegetarian: 'végétarien', menuFlagVegan: 'végan', menuFlagOrganic: 'bio',
+    menuAllergensPrefix: 'Allergènes :', menuEmpty: "Aucun plat disponible pour l'instant.",
+    menuDisclaimer: 'Informations fournies par l\'hôtel — en cas de doute, parlez au service.',
+  },
+  es: {
+    pageTitle: `${hotel.name} · Desayuno`,
+    eyebrow: '— Desayuno —',
+    title: reservationEnabled ? 'Reservar una ' : 'Desayuno ',
+    titleAccent: reservationEnabled ? 'mesa.' : 'con nosotros.',
+    subtitle: reservationEnabled ? `Encantados de recibirte — ${location}.` : 'Pásate — sin mesa, sin reserva.',
+    whenLabel: '¿Cuándo?', today: 'Hoy', tomorrow: 'Mañana', dayAfter: 'Pasado mañana',
+    peopleLabel: '¿Cuántas personas?', timeLabel: '¿A qué hora?', tableLabel: '¿Preferencia de mesa?',
+    tableInside: 'Interior', tableOutside: 'Exterior', tableGarden: 'En el jardín', tableAny: 'Sin preferencia',
+    notesLabel: '¿Algo que debamos saber?', notesPlaceholder: 'Ej. sin gluten, cumpleaños, …',
+    submit: 'Reservar', submitting: 'Reservando…', errorPrefix: 'Error',
+    pendingTitle: 'Tenemos tu solicitud.', pendingSub: `${conciergeName} confirma enseguida.`,
+    confirmedTitle: 'Reserva confirmada.', confirmedSub: 'Nos vemos pronto.',
+    cancelledTitle: 'Reserva rechazada.', cancelledSub: 'Habla con recepción, por favor.',
+    bookingDate: 'Día', bookingTime: 'Hora', bookingPeople: 'Personas', bookingTable: 'Mesa',
+    cancelBtn: 'Cancelar', rebookBtn: 'Nueva reserva',
+    noSlotsAvailable: 'No quedan plazas hoy — nos vemos mañana.',
+    infoTimeLabel: 'Cuándo', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Dónde', infoIncludedLabel: 'Qué te espera',
+    menuTabReservation: 'Reservar', menuTabInfo: 'Desayuno', menuTabMenu: 'Carta',
+    menuFilterTitle: '— Alérgenos —',
+    menuFilterHint: 'Selecciona tus alérgenos — los platos correspondientes serán marcados.',
+    menuFilterHideShow: 'Borrar filtro', menuWarningPrefix: 'Contiene',
+    menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegano', menuFlagOrganic: 'ecológico',
+    menuAllergensPrefix: 'Alérgenos:', menuEmpty: 'Aún no hay platos disponibles.',
+    menuDisclaimer: 'Datos proporcionados por el hotel — en caso de duda, hable con el servicio.',
+  },
+};
+const l = labels[lk];
+
+const peopleOptions = [1, 2, 3, 4];
+const tableOptions = [
+  { value: 'inside',  label: l.tableInside  },
+  { value: 'outside', label: l.tableOutside },
+  { value: 'garden',  label: l.tableGarden  },
+  { value: 'any',     label: l.tableAny     },
+];
+
+const sheetData = {
+  stayRangeDates,
+  allSlots,
+  startTime,
+  endTime,
+  peopleOptions,
+  tableOptions,
+  labels: l,
+  accessToken: token,
+  existingBooking,
+  lang: lk,
+  reservationEnabled,
+  includedText,
+  location,
+  menuItems: localizedItems,
+  allergenLabels,
+  allergenKeys: ALLERGEN_KEYS,
+};
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={brandStyle}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{l.pageTitle}</title>
+    <style>
+      [x-cloak] { display: none !important; }
+      *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --accent:      #FF4A82;
+        --accent-soft: rgba(255,74,130,0.10);
+        --ink:         #0F0F0D;
+        --ink-muted:   #6B6B63;
+        --ink-faint:   #A8A8A0;
+        --border:      #E7E4DD;
+        --border-strong: #C8C4BB;
+        --bg:          #FBFAF7;
+        --surface:     #FFFFFF;
+        --success:     #3D8C5C;
+        --radius:      12px;
+        --mono: 'JetBrains Mono', 'Courier New', monospace;
+        --display: 'Space Grotesk', system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0; padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--display);
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+      }
+
+      .page {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
+      }
+
+      /* ── Close button ───────────────────────────────────────────────── */
+      .close-btn {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 16px);
+        right: 20px;
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: #EFEDE8;
+        display: grid; place-items: center;
+        text-decoration: none;
+        color: var(--ink);
+        flex-shrink: 0;
+        transition: background 0.14s ease;
+        z-index: 10;
+      }
+      .close-btn:hover { background: #E0DDD7; }
+      .close-btn svg { width: 16px; height: 16px; }
+
+      /* ── Hero ───────────────────────────────────────────────────────── */
+      .hero { padding: 28px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 10px; letter-spacing: 0.16em; font-weight: 500;
+        color: var(--accent); margin: 0 0 14px; display: block;
+      }
+      .title {
+        font-size: clamp(28px, 7vw, 38px); font-weight: 700;
+        letter-spacing: -0.025em; line-height: 1.05;
+        margin: 0 0 8px; color: var(--ink);
+      }
+      .title .accent { color: var(--accent); }
+      .subtitle { font-size: 14px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Tabs ───────────────────────────────────────────────────────── */
+      .tabs {
+        display: flex; gap: 0;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 24px;
+      }
+      .tab-btn {
+        flex: 1; padding: 11px 8px;
+        background: none; border: none; border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; font-weight: 500;
+        text-transform: uppercase; color: var(--ink-muted);
+        cursor: pointer; transition: color 0.12s, border-color 0.12s;
+      }
+      .tab-btn.active, .tab-btn[data-active="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+      .tab-btn:hover { color: var(--ink); }
+
+      /* ── Section label ──────────────────────────────────────────────── */
+      .section-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+        font-weight: 500; text-transform: uppercase;
+        color: var(--ink-faint); margin: 0 0 10px;
+        padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      }
+
+      /* ── Chip row + chips ───────────────────────────────────────────── */
+      .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; min-height: 38px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 8px; font-family: var(--display); font-size: 14px;
+        font-weight: 500; color: var(--ink); cursor: pointer;
+        transition: border-color 0.12s, background 0.12s, color 0.12s;
+        white-space: nowrap;
+      }
+      .chip:hover { border-color: var(--accent); }
+      .chip[data-active="true"] {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      .chip-sub {
+        font-family: var(--mono); font-size: 10px;
+        letter-spacing: 0.06em; color: inherit; opacity: 0.65;
+      }
+      .chip[data-active="true"] .chip-sub { opacity: 0.85; }
+
+      /* ── Booking section ────────────────────────────────────────────── */
+      .booking-section { margin-bottom: 22px; }
+
+      /* ── Textarea ───────────────────────────────────────────────────── */
+      .booking-textarea {
+        width: 100%; padding: 12px 14px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 8px; font-family: var(--display); font-size: 14px;
+        color: var(--ink); resize: none; outline: none;
+        transition: border-color 0.12s;
+      }
+      .booking-textarea:focus { border-color: var(--accent); }
+
+      /* ── Error ──────────────────────────────────────────────────────── */
+      .booking-error {
+        padding: 10px 14px; background: #FFF0F0; border: 1px solid #F5C6C6;
+        border-radius: 6px; color: #8C2128; font-size: 13px; margin-bottom: 14px;
+      }
+
+      /* ── Submit button ──────────────────────────────────────────────── */
+      .submit-btn {
+        width: 100%; padding: 15px; border: none; border-radius: 10px;
+        background: var(--ink); color: var(--bg);
+        font-family: var(--display); font-size: 15px; font-weight: 600;
+        letter-spacing: -0.01em; cursor: pointer;
+        transition: background 0.14s;
+      }
+      .submit-btn:hover:not(:disabled) { background: var(--accent); }
+      .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+      /* ── No-slots message ───────────────────────────────────────────── */
+      .no-slots {
+        padding: 20px; background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); color: var(--ink-muted);
+        font-size: 14px; line-height: 1.5; text-align: center;
+      }
+
+      /* ── Status card ────────────────────────────────────────────────── */
+      .status-card { text-align: center; padding: 8px 0 24px; }
+      .status-icon {
+        width: 48px; height: 48px; border-radius: 50%;
+        background: var(--accent); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+      .status-icon.confirmed { background: var(--success); }
+      .status-icon.cancelled { background: var(--ink-muted); }
+      .status-icon svg { width: 22px; height: 22px; }
+      .status-title { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+      .status-sub   { font-size: 14px; color: var(--ink-muted); margin: 0 0 24px; line-height: 1.4; }
+
+      .summary-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); overflow: hidden; margin-bottom: 20px;
+      }
+      .summary-row {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 12px 16px; border-bottom: 1px solid var(--border);
+      }
+      .summary-row:last-child { border-bottom: none; }
+      .summary-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--ink-faint);
+      }
+      .summary-value { font-size: 14px; font-weight: 500; color: var(--ink); }
+
+      .rebook-btn {
+        width: 100%; padding: 13px; border: 1px solid var(--border);
+        border-radius: 8px; background: transparent; color: var(--ink-muted);
+        font-family: var(--display); font-size: 14px; cursor: pointer;
+        transition: border-color 0.12s, color 0.12s;
+      }
+      .rebook-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+      /* ── Info card ──────────────────────────────────────────────────── */
+      .info-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); overflow: hidden;
+      }
+      .info-row {
+        display: flex; flex-direction: column; gap: 4px;
+        padding: 14px 18px; border-bottom: 1px solid var(--border);
+      }
+      .info-row:last-child { border-bottom: none; }
+      .info-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em;
+        text-transform: uppercase; color: var(--ink-faint);
+      }
+      .info-value { font-size: 15px; font-weight: 500; color: var(--ink); }
+      .info-value--multi { white-space: pre-line; font-weight: 400; font-size: 14px; line-height: 1.55; }
+
+      /* ── Menu tab ───────────────────────────────────────────────────── */
+      .filter-section { margin-bottom: 20px; }
+      .filter-title {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+        font-weight: 500; text-transform: uppercase; color: var(--ink-muted);
+        margin-bottom: 8px;
+      }
+      .filter-hint { font-size: 12px; color: var(--ink-muted); margin: 0 0 12px; line-height: 1.4; }
+      .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+      .filter-chip {
+        padding: 5px 11px; border-radius: 20px; border: 1px solid var(--border);
+        background: var(--surface); font-size: 12px; color: var(--ink-muted);
+        cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
+      }
+      .filter-chip.active {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      .filter-reset {
+        padding: 6px 0; background: none; border: none;
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--accent); cursor: pointer;
+      }
+
+      .menu-empty { padding: 24px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+      .menu-category { margin-bottom: 24px; }
+      .menu-category-title {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--ink-faint);
+        padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+      }
+      .menu-item {
+        padding: 12px 0; border-bottom: 1px solid var(--border);
+      }
+      .menu-item:last-child { border-bottom: none; }
+      .menu-item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+      .menu-item-name { font-size: 15px; font-weight: 500; color: var(--ink); }
+      .menu-item-flags { display: flex; gap: 4px; flex-shrink: 0; }
+      .menu-flag {
+        font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em;
+        text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+        background: rgba(61,140,92,0.10); color: var(--success);
+      }
+      .menu-flag.organic { background: rgba(180,140,40,0.10); color: #8B6914; }
+      .menu-item-desc { font-size: 13px; color: var(--ink-muted); line-height: 1.4; margin-bottom: 6px; }
+      .menu-item-warning {
+        display: flex; align-items: center; gap: 5px;
+        font-size: 12px; color: #C05000; padding: 5px 8px;
+        background: rgba(192,80,0,0.07); border-radius: 4px; margin-top: 6px;
+      }
+      .menu-item-warning svg { flex-shrink: 0; }
+      .menu-item-allergens {
+        font-size: 11px; color: var(--ink-faint); margin-top: 4px;
+        font-family: var(--mono);
+      }
+      .menu-disclaimer {
+        font-size: 11px; color: var(--ink-faint); font-style: italic;
+        margin-top: 16px; line-height: 1.4;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .chip, .submit-btn, .filter-chip { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </a>
+
+    <div class="page">
+      <div class="hero">
+        <span class="eyebrow">{l.eyebrow}</span>
+        <h1 class="title">{l.title}<span class="accent">{l.titleAccent}</span></h1>
+        <p class="subtitle">{l.subtitle}</p>
+      </div>
+
+      <div x-data={`breakfast(${JSON.stringify(sheetData)})`} x-cloak>
+
+        <!-- Tabs: nur wenn Menü-Einträge vorhanden -->
+        <div class="tabs" x-show="menuItems.length > 0">
+          <button type="button" class="tab-btn" :data-active="tab === 'main'" @click="tab = 'main'">
+            <span x-text="reservationEnabled ? labels.menuTabReservation : labels.menuTabInfo"></span>
+          </button>
+          <button type="button" class="tab-btn" :data-active="tab === 'menu'" @click="tab = 'menu'">
+            <span x-text="labels.menuTabMenu"></span>
+          </button>
+        </div>
+
+        <!-- ── Haupt-Tab ──────────────────────────────────────────────── -->
+        <div x-show="tab === 'main'">
+
+          <!-- View: Status (existingBooking vorhanden) -->
+          <template x-if="view === 'status'">
+            <div class="status-card">
+              <div class="status-icon" :class="statusInfo.iconClass">
+                <template x-if="statusInfo.icon === 'check'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </template>
+                <template x-if="statusInfo.icon === 'clock'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <polyline points="12 7 12 12 16 14"/>
+                  </svg>
+                </template>
+                <template x-if="statusInfo.icon === 'cross'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </template>
+              </div>
+              <p class="status-title" x-text="statusInfo.title"></p>
+              <p class="status-sub"   x-text="statusInfo.sub"></p>
+              <div class="summary-card">
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingDate"></span>
+                  <span class="summary-value" x-text="formatDate(existingBooking.details.date)"></span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingTime"></span>
+                  <span class="summary-value" x-text="existingBooking.details.time"></span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingPeople"></span>
+                  <span class="summary-value" x-text="existingBooking.details.people"></span>
+                </div>
+                <div class="summary-row"
+                  x-show="existingBooking.details.table_preference && existingBooking.details.table_preference !== 'any'">
+                  <span class="summary-label" x-text="labels.bookingTable"></span>
+                  <span class="summary-value" x-text="tableLabelFor(existingBooking.details.table_preference)"></span>
+                </div>
+              </div>
+              <button type="button" class="rebook-btn"
+                x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
+                x-text="labels.rebookBtn"
+                @click="startRebook()">
+              </button>
+            </div>
+          </template>
+
+          <!-- View: Formular -->
+          <template x-if="view === 'form'">
+            <div>
+              <template x-if="availableDates.length === 0">
+                <div class="no-slots" x-text="labels.noSlotsAvailable"></div>
+              </template>
+              <form @submit.prevent="submitBooking()" x-show="availableDates.length > 0">
+
+                <!-- Wann -->
+                <div class="booking-section">
+                  <div class="section-label" x-text="labels.whenLabel"></div>
+                  <div class="chip-row">
+                    <template x-for="(date, i) in availableDates" :key="date.iso">
+                      <button type="button" class="chip"
+                        :data-active="form.date === date.iso"
+                        @click="setDate(date.iso)">
+                        <span x-text="dateLabels[i]"></span>
+                        <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Personen -->
+                <div class="booking-section">
+                  <div class="section-label" x-text="labels.peopleLabel"></div>
+                  <div class="chip-row">
+                    <template x-for="n in peopleOptions" :key="n">
+                      <button type="button" class="chip"
+                        :data-active="form.people === n"
+                        @click="form.people = n"
+                        x-text="n">
+                      </button>
+                    </template>
+                    <button type="button" class="chip"
+                      :data-active="form.people > 4"
+                      @click="form.people = 5">5+</button>
+                  </div>
+                </div>
+
+                <!-- Uhrzeit -->
+                <div class="booking-section">
+                  <div class="section-label" x-text="labels.timeLabel"></div>
+                  <div class="chip-row">
+                    <template x-for="slot in slots" :key="slot">
+                      <button type="button" class="chip"
+                        :data-active="form.time === slot"
+                        @click="form.time = slot"
+                        x-text="slot">
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Tisch -->
+                <div class="booking-section">
+                  <div class="section-label" x-text="labels.tableLabel"></div>
+                  <div class="chip-row">
+                    <template x-for="opt in tableOptions" :key="opt.value">
+                      <button type="button" class="chip"
+                        :data-active="form.table_preference === opt.value"
+                        @click="form.table_preference = opt.value"
+                        x-text="opt.label">
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Notizen -->
+                <div class="booking-section">
+                  <div class="section-label" x-text="labels.notesLabel"></div>
+                  <textarea class="booking-textarea" rows="3"
+                    :placeholder="labels.notesPlaceholder"
+                    x-model="form.notes">
+                  </textarea>
+                </div>
+
+                <div x-show="errorMsg" class="booking-error" x-text="errorMsg"></div>
+
+                <button type="submit" class="submit-btn"
+                  :disabled="!canSubmit || submitting"
+                  x-text="submitting ? labels.submitting : labels.submit">
+                </button>
+              </form>
+            </div>
+          </template>
+
+          <!-- View: Info (Reservierung deaktiviert) -->
+          <template x-if="view === 'info'">
+            <div class="info-card">
+              <div class="info-row">
+                <div class="info-label" x-text="labels.infoTimeLabel"></div>
+                <div class="info-value" x-text="labels.infoTimeValue"></div>
+              </div>
+              <div class="info-row">
+                <div class="info-label" x-text="labels.infoLocationLabel"></div>
+                <div class="info-value" x-text="location"></div>
+              </div>
+              <div class="info-row" x-show="includedText">
+                <div class="info-label" x-text="labels.infoIncludedLabel"></div>
+                <div class="info-value info-value--multi" x-text="includedText"></div>
+              </div>
+            </div>
+          </template>
+
+        </div>
+
+        <!-- ── Menü-Tab ───────────────────────────────────────────────── -->
+        <div x-show="tab === 'menu'">
+          <div class="filter-section">
+            <div class="filter-title" x-text="labels.menuFilterTitle"></div>
+            <p class="filter-hint" x-text="labels.menuFilterHint"></p>
+            <div class="filter-chips">
+              <template x-for="key in allergenKeys" :key="key">
+                <button type="button" class="filter-chip"
+                  :class="{ active: selectedAllergens.includes(key) }"
+                  @click="toggleAllergen(key)"
+                  x-text="allergenLabels[key]">
+                </button>
+              </template>
+            </div>
+            <button type="button" class="filter-reset"
+              x-show="selectedAllergens.length > 0"
+              x-text="labels.menuFilterHideShow"
+              @click="clearAllergenFilter()">
+            </button>
+          </div>
+
+          <template x-if="menuItems.length === 0">
+            <div class="menu-empty" x-text="labels.menuEmpty"></div>
+          </template>
+
+          <template x-for="(items, category) in groupedMenuItems" :key="category">
+            <div class="menu-category">
+              <div class="menu-category-title" x-text="category"></div>
+              <div>
+                <template x-for="item in items" :key="item.id">
+                  <div class="menu-item">
+                    <div class="menu-item-header">
+                      <div class="menu-item-name" x-text="item.name"></div>
+                      <div class="menu-item-flags">
+                        <template x-if="item.isVegan">
+                          <span class="menu-flag" x-text="labels.menuFlagVegan"></span>
+                        </template>
+                        <template x-if="!item.isVegan && item.isVegetarian">
+                          <span class="menu-flag" x-text="labels.menuFlagVegetarian"></span>
+                        </template>
+                        <template x-if="item.isOrganic">
+                          <span class="menu-flag organic" x-text="labels.menuFlagOrganic"></span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="menu-item-desc" x-text="item.description" x-show="item.description"></div>
+                    <template x-if="getMatchingAllergens(item).length > 0">
+                      <div class="menu-item-warning">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+                        </svg>
+                        <span>
+                          <span x-text="labels.menuWarningPrefix"></span>
+                          <span x-text="getMatchingAllergens(item).map(k => allergenLabels[k]).join(', ')"></span>
+                        </span>
+                      </div>
+                    </template>
+                    <template x-if="item.allergens.length > 0 && selectedAllergens.length === 0">
+                      <div class="menu-item-allergens">
+                        <span x-text="labels.menuAllergensPrefix"></span>
+                        <span x-text="item.allergens.map(k => allergenLabels[k]).join(', ')"></span>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div class="menu-disclaimer" x-text="labels.menuDisclaimer"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      import Alpine from 'alpinejs';
+
+      Alpine.data('breakfast', (initial: any) => ({
+        view: initial.existingBooking
+          ? 'status'
+          : (initial.reservationEnabled === false ? 'info' : 'form'),
+        reservationEnabled: initial.reservationEnabled !== false,
+        includedText: initial.includedText || '',
+        location: initial.location || '',
+
+        menuItems: initial.menuItems || [],
+        allergenLabels: initial.allergenLabels || {},
+        allergenKeys: initial.allergenKeys || [],
+        selectedAllergens: [] as string[],
+        tab: 'main' as 'main' | 'menu',
+
+        stayRangeDates: initial.stayRangeDates,
+        allSlots: initial.allSlots,
+        startTime: initial.startTime,
+        endTime: initial.endTime,
+        peopleOptions: initial.peopleOptions,
+        tableOptions: initial.tableOptions,
+        labels: initial.labels,
+        accessToken: initial.accessToken,
+        existingBooking: initial.existingBooking,
+        lang: initial.lang,
+        nowTick: 0,
+
+        form: {
+          date: '',
+          people: 2,
+          time: '',
+          table_preference: 'any',
+          notes: '',
+        },
+        submitting: false,
+        errorMsg: '',
+
+        init() {
+          const firstAvail = this.availableDates[0];
+          if (firstAvail) this.form.date = firstAvail.iso;
+          setInterval(() => {
+            this.nowTick = Date.now();
+            if (!this.availableDates.find((d: any) => d.iso === this.form.date)) {
+              const newFirst = this.availableDates[0];
+              this.form.date = newFirst ? newFirst.iso : '';
+              this.form.time = '';
+            }
+            if (this.form.time && !this.slots.includes(this.form.time)) {
+              this.form.time = '';
+            }
+          }, 60000);
+        },
+
+        toggleAllergen(key: string) {
+          if (this.selectedAllergens.includes(key)) {
+            this.selectedAllergens = this.selectedAllergens.filter((k: string) => k !== key);
+          } else {
+            this.selectedAllergens = [...this.selectedAllergens, key];
+          }
+        },
+
+        clearAllergenFilter() { this.selectedAllergens = []; },
+
+        getMatchingAllergens(item: any) {
+          return item.allergens.filter((a: string) => this.selectedAllergens.includes(a));
+        },
+
+        get groupedMenuItems() {
+          const groups: Record<string, any[]> = {};
+          this.menuItems.forEach((item: any) => {
+            const cat = item.category || 'Allgemein';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(item);
+          });
+          return groups;
+        },
+
+        get todayIso() {
+          this.nowTick;
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        },
+
+        slotsForDate(dateIso: string) {
+          if (dateIso !== this.todayIso) return this.allSlots;
+          const now = new Date();
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          return this.allSlots.filter((slot: string) => {
+            const [h, m] = slot.split(':').map(Number);
+            return h * 60 + m > nowMin;
+          });
+        },
+
+        get availableDates() {
+          const today = this.todayIso;
+          return this.stayRangeDates
+            .filter((d: any) => d.iso >= today)
+            .filter((d: any) => this.slotsForDate(d.iso).length > 0)
+            .slice(0, 5);
+        },
+
+        get slots() { return this.slotsForDate(this.form.date); },
+
+        get dateLabels() {
+          const today = new Date();
+          const todayIso = this.todayIso;
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomIso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}`;
+          const dayAfter = new Date(today);
+          dayAfter.setDate(dayAfter.getDate() + 2);
+          const dayAfterIso = `${dayAfter.getFullYear()}-${String(dayAfter.getMonth()+1).padStart(2,'0')}-${String(dayAfter.getDate()).padStart(2,'0')}`;
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return this.availableDates.map((d: any) => {
+            if (d.iso === todayIso) return this.labels.today;
+            if (d.iso === tomIso)   return this.labels.tomorrow;
+            if (d.iso === dayAfterIso) return this.labels.dayAfter;
+            return new Date(d.iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { weekday: 'long' });
+          });
+        },
+
+        get canSubmit() {
+          return this.form.date && this.form.time && this.form.people > 0;
+        },
+
+        get statusInfo() {
+          if (!this.existingBooking) return { iconClass: '', icon: '', title: '', sub: '' };
+          const status = (this.existingBooking.status || 'pending').toLowerCase();
+          if (status === 'confirmed') return { iconClass: 'confirmed', icon: 'check', title: this.labels.confirmedTitle, sub: this.labels.confirmedSub };
+          if (status === 'cancelled') return { iconClass: 'cancelled', icon: 'cross', title: this.labels.cancelledTitle, sub: this.labels.cancelledSub };
+          return { iconClass: 'pending', icon: 'clock', title: this.labels.pendingTitle, sub: this.labels.pendingSub };
+        },
+
+        formatDate(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+        },
+
+        formatDateShort(iso: string) {
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { day: '2-digit', month: 'short' });
+        },
+
+        tableLabelFor(value: string) {
+          const opt = this.tableOptions.find((o: any) => o.value === value);
+          return opt ? opt.label : value;
+        },
+
+        startRebook() {
+          this.form = { date: this.availableDates[0]?.iso || '', people: 2, time: '', table_preference: 'any', notes: '' };
+          this.existingBooking = null;
+          this.view = 'form';
+        },
+
+        setDate(iso: string) {
+          this.form.date = iso;
+          if (this.form.time && !this.slots.includes(this.form.time)) this.form.time = '';
+        },
+
+        async submitBooking() {
+          if (!this.canSubmit || this.submitting) return;
+          this.submitting = true;
+          this.errorMsg = '';
+          try {
+            const resp = await fetch('/api/bookings/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: this.accessToken,
+                type: 'breakfast',
+                details: {
+                  date: this.form.date,
+                  time: this.form.time,
+                  people: this.form.people,
+                  table_preference: this.form.table_preference,
+                  notes: this.form.notes || null,
+                },
+              }),
+            });
+            const data = await resp.json();
+            if (!data.ok) {
+              this.errorMsg = `${this.labels.errorPrefix}: ${data.error || 'unknown'}`;
+              this.submitting = false;
+              return;
+            }
+            this.existingBooking = {
+              id: data.booking.id,
+              status: 'pending',
+              details: {
+                date: this.form.date,
+                time: this.form.time,
+                people: this.form.people,
+                table_preference: this.form.table_preference,
+                notes: this.form.notes,
+              },
+            };
+            this.view = 'status';
+            this.submitting = false;
+          } catch (e: any) {
+            this.errorMsg = `${this.labels.errorPrefix}: ${e.message || 'network error'}`;
+            this.submitting = false;
+          }
+        },
+      }));
+
+      Alpine.start();
+    </script>
+  </body>
+</html>
