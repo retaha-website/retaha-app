@@ -7,6 +7,7 @@ import {
   createSupabaseServiceRoleInstance,
 } from '@retaha/auth';
 import { loadBreakfastItem, EU_ALLERGENS } from '@retaha/db';
+import { mergeAndTranslate, asLanguageCode } from '@retaha/i18n';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -19,6 +20,13 @@ const { id } = Astro.params;
 const isNew = id === 'new';
 
 const supabase = createSupabaseServiceRoleInstance();
+
+const { data: hotelLangRow } = await supabase
+  .from('hotels')
+  .select('default_language')
+  .eq('id', hotel.id)
+  .maybeSingle();
+const hotelDefaultLang = asLanguageCode((hotelLangRow?.default_language as string | undefined) ?? 'de');
 
 let item: any = null;
 if (!isNew && id) {
@@ -45,20 +53,17 @@ if (Astro.request.method === 'POST') {
       allergenValues[`contains_${a.key}`] = form.get(`allergen_${a.key}`) === 'on';
     });
 
+    const nameDe = form.get('name_de')?.toString().trim() || '';
+    const descDe = form.get('description_de')?.toString().trim() || null;
+
     const updates: Record<string, any> = {
       hotel_id: hotel.id,
       display_order: parseInt(form.get('display_order')?.toString() || '0') || 0,
       is_active: form.getAll('is_active').includes('on'),
       category: form.get('category')?.toString().trim() || null,
       price_cents: Math.max(0, Math.round(parseFloat(form.get('price_eur')?.toString().replace(',', '.') || '0') * 100) || 0),
-      name_de: form.get('name_de')?.toString().trim() || '',
-      name_en: form.get('name_en')?.toString().trim() || null,
-      name_fr: form.get('name_fr')?.toString().trim() || null,
-      name_es: form.get('name_es')?.toString().trim() || null,
-      description_de: form.get('description_de')?.toString().trim() || null,
-      description_en: form.get('description_en')?.toString().trim() || null,
-      description_fr: form.get('description_fr')?.toString().trim() || null,
-      description_es: form.get('description_es')?.toString().trim() || null,
+      name_de: nameDe,
+      description_de: descDe,
       ...allergenValues,
       is_vegetarian: form.getAll('is_vegetarian').includes('on'),
       is_vegan: form.getAll('is_vegan').includes('on'),
@@ -69,6 +74,16 @@ if (Astro.request.method === 'POST') {
     if (!updates.name_de) {
       message = { type: 'error', text: 'Name (Deutsch) ist Pflichtfeld' };
     } else {
+      // Auto-translate name + description into all active languages
+      const currentNameI18n = isNew ? null : (item?.name_i18n ?? null);
+      const currentDescI18n = isNew ? null : (item?.description_i18n ?? null);
+      const [nameResult, descResult] = await Promise.all([
+        mergeAndTranslate(currentNameI18n, nameDe, hotelDefaultLang, { logLabel: 'breakfast_items.name' }),
+        mergeAndTranslate(currentDescI18n, descDe ?? '', hotelDefaultLang, { logLabel: 'breakfast_items.description' }),
+      ]);
+      updates.name_i18n = Object.keys(nameResult.i18n).length > 0 ? nameResult.i18n : null;
+      updates.description_i18n = Object.keys(descResult.i18n).length > 0 ? descResult.i18n : null;
+
       if (isNew) {
         const { data, error } = await supabase.from('breakfast_items').insert(updates).select('id').single();
         if (error) {
@@ -149,6 +164,7 @@ if (url.searchParams.get('created') === '1' && !message) {
         <label class="bauhaus-field col-span-2">
           <span class="bauhaus-field-eyebrow">— Preis (EUR) —</span>
           <input type="number" name="price_eur" value={((data.price_cents ?? 0) / 100).toFixed(2)} min="0" step="0.01" placeholder="0,00" class="bauhaus-input" />
+          <span class="text-[10px] text-anthrazit/40 italic mt-0.5 block">0,00 = im Buffet enthalten</span>
         </label>
         <label class="bauhaus-field col-span-2">
           <span class="bauhaus-field-eyebrow">— Reihenfolge —</span>
@@ -165,48 +181,20 @@ if (url.searchParams.get('created') === '1' && !message) {
 
     <section class="bg-white border border-anthrazit/[0.12] p-6">
       <h2 class="text-lg font-medium mb-1">Name</h2>
-      <p class="text-xs text-anthrazit/55 mb-4">In allen 4 Sprachen. Pflichtfeld: Deutsch.</p>
-      <div class="grid grid-cols-2 gap-4">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch *</span>
-          <input type="text" name="name_de" value={data.name_de || ''} required class="bauhaus-input" />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <input type="text" name="name_en" value={data.name_en || ''} class="bauhaus-input" />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <input type="text" name="name_fr" value={data.name_fr || ''} class="bauhaus-input" />
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <input type="text" name="name_es" value={data.name_es || ''} class="bauhaus-input" />
-        </label>
-      </div>
+      <p class="text-xs text-anthrazit/55 mb-4">Pflichtfeld: Deutsch. Wird automatisch in alle aktiven Sprachen übersetzt.</p>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch *</span>
+        <input type="text" name="name_de" value={data.name_de || ''} required class="bauhaus-input" />
+      </label>
     </section>
 
     <section class="bg-white border border-anthrazit/[0.12] p-6">
       <h2 class="text-lg font-medium mb-1">Beschreibung</h2>
-      <p class="text-xs text-anthrazit/55 mb-4">Optional. Z.B. "Hausgemacht mit Roggen-Sauerteig"</p>
-      <div class="space-y-3">
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
-          <textarea name="description_de" rows="2" class="bauhaus-textarea">{data.description_de || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">English</span>
-          <textarea name="description_en" rows="2" class="bauhaus-textarea">{data.description_en || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Français</span>
-          <textarea name="description_fr" rows="2" class="bauhaus-textarea">{data.description_fr || ''}</textarea>
-        </label>
-        <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Español</span>
-          <textarea name="description_es" rows="2" class="bauhaus-textarea">{data.description_es || ''}</textarea>
-        </label>
-      </div>
+      <p class="text-xs text-anthrazit/55 mb-4">Optional. Z.B. "Hausgemacht mit Roggen-Sauerteig" — wird automatisch übersetzt.</p>
+      <label class="bauhaus-field">
+        <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
+        <textarea name="description_de" rows="2" class="bauhaus-textarea">{data.description_de || ''}</textarea>
+      </label>
     </section>
 
     <section class="bg-white border-2 border-amber-300 p-6">

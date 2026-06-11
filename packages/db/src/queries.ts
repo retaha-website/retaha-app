@@ -205,16 +205,19 @@ export interface BreakfastItem {
   display_order: number;
   is_active: boolean;
   category: string | null;
+  price_cents: number;
 
   name_de: string;
   name_en: string | null;
   name_fr: string | null;
   name_es: string | null;
+  name_i18n: Record<string, any> | null;
 
   description_de: string | null;
   description_en: string | null;
   description_fr: string | null;
   description_es: string | null;
+  description_i18n: Record<string, any> | null;
 
   // 14 EU Allergens
   contains_gluten: boolean;

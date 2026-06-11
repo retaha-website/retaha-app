@@ -162,8 +162,8 @@ const allergenLabels: Record<string, string> = {
 const localizedItems = menuItemsRaw.map((item: any) => ({
   id: item.id,
   category: item.category || 'Allgemein',
-  name: item[`name_${lk}`] || item.name_de,
-  description: item[`description_${lk}`] || item.description_de || '',
+  name: pickI18n(item.name_i18n, hotelDefaultLang, lang) || item.name_de || '',
+  description: pickI18n(item.description_i18n, hotelDefaultLang, lang) || item.description_de || '',
   allergens: ALLERGEN_KEYS.filter(key => item[`contains_${key}`]),
   isVegetarian: item.is_vegetarian,
   isVegan: item.is_vegan,
@@ -189,7 +189,7 @@ const labels = {
     deliveryLabel: 'Wo?',
     deliveryTable: 'Im Frühstücksraum', deliveryRoom: 'Aufs Zimmer',
     roomNumberLabel: 'Zimmernummer',
-    priceSuffix: '/ Person', priceRoomFee: '+ Zimmerservice',
+    priceSuffix: '/ Person', priceRoomFee: '+ Zimmerservice', buffetIncluded: 'Im Buffet enthalten',
     notesLabel: 'Etwas, das wir wissen sollten?',
     notesPlaceholder: 'Z.B. glutenfrei, Geburtstag, …',
     submit: 'Tisch reservieren', submitting: 'Wird reserviert…',
@@ -227,7 +227,7 @@ const labels = {
     deliveryLabel: 'Where?',
     deliveryTable: 'In the breakfast room', deliveryRoom: 'To the room',
     roomNumberLabel: 'Room number',
-    priceSuffix: '/ person', priceRoomFee: '+ room service',
+    priceSuffix: '/ person', priceRoomFee: '+ room service', buffetIncluded: 'Included in breakfast',
     notesLabel: 'Anything we should know?', notesPlaceholder: 'E.g. gluten-free, birthday, …',
     submit: 'Reserve table', submitting: 'Reserving…', errorPrefix: 'Error',
     pendingTitle: 'We got your request.', pendingSub: `${conciergeName} will confirm shortly.`,
@@ -260,7 +260,7 @@ const labels = {
     deliveryLabel: 'Où ?',
     deliveryTable: 'Dans la salle', deliveryRoom: 'En chambre',
     roomNumberLabel: 'Numéro de chambre',
-    priceSuffix: '/ personne', priceRoomFee: '+ service en chambre',
+    priceSuffix: '/ personne', priceRoomFee: '+ service en chambre', buffetIncluded: 'Inclus dans le petit-déjeuner',
     notesLabel: 'Quelque chose à savoir ?', notesPlaceholder: 'P. ex. sans gluten, anniversaire, …',
     submit: 'Réserver', submitting: 'Réservation…', errorPrefix: 'Erreur',
     pendingTitle: 'Nous avons votre demande.', pendingSub: `${conciergeName} confirme bientôt.`,
@@ -293,7 +293,7 @@ const labels = {
     deliveryLabel: '¿Dónde?',
     deliveryTable: 'En el comedor', deliveryRoom: 'A la habitación',
     roomNumberLabel: 'Número de habitación',
-    priceSuffix: '/ persona', priceRoomFee: '+ servicio a la habitación',
+    priceSuffix: '/ persona', priceRoomFee: '+ servicio a la habitación', buffetIncluded: 'Incluido en el desayuno',
     notesLabel: '¿Algo que debamos saber?', notesPlaceholder: 'Ej. sin gluten, cumpleaños, …',
     submit: 'Reservar', submitting: 'Reservando…', errorPrefix: 'Error',
     pendingTitle: 'Tenemos tu solicitud.', pendingSub: `${conciergeName} confirma enseguida.`,
@@ -326,7 +326,7 @@ const labels = {
     deliveryLabel: 'Dove?',
     deliveryTable: 'Nella sala colazione', deliveryRoom: 'In camera',
     roomNumberLabel: 'Numero camera',
-    priceSuffix: '/ persona', priceRoomFee: '+ servizio in camera',
+    priceSuffix: '/ persona', priceRoomFee: '+ servizio in camera', buffetIncluded: 'Incluso nella colazione',
     notesLabel: 'Qualcosa che dovremmo sapere?', notesPlaceholder: 'Es. senza glutine, compleanno, …',
     submit: 'Prenota', submitting: 'Prenotazione…', errorPrefix: 'Errore',
     pendingTitle: 'Abbiamo la tua richiesta.', pendingSub: `${conciergeName} confermerà a breve.`,
@@ -359,7 +359,7 @@ const labels = {
     deliveryLabel: 'Onde?',
     deliveryTable: 'Na sala de pequeno-almoço', deliveryRoom: 'Para o quarto',
     roomNumberLabel: 'Número do quarto',
-    priceSuffix: '/ pessoa', priceRoomFee: '+ serviço de quarto',
+    priceSuffix: '/ pessoa', priceRoomFee: '+ serviço de quarto', buffetIncluded: 'Incluído no pequeno-almoço',
     notesLabel: 'Algo que devemos saber?', notesPlaceholder: 'Ex. sem glúten, aniversário, …',
     submit: 'Reservar', submitting: 'A reservar…', errorPrefix: 'Erro',
     pendingTitle: 'Recebemos o seu pedido.', pendingSub: `${conciergeName} confirmará em breve.`,
@@ -392,7 +392,7 @@ const labels = {
     deliveryLabel: 'Waar?',
     deliveryTable: 'In de ontbijtzaal', deliveryRoom: 'Op de kamer',
     roomNumberLabel: 'Kamernummer',
-    priceSuffix: '/ persoon', priceRoomFee: '+ roomservice',
+    priceSuffix: '/ persoon', priceRoomFee: '+ roomservice', buffetIncluded: 'Inbegrepen bij ontbijt',
     notesLabel: 'Iets wat we moeten weten?', notesPlaceholder: 'Bijv. glutenvrij, verjaardag, …',
     submit: 'Reserveer', submitting: 'Reserveren…', errorPrefix: 'Fout',
     pendingTitle: 'We hebben je aanvraag.', pendingSub: `${conciergeName} bevestigt zo snel mogelijk.`,
@@ -425,7 +425,7 @@ const labels = {
     deliveryLabel: 'Куда?',
     deliveryTable: 'В ресторане', deliveryRoom: 'В номер',
     roomNumberLabel: 'Номер комнаты',
-    priceSuffix: '/ чел.', priceRoomFee: '+ обслуживание в номере',
+    priceSuffix: '/ чел.', priceRoomFee: '+ обслуживание в номере', buffetIncluded: 'Включено в завтрак',
     notesLabel: 'Что-то, что мы должны знать?', notesPlaceholder: 'Напр. без глютена, день рождения, …',
     submit: 'Забронировать', submitting: 'Бронирование…', errorPrefix: 'Ошибка',
     pendingTitle: 'Мы получили ваш запрос.', pendingSub: `${conciergeName} подтвердит в ближайшее время.`,
@@ -458,7 +458,7 @@ const labels = {
     deliveryLabel: 'أين؟',
     deliveryTable: 'في قاعة الإفطار', deliveryRoom: 'إلى الغرفة',
     roomNumberLabel: 'رقم الغرفة',
-    priceSuffix: '/ شخص', priceRoomFee: '+ خدمة الغرفة',
+    priceSuffix: '/ شخص', priceRoomFee: '+ خدمة الغرفة', buffetIncluded: 'مشمول في الإفطار',
     notesLabel: 'هل هناك شيء يجب أن نعرفه؟', notesPlaceholder: 'مثلاً بدون جلوتين، عيد ميلاد، …',
     submit: 'احجز', submitting: 'جارٍ الحجز…', errorPrefix: 'خطأ',
     pendingTitle: 'استلمنا طلبك.', pendingSub: `${conciergeName} سيؤكد قريباً.`,
@@ -491,7 +491,7 @@ const labels = {
     deliveryLabel: '送至？',
     deliveryTable: '在早餐厅', deliveryRoom: '送到房间',
     roomNumberLabel: '房间号',
-    priceSuffix: '/ 人', priceRoomFee: '+ 客房服务',
+    priceSuffix: '/ 人', priceRoomFee: '+ 客房服务', buffetIncluded: '含在早餐内',
     notesLabel: '有什么需要告知我们的？', notesPlaceholder: '例如无麸质、生日等…',
     submit: '预订', submitting: '预订中…', errorPrefix: '错误',
     pendingTitle: '我们已收到您的请求。', pendingSub: `${conciergeName} 将尽快确认。`,
@@ -1013,6 +1013,10 @@ const sheetData = {
                 <div x-show="totalPrice !== null" style="margin-bottom:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:baseline">
                   <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)" x-text="priceCents !== null && roomServiceFeeCents > 0 && form.delivery === 'room' ? labels.priceRoomFee : labels.priceSuffix"></span>
                   <span style="font-size:16px;font-weight:600;color:var(--ink)" x-text="formatPrice(totalPrice)"></span>
+                </div>
+                <!-- Buffet-Badge: priceCents===0 = im Paket enthalten, kein Einzelpreis -->
+                <div x-show="priceCents === 0" style="margin-bottom:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center">
+                  <span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 10px;border-radius:4px;font-family:var(--mono);letter-spacing:0.05em" x-text="labels.buffetIncluded"></span>
                 </div>
 
                 <div x-show="errorMsg" class="booking-error" x-text="errorMsg"></div>
