@@ -48,14 +48,8 @@ export type StayContext = {
     breakfast_start_time: string | null;
     breakfast_end_time: string | null;
     breakfast_slot_minutes: number | null;
-    breakfast_location_de: string | null;
-    breakfast_location_en: string | null;
-    breakfast_location_fr: string | null;
-    breakfast_location_es: string | null;
-    breakfast_included_de: string | null;
-    breakfast_included_en: string | null;
-    breakfast_included_fr: string | null;
-    breakfast_included_es: string | null;
+    breakfast_location_i18n: Record<string, any> | null;
+    breakfast_included_i18n: Record<string, any> | null;
     conference_rooms: any[];
     conference_start_time: string | null;
     conference_end_time: string | null;
@@ -107,8 +101,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       eve_name, eve_online_until, eve_enabled,
       wifi_ssid, wifi_password, wifi_speed_mbits,
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
-      breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es,
-      breakfast_included_de, breakfast_included_en, breakfast_included_fr, breakfast_included_es,
+      breakfast_location_i18n, breakfast_included_i18n,
       conference_rooms, conference_start_time, conference_end_time, conference_slot_minutes,
       service_items, service_start_time, service_end_time
     `)

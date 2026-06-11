@@ -1,6 +1,6 @@
 ---
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, pickI18n, asLanguageCode, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
 import '@fontsource/space-grotesk/400.css';
@@ -70,8 +70,7 @@ const { stay, guest, hotel, settings } = ctx;
 const lang: Lang = normalizeLang(
   langParam ?? (guest as any)?.language ?? (hotel as any).default_language ?? 'de'
 ) as Lang;
-type LK = 'de' | 'en' | 'fr' | 'es';
-const lk = (['de','en','fr','es'].includes(lang) ? lang : 'de') as LK;
+const lk = lang;
 
 // Breakfast-Einstellungen
 const startTime: string = (settings as any).breakfast_start_time || '07:30:00';
@@ -83,21 +82,9 @@ const priceCents: number | null = (settings as any).breakfast_price_cents ?? nul
 const roomServiceFeeCents: number = (settings as any).breakfast_room_service_fee_cents ?? 0;
 const roomNumber: string | null = showcaseMode ? null : ((ctx as any).room?.room_number ?? null);
 
-const breakfastLocationMap: Record<LK, string | null> = {
-  de: (settings as any).breakfast_location_de,
-  en: (settings as any).breakfast_location_en,
-  fr: (settings as any).breakfast_location_fr,
-  es: (settings as any).breakfast_location_es,
-};
-const location = breakfastLocationMap[lk] || (settings as any).breakfast_location_de || 'im Wintergarten';
-
-const breakfastIncludedMap: Record<LK, string | null> = {
-  de: (settings as any).breakfast_included_de,
-  en: (settings as any).breakfast_included_en,
-  fr: (settings as any).breakfast_included_fr,
-  es: (settings as any).breakfast_included_es,
-};
-const includedText = breakfastIncludedMap[lk] || (settings as any).breakfast_included_de || '';
+const hotelDefaultLang = asLanguageCode((hotel as any).default_language ?? 'de');
+const location = pickI18n((settings as any).breakfast_location_i18n, hotelDefaultLang, lang) || '';
+const includedText = pickI18n((settings as any).breakfast_included_i18n, hotelDefaultLang, lang) || '';
 const conciergeName: string = (settings as any).eve_name || 'das Team';
 
 // Menu-Items + existingBooking laden
@@ -122,11 +109,20 @@ const toLocalIso = (d: Date) =>
 
 const stayRangeDates: { iso: string }[] = [];
 {
-  const cursor = new Date(stay.check_in);
-  const stayEnd = new Date(stay.check_out);
-  while (cursor <= stayEnd) {
-    stayRangeDates.push({ iso: toLocalIso(cursor) });
-    cursor.setDate(cursor.getDate() + 1);
+  if (showcaseMode) {
+    // Showcase: always 3 rolling days regardless of check-in/out times so evening demos work.
+    for (let i = 0; i < 3; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      stayRangeDates.push({ iso: toLocalIso(d) });
+    }
+  } else {
+    const cursor = new Date(stay.check_in);
+    const stayEnd = new Date(stay.check_out);
+    while (cursor <= stayEnd) {
+      stayRangeDates.push({ iso: toLocalIso(cursor) });
+      cursor.setDate(cursor.getDate() + 1);
+    }
   }
 }
 
@@ -145,21 +141,22 @@ const allSlots = generateSlots(startTime, endTime, slotMinutes);
 
 // Allergen-Keys + Labels
 const ALLERGEN_KEYS = ['gluten','crustaceans','eggs','fish','peanuts','soy','milk','nuts','celery','mustard','sesame','sulfites','lupins','molluscs'];
+const _al = (d: Record<string, string>) => d[lk] || d.en || '';
 const allergenLabels: Record<string, string> = {
-  gluten:      { de: 'Gluten',      en: 'Gluten',         fr: 'Gluten',          es: 'Gluten'       }[lk],
-  crustaceans: { de: 'Krebstiere',  en: 'Crustaceans',    fr: 'Crustacés',       es: 'Crustáceos'   }[lk],
-  eggs:        { de: 'Eier',        en: 'Eggs',           fr: 'Œufs',            es: 'Huevos'       }[lk],
-  fish:        { de: 'Fisch',       en: 'Fish',           fr: 'Poisson',         es: 'Pescado'      }[lk],
-  peanuts:     { de: 'Erdnüsse',    en: 'Peanuts',        fr: 'Arachides',       es: 'Cacahuetes'   }[lk],
-  soy:         { de: 'Soja',        en: 'Soy',            fr: 'Soja',            es: 'Soja'         }[lk],
-  milk:        { de: 'Milch',       en: 'Milk',           fr: 'Lait',            es: 'Leche'        }[lk],
-  nuts:        { de: 'Nüsse',       en: 'Tree nuts',      fr: 'Fruits à coque',  es: 'Frutos secos' }[lk],
-  celery:      { de: 'Sellerie',    en: 'Celery',         fr: 'Céleri',          es: 'Apio'         }[lk],
-  mustard:     { de: 'Senf',        en: 'Mustard',        fr: 'Moutarde',        es: 'Mostaza'      }[lk],
-  sesame:      { de: 'Sesam',       en: 'Sesame',         fr: 'Sésame',          es: 'Sésamo'       }[lk],
-  sulfites:    { de: 'Sulfite',     en: 'Sulphites',      fr: 'Sulfites',        es: 'Sulfitos'     }[lk],
-  lupins:      { de: 'Lupinen',     en: 'Lupin',          fr: 'Lupin',           es: 'Altramuces'   }[lk],
-  molluscs:    { de: 'Weichtiere',  en: 'Molluscs',       fr: 'Mollusques',      es: 'Moluscos'     }[lk],
+  gluten:      _al({ de: 'Gluten',      en: 'Gluten',        fr: 'Gluten',           es: 'Gluten',        it: 'Glutine',             pt: 'Glúten',          nl: 'Gluten',        ru: 'Глютен',              ar: 'الغلوتين',     zh: '麸质'    }),
+  crustaceans: _al({ de: 'Krebstiere',  en: 'Crustaceans',   fr: 'Crustacés',        es: 'Crustáceos',    it: 'Crostacei',           pt: 'Crustáceos',      nl: 'Schaaldieren',  ru: 'Ракообразные',        ar: 'القشريات',     zh: '甲壳类'  }),
+  eggs:        _al({ de: 'Eier',        en: 'Eggs',          fr: 'Œufs',             es: 'Huevos',        it: 'Uova',                pt: 'Ovos',            nl: 'Eieren',        ru: 'Яйца',                ar: 'البيض',        zh: '鸡蛋'    }),
+  fish:        _al({ de: 'Fisch',       en: 'Fish',          fr: 'Poisson',          es: 'Pescado',       it: 'Pesce',               pt: 'Peixe',           nl: 'Vis',           ru: 'Рыба',                ar: 'السمك',        zh: '鱼'      }),
+  peanuts:     _al({ de: 'Erdnüsse',    en: 'Peanuts',       fr: 'Arachides',        es: 'Cacahuetes',    it: 'Arachidi',            pt: 'Amendoins',       nl: "Pinda's",       ru: 'Арахис',              ar: 'الفول السوداني', zh: '花生'  }),
+  soy:         _al({ de: 'Soja',        en: 'Soy',           fr: 'Soja',             es: 'Soja',          it: 'Soia',                pt: 'Soja',            nl: 'Soja',          ru: 'Соя',                 ar: 'فول الصويا',   zh: '大豆'    }),
+  milk:        _al({ de: 'Milch',       en: 'Milk',          fr: 'Lait',             es: 'Leche',         it: 'Latte',               pt: 'Leite',           nl: 'Melk',          ru: 'Молоко',              ar: 'الحليب',       zh: '牛奶'    }),
+  nuts:        _al({ de: 'Nüsse',       en: 'Tree nuts',     fr: 'Fruits à coque',   es: 'Frutos secos',  it: 'Frutta a guscio',     pt: 'Frutos secos',    nl: 'Noten',         ru: 'Древесные орехи',     ar: 'المكسرات',     zh: '坚果'    }),
+  celery:      _al({ de: 'Sellerie',    en: 'Celery',        fr: 'Céleri',           es: 'Apio',          it: 'Sedano',              pt: 'Aipo',            nl: 'Selderij',      ru: 'Сельдерей',           ar: 'الكرفس',       zh: '芹菜'    }),
+  mustard:     _al({ de: 'Senf',        en: 'Mustard',       fr: 'Moutarde',         es: 'Mostaza',       it: 'Senape',              pt: 'Mostarda',        nl: 'Mosterd',       ru: 'Горчица',             ar: 'الخردل',       zh: '芥末'    }),
+  sesame:      _al({ de: 'Sesam',       en: 'Sesame',        fr: 'Sésame',           es: 'Sésamo',        it: 'Sesamo',              pt: 'Sésamo',          nl: 'Sesam',         ru: 'Кунжут',              ar: 'السمسم',       zh: '芝麻'    }),
+  sulfites:    _al({ de: 'Sulfite',     en: 'Sulphites',     fr: 'Sulfites',         es: 'Sulfitos',      it: 'Solfiti',             pt: 'Sulfitos',        nl: 'Sulfieten',     ru: 'Сульфиты',            ar: 'الكبريتيت',    zh: '亚硫酸盐' }),
+  lupins:      _al({ de: 'Lupinen',     en: 'Lupin',         fr: 'Lupin',            es: 'Altramuces',    it: 'Lupini',              pt: 'Tremoços',        nl: 'Lupine',        ru: 'Люпин',               ar: 'الترمس',       zh: '羽扇豆'  }),
+  molluscs:    _al({ de: 'Weichtiere',  en: 'Molluscs',      fr: 'Mollusques',       es: 'Moluscos',      it: 'Molluschi',           pt: 'Moluscos',        nl: 'Weekdieren',    ru: 'Моллюски',            ar: 'الرخويات',     zh: '软体动物' }),
 };
 
 const localizedItems = menuItemsRaw.map((item: any) => ({
@@ -202,7 +199,7 @@ const labels = {
     cancelledTitle: 'Reservierung abgelehnt.', cancelledSub: 'Bitte sprich mit dem Empfang.',
     bookingDate: 'Tag', bookingTime: 'Uhrzeit', bookingPeople: 'Personen', bookingTable: 'Tisch', bookingDelivery: 'Lieferart',
     cancelBtn: 'Zurücknehmen', rebookBtn: 'Neuen Tisch reservieren',
-    noFutureDates: `Täglich ${startTime.substring(0,5)} – ${endTime.substring(0,5)}${location ? ' · ' + location : ''}`,
+    noFutureDates: `Täglich ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoTimeLabel: 'Wann', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Ort', infoIncludedLabel: 'Was dich erwartet',
     menuTabReservation: 'Reservieren', menuTabInfo: 'Frühstück', menuTabMenu: 'Karte',
@@ -238,7 +235,7 @@ const labels = {
     cancelledTitle: 'Reservation declined.', cancelledSub: 'Please speak with the front desk.',
     bookingDate: 'Day', bookingTime: 'Time', bookingPeople: 'People', bookingTable: 'Table', bookingDelivery: 'Delivery',
     cancelBtn: 'Cancel', rebookBtn: 'Book a new table',
-    noFutureDates: `Daily ${startTime.substring(0,5)} – ${endTime.substring(0,5)}${location ? ' · ' + location : ''}`,
+    noFutureDates: `Daily ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoTimeLabel: 'When', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Where', infoIncludedLabel: 'What to expect',
     menuTabReservation: 'Reserve', menuTabInfo: 'Breakfast', menuTabMenu: 'Menu',
@@ -271,7 +268,7 @@ const labels = {
     cancelledTitle: 'Réservation refusée.', cancelledSub: 'Merci de voir la réception.',
     bookingDate: 'Jour', bookingTime: 'Heure', bookingPeople: 'Personnes', bookingTable: 'Table', bookingDelivery: 'Livraison',
     cancelBtn: 'Annuler', rebookBtn: 'Nouvelle réservation',
-    noFutureDates: `Tous les jours ${startTime.substring(0,5)} – ${endTime.substring(0,5)}${location ? ' · ' + location : ''}`,
+    noFutureDates: `Tous les jours ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoTimeLabel: 'Quand', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Où', infoIncludedLabel: 'Ce qui vous attend',
     menuTabReservation: 'Réserver', menuTabInfo: 'Petit-déjeuner', menuTabMenu: 'Carte',
@@ -304,7 +301,7 @@ const labels = {
     cancelledTitle: 'Reserva rechazada.', cancelledSub: 'Habla con recepción, por favor.',
     bookingDate: 'Día', bookingTime: 'Hora', bookingPeople: 'Personas', bookingTable: 'Mesa', bookingDelivery: 'Entrega',
     cancelBtn: 'Cancelar', rebookBtn: 'Nueva reserva',
-    noFutureDates: `Todos los días ${startTime.substring(0,5)} – ${endTime.substring(0,5)}${location ? ' · ' + location : ''}`,
+    noFutureDates: `Todos los días ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoTimeLabel: 'Cuándo', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoLocationLabel: 'Dónde', infoIncludedLabel: 'Qué te espera',
     menuTabReservation: 'Reservar', menuTabInfo: 'Desayuno', menuTabMenu: 'Carta',
@@ -314,6 +311,204 @@ const labels = {
     menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegano', menuFlagOrganic: 'ecológico',
     menuAllergensPrefix: 'Alérgenos:', menuEmpty: 'Aún no hay platos disponibles.',
     menuDisclaimer: 'Datos proporcionados por el hotel — en caso de duda, hable con el servicio.',
+  },
+  it: {
+    pageTitle: `${hotel.name} · Colazione`,
+    eyebrow: '— Colazione —',
+    title: 'Ora della colazione',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? 'Prenota un tavolo o ordina in camera.' : 'Prenota un tavolo.')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: 'Quando?', today: 'Oggi', tomorrow: 'Domani', dayAfter: 'Dopodomani',
+    peopleLabel: 'Quante persone?', timeLabel: 'A che ora?', tableLabel: 'Preferenza tavolo?',
+    tableInside: 'Interno', tableOutside: 'Esterno', tableGarden: 'In giardino', tableAny: 'Nessuna preferenza',
+    deliveryLabel: 'Dove?',
+    deliveryTable: 'Nella sala colazione', deliveryRoom: 'In camera',
+    roomNumberLabel: 'Numero camera',
+    priceSuffix: '/ persona', priceRoomFee: '+ servizio in camera',
+    notesLabel: 'Qualcosa che dovremmo sapere?', notesPlaceholder: 'Es. senza glutine, compleanno, …',
+    submit: 'Prenota', submitting: 'Prenotazione…', errorPrefix: 'Errore',
+    pendingTitle: 'Abbiamo la tua richiesta.', pendingSub: `${conciergeName} confermerà a breve.`,
+    confirmedTitle: 'Prenotazione confermata.', confirmedSub: 'Ci vediamo presto.',
+    cancelledTitle: 'Prenotazione rifiutata.', cancelledSub: 'Si prega di parlare con la reception.',
+    bookingDate: 'Giorno', bookingTime: 'Ora', bookingPeople: 'Persone', bookingTable: 'Tavolo', bookingDelivery: 'Consegna',
+    cancelBtn: 'Annulla', rebookBtn: 'Nuova prenotazione',
+    noFutureDates: `Ogni giorno ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: 'Quando', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Dove', infoIncludedLabel: 'Cosa ti aspetta',
+    menuTabReservation: 'Prenota', menuTabInfo: 'Colazione', menuTabMenu: 'Menu',
+    menuFilterTitle: '— Allergeni —',
+    menuFilterHint: 'Seleziona i tuoi allergeni — i piatti con questi ingredienti saranno contrassegnati.',
+    menuFilterHideShow: 'Cancella filtro', menuWarningPrefix: 'Contiene',
+    menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegano', menuFlagOrganic: 'biologico',
+    menuAllergensPrefix: 'Allergeni:', menuEmpty: 'Nessun piatto disponibile al momento.',
+    menuDisclaimer: "Informazioni fornite dall'hotel — in caso di dubbio, parlare con il servizio.",
+  },
+  pt: {
+    pageTitle: `${hotel.name} · Pequeno-almoço`,
+    eyebrow: '— Pequeno-almoço —',
+    title: 'Hora do pequeno-almoço',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? 'Reservar uma mesa ou pedir ao quarto.' : 'Reservar uma mesa.')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: 'Quando?', today: 'Hoje', tomorrow: 'Amanhã', dayAfter: 'Depois de amanhã',
+    peopleLabel: 'Quantas pessoas?', timeLabel: 'A que horas?', tableLabel: 'Preferência de mesa?',
+    tableInside: 'Interior', tableOutside: 'Exterior', tableGarden: 'No jardim', tableAny: 'Sem preferência',
+    deliveryLabel: 'Onde?',
+    deliveryTable: 'Na sala de pequeno-almoço', deliveryRoom: 'Para o quarto',
+    roomNumberLabel: 'Número do quarto',
+    priceSuffix: '/ pessoa', priceRoomFee: '+ serviço de quarto',
+    notesLabel: 'Algo que devemos saber?', notesPlaceholder: 'Ex. sem glúten, aniversário, …',
+    submit: 'Reservar', submitting: 'A reservar…', errorPrefix: 'Erro',
+    pendingTitle: 'Recebemos o seu pedido.', pendingSub: `${conciergeName} confirmará em breve.`,
+    confirmedTitle: 'Reserva confirmada.', confirmedSub: 'Até breve.',
+    cancelledTitle: 'Reserva recusada.', cancelledSub: 'Por favor fale com a receção.',
+    bookingDate: 'Dia', bookingTime: 'Hora', bookingPeople: 'Pessoas', bookingTable: 'Mesa', bookingDelivery: 'Entrega',
+    cancelBtn: 'Cancelar', rebookBtn: 'Nova reserva',
+    noFutureDates: `Todos os dias ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: 'Quando', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Onde', infoIncludedLabel: 'O que o espera',
+    menuTabReservation: 'Reservar', menuTabInfo: 'Pequeno-almoço', menuTabMenu: 'Ementa',
+    menuFilterTitle: '— Alergénios —',
+    menuFilterHint: 'Selecione os seus alergénios — os pratos com esses ingredientes serão marcados.',
+    menuFilterHideShow: 'Limpar filtro', menuWarningPrefix: 'Contém',
+    menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegan', menuFlagOrganic: 'biológico',
+    menuAllergensPrefix: 'Alergénios:', menuEmpty: 'Ainda não há pratos disponíveis.',
+    menuDisclaimer: 'Informações fornecidas pelo hotel — em caso de dúvida, fale com o serviço.',
+  },
+  nl: {
+    pageTitle: `${hotel.name} · Ontbijt`,
+    eyebrow: '— Ontbijt —',
+    title: 'Ontbijtijd',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? 'Reserveer een tafel of bestel op de kamer.' : 'Reserveer een tafel.')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: 'Wanneer?', today: 'Vandaag', tomorrow: 'Morgen', dayAfter: 'Overmorgen',
+    peopleLabel: 'Hoeveel personen?', timeLabel: 'Hoe laat?', tableLabel: 'Tafelvoorkeur?',
+    tableInside: 'Binnen', tableOutside: 'Buiten', tableGarden: 'In de tuin', tableAny: 'Geen voorkeur',
+    deliveryLabel: 'Waar?',
+    deliveryTable: 'In de ontbijtzaal', deliveryRoom: 'Op de kamer',
+    roomNumberLabel: 'Kamernummer',
+    priceSuffix: '/ persoon', priceRoomFee: '+ roomservice',
+    notesLabel: 'Iets wat we moeten weten?', notesPlaceholder: 'Bijv. glutenvrij, verjaardag, …',
+    submit: 'Reserveer', submitting: 'Reserveren…', errorPrefix: 'Fout',
+    pendingTitle: 'We hebben je aanvraag.', pendingSub: `${conciergeName} bevestigt zo snel mogelijk.`,
+    confirmedTitle: 'Reservering bevestigd.', confirmedSub: 'We kijken ernaar uit.',
+    cancelledTitle: 'Reservering afgewezen.', cancelledSub: 'Spreek met de receptie.',
+    bookingDate: 'Dag', bookingTime: 'Tijd', bookingPeople: 'Personen', bookingTable: 'Tafel', bookingDelivery: 'Bezorging',
+    cancelBtn: 'Annuleren', rebookBtn: 'Nieuwe reservering',
+    noFutureDates: `Dagelijks ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: 'Wanneer', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Waar', infoIncludedLabel: 'Wat u kunt verwachten',
+    menuTabReservation: 'Reserveer', menuTabInfo: 'Ontbijt', menuTabMenu: 'Menu',
+    menuFilterTitle: '— Allergenen —',
+    menuFilterHint: 'Selecteer uw allergenen — gerechten met deze ingrediënten worden gemarkeerd.',
+    menuFilterHideShow: 'Filter wissen', menuWarningPrefix: 'Bevat',
+    menuFlagVegetarian: 'vegetarisch', menuFlagVegan: 'veganistisch', menuFlagOrganic: 'biologisch',
+    menuAllergensPrefix: 'Allergenen:', menuEmpty: 'Nog geen gerechten beschikbaar.',
+    menuDisclaimer: 'Informatie verstrekt door het hotel — bij twijfel, spreek met de bediening.',
+  },
+  ru: {
+    pageTitle: `${hotel.name} · Завтрак`,
+    eyebrow: '— Завтрак —',
+    title: 'Время завтрака',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? 'Забронировать стол или заказать в номер.' : 'Забронировать стол.')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: 'Когда?', today: 'Сегодня', tomorrow: 'Завтра', dayAfter: 'Послезавтра',
+    peopleLabel: 'Сколько человек?', timeLabel: 'В какое время?', tableLabel: 'Предпочтение стола?',
+    tableInside: 'Внутри', tableOutside: 'На улице', tableGarden: 'В саду', tableAny: 'Без предпочтений',
+    deliveryLabel: 'Куда?',
+    deliveryTable: 'В ресторане', deliveryRoom: 'В номер',
+    roomNumberLabel: 'Номер комнаты',
+    priceSuffix: '/ чел.', priceRoomFee: '+ обслуживание в номере',
+    notesLabel: 'Что-то, что мы должны знать?', notesPlaceholder: 'Напр. без глютена, день рождения, …',
+    submit: 'Забронировать', submitting: 'Бронирование…', errorPrefix: 'Ошибка',
+    pendingTitle: 'Мы получили ваш запрос.', pendingSub: `${conciergeName} подтвердит в ближайшее время.`,
+    confirmedTitle: 'Бронирование подтверждено.', confirmedSub: 'Ждём вас.',
+    cancelledTitle: 'Бронирование отклонено.', cancelledSub: 'Пожалуйста, обратитесь на ресепшн.',
+    bookingDate: 'День', bookingTime: 'Время', bookingPeople: 'Гости', bookingTable: 'Стол', bookingDelivery: 'Доставка',
+    cancelBtn: 'Отменить', rebookBtn: 'Новое бронирование',
+    noFutureDates: `Ежедневно ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: 'Когда', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'Где', infoIncludedLabel: 'Что вас ждёт',
+    menuTabReservation: 'Бронировать', menuTabInfo: 'Завтрак', menuTabMenu: 'Меню',
+    menuFilterTitle: '— Аллергены —',
+    menuFilterHint: 'Выберите свои аллергены — блюда с этими ингредиентами будут отмечены.',
+    menuFilterHideShow: 'Сбросить фильтр', menuWarningPrefix: 'Содержит',
+    menuFlagVegetarian: 'вегетарианское', menuFlagVegan: 'веганское', menuFlagOrganic: 'органическое',
+    menuAllergensPrefix: 'Аллергены:', menuEmpty: 'Блюда пока не добавлены.',
+    menuDisclaimer: 'Информация предоставлена отелем — при сомнениях обратитесь к персоналу.',
+  },
+  ar: {
+    pageTitle: `${hotel.name} · الإفطار`,
+    eyebrow: '— الإفطار —',
+    title: 'وقت الإفطار',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? 'احجز طاولة أو اطلب إلى غرفتك.' : 'احجز طاولة.')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: 'متى؟', today: 'اليوم', tomorrow: 'غداً', dayAfter: 'بعد غد',
+    peopleLabel: 'كم شخصاً؟', timeLabel: 'في أي وقت؟', tableLabel: 'تفضيل الطاولة؟',
+    tableInside: 'داخلي', tableOutside: 'خارجي', tableGarden: 'في الحديقة', tableAny: 'لا تفضيل',
+    deliveryLabel: 'أين؟',
+    deliveryTable: 'في قاعة الإفطار', deliveryRoom: 'إلى الغرفة',
+    roomNumberLabel: 'رقم الغرفة',
+    priceSuffix: '/ شخص', priceRoomFee: '+ خدمة الغرفة',
+    notesLabel: 'هل هناك شيء يجب أن نعرفه؟', notesPlaceholder: 'مثلاً بدون جلوتين، عيد ميلاد، …',
+    submit: 'احجز', submitting: 'جارٍ الحجز…', errorPrefix: 'خطأ',
+    pendingTitle: 'استلمنا طلبك.', pendingSub: `${conciergeName} سيؤكد قريباً.`,
+    confirmedTitle: 'تم تأكيد الحجز.', confirmedSub: 'نتطلع لرؤيتك.',
+    cancelledTitle: 'تم رفض الحجز.', cancelledSub: 'يرجى التحدث مع الاستقبال.',
+    bookingDate: 'اليوم', bookingTime: 'الوقت', bookingPeople: 'الأشخاص', bookingTable: 'الطاولة', bookingDelivery: 'التسليم',
+    cancelBtn: 'إلغاء', rebookBtn: 'حجز جديد',
+    noFutureDates: `يومياً ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: 'متى', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: 'أين', infoIncludedLabel: 'ما الذي ينتظرك',
+    menuTabReservation: 'احجز', menuTabInfo: 'الإفطار', menuTabMenu: 'القائمة',
+    menuFilterTitle: '— مسببات الحساسية —',
+    menuFilterHint: 'اختر مسببات الحساسية لديك — سيتم تحديد الأطباق التي تحتوي على هذه المكونات.',
+    menuFilterHideShow: 'إعادة تعيين', menuWarningPrefix: 'يحتوي على',
+    menuFlagVegetarian: 'نباتي', menuFlagVegan: 'نباتي صرف', menuFlagOrganic: 'عضوي',
+    menuAllergensPrefix: 'مسببات الحساسية:', menuEmpty: 'لا توجد أطباق متاحة حالياً.',
+    menuDisclaimer: 'المعلومات مقدمة من الفندق — في حالة الشك يرجى التحدث مع الموظفين.',
+  },
+  zh: {
+    pageTitle: `${hotel.name} · 早餐`,
+    eyebrow: '— 早餐 —',
+    title: '早餐时间',
+    titleAccent: '.',
+    subtitle: reservationEnabled
+      ? (roomServiceEnabled ? '预订餐桌或送餐到房间。' : '预订餐桌。')
+      : `${location ? location + ' · ' : ''}${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    whenLabel: '何时？', today: '今天', tomorrow: '明天', dayAfter: '后天',
+    peopleLabel: '几位？', timeLabel: '几点？', tableLabel: '桌位偏好？',
+    tableInside: '室内', tableOutside: '室外', tableGarden: '花园', tableAny: '不限',
+    deliveryLabel: '送至？',
+    deliveryTable: '在早餐厅', deliveryRoom: '送到房间',
+    roomNumberLabel: '房间号',
+    priceSuffix: '/ 人', priceRoomFee: '+ 客房服务',
+    notesLabel: '有什么需要告知我们的？', notesPlaceholder: '例如无麸质、生日等…',
+    submit: '预订', submitting: '预订中…', errorPrefix: '错误',
+    pendingTitle: '我们已收到您的请求。', pendingSub: `${conciergeName} 将尽快确认。`,
+    confirmedTitle: '预订已确认。', confirmedSub: '期待您的光临。',
+    cancelledTitle: '预订已拒绝。', cancelledSub: '请联系前台。',
+    bookingDate: '日期', bookingTime: '时间', bookingPeople: '人数', bookingTable: '桌位', bookingDelivery: '配送',
+    cancelBtn: '取消', rebookBtn: '重新预订',
+    noFutureDates: `每天 ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoTimeLabel: '时间', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
+    infoLocationLabel: '地点', infoIncludedLabel: '等待您的',
+    menuTabReservation: '预订', menuTabInfo: '早餐', menuTabMenu: '菜单',
+    menuFilterTitle: '— 过敏原 —',
+    menuFilterHint: '选择您的过敏原 — 含有这些成分的菜肴将被标记。',
+    menuFilterHideShow: '重置筛选', menuWarningPrefix: '含有',
+    menuFlagVegetarian: '素食', menuFlagVegan: '纯素', menuFlagOrganic: '有机',
+    menuAllergensPrefix: '过敏原:', menuEmpty: '暂无菜品。',
+    menuDisclaimer: '信息由酒店提供——如有疑问，请直接与服务人员沟通。',
   },
 };
 const l = labels[lk];
@@ -500,13 +695,6 @@ const sheetData = {
       }
       .submit-btn:hover:not(:disabled) { background: var(--accent); }
       .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-      /* ── No-future-dates info (neutral, mono, dezent) ──────────────── */
-      .no-future-dates {
-        padding: 18px 20px; text-align: center;
-        font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em;
-        color: var(--ink-faint); line-height: 1.7;
-      }
 
       /* ── Status card ────────────────────────────────────────────────── */
       .status-card { text-align: center; padding: 8px 0 24px; }
@@ -715,7 +903,16 @@ const sheetData = {
           <template x-if="view === 'form'">
             <div>
               <template x-if="availableDates.length === 0">
-                <div class="no-future-dates" x-text="labels.noFutureDates"></div>
+                <div class="info-card">
+                  <div class="info-row">
+                    <div class="info-label" x-text="labels.infoTimeLabel"></div>
+                    <div class="info-value" x-text="labels.noFutureDates"></div>
+                  </div>
+                  <div class="info-row" x-show="location">
+                    <div class="info-label" x-text="labels.infoLocationLabel"></div>
+                    <div class="info-value" x-text="location"></div>
+                  </div>
+                </div>
               </template>
               <form @submit.prevent="submitBooking()" x-show="availableDates.length > 0">
 
@@ -1042,7 +1239,7 @@ const sheetData = {
           const dayAfter = new Date(today);
           dayAfter.setDate(dayAfter.getDate() + 2);
           const dayAfterIso = `${dayAfter.getFullYear()}-${String(dayAfter.getMonth()+1).padStart(2,'0')}-${String(dayAfter.getDate()).padStart(2,'0')}`;
-          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES', it: 'it-IT', pt: 'pt-PT', nl: 'nl-NL', ru: 'ru-RU', ar: 'ar-SA', zh: 'zh-CN' };
           return this.availableDates.map((d: any) => {
             if (d.iso === todayIso) return this.labels.today;
             if (d.iso === tomIso)   return this.labels.tomorrow;
@@ -1079,12 +1276,12 @@ const sheetData = {
         },
 
         formatDate(iso: string) {
-          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES', it: 'it-IT', pt: 'pt-PT', nl: 'nl-NL', ru: 'ru-RU', ar: 'ar-SA', zh: 'zh-CN' };
           return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
         },
 
         formatDateShort(iso: string) {
-          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+          const localeMap: any = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES', it: 'it-IT', pt: 'pt-PT', nl: 'nl-NL', ru: 'ru-RU', ar: 'ar-SA', zh: 'zh-CN' };
           return new Date(iso).toLocaleDateString(localeMap[this.lang] || 'de-DE', { day: '2-digit', month: 'short' });
         },
 

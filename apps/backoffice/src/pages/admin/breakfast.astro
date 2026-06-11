@@ -97,8 +97,8 @@ if (Astro.request.method === 'POST') {
     const startTime         = form.get('breakfast_start_time')?.toString() || '07:30';
     const endTime           = form.get('breakfast_end_time')?.toString()   || '10:30';
     const slotMinutes       = parseInt(form.get('breakfast_slot_minutes')?.toString() || '30') || 30;
-    const locationDe        = form.get('breakfast_location_de')?.toString().trim() || null;
-    const includedDe        = form.get('breakfast_included_de')?.toString().trim() || null;
+    const locationDe        = form.get('location_de')?.toString().trim() || null;
+    const includedDe        = form.get('included_de')?.toString().trim() || null;
     const priceRaw          = form.get('breakfast_price_cents')?.toString().trim();
     const priceCents        = priceRaw ? (parseInt(priceRaw) || null) : null;
     const roomServiceEnabled = form.getAll('breakfast_room_service_enabled').includes('on');
@@ -140,9 +140,7 @@ if (Astro.request.method === 'POST') {
         breakfast_start_time:             startTime,
         breakfast_end_time:               endTime,
         breakfast_slot_minutes:           slotMinutes,
-        breakfast_location_de:            locationDe,
         breakfast_location_i18n:          Object.keys(locResult.i18n).length > 0 ? locResult.i18n : null,
-        breakfast_included_de:            includedDe,
         breakfast_included_i18n:          Object.keys(incResult.i18n).length > 0 ? incResult.i18n : null,
         breakfast_price_cents:            priceCents,
         breakfast_room_service_enabled:   roomServiceEnabled,
@@ -163,7 +161,7 @@ const { data: settings } = await supabase
   .select(`
     features,
     breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
-    breakfast_location_de, breakfast_included_de,
+    breakfast_location_i18n, breakfast_included_i18n,
     breakfast_price_cents,
     breakfast_room_service_enabled, breakfast_room_service_fee_cents
   `)
@@ -176,8 +174,8 @@ const breakfastOn     = features.breakfast !== false;
 const startTime       = ((s.breakfast_start_time as string | undefined) || '07:30').substring(0, 5);
 const endTime         = ((s.breakfast_end_time   as string | undefined) || '10:30').substring(0, 5);
 const slotMinutes     = (s.breakfast_slot_minutes as number | undefined) || 30;
-const locationDe      = (s.breakfast_location_de  as string | undefined) || '';
-const includedDe      = (s.breakfast_included_de  as string | undefined) || '';
+const locationDe      = (s.breakfast_location_i18n as any)?.de?.value || '';
+const includedDe      = (s.breakfast_included_i18n as any)?.de?.value || '';
 const priceCents      = (s.breakfast_price_cents   as number | null | undefined) ?? null;
 const roomServiceOn   = (s.breakfast_room_service_enabled as boolean | undefined) === true;
 const roomServiceFee  = (s.breakfast_room_service_fee_cents as number | undefined) || 0;
@@ -313,7 +311,7 @@ if (url.searchParams.get('deleted') === '1' && !message) {
         <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
         <input
           type="text"
-          name="breakfast_location_de"
+          name="location_de"
           value={locationDe}
           placeholder="z.B. im Wintergarten"
           class="bauhaus-input"
@@ -333,7 +331,7 @@ if (url.searchParams.get('deleted') === '1' && !message) {
       <label class="bauhaus-field">
         <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Deutsch</span>
         <textarea
-          name="breakfast_included_de"
+          name="included_de"
           rows="3"
           placeholder="z.B. Frische Backwaren, regionaler Honig, Bio-Eier, …"
           class="bauhaus-textarea"
