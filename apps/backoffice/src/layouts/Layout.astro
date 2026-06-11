@@ -138,6 +138,57 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
         },
       }));
 
+      // Shared component: per-section AJAX save with dirty-state tracking
+      Alpine.data('sectionSave', ({
+        initial,
+        section,
+        endpoint = '/api/admin/breakfast/section',
+      }: {
+        initial: Record<string, string>;
+        section: string;
+        endpoint?: string;
+      }) => ({
+        data: { ...initial } as Record<string, string>,
+        original: { ...initial } as Record<string, string>,
+        saving: false,
+        success: false,
+        error: '',
+        _timer: null as ReturnType<typeof setTimeout> | null,
+
+        get isDirty(): boolean {
+          const d = this.data as Record<string, string>;
+          const o = this.original as Record<string, string>;
+          return Object.keys(o).some(k => String(d[k] ?? '') !== String(o[k] ?? ''));
+        },
+
+        async save() {
+          if (!this.isDirty || this.saving) return;
+          this.saving = true;
+          this.success = false;
+          this.error = '';
+          if (this._timer) clearTimeout(this._timer);
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ section, ...(this.data as Record<string, string>) }),
+            });
+            const d = await res.json();
+            if (!d.ok) {
+              this.error = d.error || 'Fehler beim Speichern';
+            } else {
+              this.original = { ...(this.data as Record<string, string>) };
+              this.success = true;
+              this._timer = setTimeout(() => { this.success = false; }, 2500);
+            }
+          } catch {
+            this.error = 'Netzwerk-Fehler';
+          } finally {
+            this.saving = false;
+          }
+        },
+      }));
+
       Alpine.start();
     </script>
   </body>
