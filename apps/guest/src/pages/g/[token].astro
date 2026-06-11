@@ -860,28 +860,35 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             this._bgColor = bg;
             _tc.setAttribute('content', bg);
           }
-          // R11: Couple statusbar-dim to Alpine state — covers ALL close paths automatically.
+          // R12: MutationObserver on body.sheet-open — scope-immune, zero Alpine dependency.
+          // body.sheet-open is toggled synchronously by openSheet()/closeSheet() before
+          // any Alpine reactivity cycle, making this more reliable than $watch on iOS Safari.
           const _dim = getComputedStyle(document.documentElement).getPropertyValue('--sheet-dim').trim() || '#505050';
-          this.$watch('activeSheet', (val: string | null) => {
-            if (val) {
+          const _self = this;
+          const _applyDim = (open: boolean) => {
+            if (open) {
               document.documentElement.style.backgroundColor = _dim;
               document.body.style.backgroundColor = _dim;
-              const _tcW = document.querySelector('meta[name="theme-color"]');
-              if (_tcW) _tcW.setAttribute('content', _dim);
+              const _tcMO = document.querySelector('meta[name="theme-color"]');
+              if (_tcMO) _tcMO.setAttribute('content', _dim);
             } else {
               document.documentElement.style.backgroundColor = '';
               document.body.style.backgroundColor = '';
-              const _tcW = document.querySelector('meta[name="theme-color"]');
-              if (_tcW) _tcW.setAttribute('content', this._bgColor);
+              const _tcMO = document.querySelector('meta[name="theme-color"]');
+              if (_tcMO) _tcMO.setAttribute('content', _self._bgColor);
             }
+          };
+          const _bodyMO = new MutationObserver(() => {
+            _applyDim(document.body.classList.contains('sheet-open'));
           });
+          _bodyMO.observe(document.body, { attributes: true, attributeFilter: ['class'] });
           // Edge-case: page left with sheet open (bfcache restore shows dark statusbar)
           window.addEventListener('pagehide', () => {
             document.documentElement.style.backgroundColor = '';
             document.body.style.backgroundColor = '';
           });
           window.addEventListener('pageshow', (e: PageTransitionEvent) => {
-            if (e.persisted && !this.activeSheet) {
+            if (e.persisted && !document.body.classList.contains('sheet-open')) {
               document.documentElement.style.backgroundColor = '';
               document.body.style.backgroundColor = '';
             }
