@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import Layout from '../layouts/Layout.astro';
 import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import {
   getUser,
@@ -8,8 +8,8 @@ import {
   createSupabaseServiceRoleInstance,
 } from '@retaha/auth';
 import { encryptToken } from '@retaha/auth';
-import { MewsClient } from '../../lib/mews/client';
-import { getMewsClientForHotel } from '../../lib/mews/factory';
+import { MewsClient } from '../lib/mews/client';
+import { getMewsClientForHotel } from '../lib/mews/factory';
 import { getEnv } from '@retaha/db';
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -117,7 +117,7 @@ if (Astro.request.method === 'POST') {
               message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
             } else {
               return Astro.redirect(
-                `/admin/pms?saved=connected${enterpriseName ? `&hotel=${encodeURIComponent(enterpriseName)}` : ''}`,
+                `/pms?saved=connected${enterpriseName ? `&hotel=${encodeURIComponent(enterpriseName)}` : ''}`,
               );
             }
           }
@@ -199,9 +199,9 @@ if (Astro.request.method === 'POST') {
       } else if (taxRateLookupError && taxCode) {
         // Soft-Warning: gespeichert, aber Tax-Rate konnte nicht aufgelöst werden.
         // Bei Net-Hotels wirft pushBookingToMews dann PushSkipped(no_default_tax_rate).
-        return Astro.redirect(`/admin/pms?saved=config_warn&warn=${encodeURIComponent(taxRateLookupError)}`);
+        return Astro.redirect(`/pms?saved=config_warn&warn=${encodeURIComponent(taxRateLookupError)}`);
       } else {
-        return Astro.redirect('/admin/pms?saved=config');
+        return Astro.redirect('/pms?saved=config');
       }
     }
   } else if (action === 'save_charge_config') {
@@ -224,7 +224,7 @@ if (Astro.request.method === 'POST') {
     if (error) {
       message = { type: 'error', text: `Charge-Konfig speichern fehlgeschlagen: ${error.message}` };
     } else {
-      return Astro.redirect('/admin/pms?saved=charge_config');
+      return Astro.redirect('/pms?saved=charge_config');
     }
   } else if (action === 'disconnect') {
     // Sprint D Phase 6b — Reconnect-Symmetrie: Row NICHT löschen, nur Auth-Felder
@@ -246,7 +246,7 @@ if (Astro.request.method === 'POST') {
     if (error) {
       message = { type: 'error', text: `Trennen fehlgeschlagen: ${error.message}` };
     } else {
-      return Astro.redirect('/admin/pms?saved=disconnected');
+      return Astro.redirect('/pms?saved=disconnected');
     }
   }
 }
@@ -782,7 +782,7 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
               });
               const data = await resp.json();
               if (data.ok) {
-                window.location.href = '/admin/pms?saved=sync';
+                window.location.href = '/pms?saved=sync';
               } else {
                 alert('Sync fehlgeschlagen: ' + (data.error || 'unbekannter Fehler'));
                 syncBtn.disabled = false;
