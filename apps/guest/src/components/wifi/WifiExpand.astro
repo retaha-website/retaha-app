@@ -1,0 +1,316 @@
+---
+// WifiExpand · Inline-Karte im Dokumentfluss (V19)
+// KEIN position:fixed, KEIN Overlay — Expand direkt im gate-grid.
+import QRCode from 'qrcode';
+
+interface Props {
+  ssid: string;
+  password: string;
+  speedMbits: number;
+  lang: string;
+}
+const { ssid, password, speedMbits, lang: rawLang } = Astro.props;
+const lang = ['de','en','fr','es'].includes(rawLang) ? rawLang as 'de'|'en'|'fr'|'es' : 'en';
+
+const escapeWifi = (s: string) => s.replace(/([\\;,":])/g, '\\$1');
+const qrDataUrl: string | null = ssid && ssid !== '—' ? await QRCode.toDataURL(
+  `WIFI:T:WPA;S:${escapeWifi(ssid)};P:${escapeWifi(password ?? '')};;`,
+  { errorCorrectionLevel: 'M', margin: 2, width: 200,
+    color: { dark: '#1A1A1A', light: '#FFFFFF' } }
+).catch(() => null) : null;
+
+type LangKey = 'de'|'en'|'fr'|'es';
+const labels: Record<LangKey, {
+  eyebrow: string; title: string; titleAccent: string; subtitle: string;
+  networkLabel: string; passwordLabel: string; speedLabel: string;
+  copy: string; qrHint: string; close: string; tileLabel: string; tileSub: string;
+}> = {
+  de: { eyebrow: '— Verbindung —', title: 'WLAN ist', titleAccent: 'bereit.', subtitle: 'Schnell verbunden — direkt loslegen.', networkLabel: 'Netzwerk', passwordLabel: 'Passwort', speedLabel: 'Geschwindigkeit', copy: 'Kopieren', qrHint: 'Mit Handy-Kamera scannen für automatische Verbindung.', close: 'Schließen', tileLabel: 'WLAN', tileSub: 'Netz & Passwort' },
+  en: { eyebrow: '— Connection —', title: 'Wi-Fi is', titleAccent: 'ready.', subtitle: 'Connect fast — get started.', networkLabel: 'Network', passwordLabel: 'Password', speedLabel: 'Speed', copy: 'Copy', qrHint: 'Scan with phone camera to auto-connect.', close: 'Close', tileLabel: 'Wi-Fi', tileSub: 'Network & Password' },
+  fr: { eyebrow: '— Connexion —', title: 'Wi-Fi est', titleAccent: 'prêt.', subtitle: "Connexion rapide — c'est parti.", networkLabel: 'Réseau', passwordLabel: 'Mot de passe', speedLabel: 'Vitesse', copy: 'Copier', qrHint: 'Scannez avec la caméra pour vous connecter automatiquement.', close: 'Fermer', tileLabel: 'Wi-Fi', tileSub: 'Réseau & Mot de passe' },
+  es: { eyebrow: '— Conexión —', title: 'Wi-Fi está', titleAccent: 'listo.', subtitle: 'Conéctate rápido — empieza ya.', networkLabel: 'Red', passwordLabel: 'Contraseña', speedLabel: 'Velocidad', copy: 'Copiar', qrHint: 'Escanea con la cámara para conectar automáticamente.', close: 'Cerrar', tileLabel: 'Wi-Fi', tileSub: 'Red & Contraseña' },
+};
+const l = labels[lang];
+---
+
+<div
+  id="wifi-expand"
+  class="gate-tile wfi"
+  :class="{ 'wfi--open': wifiExpanded }"
+>
+  <!-- Head: collapsed = volle Kachel; expanded = Titelzeile mit ✕ -->
+  <div
+    class="wfi__head"
+    role="button"
+    tabindex="0"
+    @click="toggleWifi()"
+    @keydown.enter.prevent="toggleWifi()"
+    @keydown.space.prevent="toggleWifi()"
+    :aria-expanded="wifiExpanded ? 'true' : 'false'"
+  >
+    <span class="wfi__icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 8.5 a16 16 0 0 1 20 0"/>
+        <path d="M5 12 a11 11 0 0 1 14 0"/>
+        <path d="M8.5 15.5 a6 6 0 0 1 7 0"/>
+        <circle cx="12" cy="19" r="1" fill="currentColor"/>
+      </svg>
+    </span>
+    <span class="wfi__label">{l.tileLabel}</span>
+    <span class="wfi__sub">{l.tileSub}</span>
+    <button
+      class="wfi__close"
+      type="button"
+      @click.stop="closeWifi()"
+      aria-label={l.close}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Animated body: grid-template-rows 0fr → 1fr (height:auto-Transition) -->
+  <div class="wfi__body">
+    <div class="wfi__body-inner">
+      <div class="wfi__content">
+
+        <div class="wfi__content-head">
+          <div class="wfi__eyebrow">{l.eyebrow}</div>
+          <h2 class="wfi__title">
+            {l.title} <span class="wfi__accent">{l.titleAccent}</span>
+          </h2>
+          <p class="wfi__subtitle">{l.subtitle}</p>
+        </div>
+
+        <div class="wfi__card">
+          <!-- Netzwerk -->
+          <div class="wfi__row">
+            <div class="wfi__col">
+              <div class="wfi__row-label">{l.networkLabel}</div>
+              <div class="wfi__row-value">{ssid}</div>
+            </div>
+            <button class="wifi-copy wfi__copy" type="button"
+              @click={`copyText(${JSON.stringify(ssid)}, $event)`}
+              aria-label={l.copy}>
+              <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Passwort -->
+          <div class="wfi__row">
+            <div class="wfi__col">
+              <div class="wfi__row-label">{l.passwordLabel}</div>
+              <div class="wfi__row-value wfi__row-value--pw">{password}</div>
+            </div>
+            <button class="wifi-copy wfi__copy" type="button"
+              @click={`copyText(${JSON.stringify(password)}, $event)`}
+              aria-label={l.copy}>
+              <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Geschwindigkeit -->
+          <div class="wfi__row wfi__row--last">
+            <div class="wfi__col">
+              <div class="wfi__row-label">{l.speedLabel}</div>
+              <div class="wfi__row-value">{speedMbits} Mbit/s</div>
+            </div>
+          </div>
+        </div>
+
+        {qrDataUrl && (
+          <div class="wfi__qr">
+            <p class="wfi__qr-hint">{l.qrHint}</p>
+            <div class="wfi__qr-frame">
+              <img src={qrDataUrl} alt="WiFi QR Code" width="150" height="150" />
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+/* ── WifiExpand · Inline-Expand (V19) ───────────────────────────────────── */
+/* Kein position:fixed, kein Overlay, kein body-Touch. Dokumentfluss ist heilig. */
+
+/* Collapsed: gap=0 überschreibt gate-tile gap:10px (sonst leerer 10px-Abstand) */
+.wfi { gap: 0; }
+
+/* Head: flex-column im collapsed state (füllt die gate-tile) */
+.wfi__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  flex: 1;
+}
+.wfi__icon { color: var(--color-anthrazit); margin-bottom: 4px; }
+.wfi__icon svg { width: 22px; height: 22px; }
+.wfi__label { font-size: 17px; font-weight: 500; color: var(--color-anthrazit); }
+.wfi__sub {
+  font-family: var(--font-georgia);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--color-anthrazit-60);
+  line-height: 1.4;
+}
+
+/* Close-Button: versteckt im collapsed state */
+.wfi__close {
+  display: none;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--color-anthrazit) 8%, transparent);
+  color: var(--color-anthrazit);
+  cursor: pointer;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.wfi__close svg { width: 15px; height: 15px; }
+.wfi__close:hover { background: color-mix(in srgb, var(--color-anthrazit) 15%, transparent); }
+
+/* Animated body: grid-template-rows 0fr → 1fr */
+.wfi__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms ease-out;
+}
+.wfi__body-inner { overflow: hidden; min-height: 0; }
+
+/* ── Expanded state ─────────────────────────────────────────────────────── */
+.wfi--open {
+  grid-column: 1 / -1;
+  background: #FFFFFF !important;
+  border-color: #E7E4DD !important;
+  border-radius: 12px;
+  cursor: default;
+  min-height: auto !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+.wfi--open::before    { content: none; }
+.wfi--open:hover      { transform: none !important; border-color: #E7E4DD !important; }
+
+/* Head im expanded state: horizontal mit ✕ */
+.wfi--open .wfi__head {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #E7E4DD;
+  cursor: pointer;
+  flex: none;
+}
+.wfi--open .wfi__icon  { margin-bottom: 0; }
+.wfi--open .wfi__sub   { display: none; }
+.wfi--open .wfi__label { flex: 1; font-size: 16px; }
+.wfi--open .wfi__close { display: grid; }
+.wfi--open .wfi__body  { grid-template-rows: 1fr; }
+
+/* ── Expand-Inhalt ──────────────────────────────────────────────────────── */
+.wfi__content {
+  padding: 18px 20px calc(env(safe-area-inset-bottom, 0px) + 18px);
+}
+.wfi__content-head { margin-bottom: 16px; }
+.wfi__eyebrow {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--guest-ink-muted, #888);
+  margin-bottom: 8px;
+}
+.wfi__title {
+  font-family: var(--guest-font-display, 'Space Grotesk', system-ui, sans-serif);
+  font-size: clamp(22px, 6vw, 30px); font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.1;
+  margin: 0 0 5px;
+  color: var(--guest-ink, #0F1115);
+}
+.wfi__accent { color: var(--guest-accent); }
+.wfi__subtitle {
+  font-family: var(--guest-font-body, 'Inter', system-ui, sans-serif);
+  font-size: 14px; color: var(--guest-ink-muted, #888);
+  margin: 0; line-height: 1.4;
+}
+
+/* Card */
+.wfi__card {
+  background: var(--guest-bg-card, #fff);
+  border: 1px solid var(--guest-border, #E7E4DD);
+  border-radius: var(--guest-radius, 12px);
+  overflow: hidden; margin-bottom: 18px;
+}
+.wfi__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--guest-border, #E7E4DD);
+}
+.wfi__row--last { border-bottom: none; }
+.wfi__col { flex: 1; min-width: 0; }
+.wfi__row-label {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--guest-ink-faint, #aaa); margin-bottom: 3px;
+}
+.wfi__row-value {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 15px; font-weight: 500;
+  color: var(--guest-ink, #0F1115);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wfi__row-value--pw { letter-spacing: 0.03em; }
+
+/* Copy-Buttons — ausschließlich accent-Töne */
+.wfi__copy {
+  width: 38px; height: 38px; border-radius: 9px;
+  border: 1px solid var(--guest-border, #E7E4DD);
+  background: color-mix(in srgb, var(--guest-accent) 10%, transparent);
+  color: var(--guest-accent);
+  cursor: pointer; display: grid; place-items: center; flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wfi__copy svg { width: 15px; height: 15px; }
+.wfi__copy .icon-check { display: none; }
+.wfi__copy:hover {
+  background: color-mix(in srgb, var(--guest-accent) 18%, transparent);
+  border-color: var(--guest-accent);
+}
+.wfi__copy.copied { background: var(--guest-accent); border-color: var(--guest-accent); color: #fff; }
+.wfi__copy.copied .icon-copy  { display: none; }
+.wfi__copy.copied .icon-check { display: block; }
+
+/* QR */
+.wfi__qr { text-align: center; }
+.wfi__qr-hint {
+  font-family: var(--guest-font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px; letter-spacing: 0.06em;
+  color: var(--guest-ink-muted, #888); margin: 0 0 12px;
+}
+.wfi__qr-frame {
+  display: inline-block; padding: 10px;
+  background: #fff;
+  border: 1px solid var(--guest-border, #E7E4DD); border-radius: 8px;
+}
+.wfi__qr-frame img { display: block; width: 150px; height: 150px; }
+
+/* prefers-reduced-motion: sofortiger Zustandswechsel */
+@media (prefers-reduced-motion: reduce) {
+  .wfi__body { transition: none; }
+  .wfi       { transition: none; }
+}
+</style>

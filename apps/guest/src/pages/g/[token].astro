@@ -3,7 +3,7 @@ import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import WifiPanel from '../../components/panels/WifiPanel.astro';
+import WifiExpand from '../../components/wifi/WifiExpand.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
@@ -445,10 +445,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   new Date(stay.check_out).toDateString() === new Date().toDateString() ? 'checking_out' :
   'in_house';
 
-// CC · Statusbar-Isolationstest — nur für showcase_-Tokens
-// ?wifitest=1 Kontrolle | 2 kein overflow-scroll | 3 position:absolute |
-// 4 fixed nicht vollflächig | 5 leeres Div | 6 kein will-change
-const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : '0';
 ---
 
 <!DOCTYPE html>
@@ -459,7 +455,7 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
     <meta name="theme-color" content="#ffffff" />
     <title>{hotel.name} · {greetingName}</title>
   </head>
-  <body class={`gate-guest gate-theme-${activeTheme}`} data-wifitest={wifitest}>
+  <body class={`gate-guest gate-theme-${activeTheme}`}>
     <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
@@ -644,13 +640,12 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
         </div>
 
         <div class="gate-grid">
-          <button class="gate-tile" type="button" @click="openWifiPanel()">
-            <span class="gate-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5 a16 16 0 0 1 20 0"/><path d="M5 12 a11 11 0 0 1 14 0"/><path d="M8.5 15.5 a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
-            </span>
-            <span class="gate-tile-label">{t('tile.wifi', lang)}</span>
-            <span class="gate-tile-sub">{t('tile.wifi.sub', lang)}</span>
-          </button>
+          <WifiExpand
+            ssid={wifiSsid ?? '—'}
+            password={wifiPassword}
+            speedMbits={settings.wifi_speed_mbits || 320}
+            lang={lang}
+          />
 
           {f.eve !== false && (
             <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
@@ -749,24 +744,6 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
       )}
 
       <!-- SHEETS (rendered as overlays, alle Themes) -->
-      <WifiPanel
-        ssid={wifiSsid ?? '—'}
-        password={wifiPassword}
-        speedMbits={settings.wifi_speed_mbits || 320}
-        lang={lang}
-      />
-
-      {/* wifitest=5: leeres opakes fixed-inset:0-Div ohne Inhalt/Scroll-Container */}
-      {wifitest === '5' && (
-        <template x-teleport="body">
-          <div
-            x-show="wifiPanelOpen"
-            style="position:fixed;inset:0;z-index:300;background:#FBFAF7;display:none;"
-            @click="closeWifiPanel()"
-          ></div>
-        </template>
-      )}
-
       <BreakfastSheet
         lang={lang}
         startTime={settings.breakfast_start_time || '07:30:00'}
@@ -868,15 +845,6 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
           } else {
             setTimeout(() => { this.consentOpen = true; }, 900);
           }
-          // iOS status-bar: resolve actual bg color and set theme-color meta correctly
-          const _tc = document.querySelector('meta[name="theme-color"]');
-          if (_tc) {
-            const bg = getComputedStyle(document.documentElement).getPropertyValue('--theme-bg-primary').trim() || '#ffffff';
-            this._bgColor = bg;
-            _tc.setAttribute('content', bg);
-          }
-          // R13: body/html-Hintergrund über CSS (body.gate-guest.sheet-open in retaha.css).
-          // x-effect auf <main> koppelt sheet-open an activeSheet — kein JS-Farb-Write mehr.
         },
         recSlideIndex: 0,
 
@@ -919,11 +887,8 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
         _sheetDragStart: 0,
         _bgColor: '#ffffff',
 
-        // WiFi Full-Panel state (R16 — opakes Vollflächen-Panel)
-        wifiPanelOpen: false,
-        wifiPanelDragOffset: 0,
-        wifiPanelDragging: false,
-        _wifiPanelDragStart: 0,
+        // WiFi Inline-Expand state (V19 — kein Overlay, kein fixed)
+        wifiExpanded: false,
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
@@ -1315,7 +1280,8 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
                 if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
                 return;
               }
-              const KNOWN_SHEETS = new Set(['wifi', 'breakfast', 'conference', 'service', 'places']);
+              if (sheetId === 'wifi') { this.toggleWifi(); return; }
+              const KNOWN_SHEETS = new Set(['breakfast', 'conference', 'service', 'places']);
               if (KNOWN_SHEETS.has(sheetId)) {
                 this.openSheet(sheetId);
               } else {
@@ -1357,58 +1323,19 @@ const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : 
           document.body.style.overflow = '';
         },
 
-        // WiFi Full-Panel (R16 — opakes Panel, kein Body-Hack)
-        openWifiPanel() {
-          this.wifiPanelOpen = true;
-          this.wifiPanelDragOffset = 0;
-          document.body.classList.add('wifi-panel-open');
+        // WiFi Inline-Expand (V19 — kein Overlay, kein body-Touch)
+        toggleWifi() {
+          this.wifiExpanded = !this.wifiExpanded;
+          if (this.wifiExpanded) {
+            this.$nextTick(() => {
+              const el = document.getElementById('wifi-expand');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+          }
         },
 
-        closeWifiPanel() {
-          this.wifiPanelOpen = false;
-          this.wifiPanelDragOffset = 0;
-          document.body.classList.remove('wifi-panel-open');
-        },
-
-        startWifiPanelDrag(event: PointerEvent) {
-          event.preventDefault();
-          this._wifiPanelDragStart = event.clientY;
-          this.wifiPanelDragging = true;
-          this.wifiPanelDragOffset = 0;
-          const onMove = (e: PointerEvent) => {
-            this.wifiPanelDragOffset = Math.max(0, e.clientY - this._wifiPanelDragStart);
-          };
-          const onEnd = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onEnd);
-            document.removeEventListener('pointercancel', onEnd);
-            this.wifiPanelDragging = false;
-            if (this.wifiPanelDragOffset > 120) this.closeWifiPanel();
-            else this.wifiPanelDragOffset = 0;
-          };
-          document.addEventListener('pointermove', onMove);
-          document.addEventListener('pointerup', onEnd);
-          document.addEventListener('pointercancel', onEnd);
-        },
-
-        startWifiPanelDragTouch(event: TouchEvent) {
-          this._wifiPanelDragStart = event.touches[0].clientY;
-          this.wifiPanelDragging = true;
-          this.wifiPanelDragOffset = 0;
-          const onMove = (e: TouchEvent) => {
-            this.wifiPanelDragOffset = Math.max(0, e.touches[0].clientY - this._wifiPanelDragStart);
-          };
-          const onEnd = () => {
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onEnd);
-            document.removeEventListener('touchcancel', onEnd);
-            this.wifiPanelDragging = false;
-            if (this.wifiPanelDragOffset > 120) this.closeWifiPanel();
-            else this.wifiPanelDragOffset = 0;
-          };
-          document.addEventListener('touchmove', onMove, { passive: true });
-          document.addEventListener('touchend', onEnd);
-          document.addEventListener('touchcancel', onEnd);
+        closeWifi() {
+          this.wifiExpanded = false;
         },
 
         copyText(text: string, event: Event) {
