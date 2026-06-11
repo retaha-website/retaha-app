@@ -191,16 +191,38 @@
   font-size: 13px; color: var(--ink-soft);
 }
 
-/* Dirty-state dot on section save buttons */
-.v9-btn--dirty::before {
-  content: '';
-  display: inline-block;
-  width: 5px; height: 5px;
-  background: var(--pink);
-  border-radius: 50%;
-  margin-right: 7px;
-  vertical-align: 1px;
+/* BAUHAUS TOGGLE — thin-line switch (source: BauhausToggle.astro, team-security.astro Prototyp v4) */
+.bt-visual {
+  position: relative; display: inline-block; flex-shrink: 0;
+  width: 56px; height: 28px;
+  background: white;
+  border: 1px solid rgba(26, 26, 26, 0.2);
+  border-radius: 6px;
+  transition: border-color 200ms ease-in-out;
+  cursor: pointer;
 }
+.bt-visual::before {
+  content: ''; position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 34px; height: 2px;
+  background: rgba(26, 26, 26, 0.25);
+  transition: background 200ms ease-in-out;
+}
+.bt-knob {
+  position: absolute; top: 50%; left: 4px;
+  transform: translateY(-50%);
+  width: 14px; height: 14px;
+  background: #1a1a1a;
+  border-radius: 50%;
+  transition: left 200ms ease-in-out;
+}
+/* Alpine-driven state */
+.bt-visual.is-checked::before { background: var(--sage, #5C9070); }
+.bt-visual.is-checked .bt-knob { left: 38px; }
+/* CSS-only state for plain form checkboxes (no Alpine) */
+input.sr-only:checked + .bt-visual::before { background: var(--sage, #5C9070); }
+input.sr-only:checked + .bt-visual .bt-knob { left: 38px; }
 
 /* DIVIDER-LABEL */
 .s-divider-label {

@@ -240,15 +240,24 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <h2 class="s-card__title">Frühstücksmodul</h2>
           <span class="s-card__num">01</span>
         </div>
-        <div class="s-card__body">
-          <p class="field__hint">Schaltet das gesamte Frühstücks-Feature in der Gäste-App ein oder aus.</p>
-          <div x-data={`persistToggle({ initial: ${breakfastOn}, field: 'features_breakfast' })`}>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ features_breakfast: breakfastOn ? 'true' : 'false' })}, section: 'module' })`}>
+          <div class="s-card__body">
+            <p class="field__hint">Schaltet das gesamte Frühstücks-Feature in der Gäste-App ein oder aus.</p>
             <label class="toggle-row">
-              <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <input type="checkbox"
+                :checked="data.features_breakfast === 'true'"
+                @change="data.features_breakfast = $event.target.checked ? 'true' : 'false'"
+                class="sr-only" />
+              <span class="bt-visual" :class="{'is-checked': data.features_breakfast === 'true'}">
+                <span class="bt-knob"></span>
+              </span>
               <span class="toggle-label">Frühstück in Gäste-App sichtbar</span>
             </label>
-            <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>
@@ -281,10 +290,7 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <div class="s-card__footer">
             <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
             <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn" :class="isDirty&&!saving?'v9-btn--dirty':''">
-              <span x-show="!saving">Speichern</span>
-              <span x-show="saving" x-cloak>Speichert …</span>
-            </button>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>
@@ -309,10 +315,7 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <div class="s-card__footer">
             <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
             <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn" :class="isDirty&&!saving?'v9-btn--dirty':''">
-              <span x-show="!saving">Speichern</span>
-              <span x-show="saving" x-cloak>Speichert …</span>
-            </button>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>
@@ -338,10 +341,7 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <div class="s-card__footer">
             <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
             <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn" :class="isDirty&&!saving?'v9-btn--dirty':''">
-              <span x-show="!saving">Speichern</span>
-              <span x-show="saving" x-cloak>Speichert …</span>
-            </button>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>
@@ -368,10 +368,7 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <div class="s-card__footer">
             <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
             <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn" :class="isDirty&&!saving?'v9-btn--dirty':''">
-              <span x-show="!saving">Speichern</span>
-              <span x-show="saving" x-cloak>Speichert …</span>
-            </button>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>
@@ -382,35 +379,36 @@ textarea.s-input { resize: vertical; min-height: 72px; }
           <h2 class="s-card__title">Zimmerservice</h2>
           <span class="s-card__num">06</span>
         </div>
-        <div class="s-card__body">
-          <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
-          <div x-data={`persistToggle({ initial: ${roomServiceOn}, field: 'breakfast_room_service_enabled' })`}>
+        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_enabled: roomServiceOn ? 'true' : 'false', breakfast_room_service_fee_cents: String(roomServiceFee) })}, section: 'room_service' })`}>
+          <div class="s-card__body">
+            <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
             <label class="toggle-row">
-              <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <input type="checkbox"
+                :checked="data.breakfast_room_service_enabled === 'true'"
+                @change="data.breakfast_room_service_enabled = $event.target.checked ? 'true' : 'false'"
+                class="sr-only" />
+              <span class="bt-visual" :class="{'is-checked': data.breakfast_room_service_enabled === 'true'}">
+                <span class="bt-knob"></span>
+              </span>
               <span class="toggle-label">Room-Service aktiv</span>
             </label>
-            <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
-            <div x-show="checked" class="bp-fee-section" style={roomServiceOn ? '' : 'display:none'}>
-              <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_fee_cents: String(roomServiceFee) })}, section: 'room_service_fee' })`}>
-                <div class="field field--row">
-                  <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
-                  <div class="field__input-wrap">
-                    <input type="number" id="rs-fee" name="breakfast_room_service_fee_cents" x-model="data.breakfast_room_service_fee_cents"
-                      min="0" step="50" class="s-input" inputmode="numeric" style="max-width:220px" />
-                    <span class="field__hint">0 = kein Aufschlag · z.B. 300 = €3,00</span>
-                  </div>
-                </div>
-                <div class="s-card__footer" style="border-top:none;padding-top:12px;margin-top:0">
-                  <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-                  <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
-                  <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn" :class="isDirty&&!saving?'v9-btn--dirty':''">
-                    <span x-show="!saving">Speichern</span>
-                    <span x-show="saving" x-cloak>Speichert …</span>
-                  </button>
+            <div x-show="data.breakfast_room_service_enabled === 'true'" class="bp-fee-section"
+                 style={roomServiceOn ? '' : 'display:none'}>
+              <div class="field field--row">
+                <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
+                <div class="field__input-wrap">
+                  <input type="number" id="rs-fee" name="breakfast_room_service_fee_cents"
+                    x-model="data.breakfast_room_service_fee_cents"
+                    min="0" step="50" class="s-input" inputmode="numeric" style="max-width:220px" />
+                  <span class="field__hint">0 = kein Aufschlag · z.B. 300 = €3,00</span>
                 </div>
               </div>
             </div>
+          </div>
+          <div class="s-card__footer">
+            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+            <button type="button" @click="save()" :disabled="!isDirty||saving" class="v9-btn">Speichern</button>
           </div>
         </div>
       </section>

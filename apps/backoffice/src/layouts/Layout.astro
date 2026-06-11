@@ -154,6 +154,18 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
         success: false,
         error: '',
         _timer: null as ReturnType<typeof setTimeout> | null,
+        _beforeUnload: null as ((e: BeforeUnloadEvent) => void) | null,
+
+        init() {
+          this._beforeUnload = (e: BeforeUnloadEvent) => {
+            if (this.isDirty) { e.preventDefault(); e.returnValue = ''; }
+          };
+          window.addEventListener('beforeunload', this._beforeUnload);
+        },
+
+        destroy() {
+          if (this._beforeUnload) window.removeEventListener('beforeunload', this._beforeUnload);
+        },
 
         get isDirty(): boolean {
           const d = this.data as Record<string, string>;

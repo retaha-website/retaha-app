@@ -9,7 +9,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-const ALLOWED = ['times', 'location', 'included', 'price', 'room_service_fee'] as const;
+const ALLOWED = ['times', 'location', 'included', 'price', 'room_service_fee', 'module', 'room_service'] as const;
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
@@ -80,6 +80,24 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       const fee = raw !== '' ? (parseInt(raw) || 0) : 0;
       const { error } = await ups({ breakfast_room_service_fee_cents: fee });
       if (error) { console.error('[breakfast/section room_service_fee]', error); return json({ ok: false, error: error.message }, 500); }
+      return json({ ok: true });
+    }
+
+    if (section === 'module') {
+      const value = body.features_breakfast === 'true';
+      const { data: cur } = await supabase.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle();
+      const newFeatures = { ...((cur?.features as Record<string, unknown>) ?? {}), breakfast: value };
+      const { error } = await ups({ features: newFeatures });
+      if (error) { console.error('[breakfast/section module]', error); return json({ ok: false, error: error.message }, 500); }
+      return json({ ok: true });
+    }
+
+    if (section === 'room_service') {
+      const enabled = body.breakfast_room_service_enabled === 'true';
+      const raw = String(body.breakfast_room_service_fee_cents ?? '').trim();
+      const fee = raw !== '' ? (parseInt(raw) || 0) : 0;
+      const { error } = await ups({ breakfast_room_service_enabled: enabled, breakfast_room_service_fee_cents: fee });
+      if (error) { console.error('[breakfast/section room_service]', error); return json({ ok: false, error: error.message }, 500); }
       return json({ ok: true });
     }
   } catch (err) {
