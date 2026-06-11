@@ -8,8 +8,10 @@ interface Props {
   password: string;
   speedMbits: number;
   lang: string;
+  /** standalone=true: collapsed head versteckt (bh-tile in Elterngrid dient als Toggle) */
+  standalone?: boolean;
 }
-const { ssid, password, speedMbits, lang: rawLang } = Astro.props;
+const { ssid, password, speedMbits, lang: rawLang, standalone = false } = Astro.props;
 const lang = ['de','en','fr','es'].includes(rawLang) ? rawLang as 'de'|'en'|'fr'|'es' : 'en';
 
 const escapeWifi = (s: string) => s.replace(/([\\;,":])/g, '\\$1');
@@ -35,7 +37,7 @@ const l = labels[lang];
 
 <div
   id="wifi-expand"
-  class="gate-tile wfi"
+  class={standalone ? 'wfi wfi--standalone' : 'gate-tile wfi'}
   :class="{ 'wfi--open': wifiExpanded }"
 >
   <!-- Head: collapsed = volle Kachel; expanded = Titelzeile mit ✕ -->
@@ -307,6 +309,12 @@ const l = labels[lang];
   border: 1px solid var(--guest-border, #E7E4DD); border-radius: 8px;
 }
 .wfi__qr-frame img { display: block; width: 150px; height: 150px; }
+
+/* ── standalone-Modus: collapsed head versteckt (bh-tile übernimmt Toggle) */
+.wfi--standalone           { background: transparent; border: none; min-height: 0 !important; padding: 0 !important; }
+.wfi--standalone .wfi__head { display: none; }
+.wfi--standalone.wfi--open  { background: #FFFFFF; border: 1px solid #E7E4DD; border-radius: 12px; }
+.wfi--standalone.wfi--open .wfi__head { display: flex; padding: 14px 20px; border-bottom: 1px solid #E7E4DD; }
 
 /* prefers-reduced-motion: sofortiger Zustandswechsel */
 @media (prefers-reduced-motion: reduce) {
