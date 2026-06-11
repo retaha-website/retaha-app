@@ -77,13 +77,10 @@ const l = labels[lang];
 <template x-teleport="body">
   <div
     class="wifi-panel"
-    x-show="wifiPanelOpen"
-    x-transition:enter-start="wifi-panel--hidden"
-    x-transition:leave-end="wifi-panel--hidden"
-    :class="{ 'wifi-panel--dragging': wifiPanelDragging }"
+    :class="{ 'wifi-panel--open': wifiPanelOpen, 'wifi-panel--dragging': wifiPanelDragging }"
     :style="wifiPanelDragOffset > 0 ? `transform: translateY(${wifiPanelDragOffset}px)` : ''"
     role="dialog"
-    aria-modal="true"
+    :aria-modal="wifiPanelOpen ? 'true' : 'false'"
     aria-label={l.close}
   >
     <!-- Grab handle: swipe-down-to-close -->
@@ -200,11 +197,12 @@ const l = labels[lang];
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  /* Slide-Animation */
+  /* Standardmäßig off-screen — kein x-show nötig (Panel ist immer hell) */
+  transform: translateY(100%);
   transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
-.wifi-panel--hidden  { transform: translateY(100%); }
+.wifi-panel--open     { transform: translateY(0); }
 .wifi-panel--dragging { transition: none; }
 
 /* ── Grab-Handle ─────────────────────────────────────────────────────── */
