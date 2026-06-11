@@ -1274,13 +1274,13 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.sheetDragOffset = 0;
           document.body.style.overflow = 'hidden';
           document.body.classList.add('sheet-open');
-          // iOS 26 (Liquid Glass): Safari sampelt html + body background für Toolbar-Tint.
-          // Effektiver Ton = Backdrop rgba(26,26,26,.55) über Seitenhintergrund.
-          // body hat CSS background:white (overridet html) → body MUSS getoggled werden.
-          document.documentElement.style.backgroundColor = '#1a1a1a';
-          document.body.style.backgroundColor = '#1a1a1a';
+          // iOS 26 (Liquid Glass): body+html auf --sheet-dim setzen (= Overlay-Grundfarbe).
+          // Invariante: gleiche Farbe → kein Helligkeitssprung an der Statusbar-Kante.
+          const _dim = getComputedStyle(document.documentElement).getPropertyValue('--sheet-dim').trim() || '#505050';
+          document.documentElement.style.backgroundColor = _dim;
+          document.body.style.backgroundColor = _dim;
           const _tc = document.querySelector('meta[name="theme-color"]');
-          if (_tc) _tc.setAttribute('content', '#1a1a1a');
+          if (_tc) _tc.setAttribute('content', _dim);
         },
 
         // Sprint E7 Phase 4 — Action-Card-Click dispatch (5 Typen)
