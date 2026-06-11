@@ -134,7 +134,7 @@ async function loadHotelSettings(hotelId: string) {
   const supabase = createSupabaseServiceRoleInstance();
   const { data } = await supabase
     .from('hotel_settings')
-    .select('conference_rooms, service_items')
+    .select('conference_rooms, service_items, breakfast_price_cents')
     .eq('hotel_id', hotelId)
     .maybeSingle();
   return data;
@@ -258,6 +258,11 @@ export async function buildOrderItems(
       // Beide Pfade lookupen breakfast_items.price_cents — Fallback nur wenn
       // weder Multi-Item-IDs gefunden noch ein aktives Default-Item existiert.
 
+      const settingsPriceCents: number =
+        (hotelSettings as any)?.breakfast_price_cents != null && (hotelSettings as any).breakfast_price_cents > 0
+          ? (hotelSettings as any).breakfast_price_cents
+          : DEFAULT_BREAKFAST_PRICE_CENTS;
+
       // (a) Multi-Item-Schema
       if (Array.isArray(details.items) && details.items.length > 0) {
         const itemIds = details.items
@@ -271,7 +276,7 @@ export async function buildOrderItems(
           const price =
             dbItem?.price_cents && dbItem.price_cents > 0
               ? dbItem.price_cents
-              : DEFAULT_BREAKFAST_PRICE_CENTS;
+              : settingsPriceCents;
           return {
             Name: pickBreakfastName(dbItem, orderItem.name ?? 'Frühstück'),
             UnitCount: typeof orderItem.quantity === 'number' && orderItem.quantity > 0
@@ -291,7 +296,7 @@ export async function buildOrderItems(
       const price =
         defaultItem?.price_cents && defaultItem.price_cents > 0
           ? defaultItem.price_cents
-          : DEFAULT_BREAKFAST_PRICE_CENTS;
+          : settingsPriceCents;
       return [{
         Name: pickBreakfastName(defaultItem),
         UnitCount: people,

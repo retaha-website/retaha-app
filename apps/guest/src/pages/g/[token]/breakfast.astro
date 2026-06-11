@@ -77,7 +77,11 @@ const lk = (['de','en','fr','es'].includes(lang) ? lang : 'de') as LK;
 const startTime: string = (settings as any).breakfast_start_time || '07:30:00';
 const endTime: string   = (settings as any).breakfast_end_time   || '10:30:00';
 const slotMinutes: number = (settings as any).breakfast_slot_minutes || 30;
-const reservationEnabled: boolean = (settings as any).features?.breakfast_reservation !== false;
+const reservationEnabled: boolean = (settings as any).features?.breakfast !== false;
+const roomServiceEnabled: boolean = (settings as any).breakfast_room_service_enabled === true;
+const priceCents: number | null = (settings as any).breakfast_price_cents ?? null;
+const roomServiceFeeCents: number = (settings as any).breakfast_room_service_fee_cents ?? 0;
+const roomNumber: string | null = showcaseMode ? null : ((ctx as any).room?.room_number ?? null);
 
 const breakfastLocationMap: Record<LK, string | null> = {
   de: (settings as any).breakfast_location_de,
@@ -183,6 +187,10 @@ const labels = {
     timeLabel: 'Welche Uhrzeit?',
     tableLabel: 'Tisch-Wunsch?',
     tableInside: 'Drinnen', tableOutside: 'Draußen', tableGarden: 'Im Garten', tableAny: 'Egal',
+    deliveryLabel: 'Wo?',
+    deliveryTable: 'Im Frühstücksraum', deliveryRoom: 'Aufs Zimmer',
+    roomNumberLabel: 'Zimmernummer',
+    priceSuffix: '/ Person', priceRoomFee: '+ Zimmerservice',
     notesLabel: 'Etwas, das wir wissen sollten?',
     notesPlaceholder: 'Z.B. glutenfrei, Geburtstag, …',
     submit: 'Tisch reservieren', submitting: 'Wird reserviert…',
@@ -190,7 +198,7 @@ const labels = {
     pendingTitle: 'Wir haben deine Anfrage.', pendingSub: `${conciergeName} meldet sich gleich mit der Bestätigung.`,
     confirmedTitle: 'Reservierung bestätigt.', confirmedSub: 'Wir freuen uns auf dich.',
     cancelledTitle: 'Reservierung abgelehnt.', cancelledSub: 'Bitte sprich mit dem Empfang.',
-    bookingDate: 'Tag', bookingTime: 'Uhrzeit', bookingPeople: 'Personen', bookingTable: 'Tisch',
+    bookingDate: 'Tag', bookingTime: 'Uhrzeit', bookingPeople: 'Personen', bookingTable: 'Tisch', bookingDelivery: 'Lieferart',
     cancelBtn: 'Zurücknehmen', rebookBtn: 'Neuen Tisch reservieren',
     noSlotsAvailable: 'Heute keine freien Plätze mehr — wir freuen uns auf dich morgen.',
     infoTimeLabel: 'Wann', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
@@ -215,12 +223,16 @@ const labels = {
     timeLabel: 'What time?',
     tableLabel: 'Table preference?',
     tableInside: 'Inside', tableOutside: 'Outside', tableGarden: 'In the garden', tableAny: 'No preference',
+    deliveryLabel: 'Where?',
+    deliveryTable: 'In the breakfast room', deliveryRoom: 'To the room',
+    roomNumberLabel: 'Room number',
+    priceSuffix: '/ person', priceRoomFee: '+ room service',
     notesLabel: 'Anything we should know?', notesPlaceholder: 'E.g. gluten-free, birthday, …',
     submit: 'Reserve table', submitting: 'Reserving…', errorPrefix: 'Error',
     pendingTitle: 'We got your request.', pendingSub: `${conciergeName} will confirm shortly.`,
     confirmedTitle: 'Reservation confirmed.', confirmedSub: 'See you soon.',
     cancelledTitle: 'Reservation declined.', cancelledSub: 'Please speak with the front desk.',
-    bookingDate: 'Day', bookingTime: 'Time', bookingPeople: 'People', bookingTable: 'Table',
+    bookingDate: 'Day', bookingTime: 'Time', bookingPeople: 'People', bookingTable: 'Table', bookingDelivery: 'Delivery',
     cancelBtn: 'Cancel', rebookBtn: 'Book a new table',
     noSlotsAvailable: 'No slots left today — see you tomorrow.',
     infoTimeLabel: 'When', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
@@ -242,12 +254,16 @@ const labels = {
     whenLabel: 'Quand ?', today: "Aujourd'hui", tomorrow: 'Demain', dayAfter: 'Après-demain',
     peopleLabel: 'Combien de personnes ?', timeLabel: 'À quelle heure ?', tableLabel: 'Préférence de table ?',
     tableInside: 'Intérieur', tableOutside: 'Extérieur', tableGarden: 'Au jardin', tableAny: 'Peu importe',
+    deliveryLabel: 'Où ?',
+    deliveryTable: 'Dans la salle', deliveryRoom: 'En chambre',
+    roomNumberLabel: 'Numéro de chambre',
+    priceSuffix: '/ personne', priceRoomFee: '+ service en chambre',
     notesLabel: 'Quelque chose à savoir ?', notesPlaceholder: 'P. ex. sans gluten, anniversaire, …',
     submit: 'Réserver', submitting: 'Réservation…', errorPrefix: 'Erreur',
     pendingTitle: 'Nous avons votre demande.', pendingSub: `${conciergeName} confirme bientôt.`,
     confirmedTitle: 'Réservation confirmée.', confirmedSub: 'À très vite.',
     cancelledTitle: 'Réservation refusée.', cancelledSub: 'Merci de voir la réception.',
-    bookingDate: 'Jour', bookingTime: 'Heure', bookingPeople: 'Personnes', bookingTable: 'Table',
+    bookingDate: 'Jour', bookingTime: 'Heure', bookingPeople: 'Personnes', bookingTable: 'Table', bookingDelivery: 'Livraison',
     cancelBtn: 'Annuler', rebookBtn: 'Nouvelle réservation',
     noSlotsAvailable: "Plus de créneaux aujourd'hui — à demain.",
     infoTimeLabel: 'Quand', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
@@ -269,12 +285,16 @@ const labels = {
     whenLabel: '¿Cuándo?', today: 'Hoy', tomorrow: 'Mañana', dayAfter: 'Pasado mañana',
     peopleLabel: '¿Cuántas personas?', timeLabel: '¿A qué hora?', tableLabel: '¿Preferencia de mesa?',
     tableInside: 'Interior', tableOutside: 'Exterior', tableGarden: 'En el jardín', tableAny: 'Sin preferencia',
+    deliveryLabel: '¿Dónde?',
+    deliveryTable: 'En el comedor', deliveryRoom: 'A la habitación',
+    roomNumberLabel: 'Número de habitación',
+    priceSuffix: '/ persona', priceRoomFee: '+ servicio a la habitación',
     notesLabel: '¿Algo que debamos saber?', notesPlaceholder: 'Ej. sin gluten, cumpleaños, …',
     submit: 'Reservar', submitting: 'Reservando…', errorPrefix: 'Error',
     pendingTitle: 'Tenemos tu solicitud.', pendingSub: `${conciergeName} confirma enseguida.`,
     confirmedTitle: 'Reserva confirmada.', confirmedSub: 'Nos vemos pronto.',
     cancelledTitle: 'Reserva rechazada.', cancelledSub: 'Habla con recepción, por favor.',
-    bookingDate: 'Día', bookingTime: 'Hora', bookingPeople: 'Personas', bookingTable: 'Mesa',
+    bookingDate: 'Día', bookingTime: 'Hora', bookingPeople: 'Personas', bookingTable: 'Mesa', bookingDelivery: 'Entrega',
     cancelBtn: 'Cancelar', rebookBtn: 'Nueva reserva',
     noSlotsAvailable: 'No quedan plazas hoy — nos vemos mañana.',
     infoTimeLabel: 'Cuándo', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
@@ -310,6 +330,10 @@ const sheetData = {
   existingBooking,
   lang: lk,
   reservationEnabled,
+  roomServiceEnabled,
+  priceCents,
+  roomServiceFeeCents,
+  roomNumber,
   includedText,
   location,
   menuItems: localizedItems,
@@ -666,6 +690,10 @@ const sheetData = {
                   <span class="summary-label" x-text="labels.bookingTable"></span>
                   <span class="summary-value" x-text="tableLabelFor(existingBooking.details.table_preference)"></span>
                 </div>
+                <div class="summary-row" x-show="existingBooking.details.delivery">
+                  <span class="summary-label" x-text="labels.bookingDelivery"></span>
+                  <span class="summary-value" x-text="existingBooking.details.delivery === 'room' ? (labels.deliveryRoom + (existingBooking.details.room_number ? ' ' + existingBooking.details.room_number : '')) : labels.deliveryTable"></span>
+                </div>
               </div>
               <button type="button" class="rebook-btn"
                 x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
@@ -743,6 +771,30 @@ const sheetData = {
                   </div>
                 </div>
 
+                <!-- Wo? (nur wenn roomServiceEnabled) -->
+                <div class="booking-section" x-show="roomServiceEnabled">
+                  <div class="section-label" x-text="labels.deliveryLabel"></div>
+                  <div class="chip-row">
+                    <button type="button" class="chip"
+                      :data-active="form.delivery === 'table'"
+                      @click="form.delivery = 'table'"
+                      x-text="labels.deliveryTable">
+                    </button>
+                    <button type="button" class="chip"
+                      :data-active="form.delivery === 'room'"
+                      @click="form.delivery = 'room'"
+                      x-text="labels.deliveryRoom">
+                    </button>
+                  </div>
+                  <div x-show="form.delivery === 'room'" style="margin-top:12px">
+                    <div class="section-label" x-text="labels.roomNumberLabel"></div>
+                    <input type="text" class="booking-textarea"
+                      style="resize:none;height:auto;padding:10px 14px"
+                      x-model="form.room_number"
+                      :placeholder="labels.roomNumberLabel">
+                  </div>
+                </div>
+
                 <!-- Notizen -->
                 <div class="booking-section">
                   <div class="section-label" x-text="labels.notesLabel"></div>
@@ -750,6 +802,12 @@ const sheetData = {
                     :placeholder="labels.notesPlaceholder"
                     x-model="form.notes">
                   </textarea>
+                </div>
+
+                <!-- Preis-Anzeige -->
+                <div x-show="totalPrice !== null" style="margin-bottom:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:baseline">
+                  <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)" x-text="priceCents !== null && roomServiceFeeCents > 0 && form.delivery === 'room' ? labels.priceRoomFee : labels.priceSuffix"></span>
+                  <span style="font-size:16px;font-weight:600;color:var(--ink)" x-text="formatPrice(totalPrice)"></span>
                 </div>
 
                 <div x-show="errorMsg" class="booking-error" x-text="errorMsg"></div>
@@ -865,6 +923,9 @@ const sheetData = {
           ? 'status'
           : (initial.reservationEnabled === false ? 'info' : 'form'),
         reservationEnabled: initial.reservationEnabled !== false,
+        roomServiceEnabled: initial.roomServiceEnabled === true,
+        priceCents: initial.priceCents ?? null,
+        roomServiceFeeCents: initial.roomServiceFeeCents ?? 0,
         includedText: initial.includedText || '',
         location: initial.location || '',
 
@@ -891,6 +952,8 @@ const sheetData = {
           people: 2,
           time: '',
           table_preference: 'any',
+          delivery: 'table' as 'table' | 'room',
+          room_number: String(initial.roomNumber ?? ''),
           notes: '',
         },
         submitting: false,
@@ -980,8 +1043,23 @@ const sheetData = {
           });
         },
 
+        get totalPrice(): number | null {
+          if (this.priceCents === null || this.priceCents === 0) return null;
+          const base = this.priceCents * this.form.people;
+          return this.roomServiceEnabled && this.form.delivery === 'room'
+            ? base + this.roomServiceFeeCents
+            : base;
+        },
+
+        formatPrice(cents: number | null): string {
+          if (cents === null) return '';
+          return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+        },
+
         get canSubmit() {
-          return this.form.date && this.form.time && this.form.people > 0;
+          if (!this.form.date || !this.form.time || this.form.people <= 0) return false;
+          if (this.roomServiceEnabled && this.form.delivery === 'room' && !this.form.room_number.trim()) return false;
+          return true;
         },
 
         get statusInfo() {
@@ -1008,7 +1086,7 @@ const sheetData = {
         },
 
         startRebook() {
-          this.form = { date: this.availableDates[0]?.iso || '', people: 2, time: '', table_preference: 'any', notes: '' };
+          this.form = { date: (this.availableDates as any[])[0]?.iso || '', people: 2, time: '', table_preference: 'any', delivery: 'table' as const, room_number: String(initial.roomNumber ?? ''), notes: '' };
           this.existingBooking = null;
           this.view = 'form';
         },
@@ -1034,6 +1112,8 @@ const sheetData = {
                   time: this.form.time,
                   people: this.form.people,
                   table_preference: this.form.table_preference,
+                  delivery: this.roomServiceEnabled ? this.form.delivery : 'table',
+                  room_number: this.form.delivery === 'room' ? this.form.room_number || null : null,
                   notes: this.form.notes || null,
                 },
               }),
@@ -1052,6 +1132,8 @@ const sheetData = {
                 time: this.form.time,
                 people: this.form.people,
                 table_preference: this.form.table_preference,
+                delivery: this.roomServiceEnabled ? this.form.delivery : 'table',
+                room_number: this.form.delivery === 'room' ? this.form.room_number || null : null,
                 notes: this.form.notes,
               },
             };
