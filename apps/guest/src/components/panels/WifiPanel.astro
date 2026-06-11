@@ -367,4 +367,40 @@ const l = labels[lang];
   border-radius: var(--guest-radius-sm, 8px);
 }
 .wifi-panel__qr-frame img { display: block; width: 160px; height: 160px; }
+
+/* ── CC · Statusbar-Isolationstest (nur ?wifitest=N auf showcase_-URLs) ── */
+
+/* Variante 1 = Ist-Zustand (Kontrolle) — keine Änderung */
+
+/* Variante 2: kein -webkit-overflow-scrolling + kein overflow-y */
+body[data-wifitest="2"] .wifi-panel {
+  overflow-y: visible;
+  -webkit-overflow-scrolling: unset;
+}
+
+/* Variante 3: position:absolute statt position:fixed */
+body[data-wifitest="3"] .wifi-panel {
+  position: absolute;
+  inset: 0;
+  min-height: 100vh;
+}
+
+/* Variante 4: fixed, aber NICHT vollflächig (top:20px statt inset:0) */
+body[data-wifitest="4"] .wifi-panel {
+  inset: unset;
+  top: 20px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Variante 5: Panel ausblenden — leeres Div übernimmt (in [token].astro) */
+body[data-wifitest="5"] .wifi-panel {
+  display: none !important;
+}
+
+/* Variante 6: kein will-change:transform (Compositing-Layer-Verdächtiger) */
+body[data-wifitest="6"] .wifi-panel {
+  will-change: auto;
+}
 </style>

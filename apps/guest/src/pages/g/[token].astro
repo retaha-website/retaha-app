@@ -444,6 +444,11 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   Date.parse(stay.check_in) > Date.now() ? 'pre_arrival' :
   new Date(stay.check_out).toDateString() === new Date().toDateString() ? 'checking_out' :
   'in_house';
+
+// CC · Statusbar-Isolationstest — nur für showcase_-Tokens
+// ?wifitest=1 Kontrolle | 2 kein overflow-scroll | 3 position:absolute |
+// 4 fixed nicht vollflächig | 5 leeres Div | 6 kein will-change
+const wifitest = isShowcase ? (Astro.url.searchParams.get('wifitest') ?? '0') : '0';
 ---
 
 <!DOCTYPE html>
@@ -454,7 +459,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
     <meta name="theme-color" content="#ffffff" />
     <title>{hotel.name} · {greetingName}</title>
   </head>
-  <body class={`gate-guest gate-theme-${activeTheme}`}>
+  <body class={`gate-guest gate-theme-${activeTheme}`} data-wifitest={wifitest}>
     <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
@@ -750,6 +755,17 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         speedMbits={settings.wifi_speed_mbits || 320}
         lang={lang}
       />
+
+      {/* wifitest=5: leeres opakes fixed-inset:0-Div ohne Inhalt/Scroll-Container */}
+      {wifitest === '5' && (
+        <template x-teleport="body">
+          <div
+            x-show="wifiPanelOpen"
+            style="position:fixed;inset:0;z-index:300;background:#FBFAF7;display:none;"
+            @click="closeWifiPanel()"
+          ></div>
+        </template>
+      )}
 
       <BreakfastSheet
         lang={lang}
