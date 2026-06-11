@@ -453,8 +453,30 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
     <title>{hotel.name} · {greetingName}</title>
+    <!-- Safari 26 (Liquid Glass) Toolbar-Tint-Sampler
+         iOS 26 ignoriert theme-color + JS backgroundColor — sampelt stattdessen
+         position:fixed Elemente am Viewport-Rand. body.sheet-open-Klasse schaltet
+         Sampler von page-bg auf anthrazit um. Constraint: Element muss im initial HTML
+         sein (kein JS-inject). Refs: docs/debug-reports/IOS_STATUS_BAR_INVESTIGATION.md -->
+    <style is:inline>
+      @supports (-webkit-text-size-adjust: none) and (-webkit-touch-callout: none) {
+        @media (max-width: 767px) {
+          #safari-toolbar-tint {
+            position: fixed; top: -8px;
+            left: 0; right: 0; width: 100%;
+            min-height: 12px; z-index: 999;
+            pointer-events: none;
+            background-color: var(--theme-bg-primary, #ffffff);
+          }
+          body.sheet-open #safari-toolbar-tint {
+            background-color: #1a1a1a;
+          }
+        }
+      }
+    </style>
   </head>
   <body class={`gate-guest gate-theme-${activeTheme}`}>
+    <div id="safari-toolbar-tint" aria-hidden="true"></div>
     <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
@@ -1273,7 +1295,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = id;
           this.sheetDragOffset = 0;
           document.body.style.overflow = 'hidden';
-          document.documentElement.style.backgroundColor = '#1a1a1a';
+          document.body.classList.add('sheet-open');
           const _tc = document.querySelector('meta[name="theme-color"]');
           if (_tc) _tc.setAttribute('content', '#1a1a1a');
         },
@@ -1335,7 +1357,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = null;
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
-          document.documentElement.style.backgroundColor = '';
+          document.body.classList.remove('sheet-open');
           const _tc = document.querySelector('meta[name="theme-color"]');
           if (_tc) _tc.setAttribute('content', this._bgColor);
         },
