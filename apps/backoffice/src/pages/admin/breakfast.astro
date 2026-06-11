@@ -99,20 +99,15 @@ if (Astro.request.method === 'POST') {
     const includedDe        = form.get('included_de')?.toString().trim() || null;
     const priceRaw          = form.get('breakfast_price_cents')?.toString().trim();
     const priceCents        = priceRaw ? parseInt(priceRaw) : null;
-    const roomServiceEnabled = form.getAll('breakfast_room_service_enabled').includes('on');
     const roomServiceFeeRaw  = form.get('breakfast_room_service_fee_cents')?.toString().trim();
     const roomServiceFeeCents = roomServiceFeeRaw ? (parseInt(roomServiceFeeRaw) || 0) : 0;
-    const breakfastModuleOn  = form.getAll('features_breakfast').includes('on');
 
-    // Read current i18n values + features so we can merge
+    // Read current i18n values for merge (toggles now persist via toggle API)
     const { data: current } = await supabase
       .from('hotel_settings')
-      .select('breakfast_location_i18n, breakfast_included_i18n, features')
+      .select('breakfast_location_i18n, breakfast_included_i18n')
       .eq('hotel_id', hotel.id)
       .maybeSingle();
-
-    const currentFeatures = ((current?.features as Record<string, unknown>) ?? {});
-    const newFeatures = { ...currentFeatures, breakfast: breakfastModuleOn };
 
     // Auto-translate location + included via @retaha/i18n (parallel)
     const [locResult, incResult] = await Promise.all([
@@ -134,14 +129,12 @@ if (Astro.request.method === 'POST') {
       .from('hotel_settings')
       .upsert({
         hotel_id:                         hotel.id,
-        features:                         newFeatures,
         breakfast_start_time:             startTime,
         breakfast_end_time:               endTime,
         breakfast_slot_minutes:           slotMinutes,
         breakfast_location_i18n:          Object.keys(locResult.i18n).length > 0 ? locResult.i18n : null,
         breakfast_included_i18n:          Object.keys(incResult.i18n).length > 0 ? incResult.i18n : null,
         breakfast_price_cents:            priceCents,
-        breakfast_room_service_enabled:   roomServiceEnabled,
         breakfast_room_service_fee_cents: roomServiceFeeCents,
         updated_at:                       new Date().toISOString(),
       }, { onConflict: 'hotel_id' });
@@ -198,7 +191,7 @@ const allergenInit = EU_ALLERGENS.map(a => ({ key: a.key, label_de: a.label_de }
 
 <Layout title="Frühstück" activeTab="backoffice">
 
-<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, roomServiceOn } }}>
+<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit } }}>
   window._bfInit = _bfInit;
 </script>
 
@@ -313,13 +306,14 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         </div>
         <div class="s-card__body">
           <p class="field__hint">Schaltet das gesamte Frühstücks-Feature in der Gäste-App ein oder aus.</p>
-          <input type="hidden" name="features_breakfast" value="off" />
-          <label class="toggle-row" for="bf-mod-toggle">
-            <input type="checkbox" id="bf-mod-toggle" name="features_breakfast" value="on"
-              {...(breakfastOn ? { checked: true } : {})} class="sr-only" />
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-label">Frühstück in Gäste-App sichtbar</span>
-          </label>
+          <div x-data={`persistToggle({ initial: ${breakfastOn}, field: 'features_breakfast' })`}>
+            <label class="toggle-row">
+              <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Frühstück in Gäste-App sichtbar</span>
+            </label>
+            <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
+          </div>
         </div>
       </section>
 
@@ -414,21 +408,21 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         </div>
         <div class="s-card__body">
           <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
-          <input type="hidden" name="breakfast_room_service_enabled" value="off" />
-          <label class="toggle-row" for="rs-toggle">
-            <input type="checkbox" id="rs-toggle" name="breakfast_room_service_enabled" value="on"
-              {...(roomServiceOn ? { checked: true } : {})} class="sr-only"
-              @change="roomServiceOn = $event.target.checked" />
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            <span class="toggle-label">Room-Service aktiv</span>
-          </label>
-          <div x-show="roomServiceOn" class="bp-fee-section" style={roomServiceOn ? '' : 'display:none'}>
-            <div class="field field--row">
-              <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
-              <div class="field__input-wrap">
-                <input type="number" id="rs-fee" name="breakfast_room_service_fee_cents" value={roomServiceFee}
-                  min="0" step="50" class="s-input" inputmode="numeric" style="max-width:220px" />
-                <span class="field__hint">0 = kein Aufschlag · z.B. 300 = €3,00</span>
+          <div x-data={`persistToggle({ initial: ${roomServiceOn}, field: 'breakfast_room_service_enabled' })`}>
+            <label class="toggle-row">
+              <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-label">Room-Service aktiv</span>
+            </label>
+            <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
+            <div x-show="checked" class="bp-fee-section" style={roomServiceOn ? '' : 'display:none'}>
+              <div class="field field--row">
+                <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
+                <div class="field__input-wrap">
+                  <input type="number" id="rs-fee" name="breakfast_room_service_fee_cents" value={roomServiceFee}
+                    min="0" step="50" class="s-input" inputmode="numeric" style="max-width:220px" />
+                  <span class="field__hint">0 = kein Aufschlag · z.B. 300 = €3,00</span>
+                </div>
               </div>
             </div>
           </div>
@@ -641,7 +635,6 @@ textarea.s-input { resize: vertical; min-height: 72px; }
     Alpine.data('bfPage', () => ({
       items: (window._bfInit || {}).items || [],
       allergens: (window._bfInit || {}).allergens || [],
-      roomServiceOn: !!(window._bfInit || {}).roomServiceOn,
       modalOpen: false,
       modalIsNew: false,
       modalItem: {},

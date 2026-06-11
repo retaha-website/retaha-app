@@ -115,11 +115,10 @@ if (Astro.request.method === 'POST') {
       : { section: 'billing_address', ok: true, msg: '✓ Gespeichert' };
 
   } else if (action === 'team_security') {
-    // mfa_required_for_team ist der korrekte Spaltenname in der DB
-    const mfa_required_for_team = form.get('mfa_required') === 'on';
+    // mfa_required_for_team is now persisted immediately via toggle API — only save session_timeout_hours here
     const session_timeout_hours = parseInt(form.get('session_timeout_hours')?.toString() || '4') || 4;
     const { error } = await client.from('hotels')
-      .update({ mfa_required_for_team, session_timeout_hours })
+      .update({ session_timeout_hours })
       .eq('id', hotel.id);
     saved = error
       ? { section: 'team_security', ok: false, msg: error.message }
@@ -442,12 +441,14 @@ function isSelected(key: string, value: string, fallback = '') {
 
           <div class="field field--row">
             <span class="field__label">2FA für alle Mitarbeiter</span>
-            <label class="toggle-row">
-              <input type="checkbox" name="mfa_required" class="sr-only"
-                checked={isChecked('mfa_required_for_team')} />
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              <span class="toggle-label">Mitarbeiter ohne 2FA können sich nicht anmelden</span>
-            </label>
+            <div x-data={`persistToggle({ initial: ${isChecked('mfa_required_for_team')}, field: 'mfa_required_for_team' })`}>
+              <label class="toggle-row">
+                <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span class="toggle-label">Mitarbeiter ohne 2FA können sich nicht anmelden</span>
+              </label>
+              <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
+            </div>
           </div>
 
           <div class="field field--row">

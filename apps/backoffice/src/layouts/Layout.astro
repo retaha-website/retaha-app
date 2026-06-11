@@ -106,6 +106,38 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
       Alpine.plugin(collapse);
       // @ts-expect-error
       window.Alpine = Alpine;
+
+      // Shared component: binary toggles that save immediately via API
+      Alpine.data('persistToggle', ({ initial, field }: { initial: boolean; field: string }) => ({
+        checked: Boolean(initial),
+        saving: false,
+        error: '',
+        async toggle(e: Event) {
+          const newVal = (e.target as HTMLInputElement).checked;
+          const prev = this.checked;
+          this.checked = newVal;
+          this.saving = true;
+          this.error = '';
+          try {
+            const res = await fetch('/api/admin/hotel-settings/toggle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ field, value: newVal }),
+            });
+            const data = await res.json();
+            if (!data.ok) {
+              this.checked = prev;
+              this.error = data.error || 'Fehler beim Speichern';
+            }
+          } catch {
+            this.checked = prev;
+            this.error = 'Netzwerk-Fehler';
+          } finally {
+            this.saving = false;
+          }
+        },
+      }));
+
       Alpine.start();
     </script>
   </body>
