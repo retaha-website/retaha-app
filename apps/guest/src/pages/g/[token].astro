@@ -860,6 +860,32 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             this._bgColor = bg;
             _tc.setAttribute('content', bg);
           }
+          // R11: Couple statusbar-dim to Alpine state — covers ALL close paths automatically.
+          const _dim = getComputedStyle(document.documentElement).getPropertyValue('--sheet-dim').trim() || '#505050';
+          this.$watch('activeSheet', (val: string | null) => {
+            if (val) {
+              document.documentElement.style.backgroundColor = _dim;
+              document.body.style.backgroundColor = _dim;
+              const _tcW = document.querySelector('meta[name="theme-color"]');
+              if (_tcW) _tcW.setAttribute('content', _dim);
+            } else {
+              document.documentElement.style.backgroundColor = '';
+              document.body.style.backgroundColor = '';
+              const _tcW = document.querySelector('meta[name="theme-color"]');
+              if (_tcW) _tcW.setAttribute('content', this._bgColor);
+            }
+          });
+          // Edge-case: page left with sheet open (bfcache restore shows dark statusbar)
+          window.addEventListener('pagehide', () => {
+            document.documentElement.style.backgroundColor = '';
+            document.body.style.backgroundColor = '';
+          });
+          window.addEventListener('pageshow', (e: PageTransitionEvent) => {
+            if (e.persisted && !this.activeSheet) {
+              document.documentElement.style.backgroundColor = '';
+              document.body.style.backgroundColor = '';
+            }
+          });
         },
         recSlideIndex: 0,
 
@@ -1274,13 +1300,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.sheetDragOffset = 0;
           document.body.style.overflow = 'hidden';
           document.body.classList.add('sheet-open');
-          // iOS 26 (Liquid Glass): body+html auf --sheet-dim setzen (= Overlay-Grundfarbe).
-          // Invariante: gleiche Farbe → kein Helligkeitssprung an der Statusbar-Kante.
-          const _dim = getComputedStyle(document.documentElement).getPropertyValue('--sheet-dim').trim() || '#505050';
-          document.documentElement.style.backgroundColor = _dim;
-          document.body.style.backgroundColor = _dim;
-          const _tc = document.querySelector('meta[name="theme-color"]');
-          if (_tc) _tc.setAttribute('content', _dim);
         },
 
         // Sprint E7 Phase 4 — Action-Card-Click dispatch (5 Typen)
@@ -1341,10 +1360,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
           document.body.classList.remove('sheet-open');
-          document.documentElement.style.backgroundColor = '';
-          document.body.style.backgroundColor = '';
-          const _tc = document.querySelector('meta[name="theme-color"]');
-          if (_tc) _tc.setAttribute('content', this._bgColor);
         },
 
         copyText(text: string, event: Event) {
