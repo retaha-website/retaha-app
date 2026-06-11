@@ -451,7 +451,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="var(--theme-text-primary)" />
+    <meta name="theme-color" content="#ffffff" />
     <title>{hotel.name} · {greetingName}</title>
   </head>
   <body class={`gate-guest gate-theme-${activeTheme}`}>
@@ -853,6 +853,13 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           } else {
             setTimeout(() => { this.consentOpen = true; }, 900);
           }
+          // iOS status-bar: resolve actual bg color and set theme-color meta correctly
+          const _tc = document.querySelector('meta[name="theme-color"]');
+          if (_tc) {
+            const bg = getComputedStyle(document.documentElement).getPropertyValue('--theme-bg-primary').trim() || '#ffffff';
+            this._bgColor = bg;
+            _tc.setAttribute('content', bg);
+          }
         },
         recSlideIndex: 0,
 
@@ -893,6 +900,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         sheetDragOffset: 0,
         sheetIsDragging: false,
         _sheetDragStart: 0,
+        _bgColor: '#ffffff',
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
@@ -1265,6 +1273,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = id;
           this.sheetDragOffset = 0;
           document.body.style.overflow = 'hidden';
+          const _tc = document.querySelector('meta[name="theme-color"]');
+          if (_tc) _tc.setAttribute('content', '#1a1a1a');
         },
 
         // Sprint E7 Phase 4 — Action-Card-Click dispatch (5 Typen)
@@ -1324,6 +1334,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = null;
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
+          const _tc = document.querySelector('meta[name="theme-color"]');
+          if (_tc) _tc.setAttribute('content', this._bgColor);
         },
 
         copyText(text: string, event: Event) {
