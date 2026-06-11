@@ -1,0 +1,422 @@
+---
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
+import QRCode from 'qrcode';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const url = new URL(Astro.request.url);
+const persona = url.searchParams.get('persona') ?? 'in_house';
+const langParam = url.searchParams.get('lang');
+
+// Showcase- oder Echtdaten laden (wie token.astro)
+let ctx: any = null;
+if (isShowcaseToken(token)) {
+  const showcase = await findShowcaseSessionByToken(token);
+  if (showcase) {
+    const sbSr = createSupabaseServiceRoleInstance();
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary').eq('id', showcase.hotel_id).single(),
+      sbSr.from('hotel_settings').select('wifi_ssid, wifi_password, wifi_speed_mbits').eq('hotel_id', showcase.hotel_id).single(),
+    ]);
+    if (hotelRow) {
+      ctx = {
+        hotel: hotelRow,
+        guest: { language: hotelRow.default_language ?? 'de' },
+        settings: settingsRow ?? {},
+      };
+    }
+  }
+} else {
+  const loaded = token ? await loadStayByToken(token) : null;
+  if (loaded) {
+    const existingSession = await getStaySession(Astro.cookies);
+    if (!existingSession || existingSession.stay_id !== loaded.stay.id) {
+      await setStaySessionCookie(Astro.cookies, {
+        stay_id: loaded.stay.id,
+        hotel_id: loaded.hotel.id,
+        check_out_utc: loaded.stay.check_out,
+        is_showcase: false,
+      });
+    }
+    ctx = loaded;
+  }
+}
+
+if (!ctx) return Astro.redirect(`/g/${token}`);
+
+const { hotel, guest, settings } = ctx;
+
+// Feature-Gate: kein WLAN konfiguriert → zurück zur Hauptseite
+const wifiSsid: string | null = (settings as any).wifi_ssid || (isShowcaseToken(token) ? 'Demo-Hotel-WLAN' : null);
+if (!wifiSsid) return Astro.redirect(`/g/${token}?persona=${persona}`);
+const wifiPassword: string = (settings as any).wifi_password || (isShowcaseToken(token) ? 'gast2026' : '');
+const speedMbits: number = (settings as any).wifi_speed_mbits || 320;
+
+// Sprach-Resolution
+const lang: Lang = normalizeLang(
+  langParam ?? (guest as any)?.language ?? (hotel as any).default_language ?? 'de'
+) as Lang;
+
+// Brand-Palette
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandStyle = brandPrimary
+  ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
+  : undefined;
+
+// QR-Code
+const escapeWifi = (s: string) => s.replace(/([\\;,":])/g, '\\$1');
+const qrDataUrl: string | null = await QRCode.toDataURL(
+  `WIFI:T:WPA;S:${escapeWifi(wifiSsid)};P:${escapeWifi(wifiPassword)};;`,
+  { errorCorrectionLevel: 'M', margin: 2, width: 200, color: { dark: '#1A1A1A', light: '#FFFFFF' } }
+).catch(() => null);
+
+// Zurück-Link
+const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
+
+// i18n
+type LK = 'de' | 'en' | 'fr' | 'es';
+const lk = (['de','en','fr','es'].includes(lang) ? lang : 'de') as LK;
+const labels: Record<LK, {
+  pageTitle: string;
+  back: string;
+  eyebrow: string;
+  title: string;
+  titleAccent: string;
+  subtitle: string;
+  network: string;
+  password: string;
+  speed: string;
+  copy: string;
+  copied: string;
+  qrHint: string;
+}> = {
+  de: {
+    pageTitle: `${hotel.name} · WLAN`,
+    back: '← Zurück',
+    eyebrow: '— Verbindung —',
+    title: 'WLAN ist',
+    titleAccent: 'bereit.',
+    subtitle: 'Schnell verbunden — direkt loslegen.',
+    network: 'Netzwerk',
+    password: 'Passwort',
+    speed: 'Geschwindigkeit',
+    copy: 'Kopieren',
+    copied: 'Kopiert',
+    qrHint: 'Mit Handy-Kamera scannen für automatische Verbindung.',
+  },
+  en: {
+    pageTitle: `${hotel.name} · Wi-Fi`,
+    back: '← Back',
+    eyebrow: '— Connection —',
+    title: 'Wi-Fi is',
+    titleAccent: 'ready.',
+    subtitle: 'Connect fast — get started right away.',
+    network: 'Network',
+    password: 'Password',
+    speed: 'Speed',
+    copy: 'Copy',
+    copied: 'Copied',
+    qrHint: 'Scan with your phone camera to connect automatically.',
+  },
+  fr: {
+    pageTitle: `${hotel.name} · Wi-Fi`,
+    back: '← Retour',
+    eyebrow: '— Connexion —',
+    title: 'Wi-Fi est',
+    titleAccent: 'prêt.',
+    subtitle: "Connexion rapide — c'est parti.",
+    network: 'Réseau',
+    password: 'Mot de passe',
+    speed: 'Vitesse',
+    copy: 'Copier',
+    copied: 'Copié',
+    qrHint: "Scannez avec l'appareil photo pour vous connecter automatiquement.",
+  },
+  es: {
+    pageTitle: `${hotel.name} · Wi-Fi`,
+    back: '← Volver',
+    eyebrow: '— Conexión —',
+    title: 'Wi-Fi está',
+    titleAccent: 'listo.',
+    subtitle: 'Conéctate rápido — empieza ya.',
+    network: 'Red',
+    password: 'Contraseña',
+    speed: 'Velocidad',
+    copy: 'Copiar',
+    copied: 'Copiado',
+    qrHint: 'Escanea con la cámara para conectar automáticamente.',
+  },
+};
+const l = labels[lk];
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={brandStyle}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{l.pageTitle}</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --accent: #FF4A82;
+        --accent-soft: rgba(255,74,130,0.10);
+        --ink: #0F0F0D;
+        --ink-muted: #6B6B63;
+        --ink-faint: #A8A8A0;
+        --border: #E7E4DD;
+        --bg: #FBFAF7;
+        --surface: #FFFFFF;
+        --radius: 12px;
+        --mono: 'JetBrains Mono', 'Courier New', monospace;
+        --display: 'Space Grotesk', system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0; padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--display);
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 0 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
+      }
+
+      /* ── Back link ────────────────────────────────────────────────── */
+      .back {
+        display: inline-flex;
+        align-items: center;
+        padding: calc(env(safe-area-inset-top, 0px) + 20px) 0 0;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        text-decoration: none;
+        gap: 6px;
+      }
+      .back:hover { color: var(--ink); }
+
+      /* ── Hero ─────────────────────────────────────────────────────── */
+      .hero { padding: 28px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        font-weight: 500;
+        color: var(--ink-faint);
+        margin: 0 0 14px;
+        display: block;
+      }
+      .title {
+        font-size: clamp(28px, 7vw, 38px);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.05;
+        margin: 0 0 8px;
+        color: var(--ink);
+      }
+      .title .accent { color: var(--accent); }
+      .subtitle {
+        font-size: 14px;
+        color: var(--ink-muted);
+        margin: 0;
+        line-height: 1.45;
+      }
+
+      /* ── Info card ────────────────────────────────────────────────── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .row:last-child { border-bottom: none; }
+      .row-body { flex: 1; min-width: 0; }
+      .row-label {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        font-weight: 500;
+        color: var(--ink-faint);
+        margin-bottom: 3px;
+      }
+      .row-value {
+        font-family: var(--mono);
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .row-value--pw { letter-spacing: 0.04em; }
+
+      /* ── Copy button ──────────────────────────────────────────────── */
+      .copy-btn {
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--accent-soft);
+        color: var(--accent);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+      }
+      .copy-btn svg { width: 16px; height: 16px; }
+      .copy-btn .icon-check { display: none; }
+      .copy-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+      .copy-btn[data-copied] { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .copy-btn[data-copied] .icon-copy  { display: none; }
+      .copy-btn[data-copied] .icon-check { display: block; }
+
+      /* ── QR ───────────────────────────────────────────────────────── */
+      .qr-section { text-align: center; margin-top: 4px; }
+      .qr-hint {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--ink-muted);
+        margin: 0 0 14px;
+        line-height: 1.5;
+      }
+      .qr-frame {
+        display: inline-block;
+        padding: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+      }
+      .qr-frame img { display: block; width: 150px; height: 150px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .copy-btn { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <a class="back" href={backHref} data-astro-reload>{l.back}</a>
+
+      <div class="hero">
+        <span class="eyebrow">{l.eyebrow}</span>
+        <h1 class="title">{l.title} <span class="accent">{l.titleAccent}</span></h1>
+        <p class="subtitle">{l.subtitle}</p>
+      </div>
+
+      <div class="card">
+        <!-- Netzwerk -->
+        <div class="row">
+          <div class="row-body">
+            <div class="row-label">{l.network}</div>
+            <div class="row-value">{wifiSsid}</div>
+          </div>
+          <button
+            class="copy-btn"
+            type="button"
+            aria-label={l.copy}
+            data-copy={wifiSsid}
+            onclick="wifiCopy(this)"
+          >
+            <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Passwort -->
+        <div class="row">
+          <div class="row-body">
+            <div class="row-label">{l.password}</div>
+            <div class="row-value row-value--pw">{wifiPassword || '—'}</div>
+          </div>
+          {wifiPassword && (
+            <button
+              class="copy-btn"
+              type="button"
+              aria-label={l.copy}
+              data-copy={wifiPassword}
+              onclick="wifiCopy(this)"
+            >
+              <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <!-- Geschwindigkeit -->
+        <div class="row">
+          <div class="row-body">
+            <div class="row-label">{l.speed}</div>
+            <div class="row-value">{speedMbits} Mbit/s</div>
+          </div>
+        </div>
+      </div>
+
+      {qrDataUrl && (
+        <div class="qr-section">
+          <p class="qr-hint">{l.qrHint}</p>
+          <div class="qr-frame">
+            <img src={qrDataUrl} alt="WiFi QR Code" width="150" height="150" />
+          </div>
+        </div>
+      )}
+    </div>
+
+    <script>
+      function wifiCopy(btn: HTMLButtonElement) {
+        const text = btn.dataset.copy ?? '';
+        navigator.clipboard.writeText(text).then(() => {
+          btn.dataset.copied = '1';
+          setTimeout(() => delete btn.dataset.copied, 1800);
+        }).catch(() => {
+          // Fallback: select text — no alert
+          const tmp = document.createElement('input');
+          tmp.value = text;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          document.body.removeChild(tmp);
+          btn.dataset.copied = '1';
+          setTimeout(() => delete btn.dataset.copied, 1800);
+        });
+      }
+      (window as any).wifiCopy = wifiCopy;
+    </script>
+  </body>
+</html>

@@ -3,7 +3,6 @@ import '../../styles/guest-base.css';
 import LanguageOverlay from './shared/LanguageOverlay.astro';
 import StayLine from './shared/StayLine.astro';
 import CraftFooter from './CraftFooter.astro';
-import WifiExpand from '../../../../../apps/guest/src/components/wifi/WifiExpand.astro';
 
 interface Props {
   hotel: any;
@@ -21,9 +20,6 @@ interface Props {
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
   greeting?: { hi: string; sub: string };
-  wifiSsid?: string;
-  wifiPassword?: string;
-  wifiSpeedMbits?: number;
 }
 
 const {
@@ -31,7 +27,6 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
   greeting = { hi: 'Willkommen,', sub: '' },
-  wifiSsid = '—', wifiPassword = '', wifiSpeedMbits = 320,
 } = Astro.props;
 
 const name = guest?.first_name ?? hotel.name;
@@ -52,7 +47,9 @@ function heroHandler(card: any): string {
     case 'external_link': return `window.open('${t}','_blank')`;
     case 'phone':  return `window.location='tel:${t}'`;
     case 'email':  return `window.location='mailto:${t}'`;
-    case 'internal_action': return t === 'wifi' ? 'toggleWifi()' : `openSheet('${t}')`;
+    case 'internal_action': return t === 'wifi'
+      ? `(() => { const _p = new URLSearchParams(window.location.search).get('persona') || 'in_house'; window.location.href = '/g/${token}/wifi?persona='+_p; })()`
+      : `openSheet('${t}')`;
     default: return '';
   }
 }
@@ -268,7 +265,14 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
   <!-- ACTION GRID -->
   <p class="bh-sec-label" style="margin-top:26px">{gridLabel[persona] ?? 'Services'}</p>
   <div class="bh-grid">
-    {actions.map((action: any) => (
+    {actions.map((action: any) => action.href ? (
+      <a class="bh-tile" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
+        <span class="bh-tile__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
+        </span>
+        <span class="bh-tile__label">{action.label}</span>
+      </a>
+    ) : (
       <button class="bh-tile" type="button" @click={action.handler}>
         <span class="bh-tile__icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
@@ -277,9 +281,6 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
       </button>
     ))}
   </div>
-
-  <!-- WLAN INLINE EXPAND (standalone: tile acts as toggle from bh-grid) -->
-  <WifiExpand standalone={true} ssid={wifiSsid ?? '—'} password={wifiPassword} speedMbits={wifiSpeedMbits ?? 320} lang={lang} />
 
   <!-- CRAFT FOOTER -->
   <CraftFooter />

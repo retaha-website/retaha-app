@@ -3,7 +3,6 @@ import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import WifiExpand from '../../components/wifi/WifiExpand.astro';
 import BreakfastSheet from '../../components/sheets/BreakfastSheet.astro';
 import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
@@ -477,9 +476,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           heroCards={actionCardsRows ?? []}
           f={f}
           wifiConfigured={wifiConfigured}
-          wifiSsid={wifiSsid ?? '—'}
-          wifiPassword={wifiPassword}
-          wifiSpeedMbits={settings.wifi_speed_mbits || 320}
           walletAvailable={walletAvailable}
           roomLabel={t('hero.stay.room', lang as Lang)}
           weather={weather}
@@ -643,12 +639,17 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         </div>
 
         <div class="gate-grid">
-          <WifiExpand
-            ssid={wifiSsid ?? '—'}
-            password={wifiPassword}
-            speedMbits={settings.wifi_speed_mbits || 320}
-            lang={lang}
-          />
+          {wifiConfigured && (
+            <a class="gate-tile" href={`/g/${token}/wifi?persona=${stayPersona}${langParam ? `&lang=${langParam}` : ''}`} data-astro-reload style="text-decoration:none;color:inherit">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+                </svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.wifi', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.wifi.sub', lang)}</span>
+            </a>
+          )}
 
           {f.eve !== false && (
             <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
@@ -889,9 +890,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         sheetIsDragging: false,
         _sheetDragStart: 0,
         _bgColor: '#ffffff',
-
-        // WiFi Inline-Expand state (V19 — kein Overlay, kein fixed)
-        wifiExpanded: false,
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
@@ -1283,7 +1281,13 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                 if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
                 return;
               }
-              if (sheetId === 'wifi') { this.toggleWifi(); return; }
+              if (sheetId === 'wifi') {
+                const _parts = window.location.pathname.split('/').filter(Boolean);
+                const _tok = _parts[1] ?? '';
+                const _pers = new URLSearchParams(window.location.search).get('persona') ?? 'in_house';
+                window.location.href = `/g/${_tok}/wifi?persona=${_pers}`;
+                return;
+              }
               const KNOWN_SHEETS = new Set(['breakfast', 'conference', 'service', 'places']);
               if (KNOWN_SHEETS.has(sheetId)) {
                 this.openSheet(sheetId);
@@ -1324,82 +1328,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.activeSheet = null;
           this.sheetDragOffset = 0;
           document.body.style.overflow = '';
-        },
-
-        // WiFi Inline-Expand (V19 — kein Overlay, kein body-Touch)
-        toggleWifi() {
-          this.wifiExpanded = !this.wifiExpanded;
-          if (this.wifiExpanded) {
-            this.$nextTick(() => {
-              const el = document.getElementById('wifi-expand');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
-          }
-        },
-
-        closeWifi() {
-          this.wifiExpanded = false;
-        },
-
-        copyText(text: string, event: Event) {
-          // Find the button first — needed for visual feedback regardless of copy method
-          let btn = event.target as HTMLElement;
-          while (btn && !btn.classList.contains('wifi-copy')) {
-            btn = btn.parentElement as HTMLElement;
-          }
-
-          const showFeedback = () => {
-            if (!btn) return;
-            btn.classList.add('copied');
-            setTimeout(() => {
-              btn.classList.remove('copied');
-            }, 1500);
-          };
-
-          // Method 1: modern clipboard API (works on Chrome, Firefox, Safari macOS)
-          // CRITICAL: must be called synchronously, no await — iOS loses gesture trust on await
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => {
-              showFeedback();
-            }).catch((err) => {
-              console.warn('clipboard.writeText failed, trying fallback', err);
-              fallbackCopy(text);
-              showFeedback();
-            });
-          } else {
-            // Method 2: fallback for old iOS / restricted contexts
-            fallbackCopy(text);
-            showFeedback();
-          }
-
-          function fallbackCopy(value: string) {
-            try {
-              const textarea = document.createElement('textarea');
-              textarea.value = value;
-              textarea.setAttribute('readonly', '');
-              textarea.style.position = 'fixed';
-              textarea.style.top = '0';
-              textarea.style.left = '0';
-              textarea.style.opacity = '0';
-              textarea.style.pointerEvents = 'none';
-              document.body.appendChild(textarea);
-
-              // iOS Safari requires selecting via Range, not just .select()
-              const range = document.createRange();
-              range.selectNodeContents(textarea);
-              const selection = window.getSelection();
-              if (selection) {
-                selection.removeAllRanges();
-                selection.addRange(range);
-              }
-              textarea.setSelectionRange(0, value.length);
-
-              document.execCommand('copy');
-              document.body.removeChild(textarea);
-            } catch (e) {
-              console.error('Fallback copy failed:', e);
-            }
-          }
         },
 
         startSheetDrag(event: PointerEvent) {

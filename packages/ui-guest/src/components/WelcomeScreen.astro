@@ -19,9 +19,6 @@ interface Props {
   recs: any[];
   f: any;
   wifiConfigured?: boolean;
-  wifiSsid?: string;
-  wifiPassword?: string;
-  wifiSpeedMbits?: number;
   heroCards?: any[];
   walletAvailable?: boolean;
   roomLabel?: string;
@@ -32,7 +29,7 @@ interface Props {
 const {
   hotel, hotelLogoDark, guest, room, settings, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
-  f, wifiConfigured = false, wifiSsid = '—', wifiPassword = '', wifiSpeedMbits = 320,
+  f, wifiConfigured = false,
   heroCards = [], weather, persona = 'in_house',
 } = Astro.props;
 
@@ -78,7 +75,7 @@ const MODE_GREETING: Record<StayMode, Record<Lang, { hi: string; sub: string }>>
 const greeting = MODE_GREETING[persona][l];
 
 // Actions-Pool — alle möglichen Module mit Key
-type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string };
+type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string; href?: string };
 const ACTION_POOL: ActionItem[] = [
   {
     key: 'wifi',
@@ -86,7 +83,8 @@ const ACTION_POOL: ActionItem[] = [
     icon: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
     label: 'WLAN',
     sub: 'Sofort verbinden',
-    handler: "toggleWifi()",
+    handler: '',
+    href: `/g/${token}/wifi?persona=${persona}`,
     visible: wifiConfigured,
   } as any,
   {
@@ -157,7 +155,6 @@ const sharedProps = {
   hotel, hotelLogoDark, guest, room, token, lang,
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards, f, actions, weather, persona, greeting,
-  wifiSsid, wifiPassword, wifiSpeedMbits,
 };
 ---
 

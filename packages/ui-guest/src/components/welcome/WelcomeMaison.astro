@@ -4,7 +4,6 @@ import LanguageOverlay from './shared/LanguageOverlay.astro';
 import ContextLine from './shared/ContextLine.astro';
 import StayLine from './shared/StayLine.astro';
 import HeroSlider from '../HeroSlider.astro';
-import WifiExpand from '../../../../../apps/guest/src/components/wifi/WifiExpand.astro';
 
 interface Props {
   hotel: any;
@@ -22,9 +21,6 @@ interface Props {
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
   greeting?: { hi: string; sub: string };
-  wifiSsid?: string;
-  wifiPassword?: string;
-  wifiSpeedMbits?: number;
 }
 
 const {
@@ -32,7 +28,6 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
   greeting = { hi: 'Willkommen,', sub: '' },
-  wifiSsid = '—', wifiPassword = '', wifiSpeedMbits = 320,
 } = Astro.props;
 
 const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
@@ -79,7 +74,13 @@ const name = guest?.first_name ?? hotel.name;
 <!-- ACTION GRID: 2 columns, generous space -->
 <section class="ma-actions">
   <div class="ma-grid">
-    {actions.map(action => (
+    {actions.map((action: any) => action.href ? (
+      <a class="ma-tile" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
+        <span class="ma-tile__num">{action.num}</span>
+        <span class="ma-tile__label">{action.label}</span>
+        <span class="ma-tile__sub">{action.sub}</span>
+      </a>
+    ) : (
       <button class="ma-tile" type="button" @click={action.handler}>
         <span class="ma-tile__num">{action.num}</span>
         <span class="ma-tile__label">{action.label}</span>
@@ -88,9 +89,6 @@ const name = guest?.first_name ?? hotel.name;
     ))}
   </div>
 </section>
-
-<!-- WLAN INLINE EXPAND -->
-<WifiExpand standalone={true} ssid={wifiSsid ?? '—'} password={wifiPassword} speedMbits={wifiSpeedMbits ?? 320} lang={lang} />
 
 <style>
   /* ── Header: centered + globe top-right ─────────────────────────────── */
