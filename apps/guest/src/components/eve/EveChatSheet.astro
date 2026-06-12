@@ -78,16 +78,17 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-      </svg>
-    </div>
+    <div class="eve-sheet-avatar" aria-hidden="true">👋</div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
     </div>
-    <button type="button" class="eve-sheet-close" @click="eveClose()" aria-label={closeLabel}>×</button>
+    <button type="button" class="eve-sheet-close" @click="eveClose()" aria-label={closeLabel}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
   </header>
 
   <!-- Messages -->
@@ -368,22 +369,33 @@ const conciergeLabel = t('eve.concierge_label', lang);
 </style>
 
 <style is:global>
-  /* ── BAUHAUS ─────────────────────────────────────────────────────────── */
+  /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */
+
+  /* Header: grid 1fr·auto·1fr → center column always truly centered */
   [data-theme="bauhaus"] .eve-sheet-header {
     background: #FAFAF6;
     border-bottom-color: #E3E1DA;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 0;
   }
+  /* Avatar: round, accent border, wave emoji */
   [data-theme="bauhaus"] .eve-sheet-avatar {
-    width: 38px; height: 38px;
-    border-radius: 13px; background: #0A0A0A; color: #fff;
-    display: grid; place-items: center; position: relative; flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-soft, rgba(255,74,130,0.10));
+    border: 1.5px solid var(--accent, #FF4A82);
+    display: grid; place-items: center;
+    font-size: 18px; line-height: 1;
+    flex-shrink: 0; justify-self: start;
   }
-  [data-theme="bauhaus"] .eve-sheet-avatar::after {
-    content: ''; position: absolute; top: 5px; right: 5px;
-    width: 6px; height: 6px; background: var(--accent, #FF4A82); border-radius: 50%;
+  /* Header info: center-aligned */
+  [data-theme="bauhaus"] .eve-sheet-header-info {
+    display: flex; flex-direction: column;
+    gap: 2px; align-items: center; text-align: center;
   }
-  [data-theme="bauhaus"] .eve-sheet-avatar svg { width: 18px; height: 18px; }
   [data-theme="bauhaus"] .eve-sheet-header-name {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
@@ -398,22 +410,31 @@ const conciergeLabel = t('eve.concierge_label', lang);
     content: '● '; font-size: 6px; vertical-align: middle;
     color: var(--accent, #FF4A82);
   }
-  [data-theme="bauhaus"] .eve-sheet-close {
-    width: 32px; height: 32px;
-    border: 1px solid #E3E1DA; background: #FFFFFF;
-    border-radius: 10px; font-size: 15px; color: #6B6B66;
-    cursor: pointer; transition: all 0.2s; display: grid; place-items: center;
-  }
-  [data-theme="bauhaus"] .eve-sheet-close:hover {
-    background: var(--hover, #FFE600); border-color: var(--hover, #FFE600); color: #0A0A0A;
-  }
-  /* Pink-pulsing live-dot on eyebrow (remove old ::after, replaced with ::before above) */
   [data-theme="bauhaus"] .eve-sheet-header-eyebrow::after { display: none; }
-  @keyframes eve-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.4; transform: scale(0.7); }
+  /* Close button: identical to /wifi page — round #EFEDE8 circle */
+  [data-theme="bauhaus"] .eve-sheet-close {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #EFEDE8;
+    border: none;
+    color: #0A0A0A;
+    cursor: pointer;
+    transition: background 0.14s ease;
+    display: grid; place-items: center;
+    justify-self: end;
   }
-  [data-theme="bauhaus"] .eve-message-bubble { max-width: 88%; }
+  [data-theme="bauhaus"] .eve-sheet-close:hover { background: #E0DDD7; }
+  [data-theme="bauhaus"] .eve-sheet-close svg { width: 16px; height: 16px; }
+
+  /* Bubbles: generous card-feel padding + Inter Tight body text */
+  [data-theme="bauhaus"] .eve-message { margin-bottom: 16px; }
+  [data-theme="bauhaus"] .eve-message-bubble {
+    max-width: 88%;
+    padding: 16px 18px;
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
   [data-theme="bauhaus"] .eve-message--user .eve-message-bubble {
     background: #0A0A0A; color: #FAFAF6;
     border-radius: 12px;
@@ -429,21 +450,23 @@ const conciergeLabel = t('eve.concierge_label', lang);
     font-family: 'JetBrains Mono', monospace;
     font-size: 7.5px; font-weight: 600; letter-spacing: 0.2em;
     color: var(--accent, #FF4A82);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
   }
   [data-theme="bauhaus"] .eve-typing {
     background: #FFFFFF;
     border: 1px solid #E3E1DA;
     border-radius: 12px;
   }
-  [data-theme="bauhaus"] .eve-typing span {
-    background: var(--accent, #FF4A82);
-  }
+  [data-theme="bauhaus"] .eve-typing span { background: var(--accent, #FF4A82); }
+  /* Input + send */
   [data-theme="bauhaus"] .eve-sheet-input {
     border-radius: 12px; font-family: 'Space Grotesk', sans-serif;
   }
   [data-theme="bauhaus"] .eve-sheet-input:focus {
     outline: none; border-color: var(--accent, #FF4A82); background: #FFFFFF;
+  }
+  [data-theme="bauhaus"] .eve-sheet-input-row {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
   [data-theme="bauhaus"] .eve-sheet-send {
     border-radius: 12px; background: #0A0A0A;
