@@ -1,9 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
+import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { invalidateTranslationsForKnowledge } from '@retaha/eve';
 import { mergeAndTranslate, asLanguageCode } from '@retaha/i18n';
+
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -218,6 +221,13 @@ const { data: knowledgeRows } = await client
   .order('sort_order', { ascending: true })
   .order('created_at', { ascending: false });
 
+const { data: eveSettingsRow } = await client
+  .from('hotel_settings')
+  .select('eve_enabled')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+const eveEnabled = eveSettingsRow?.eve_enabled ?? false;
+
 function pickI18n(value: any, lang: string, fallback: string): string {
   if (!value || typeof value !== 'object') return fallback ?? '';
   return value[lang]?.value || value[hotelDefaultLang]?.value || value['de']?.value || fallback || '';
@@ -249,8 +259,6 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <p class="settings-hero__sub">Pflege Frage-Antwort-Paare, Hausregeln und Anfahrt. Eve nutzt das im Gast-Chat.</p>
     </section>
 
-    <EveSubNav currentPath={Astro.url.pathname} />
-
     {message && (
       <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
         {message.text}
@@ -270,11 +278,28 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 
     <div class="settings-sections">
 
+      <!-- 01 Modul-Status -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Eve Concierge</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <div class="s-card__body">
+          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <ModStatusLed on={eveEnabled} />
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+          </div>
+        </div>
+      </section>
+
+      <EveSubNav currentPath={Astro.url.pathname} />
+
       <!-- ── FAQ ── -->
       <section class="s-card" id="faq-section">
         <div class="s-card__head">
           <h2 class="s-card__title">Häufige Fragen</h2>
-          <span class="s-card__num">01</span>
+          <span class="s-card__num">02</span>
         </div>
         <p class="s-card__sub" style="margin: -16px 0 20px;">Fakten die Eve genau beantworten soll — Check-out-Zeit, WLAN-Passwort, Frühstückszeiten, Anfahrt. Verhaltensregeln ("was soll Eve tun wenn…") gehören in den <a href="/eve/settings" class="s-btn-link">Einstellungs-Tab →</a></p>
 
@@ -367,7 +392,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <section class="s-card">
         <div class="s-card__head">
           <h2 class="s-card__title">Hausregeln</h2>
-          <span class="s-card__num">02</span>
+          <span class="s-card__num">03</span>
         </div>
         <p class="s-card__sub" style="margin: -16px 0 20px;">Frei-Text. Eve referenziert das wenn Gäste nach Regeln fragen (Rauchen, Haustiere, Ruhezeit, etc.).</p>
 
@@ -390,7 +415,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <section class="s-card">
         <div class="s-card__head">
           <h2 class="s-card__title">Anfahrt</h2>
-          <span class="s-card__num">03</span>
+          <span class="s-card__num">04</span>
         </div>
         <p class="s-card__sub" style="margin: -16px 0 20px;">Wie kommt der Gast ans Hotel? ÖPNV-Tipps, Parkplatz-Info, Flughafen-Verbindung.</p>
 
