@@ -721,20 +721,19 @@ const sheetData = {
 
       /* ── Tabs ───────────────────────────────────────────────────────── */
       .tabs {
-        display: flex; gap: 0;
-        border-bottom: 1px solid var(--border);
+        display: flex; gap: 6px;
         margin-bottom: 24px;
       }
       .tab-btn {
-        flex: 1; padding: 11px 8px;
-        background: none; border: none; border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
-        font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; font-weight: 500;
-        text-transform: uppercase; color: var(--ink-muted);
-        cursor: pointer; transition: color 0.12s, border-color 0.12s;
+        flex: 1; min-height: 40px; padding: 7px 13px;
+        background: white; border: 1px solid #D0CCC5; border-radius: 8px;
+        font-family: var(--display); font-size: 13px; font-weight: 500;
+        color: var(--ink); cursor: pointer; text-align: center;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 80ms, color 80ms, border-color 80ms;
       }
-      .tab-btn.active, .tab-btn[data-active="true"] { color: var(--ink); border-bottom-color: var(--ink); }
-      .tab-btn:hover { color: var(--ink); }
+      .tab-btn[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+      .tab-btn:hover:not([data-active="true"]) { border-color: #C0BCB5; }
 
       /* ── Error ──────────────────────────────────────────────────────── */
       .booking-error {
@@ -961,8 +960,30 @@ const sheetData = {
       .d-cta-complete:hover { background: #2A2A2A; }
       .d-cta-complete:active { background: var(--accent); }
 
+      /* ── Chip selection pulse ────────────────────────────────────────── */
+      @keyframes chip-active-pulse {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(0.96); }
+        100% { transform: scale(1); }
+      }
+      .v2-chip[data-active="true"] { animation: chip-active-pulse 150ms ease-out; }
+
+      /* ── Section card enter / leave animations ───────────────────────── */
+      .sect-enter       { transition: opacity 220ms ease-out, transform 220ms ease-out; }
+      .sect-enter-start { opacity: 0; transform: translateY(-6px); }
+      .sect-enter-end   { opacity: 1; transform: translateY(0); }
+      .sect-leave       { transition: opacity 180ms ease-in; }
+      .sect-leave-start { opacity: 1; }
+      .sect-leave-end   { opacity: 0; }
+      /* Collapsed confirmation row enter */
+      .row-in       { transition: opacity 150ms ease-out; }
+      .row-in-start { opacity: 0; }
+      .row-in-end   { opacity: 1; }
+
       @media (prefers-reduced-motion: reduce) {
-        .v2-chip, .d-cta-complete, .filter-chip { transition: none; }
+        .v2-chip, .d-cta-complete, .filter-chip, .tab-btn { transition: none; }
+        .v2-chip[data-active="true"] { animation: none; }
+        .sect-enter, .sect-leave, .row-in { transition: none; }
       }
     </style>
   </head>
@@ -1073,7 +1094,14 @@ const sheetData = {
 
                   <!-- DATUM -->
                   <div data-dsection="datum">
-                    <div class="d-section-open" x-show="dOpen === 'datum'">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'datum'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label" x-text="labels.labelDatum"></div>
                       <div class="v2-chips">
                         <template x-for="(date, i) in availableDates" :key="date.iso">
@@ -1086,7 +1114,12 @@ const sheetData = {
                         </template>
                       </div>
                     </div>
-                    <button type="button" class="d-row" x-show="dOpen !== 'datum'" @click="dOpen = 'datum'">
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'datum'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'datum'">
                       <span class="d-row-check" x-show="form.date">✓</span>
                       <span class="d-row-spacer" x-show="!form.date"></span>
                       <span class="d-row-value" x-show="form.date" x-text="dSummaryDate"></span>
@@ -1097,7 +1130,14 @@ const sheetData = {
 
                   <!-- PERSONEN -->
                   <div data-dsection="personen">
-                    <div class="d-section-open" x-show="dOpen === 'personen'">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'personen'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label" x-text="labels.labelPersonen"></div>
                       <div class="v2-chips">
                         <template x-for="n in peopleOptions" :key="n">
@@ -1112,7 +1152,12 @@ const sheetData = {
                           @click="form.people = 5; dNext('personen')">5+</button>
                       </div>
                     </div>
-                    <button type="button" class="d-row" x-show="dOpen !== 'personen'" @click="dOpen = 'personen'">
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'personen'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'personen'">
                       <span class="d-row-check">✓</span>
                       <span class="d-row-value" x-text="dSummaryPeople"></span>
                       <span class="d-row-action" x-text="labels.sectionAendern"></span>
@@ -1121,7 +1166,14 @@ const sheetData = {
 
                   <!-- UHRZEIT -->
                   <div data-dsection="uhrzeit">
-                    <div class="d-section-open" x-show="dOpen === 'uhrzeit'">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'uhrzeit'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label" x-text="labels.labelUhrzeit"></div>
                       <div class="v2-chips">
                         <template x-for="slot in slots" :key="slot">
@@ -1134,7 +1186,12 @@ const sheetData = {
                         <span x-show="slots.length === 0" style="font-size:13px;color:var(--ink-muted)" x-text="labels.noFutureDates"></span>
                       </div>
                     </div>
-                    <button type="button" class="d-row" x-show="dOpen !== 'uhrzeit'" @click="dOpen = 'uhrzeit'">
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'uhrzeit'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'uhrzeit'">
                       <span class="d-row-check" x-show="form.time">✓</span>
                       <span class="d-row-spacer" x-show="!form.time"></span>
                       <span class="d-row-value" x-show="form.time" x-text="form.time"></span>
@@ -1145,7 +1202,14 @@ const sheetData = {
 
                   <!-- TISCH (optional) -->
                   <div data-dsection="tisch">
-                    <div class="d-section-open" x-show="dOpen === 'tisch'">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'tisch'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label">
                         <span x-text="labels.labelTisch"></span>
                         <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
@@ -1154,14 +1218,22 @@ const sheetData = {
                         <template x-for="opt in tableOptions" :key="opt.value">
                           <button type="button" class="v2-chip"
                             :data-active="form.table_preference === opt.value"
-                            @click="form.table_preference = opt.value; dNext('tisch')"
+                            @click="form.table_preference = opt.value"
                             x-text="opt.label">
                           </button>
                         </template>
                       </div>
-                      <button type="button" class="d-skip" @click="dNext('tisch')" x-text="labels.sectionUeberspringen"></button>
+                      <div style="display:flex;gap:12px;margin-top:10px">
+                        <button type="button" class="d-skip" @click="dNext('tisch')" x-text="labels.sectionUeberspringen"></button>
+                        <button type="button" class="d-done" x-show="form.table_preference" @click="dNext('tisch')" x-text="labels.sectionFertig"></button>
+                      </div>
                     </div>
-                    <button type="button" class="d-row" x-show="dOpen !== 'tisch'" @click="dOpen = 'tisch'">
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'tisch'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'tisch'">
                       <span class="d-row-check" x-show="form.table_preference && form.table_preference !== 'any'">✓</span>
                       <span class="d-row-spacer" x-show="!form.table_preference || form.table_preference === 'any'"></span>
                       <span class="d-row-value" x-show="form.table_preference && form.table_preference !== 'any'" x-text="tableLabelFor(form.table_preference)"></span>
@@ -1175,7 +1247,14 @@ const sheetData = {
 
                   <!-- ORT (nur wenn roomServiceEnabled) -->
                   <div x-show="roomServiceEnabled" data-dsection="ort">
-                    <div class="d-section-open" x-show="roomServiceEnabled && dOpen === 'ort'">
+                    <div class="d-section-open"
+                      x-show="roomServiceEnabled && dOpen === 'ort'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label" x-text="labels.labelOrt"></div>
                       <div class="v2-chips">
                         <button type="button" class="v2-chip"
@@ -1190,7 +1269,12 @@ const sheetData = {
                         </button>
                       </div>
                     </div>
-                    <button type="button" class="d-row" x-show="roomServiceEnabled && dOpen !== 'ort'" @click="dOpen = 'ort'">
+                    <button type="button" class="d-row"
+                      x-show="roomServiceEnabled && dOpen !== 'ort'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'ort'">
                       <span class="d-row-check">✓</span>
                       <span class="d-row-value" x-text="form.delivery === 'room' ? labels.deliveryRoom : labels.deliveryTable"></span>
                       <span class="d-row-action" x-text="labels.sectionAendern"></span>
@@ -1199,7 +1283,14 @@ const sheetData = {
 
                   <!-- HINWEIS (optional) -->
                   <div data-dsection="hinweis">
-                    <div class="d-section-open" x-show="dOpen === 'hinweis'">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'hinweis'"
+                      x-transition:enter="sect-enter"
+                      x-transition:enter-start="sect-enter-start"
+                      x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave"
+                      x-transition:leave-start="sect-leave-start"
+                      x-transition:leave-end="sect-leave-end">
                       <div class="d-section-label">
                         <span x-text="labels.labelHinweis"></span>
                         <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
@@ -1211,7 +1302,12 @@ const sheetData = {
                       </textarea>
                       <button type="button" class="d-done" @click="dOpen = null" x-text="labels.sectionFertig"></button>
                     </div>
-                    <button type="button" class="d-row" x-show="dOpen !== 'hinweis'" @click="dOpen = 'hinweis'">
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'hinweis'"
+                      x-transition:enter="row-in"
+                      x-transition:enter-start="row-in-start"
+                      x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'hinweis'">
                       <span class="d-row-check" x-show="form.notes.trim()">✓</span>
                       <span class="d-row-spacer" x-show="!form.notes.trim()"></span>
                       <span class="d-row-value" x-show="form.notes.trim()" x-text="dSummaryHinweis"></span>
@@ -1544,20 +1640,30 @@ const sheetData = {
         },
 
         dNext(current: string) {
-          const order = ['datum', 'personen', 'uhrzeit', 'tisch', 'ort', 'hinweis'];
-          const idx = order.indexOf(current);
-          let next: string | null = null;
-          for (let i = idx + 1; i < order.length; i++) {
-            if (order[i] === 'ort' && !this.roomServiceEnabled) continue;
-            next = order[i];
-            break;
-          }
-          this.dOpen = next;
-          if (next) {
-            this.$nextTick(() => {
-              document.querySelector(`[data-dsection="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
-          }
+          const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+          // Step a → b: hold 150ms so user sees chip selection; 300ms for reduced-motion
+          setTimeout(() => {
+            const order = ['datum', 'personen', 'uhrzeit', 'tisch', 'ort', 'hinweis'];
+            const idx = order.indexOf(current);
+            let next: string | null = null;
+            for (let i = idx + 1; i < order.length; i++) {
+              if (order[i] === 'ort' && !this.roomServiceEnabled) continue;
+              next = order[i];
+              break;
+            }
+            this.dOpen = next;
+            if (next) {
+              // Step b → c: wait for leave animation (180ms) then scroll to opened section
+              setTimeout(() => {
+                this.$nextTick(() => {
+                  document.querySelector(`[data-dsection="${next}"]`)?.scrollIntoView({
+                    behavior: reduced ? 'auto' : 'smooth',
+                    block: 'nearest',
+                  });
+                });
+              }, reduced ? 0 : 200);
+            }
+          }, reduced ? 300 : 150);
         },
 
         get dSummaryDate() {
