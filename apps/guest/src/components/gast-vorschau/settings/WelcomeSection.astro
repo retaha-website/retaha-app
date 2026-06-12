@@ -25,21 +25,6 @@ const initEyebrow = eyebrowText || '';
     <span class="settings-section__title">— Willkommen & Ansprache —</span>
   </div>
 
-  <!-- Eyebrow / Kicker -->
-  <div class="ws-field">
-    <label class="ws-label" for="eyebrowInput">eyebrow</label>
-    <input
-      id="eyebrowInput"
-      class="ws-input"
-      type="text"
-      maxlength="60"
-      placeholder={`z.B. ${hotelName} · Hamburg`}
-      value={initEyebrow}
-      autocomplete="off"
-    />
-    <p class="ws-hint">kurzer tag oben im hero (stadt, motto, o.ä.) — max. 60 Zeichen.</p>
-  </div>
-
   <!-- Willkommenstext -->
   <div class="ws-field">
     <label class="ws-label" for="welcomeTextarea">
@@ -80,7 +65,7 @@ const initEyebrow = eyebrowText || '';
 
   <!-- Save row -->
   <div class="ws-save-row">
-    <button id="welcomeSaveBtn" class="v9-btn" type="button" disabled>
+    <button id="welcomeSaveBtn" class="v9-btn" type="button">
       Speichern
     </button>
     <span id="welcomeSaveStatus" class="ws-save-status" aria-live="polite"></span>
@@ -174,49 +159,28 @@ const initEyebrow = eyebrowText || '';
 
   const section    = document.getElementById('welcomeSection');
   const textarea   = document.getElementById('welcomeTextarea')  as HTMLTextAreaElement;
-  const eyebrowEl  = document.getElementById('eyebrowInput')     as HTMLInputElement;
   const counter    = document.getElementById('welcomeCount')     as HTMLElement;
   const cards      = document.querySelectorAll<HTMLButtonElement>('.ansprache-card');
   const saveBtn    = document.getElementById('welcomeSaveBtn')   as HTMLButtonElement;
   const statusEl   = document.getElementById('welcomeSaveStatus') as HTMLElement;
 
-  // ── Baseline (initial server-rendered values) ─────────────────
   type Baseline = { welcomeText: string; eyebrowText: string; formality: 'du' | 'sie' };
   let baseline: Baseline = JSON.parse(section?.dataset.baseline ?? '{}') as Baseline;
   let currentFormality = baseline.formality ?? 'du';
 
-  // ── Preview state sync ────────────────────────────────────────
   updateState({ welcomeText: textarea.value, formality: currentFormality });
-
-  // ── Helpers ───────────────────────────────────────────────────
-  function isDirty(): boolean {
-    return textarea.value  !== baseline.welcomeText
-        || eyebrowEl.value !== baseline.eyebrowText
-        || currentFormality !== baseline.formality;
-  }
 
   function setStatus(state: 'saved' | 'error' | 'loading' | '', msg: string) {
     statusEl.dataset.state = state;
     statusEl.textContent   = msg;
   }
 
-  function updateSaveBtn() { saveBtn.disabled = !isDirty(); }
-
-  // ── Welcome textarea ──────────────────────────────────────────
   textarea?.addEventListener('input', () => {
     if (counter) counter.textContent = `${textarea.value.length} / 120`;
     updateState({ welcomeText: textarea.value });
     setStatus('', '');
-    updateSaveBtn();
   });
 
-  // ── Eyebrow input ─────────────────────────────────────────────
-  eyebrowEl?.addEventListener('input', () => {
-    setStatus('', '');
-    updateSaveBtn();
-  });
-
-  // ── Du/Sie Toggle ─────────────────────────────────────────────
   cards.forEach(card => {
     card.addEventListener('click', () => {
       const value = card.dataset.value as 'du' | 'sie';
@@ -229,13 +193,11 @@ const initEyebrow = eyebrowText || '';
       currentFormality = value;
       updateState({ formality: value });
       setStatus('', '');
-      updateSaveBtn();
     });
   });
 
-  // ── Save ──────────────────────────────────────────────────────
   saveBtn?.addEventListener('click', async () => {
-    if (!isDirty() || saveBtn.disabled) return;
+    if (saveBtn.dataset.loading) return;
     saveBtn.dataset.loading = 'true';
     saveBtn.disabled = true;
     setStatus('loading', 'Übersetze in alle Sprachen …');
@@ -246,28 +208,23 @@ const initEyebrow = eyebrowText || '';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           welcomeText:  textarea.value,
-          eyebrowText:  eyebrowEl.value,
+          eyebrowText:  baseline.eyebrowText, // preserve existing value (field removed from UI)
           formality:    currentFormality,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
 
-      baseline = {
-        welcomeText:  textarea.value,
-        eyebrowText:  eyebrowEl.value,
-        formality:    currentFormality,
-      };
+      baseline = { ...baseline, welcomeText: textarea.value, formality: currentFormality };
       setStatus('saved', 'Gespeichert');
       setTimeout(() => setStatus('', ''), 3000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[welcome-section] save error', msg);
       setStatus('error', `Fehler: ${msg}`);
-      saveBtn.disabled = false;
     } finally {
       delete saveBtn.dataset.loading;
-      updateSaveBtn();
+      saveBtn.disabled = false;
     }
   });
 </script>

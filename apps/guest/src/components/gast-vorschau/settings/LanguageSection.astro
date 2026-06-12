@@ -77,7 +77,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
       id="langSaveBtn"
       class="v9-btn"
       type="button"
-      disabled
       data-hotel-id={hotelId}
       data-initial-langs={JSON.stringify(enabledLanguages)}
       data-initial-default={defaultLanguage}
@@ -289,7 +288,7 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
 
   function showLimit(show: boolean) { limitMsg.hidden = !show; }
 
-  function updateSaveBtn() { saveBtn.disabled = !isDirty(); }
+  function updateSaveBtn() { /* button always enabled — re-save allowed (P5) */ }
 
   function getActive(): string[] {
     return Array.from(pills ?? [])
@@ -424,7 +423,7 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
   // ── Save ─────────────────────────────────────────────────────
 
   saveBtn?.addEventListener('click', async () => {
-    if (!isDirty() || saveBtn.disabled) return;
+    if (saveBtn.dataset.loading) return;
     saveBtn.dataset.loading = 'true';
     saveBtn.disabled = true;
     setStatus('', '');

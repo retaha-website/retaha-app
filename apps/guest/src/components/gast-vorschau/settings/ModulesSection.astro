@@ -22,7 +22,6 @@ const groups = [
     label: 'Kulinarik & Buchung',
     modules: [
       { key: 'breakfast',   label: 'Frühstück',   sub: 'Slot-Buchung, Zeiten' },
-      { key: 'conference',  label: 'Konferenz',    sub: 'Räume, Verfügbarkeit' },
     ],
   },
   {
@@ -60,18 +59,21 @@ const groups = [
             <button
               class:list={['module-toggle', { 'is-on': isOn(mod.key) }]}
               data-module-key={mod.key}
-              aria-pressed={String(isOn(mod.key))}
+              aria-pressed={isOn(mod.key) ? 'true' : 'false'}
               aria-label={`${mod.label} ein/aus`}
               type="button"
             >
               <span class="module-toggle__led"></span>
-              <span class="module-toggle__label">{isOn(mod.key) ? 'an' : 'aus'}</span>
             </button>
           </div>
         ))}
       </div>
     </div>
   ))}
+
+  <div class="mod-save-row">
+    <span id="modSaveStatus" class="mod-save-status" aria-live="polite"></span>
+  </div>
 </section>
 
 <style>
@@ -114,11 +116,33 @@ const groups = [
     background: var(--sage); box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
     animation: led-pulse 2s ease-in-out infinite;
   }
+
+  .mod-save-row {
+    margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
+    min-height: 20px;
+  }
+  .mod-save-status {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+  }
+  .mod-save-status[data-state="saved"] { color: #5C9070; }
+  .mod-save-status[data-state="error"] { color: #C0392B; }
 </style>
 
 <script>
   import { updateState, getState } from '../../../lib/gast-vorschau/state';
   type ModuleKey = keyof ReturnType<typeof getState>['modules'];
+
+  const statusEl = document.getElementById('modSaveStatus') as HTMLElement | null;
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function setStatus(state: 'saved' | 'error' | '', msg: string) {
+    if (!statusEl) return;
+    statusEl.dataset.state = state;
+    statusEl.textContent = msg;
+    if (statusTimer) clearTimeout(statusTimer);
+    if (state === 'saved') statusTimer = setTimeout(() => setStatus('', ''), 2500);
+  }
+
   document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
     btn.addEventListener('click', async () => {
       const key = btn.dataset.moduleKey as ModuleKey | undefined;
@@ -126,15 +150,20 @@ const groups = [
       const current = getState().modules;
       const newVal = !current[key];
       btn.classList.toggle('is-on', newVal);
-      btn.setAttribute('aria-pressed', String(newVal));
-      const lbl = btn.querySelector('.module-toggle__label');
-      if (lbl) lbl.textContent = newVal ? 'an' : 'aus';
+      btn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
       updateState({ modules: { ...current, [key]: newVal } });
-      await fetch('/api/hotel/save-modules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: newVal }),
-      });
+      try {
+        const res = await fetch('/api/hotel/save-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: newVal }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        setStatus('saved', '✓ Gespeichert');
+      } catch {
+        setStatus('error', 'Fehler beim Speichern');
+      }
     });
   });
 </script>
