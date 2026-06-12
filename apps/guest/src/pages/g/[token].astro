@@ -940,6 +940,18 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           return 'Ich bin gerade nicht erreichbar — bitte versuch es gleich nochmal.';
         },
 
+        _parseMarkdown(text: string): string {
+          if (!text) return '';
+          return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(?!\*)(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+        },
+
         async eveSend(text: string) {
           const message = (text || '').trim();
           if (!message || this.eveTyping) return;
@@ -954,26 +966,24 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
           this.eveSeenBefore = true;
 
+          const MIN_TYPING_MS = 700;
+          const startedAt = Date.now();
+
           try {
             const res = await fetch('/api/eve/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ message, lang: this._eveLang }),
             });
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-            // Assistant-Bubble pushen + Index tracken. WICHTIG: nach push() greifen
-            // wir IMMER via this.eveMessages[msgIdx] zu, damit Alpine den reaktiven
-            // Proxy sieht (nicht die Original-Object-Reference).
-            this.eveMessages.push({ role: 'assistant', content: '', streaming: true });
-            const msgIdx = this.eveMessages.length - 1;
-            this.eveTyping = false;
-
+            // Gesamten Stream im Hintergrund sammeln — UI zeigt erst die vollständige Antwort
             const reader = res.body!.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let fullContent = '';
+            let pendingAction: any = null;
+            let streamError: string | null = null;
 
             while (true) {
               const { done, value } = await reader.read();
@@ -987,27 +997,46 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                 try {
                   const ev = JSON.parse(line.slice(5).trim());
                   if (ev.type === 'text_delta') {
-                    this.eveMessages[msgIdx].content += ev.text;
-                    this._scrollEveBottom();
+                    fullContent += ev.text;
                   } else if (ev.type === 'pending_action') {
-                    this.evePendingAction = ev.action;
-                    this._scrollEveBottom();
+                    pendingAction = ev.action;
                   } else if (ev.type === 'error') {
-                    this.eveError = this._friendlyEveError(ev.message);
-                  } else if (ev.type === 'message_complete') {
-                    this.eveMessages[msgIdx].streaming = false;
+                    streamError = ev.message;
                   } else if (ev.type === 'escalating') {
-                    this.eveMessages[msgIdx].content = '';
+                    fullContent = '';
                   }
-                  // router_decision + tool_use_preview ignorieren wir im UI
-                } catch (_) {
-                  // unbekannter chunk, weiter
-                }
+                  // router_decision, tool_use_preview, message_complete: ignoriert im UI
+                } catch (_) {}
               }
             }
-            this.eveMessages[msgIdx].streaming = false;
-            this._eveLastConversation = this._buildConversationContext();
+
+            // Mindest-Typing-Dauer — natürliches Gefühl, kein sofortiger Textplumps
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < MIN_TYPING_MS) {
+              await new Promise(r => setTimeout(r, MIN_TYPING_MS - elapsed));
+            }
+
+            this.eveTyping = false;
+
+            if (streamError) {
+              this.eveError = this._friendlyEveError(streamError);
+            } else {
+              this.eveMessages.push({
+                role: 'assistant',
+                content: fullContent,
+                html: this._parseMarkdown(fullContent),
+                streaming: false,
+              });
+              if (pendingAction) this.evePendingAction = pendingAction;
+              this._eveLastConversation = this._buildConversationContext();
+            }
+            this._scrollEveBottom();
           } catch (err) {
+            // Mindest-Typing-Dauer auch bei Netzwerkfehler
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < MIN_TYPING_MS) {
+              await new Promise(r => setTimeout(r, MIN_TYPING_MS - elapsed));
+            }
             this.eveTyping = false;
             const msg = (err as Error).message || '';
             this.eveError = this._friendlyEveError(msg);
@@ -1032,7 +1061,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             });
             const body = await res.json();
             if (body.ok) {
-              this.eveMessages.push({ role: 'assistant', content: 'Erledigt — der Hotelier bekommt deine Anfrage gleich.' });
+              this.eveMessages.push({ role: 'assistant', content: 'Erledigt — der Hotelier bekommt deine Anfrage gleich.', html: this._parseMarkdown('Erledigt — der Hotelier bekommt deine Anfrage gleich.') });
               this.evePendingAction = null;
             } else {
               this.eveError = body.error || 'Bestätigung fehlgeschlagen.';
@@ -1047,7 +1076,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
         eveCancel() {
           this.evePendingAction = null;
-          this.eveMessages.push({ role: 'assistant', content: 'Kein Problem, sag Bescheid wenn ich helfen kann.' });
+          this.eveMessages.push({ role: 'assistant', content: 'Kein Problem, sag Bescheid wenn ich helfen kann.', html: this._parseMarkdown('Kein Problem, sag Bescheid wenn ich helfen kann.') });
           this._scrollEveBottom();
         },
 
@@ -1089,7 +1118,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             },
           };
           const g = GREET[lang] ?? GREET.de;
-          this.eveMessages.push({ role: 'assistant', content: `${g.time(hour)}! ${g.body(guestName, eveName)}`, streaming: false });
+          const greetText = `${g.time(hour)}! ${g.body(guestName, eveName)}`;
+          this.eveMessages.push({ role: 'assistant', content: greetText, html: this._parseMarkdown(greetText), streaming: false });
           this._scrollEveBottom();
         },
 

@@ -1,8 +1,12 @@
 ---
 // Sprint E4 · Phase 9 — 3-Dots-Animation für "Eve schreibt …"
+interface Props {
+  typingLabel?: string;
+}
+const { typingLabel = 'Eve schreibt …' } = Astro.props;
 ---
 
-<div class="eve-typing" aria-label="Eve schreibt">
+<div class="eve-typing" data-typing-label={typingLabel} aria-label={typingLabel} role="status">
   <span></span><span></span><span></span>
 </div>
 
@@ -21,7 +25,7 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--theme-text-primary) 0.45, transparent);
+    background: color-mix(in srgb, var(--theme-text-primary) 45%, transparent);
     animation: eve-typing-bounce 1.2s infinite ease-in-out;
   }
   .eve-typing span:nth-child(1) { animation-delay: 0s; }
@@ -31,5 +35,16 @@
   @keyframes eve-typing-bounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .eve-typing span { display: none; }
+    .eve-typing::after {
+      content: attr(data-typing-label);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: color-mix(in srgb, var(--theme-text-primary) 60%, transparent);
+    }
   }
 </style>
