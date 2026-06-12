@@ -110,6 +110,14 @@ const roomServiceFee  = (s.breakfast_room_service_fee_cents as number | undefine
 
 const items = await loadBreakfastItems(hotel.id);
 
+const { data: hotelRow } = await supabase
+  .from('hotels')
+  .select('currency')
+  .eq('id', hotel.id)
+  .maybeSingle();
+const hotelCurrency = (hotelRow?.currency as string | undefined) || 'EUR';
+const currencySymbol = hotelCurrency === 'CHF' ? 'CHF' : '€';
+
 // Check Mews integration for import button
 const { data: mewsRow } = await supabase
   .from('mews_integrations')
@@ -129,7 +137,7 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 <Layout title="Frühstück" activeTab="backoffice">
 
-<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit } }}>
+<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, currency: hotelCurrency } }}>
   window._bfInit = _bfInit;
 </script>
 
@@ -367,7 +375,7 @@ textarea.s-input { resize: none; min-height: 72px; }
                     x-model="data.breakfast_price_cents"
                     inputmode="decimal" placeholder="leer = kein Preis"
                     class="s-input" style="max-width:180px" />
-                  <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">€</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">{currencySymbol}</span>
                 </div>
                 <span class="field__hint">z.B. 15 oder 15,50 · 0,00 = im Buffet enthalten · leer = kein Preis</span>
               </div>
@@ -410,7 +418,7 @@ textarea.s-input { resize: none; min-height: 72px; }
                       x-model="data.breakfast_room_service_fee_cents"
                       inputmode="decimal" class="s-input" style="max-width:180px"
                       placeholder="0,00" />
-                    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">€</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">{currencySymbol}</span>
                   </div>
                   <span class="field__hint">z.B. 3,00 · 0,00 = kein Aufschlag</span>
                 </div>
@@ -678,7 +686,8 @@ textarea.s-input { resize: none; min-height: 72px; }
       },
 
       formatEur(cents) {
-        return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+        const cur = (window._bfInit || {}).currency || 'EUR';
+        return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: cur });
       },
 
       openNew() {

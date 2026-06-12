@@ -24,7 +24,7 @@ if (isShowcaseToken(token)) {
   if (showcase) {
     const sbSr = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary').eq('id', showcase.hotel_id).single(),
+      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary, currency').eq('id', showcase.hotel_id).single(),
       sbSr.from('hotel_settings').select('*').eq('hotel_id', showcase.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -81,6 +81,7 @@ const roomServiceEnabled: boolean = (settings as any).breakfast_room_service_ena
 const priceCents: number | null = (settings as any).breakfast_price_cents ?? null;
 const roomServiceFeeCents: number = (settings as any).breakfast_room_service_fee_cents ?? 0;
 const roomNumber: string | null = showcaseMode ? null : ((ctx as any).room?.room_number ?? null);
+const hotelCurrency: string = (hotel as any).currency ?? 'EUR';
 
 const hotelDefaultLang = asLanguageCode((hotel as any).default_language ?? 'de');
 const location = pickI18n((settings as any).breakfast_location_i18n, hotelDefaultLang, lang) || '';
@@ -536,6 +537,7 @@ const sheetData = {
   roomServiceEnabled,
   priceCents,
   roomServiceFeeCents,
+  hotelCurrency,
   roomNumber,
   includedText,
   location,
@@ -1135,6 +1137,7 @@ const sheetData = {
         roomServiceEnabled: initial.roomServiceEnabled === true,
         priceCents: initial.priceCents ?? null,
         roomServiceFeeCents: initial.roomServiceFeeCents ?? 0,
+        hotelCurrency: initial.hotelCurrency ?? 'EUR',
         includedText: initial.includedText || '',
         location: initial.location || '',
 
@@ -1262,7 +1265,7 @@ const sheetData = {
 
         formatPrice(cents: number | null): string {
           if (cents === null) return '';
-          return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+          return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: this.hotelCurrency });
         },
 
         get canSubmit() {

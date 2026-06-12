@@ -23,6 +23,8 @@ if (Astro.request.method === 'POST') {
     const name           = form.get('name')?.toString().trim() || null;
     const classification = form.get('classification')?.toString() || null;
     const hotel_type     = form.get('hotel_type')?.toString() || null;
+    const currencyRaw    = form.get('currency')?.toString() || 'EUR';
+    const currency       = ['EUR', 'CHF'].includes(currencyRaw) ? currencyRaw : 'EUR';
     if (!name) {
       saved = { section: 'hotel_identity', ok: false, msg: 'Hotel-Name ist ein Pflichtfeld.' };
     } else {
@@ -36,6 +38,7 @@ if (Astro.request.method === 'POST') {
           name,
           classification,
           hotel_type,
+          currency,
           // Setup-Fortschritt auf min. 30 setzen (Hotel-Daten gilt als erledigt)
           setup_progress: Math.max(currentProgress, 30),
         })
@@ -128,7 +131,7 @@ if (Astro.request.method === 'POST') {
 
 // ─── DATEN LADEN ───────────────────────────────────────────────────────────
 const { data: h } = await client.from('hotels').select(`
-  name, classification, hotel_type,
+  name, classification, hotel_type, currency,
   address_street, address_zip, city, country,
   phone, email, website,
   legal_form, company_name, commercial_register, vat_id, tax_number,
@@ -210,6 +213,16 @@ function isSelected(key: string, value: string, fallback = '') {
                 <option value="wellness" selected={isSelected('hotel_type','wellness')}>Wellness-Hotel</option>
                 <option value="business" selected={isSelected('hotel_type','business')}>Business-Hotel</option>
                 <option value="boutique" selected={isSelected('hotel_type','boutique')}>Boutique-Hotel</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="hotel-currency">Währung</label>
+            <div class="s-select-wrap">
+              <select id="hotel-currency" name="currency" class="s-select">
+                <option value="EUR" selected={isSelected('currency','EUR','EUR')}>EUR — Euro (€)</option>
+                <option value="CHF" selected={isSelected('currency','CHF')}>CHF — Schweizer Franken</option>
               </select>
             </div>
           </div>
