@@ -1,7 +1,10 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
+import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 interface TuningRule {
   trigger: string;
@@ -24,17 +27,7 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('_action')?.toString();
 
-  if (action === 'toggle_enabled') {
-    const enabled = form.get('eve_enabled')?.toString() === 'true';
-    const { error } = await client
-      .from('hotel_settings')
-      .update({ eve_enabled: enabled, updated_at: new Date().toISOString() })
-      .eq('hotel_id', hotel.id);
-    if (error) message = { type: 'error', text: `Toggle fehlgeschlagen: ${error.message}` };
-    else message = { type: 'success', text: enabled ? 'Eve ist jetzt für deine Gäste aktiv.' : 'Eve ist deaktiviert.' };
-  }
-
-  else if (action === 'save_persona') {
+  if (action === 'save_persona') {
     const name = form.get('eve_name')?.toString().trim();
     const tonality = form.get('eve_tonality')?.toString();
     const customPersona = form.get('eve_custom_persona')?.toString().trim() || null;
@@ -177,22 +170,12 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
           <span class="s-card__num">01</span>
         </div>
 
-        <div class="ev-status-row">
-          <div class="ev-status-info">
-            <span class={`ev-status-dot ev-status-dot--${eveEnabled ? 'on' : 'off'}`}></span>
-            {eveEnabled ? (
-              <span class="ev-status-label ev-status-label--on">Eve ist aktiv und im Gast-Frontend sichtbar.</span>
-            ) : (
-              <span class="ev-status-label">Eve ist deaktiviert. Der Concierge-Tile bleibt ausgeblendet.</span>
-            )}
+        <div class="s-card__body">
+          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <ModStatusLed on={eveEnabled} />
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
           </div>
-          <form method="POST" class="shrink-0">
-            <input type="hidden" name="_action" value="toggle_enabled" />
-            <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
-            <button type="submit" class={`v9-btn ${eveEnabled ? 'v9-btn--ghost' : ''}`}>
-              {eveEnabled ? 'Deaktivieren' : 'Aktivieren'}
-            </button>
-          </form>
         </div>
       </section>
 
@@ -409,23 +392,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
   .s-textarea { resize: vertical; min-height: 80px; }
   .ev-time-input { max-width: 120px; font-family: 'JetBrains Mono', monospace; }
   .ev-mono-input { font-family: 'JetBrains Mono', monospace; }
-
-  /* Eve status row */
-  .ev-status-row {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; flex-wrap: wrap;
-  }
-  .ev-status-info { display: flex; align-items: center; gap: 10px; }
-  .ev-status-dot {
-    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-  }
-  .ev-status-dot--on  { background: var(--sage); }
-  .ev-status-dot--off { background: var(--ink-faint); }
-  .ev-status-label {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 14px; color: var(--ink-soft);
-  }
-  .ev-status-label--on { color: var(--ink); }
 
   /* Read-only field row */
   .ev-readonly-field {
