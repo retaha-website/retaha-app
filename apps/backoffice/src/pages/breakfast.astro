@@ -89,6 +89,7 @@ const { data: settings } = await supabase
   .select(`
     features,
     breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
+    breakfast_hours,
     breakfast_location_i18n, breakfast_included_i18n,
     breakfast_price_cents,
     breakfast_room_service_enabled, breakfast_room_service_fee_cents
@@ -107,6 +108,19 @@ const includedDe      = (s.breakfast_included_i18n as any)?.de?.value || '';
 const priceCents      = (s.breakfast_price_cents   as number | null | undefined) ?? null;
 const roomServiceOn   = (s.breakfast_room_service_enabled as boolean | undefined) === true;
 const roomServiceFee  = (s.breakfast_room_service_fee_cents as number | undefined) || 0;
+
+// Build per-weekday hours initial state
+const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const rawBreakfastHours = (s.breakfast_hours as Record<string, any> | null | undefined) ?? null;
+const initialHours: Record<string, {start: string; end: string; closed: boolean}> = {};
+for (const day of WEEK_DAYS) {
+  const bh = rawBreakfastHours?.[day];
+  initialHours[day] = {
+    start: (bh?.start as string | undefined) || startTime,
+    end: (bh?.end as string | undefined) || endTime,
+    closed: bh?.closed === true,
+  };
+}
 
 const items = await loadBreakfastItems(hotel.id);
 
@@ -137,8 +151,9 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 <Layout title="Frühstück" activeTab="backoffice">
 
-<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, currency: hotelCurrency } }}>
+<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, currency: hotelCurrency }, _hoursInit: { hours: initialHours, slotMinutes: String(slotMinutes) } }}>
   window._bfInit = _bfInit;
+  window._hoursInit = _hoursInit;
 </script>
 
 <style is:global>
@@ -186,6 +201,18 @@ textarea.s-input { resize: none; min-height: 72px; }
 .bp-item-edit { font-size: 11px; color: var(--ink-muted); white-space: nowrap; margin-left: 4px; flex-shrink: 0; }
 .bp-item-row:hover .bp-item-edit { color: var(--ink); }
 .bp-empty { text-align: center; padding: 48px 32px; color: var(--ink-muted); font-size: 14px; font-style: italic; }
+
+/* Hours-Grid (Section 02 Wochentage) */
+.bp-hours-grid { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; margin-bottom: 16px; }
+.bp-hours-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); min-height: 52px; }
+.bp-hours-row:last-child { border-bottom: none; }
+.bp-hours-row--closed { opacity: 0.6; }
+.bp-hours-day { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+.bp-hours-inputs { display: flex; align-items: center; gap: 6px; }
+.bp-hours-sep { font-size: 13px; color: var(--ink-muted); flex-shrink: 0; }
+.bp-hours-closed-txt { font-size: 12px; color: var(--ink-muted); font-style: italic; }
+.s-input--time { width: 110px; min-width: 88px; }
+@media (max-width: 480px) { .s-input--time { width: 88px; } .bp-hours-row { grid-template-columns: 36px 1fr auto; gap: 8px; padding: 8px 10px; } }
 
 /* Slot-Länge stepper */
 .bp-slot-stepper { display: flex; align-items: stretch; }
@@ -270,40 +297,65 @@ textarea.s-input { resize: none; min-height: 72px; }
         </div>
       </section>
 
-      <!-- 02 Zeiten -->
+      <!-- 02 Zeiten (Wochentage) -->
       <section class="s-card">
         <div class="s-card__head">
           <h2 class="s-card__title">Frühstückszeiten</h2>
           <span class="s-card__num">02</span>
         </div>
-        <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_start_time: startTime, breakfast_end_time: endTime, breakfast_slot_minutes: String(slotMinutes) })}, section: 'times' })`}>
+        <div x-data="hoursSection()">
           <div class="s-card__body">
-            <p class="field__hint">Bestimmt die buchbaren Slots in der Gäste-App.</p>
-            <div class="bp-time-grid">
-              <div class="field">
-                <label class="field__label" for="bf-start">Beginn</label>
-                <input type="time" id="bf-start" name="breakfast_start_time" x-model="data.breakfast_start_time" class="s-input" />
-              </div>
-              <div class="field">
-                <label class="field__label" for="bf-end">Ende</label>
-                <input type="time" id="bf-end" name="breakfast_end_time" x-model="data.breakfast_end_time" class="s-input" />
-              </div>
-              <div class="field">
-                <label class="field__label" for="bf-slot">Slot-Länge (Min)</label>
-                <div class="bp-slot-stepper">
-                  <button type="button" class="bp-slot-step-btn"
-                    @click="data.breakfast_slot_minutes = String(Math.max(5, (parseInt(data.breakfast_slot_minutes)||30) - 5))"
-                    aria-label="Weniger">−</button>
-                  <input type="number" id="bf-slot" name="breakfast_slot_minutes"
-                    x-model="data.breakfast_slot_minutes" min="5" max="120" step="5"
-                    class="s-input" inputmode="numeric" />
-                  <button type="button" class="bp-slot-step-btn"
-                    @click="data.breakfast_slot_minutes = String(Math.min(120, (parseInt(data.breakfast_slot_minutes)||30) + 5))"
-                    aria-label="Mehr">+</button>
+            <p class="field__hint">Buchbare Slots pro Wochentag — geschlossene Tage sind in der Gäste-App nicht buchbar.</p>
+            <div class="bp-hours-grid">
+              <template x-for="d in days" :key="d.key">
+                <div class="bp-hours-row" :class="{'bp-hours-row--closed': hours[d.key].closed}">
+                  <span class="bp-hours-day" x-text="d.label"></span>
+                  <div class="bp-hours-inputs">
+                    <input type="time" class="s-input s-input--time"
+                      x-show="!hours[d.key].closed"
+                      :value="hours[d.key].start"
+                      @change="hours[d.key].start = $event.target.value" />
+                    <span class="bp-hours-sep" x-show="!hours[d.key].closed">–</span>
+                    <input type="time" class="s-input s-input--time"
+                      x-show="!hours[d.key].closed"
+                      :value="hours[d.key].end"
+                      @change="hours[d.key].end = $event.target.value" />
+                    <span x-show="hours[d.key].closed" class="bp-hours-closed-txt">Geschlossen</span>
+                  </div>
+                  <label class="toggle-row" style="margin:0;gap:6px">
+                    <input type="checkbox"
+                      :checked="hours[d.key].closed"
+                      @change="hours[d.key].closed = $event.target.checked"
+                      class="sr-only" />
+                    <span class="bt-visual" :class="{'is-checked': hours[d.key].closed}">
+                      <span class="bt-knob"></span>
+                    </span>
+                    <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">Zu</span>
+                  </label>
                 </div>
+              </template>
+            </div>
+            <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <button type="button" @click="copyMonToAll()" class="v9-btn v9-btn--ghost" style="font-size:10px;padding:6px 12px">
+                Auf alle Tage übernehmen
+              </button>
+              <span style="font-size:12px;color:var(--ink-muted)">Montag-Zeiten auf alle Tage</span>
+            </div>
+            <div class="field">
+              <label class="field__label" for="bf-slot">Slot-Länge (Min)</label>
+              <div class="bp-slot-stepper">
+                <button type="button" class="bp-slot-step-btn"
+                  @click="slotMinutes = Math.max(5, slotMinutes - 5)"
+                  aria-label="Weniger">−</button>
+                <input type="number" id="bf-slot"
+                  x-model.number="slotMinutes" min="5" max="120" step="5"
+                  class="s-input" inputmode="numeric" />
+                <button type="button" class="bp-slot-step-btn"
+                  @click="slotMinutes = Math.min(120, slotMinutes + 5)"
+                  aria-label="Mehr">+</button>
               </div>
             </div>
-            <p class="field__hint">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
+            <p class="field__hint" style="margin-top:8px">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
           </div>
           <div class="s-card__footer">
             <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
@@ -657,6 +709,83 @@ textarea.s-input { resize: none; min-height: 72px; }
 
 <script>
   document.addEventListener('alpine:init', () => {
+
+    Alpine.data('hoursSection', () => {
+      const init = window._hoursInit || {};
+      return {
+        hours: init.hours || {},
+        slotMinutes: parseInt(init.slotMinutes) || 30,
+        saving: false,
+        success: false,
+        error: '',
+        _origStr: '',
+        _timer: null,
+        _beforeUnload: null,
+
+        days: [
+          { key: 'mon', label: 'Mo' },
+          { key: 'tue', label: 'Di' },
+          { key: 'wed', label: 'Mi' },
+          { key: 'thu', label: 'Do' },
+          { key: 'fri', label: 'Fr' },
+          { key: 'sat', label: 'Sa' },
+          { key: 'sun', label: 'So' },
+        ],
+
+        init() {
+          this._origStr = JSON.stringify({ hours: this.hours, slotMinutes: this.slotMinutes });
+          this._beforeUnload = (e) => {
+            if (this.isDirty) { e.preventDefault(); e.returnValue = ''; }
+          };
+          window.addEventListener('beforeunload', this._beforeUnload);
+        },
+
+        destroy() {
+          if (this._beforeUnload) window.removeEventListener('beforeunload', this._beforeUnload);
+        },
+
+        get isDirty() {
+          return JSON.stringify({ hours: this.hours, slotMinutes: this.slotMinutes }) !== this._origStr;
+        },
+
+        copyMonToAll() {
+          const src = this.hours['mon'];
+          if (!src || src.closed) return;
+          this.days.forEach(d => {
+            this.hours[d.key] = { ...this.hours[d.key], start: src.start, end: src.end };
+          });
+        },
+
+        async save() {
+          if (!this.isDirty || this.saving) return;
+          this.saving = true;
+          this.success = false;
+          this.error = '';
+          if (this._timer) clearTimeout(this._timer);
+          try {
+            const res = await fetch('/api/admin/breakfast/section', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                section: 'hours',
+                breakfast_hours: this.hours,
+                breakfast_slot_minutes: this.slotMinutes,
+              }),
+            });
+            const d = await res.json();
+            if (!d.ok) { this.error = d.error || 'Fehler'; return; }
+            this.success = true;
+            this._origStr = JSON.stringify({ hours: this.hours, slotMinutes: this.slotMinutes });
+            this._timer = setTimeout(() => { this.success = false; }, 3000);
+          } catch (err) {
+            this.error = 'Netzwerk-Fehler';
+          } finally {
+            this.saving = false;
+          }
+        },
+      };
+    });
+
     Alpine.data('bfPage', () => ({
       items: (window._bfInit || {}).items || [],
       allergens: (window._bfInit || {}).allergens || [],

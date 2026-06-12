@@ -140,6 +140,22 @@ function generateSlots(start: string, end: string, step: number): string[] {
 }
 const allSlots = generateSlots(startTime, endTime, slotMinutes);
 
+// Weekday-specific slots (null = closed that day)
+const rawBreakfastHours = (settings as any).breakfast_hours as Record<string, {start?: string; end?: string; closed?: boolean}> | null | undefined;
+const WDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+let slotsPerWeekday: Record<string, string[] | null> | null = null;
+if (rawBreakfastHours) {
+  slotsPerWeekday = {};
+  for (const wk of WDAY_KEYS) {
+    const d = rawBreakfastHours[wk];
+    if (!d || d.closed) {
+      slotsPerWeekday[wk] = null;
+    } else {
+      slotsPerWeekday[wk] = generateSlots(d.start || startTime, d.end || endTime, slotMinutes);
+    }
+  }
+}
+
 // Allergen-Keys + Labels
 const ALLERGEN_KEYS = ['gluten','crustaceans','eggs','fish','peanuts','soy','milk','nuts','celery','mustard','sesame','sulfites','lupins','molluscs'];
 const _al = (d: Record<string, string>) => d[lk] || d.en || '';
@@ -538,6 +554,7 @@ const sheetData = {
   priceCents,
   roomServiceFeeCents,
   hotelCurrency,
+  slotsPerWeekday,
   roomNumber,
   includedText,
   location,
@@ -1138,6 +1155,7 @@ const sheetData = {
         priceCents: initial.priceCents ?? null,
         roomServiceFeeCents: initial.roomServiceFeeCents ?? 0,
         hotelCurrency: initial.hotelCurrency ?? 'EUR',
+        slotsPerWeekday: initial.slotsPerWeekday ?? null,
         includedText: initial.includedText || '',
         location: initial.location || '',
 
@@ -1218,10 +1236,19 @@ const sheetData = {
         },
 
         slotsForDate(dateIso: string) {
-          if (dateIso !== this.todayIso) return this.allSlots;
+          const baseSlots: string[] = (() => {
+            if (this.slotsPerWeekday) {
+              // Use T12:00:00 to avoid DST edge cases when extracting weekday
+              const wkIdx = new Date(dateIso + 'T12:00:00').getDay();
+              const wkKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][wkIdx];
+              return this.slotsPerWeekday[wkKey] ?? [];
+            }
+            return this.allSlots;
+          })();
+          if (dateIso !== this.todayIso) return baseSlots;
           const now = new Date();
           const nowMin = now.getHours() * 60 + now.getMinutes();
-          return this.allSlots.filter((slot: string) => {
+          return baseSlots.filter((slot: string) => {
             const [h, m] = slot.split(':').map(Number);
             return h * 60 + m > nowMin;
           });

@@ -101,6 +101,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       eve_name, eve_online_until, eve_enabled,
       wifi_ssid, wifi_password, wifi_speed_mbits,
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
+      breakfast_hours,
       breakfast_location_i18n, breakfast_included_i18n,
       conference_rooms, conference_start_time, conference_end_time, conference_slot_minutes,
       service_items, service_start_time, service_end_time

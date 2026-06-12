@@ -21,7 +21,7 @@ function parseEuroFee(raw: string | undefined): number {
   return parseEuro(raw) ?? 0;
 }
 
-const ALLOWED = ['times', 'location', 'included', 'price', 'room_service_fee', 'module', 'room_service'] as const;
+const ALLOWED = ['times', 'hours', 'location', 'included', 'price', 'room_service_fee', 'module', 'room_service'] as const;
 
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
@@ -48,6 +48,20 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     );
 
   try {
+    if (section === 'hours') {
+      const rawHours = body.breakfast_hours as Record<string, {start?: string; end?: string; closed?: boolean}> | undefined;
+      const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+      const parsed: Record<string, {start: string; end: string; closed: boolean}> = {};
+      for (const day of DAYS) {
+        const d = rawHours?.[day];
+        parsed[day] = { start: d?.start || '07:30', end: d?.end || '10:30', closed: d?.closed === true };
+      }
+      const slotMin = Math.max(5, Math.min(120, parseInt(String(body.breakfast_slot_minutes ?? '30')) || 30));
+      const { error } = await ups({ breakfast_hours: parsed, breakfast_slot_minutes: slotMin });
+      if (error) { console.error('[breakfast/section hours]', error); return json({ ok: false, error: error.message }, 500); }
+      return json({ ok: true });
+    }
+
     if (section === 'times') {
       const startTime = (body.breakfast_start_time as string | undefined) || '07:30';
       const endTime   = (body.breakfast_end_time   as string | undefined) || '10:30';
