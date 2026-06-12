@@ -679,6 +679,11 @@ const sheetData = {
         --radius:      12px;
         --mono: 'JetBrains Mono', 'Courier New', monospace;
         --display: 'Space Grotesk', system-ui, sans-serif;
+        /* Choreografie-Timing — ein Wert justieren = alle Stufen passen */
+        --bf-ease:     cubic-bezier(.32,.72,0,1);
+        --bf-feedback: 200ms;   /* Pill aktiv sichtbar            */
+        --bf-collapse: 300ms;   /* Sektion kollabiert             */
+        --bf-open:     300ms;   /* Nächste Sektion öffnet sich    */
       }
 
       body {
@@ -946,7 +951,7 @@ const sheetData = {
       /* Sticky summary bar */
       .d-sticky {
         position: sticky; bottom: 0;
-        background: white; border-top: 2px solid var(--accent);
+        background: white; border-top: 1px solid var(--border);
         padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 8px);
         display: flex; align-items: center; gap: 12px;
         margin-top: 4px;
@@ -985,17 +990,32 @@ const sheetData = {
         40%  { transform: scale(0.96); }
         100% { transform: scale(1); }
       }
-      .v2-chip[data-active="true"] { animation: chip-active-pulse 150ms ease-out; }
+      .v2-chip[data-active="true"] { animation: chip-active-pulse var(--bf-feedback) var(--bf-ease); }
 
-      /* ── Section card enter / leave animations ───────────────────────── */
-      .sect-enter       { transition: opacity 220ms ease-out, transform 220ms ease-out; }
-      .sect-enter-start { opacity: 0; transform: translateY(-6px); }
-      .sect-enter-end   { opacity: 1; transform: translateY(0); }
-      .sect-leave       { transition: opacity 180ms ease-in; }
-      .sect-leave-start { opacity: 1; }
-      .sect-leave-end   { opacity: 0; }
+      /* ── Section card enter / leave — max-height + opacity für ruckelfreie Höhen-Animation */
+      .d-section-open { overflow: hidden; }
+
+      .sect-enter {
+        overflow: hidden;
+        transition: opacity var(--bf-open) var(--bf-ease),
+                    transform var(--bf-open) var(--bf-ease),
+                    max-height var(--bf-open) var(--bf-ease);
+      }
+      .sect-enter-start { opacity: 0; transform: translateY(-4px); max-height: 0; }
+      .sect-enter-end   { opacity: 1; transform: translateY(0);    max-height: 700px; }
+
+      .sect-leave {
+        overflow: hidden;
+        transition: opacity var(--bf-collapse) var(--bf-ease),
+                    max-height var(--bf-collapse) var(--bf-ease),
+                    padding-top var(--bf-collapse) var(--bf-ease),
+                    padding-bottom var(--bf-collapse) var(--bf-ease);
+      }
+      .sect-leave-start { opacity: 1; max-height: 700px; }
+      .sect-leave-end   { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+
       /* Collapsed confirmation row enter */
-      .row-in       { transition: opacity 150ms ease-out; }
+      .row-in       { transition: opacity 180ms var(--bf-ease); }
       .row-in-start { opacity: 0; }
       .row-in-end   { opacity: 1; }
 
@@ -1660,13 +1680,13 @@ const sheetData = {
         dNext(current: string) {
           const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
           const alreadyVisited = this.dVisited.includes(current);
-          // Step a → b: hold 150ms so user sees chip selection; 300ms for reduced-motion
+          // Phase a (--bf-feedback 200ms) + Phase b (pause 150ms) = 350ms
           setTimeout(() => {
             if (!this.dVisited.includes(current)) {
               this.dVisited = [...this.dVisited, current];
             }
             if (alreadyVisited) {
-              // Re-edit: just collapse, do not advance to next section
+              // Re-edit: nur kollabieren, nicht zur nächsten Sektion springen
               this.dOpen = null;
               return;
             }
@@ -1680,7 +1700,7 @@ const sheetData = {
             }
             this.dOpen = next;
             if (next) {
-              // Step b → c: wait for leave animation (180ms) then scroll to opened section
+              // Phase c (--bf-collapse 300ms) abwarten, dann zur neuen Sektion scrollen
               setTimeout(() => {
                 this.$nextTick(() => {
                   document.querySelector(`[data-dsection="${next}"]`)?.scrollIntoView({
@@ -1688,9 +1708,9 @@ const sheetData = {
                     block: 'nearest',
                   });
                 });
-              }, reduced ? 0 : 200);
+              }, reduced ? 0 : 300);
             }
-          }, reduced ? 300 : 150);
+          }, reduced ? 300 : 350);
         },
 
         dFinishHinweis() {
