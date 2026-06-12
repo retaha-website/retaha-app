@@ -21,6 +21,7 @@ import EveMessage from './EveMessage.astro';
 import EveActionConfirmCard from './EveActionConfirmCard.astro';
 import EveSuggestionChips from './EveSuggestionChips.astro';
 import { t, type Lang } from '@retaha/i18n';
+import eveAvatarRaw from '../../assets/eve-avatar.svg?raw';
 
 interface Props {
   lang: Lang;
@@ -78,7 +79,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" aria-hidden="true">E</div>
+    <div class="eve-sheet-avatar" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
@@ -381,17 +382,19 @@ const conciergeLabel = t('eve.concierge_label', lang);
     padding: 14px 16px;
     gap: 0;
   }
-  /* Avatar: "E" monogram, tinted from hotel accent via color-mix (no hardcoded pink) */
+  /* Avatar: Eve line-art SVG, inherits hotel accent via currentColor */
   [data-theme="bauhaus"] .eve-sheet-avatar {
-    width: 36px; height: 36px;
+    width: 40px; height: 40px;
     border-radius: 50%;
     background: color-mix(in srgb, var(--theme-accent, #FF4A82) 13%, #FAFAF6);
     border: none;
     display: grid; place-items: center;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px; font-weight: 700; line-height: 1;
     color: var(--theme-accent, #FF4A82);
     flex-shrink: 0; justify-self: start;
+    overflow: hidden;
+  }
+  [data-theme="bauhaus"] .eve-sheet-avatar svg {
+    width: 38px; height: 38px;
   }
   /* Header info: center-aligned */
   [data-theme="bauhaus"] .eve-sheet-header-info {
