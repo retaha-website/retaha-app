@@ -380,18 +380,32 @@ function walkLabel(min: number | undefined): string {
       }
       .show-more-btn:hover { opacity: 0.75; }
 
+      /* ── Stars ───────────────────────────────────────────────────────── */
+      .star {
+        color: var(--accent); font-size: 11px; line-height: 1;
+        vertical-align: middle;
+      }
+
       /* ── Place detail overlay ─────────────────────────────────────────── */
       .detail-backdrop {
-        position: fixed; inset: 0; background: rgba(10,10,10,0.35);
+        position: fixed;
+        /* starts BELOW safe-area so statusbar stays light */
+        top: env(safe-area-inset-top, 50px);
+        left: 0; right: 0; bottom: 0;
+        background: rgba(10,10,10,0.18);
         z-index: 40;
       }
       .detail-sheet {
-        position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-        width: 100%; max-width: 480px;
+        position: fixed; bottom: 0;
+        /* centering without transform so translateY animation is pure */
+        left: 0; right: 0;
+        margin-inline: auto;
+        width: min(100%, 480px);
         max-height: 88vh; overflow-y: auto;
         background: var(--bg); border-radius: 16px 16px 0 0;
         z-index: 41;
         padding-bottom: env(safe-area-inset-bottom, 20px);
+        box-shadow: 0 -4px 24px rgba(10,10,10,0.10);
       }
       .detail-header {
         display: flex; align-items: center; justify-content: space-between;
@@ -516,10 +530,10 @@ function walkLabel(min: number | undefined): string {
         return (
           <div x-show={`activeTab === '${cat}'`} x-cloak role="tabpanel">
 
-            <!-- Hotel picks -->
+            <!-- Hotel picks — hidden entirely when no picks exist -->
+            {d.picks.length > 0 && (
             <section class="cat-section">
               <p class="cat-title">{labels.sectionPicks}</p>
-              {d.picks.length === 0 && <p class="place-empty">{labels.noPicks}</p>}
               {d.picks.map(p => (
                 <article
                   class="place-card"
@@ -535,7 +549,7 @@ function walkLabel(min: number | undefined): string {
                   <div class="place-card-body">
                     <p class="place-card-name">{p.name}</p>
                     <p class="place-card-meta">
-                      {p.rating != null && <span>⭐ {p.rating}</span>}
+                      {p.rating != null && <span><span class="star" aria-hidden="true">★</span> {p.rating}</span>}
                       {p.rating != null && (p.priceLevel || p.walkingMin != null) && <span class="place-card-meta-sep">·</span>}
                       {p.priceLevel && <span>{PRICE[p.priceLevel]}</span>}
                       {p.priceLevel && p.walkingMin != null && <span class="place-card-meta-sep">·</span>}
@@ -546,6 +560,7 @@ function walkLabel(min: number | undefined): string {
                 </article>
               ))}
             </section>
+            )}
 
             <!-- Auto / nearby -->
             <section class="cat-section">
@@ -568,7 +583,7 @@ function walkLabel(min: number | undefined): string {
                     <div class="place-item-body">
                       <p class="place-item-name">{a.name}</p>
                       <p class="place-item-meta">
-                        {a.rating != null && `⭐ ${a.rating}`}
+                        {a.rating != null && <><span class="star" aria-hidden="true">★</span> {a.rating}</>}
                         {a.rating != null && a.walkingMin != null && ' · '}
                         {a.walkingMin != null && walkLabel(a.walkingMin)}
                       </p>
@@ -607,7 +622,7 @@ function walkLabel(min: number | undefined): string {
                     <div class="place-item-body">
                       <p class="place-item-name">{a.name}</p>
                       <p class="place-item-meta">
-                        {a.rating != null && `⭐ ${a.rating}`}
+                        {a.rating != null && <><span class="star" aria-hidden="true">★</span> {a.rating}</>}
                         {a.rating != null && a.walkingMin != null && ' · '}
                         {a.walkingMin != null && walkLabel(a.walkingMin)}
                       </p>
@@ -674,9 +689,10 @@ function walkLabel(min: number | undefined): string {
         <div class="detail-body">
           <!-- Meta row -->
           <div class="detail-meta">
-            <span class="detail-meta-item" x-show="data?.rating">
-              ⭐ <span x-text="data?.rating"></span>
-              <span x-show="data?.userRatingCount"> (<span x-text="data?.userRatingCount"></span>)</span>
+            <span class="detail-meta-item" x-show="data?.rating" style="display:inline-flex;align-items:center;gap:3px">
+              <span class="star" aria-hidden="true">★</span>
+              <span x-text="data?.rating"></span>
+              <span x-show="data?.userRatingCount">(<span x-text="data?.userRatingCount"></span>)</span>
             </span>
             <span class="detail-meta-item" x-show="data?.priceSymbol" x-text="data?.priceSymbol"></span>
             <span class="detail-meta-item"
@@ -723,7 +739,10 @@ function walkLabel(min: number | undefined): string {
             <p class="detail-reviews-title">Bewertungen</p>
             <template x-for="r in (data?.reviews || [])" :key="r.author">
               <div class="detail-review">
-                <p class="detail-review-author" x-text="r.author + (r.rating ? '  ·  ' + '★'.repeat(r.rating) : '')"></p>
+                <p class="detail-review-author">
+                  <span x-text="r.author"></span>
+                  <span class="star" x-show="r.rating" x-text="r.rating ? ' · ' + '★'.repeat(r.rating) : ''" style="font-size:10px;margin-left:4px"></span>
+                </p>
                 <p class="detail-review-text" x-text="r.text"></p>
               </div>
             </template>
