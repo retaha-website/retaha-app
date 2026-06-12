@@ -1,0 +1,52 @@
+---
+// Pulsierendes LED-Indikator für Modul-Status.
+// Spec 1:1 aus gast-vorschau/settings/ModulesSection.astro übernommen.
+// @keyframes led-pulse ist global in packages/ui/src/styles/v9-colors.css.
+
+interface Props {
+  on: boolean;
+  label?: string;
+}
+
+const { on, label } = Astro.props;
+const text = label ?? (on ? 'Modul aktiv' : 'Modul inaktiv');
+---
+
+<span class={`mod-status-led-wrap${on ? ' is-on' : ''}`}>
+  <span class="mod-status-led__dot" aria-hidden="true"></span>
+  <span class="mod-status-led__text">{text}</span>
+</span>
+
+<style>
+  .mod-status-led-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mod-status-led__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    flex-shrink: 0;
+    transition: background 200ms ease, box-shadow 200ms ease;
+  }
+  .mod-status-led-wrap.is-on .mod-status-led__dot {
+    background: var(--sage);
+    box-shadow: 0 0 0 3px rgba(92, 144, 112, 0.25);
+    animation: led-pulse 2s ease-in-out infinite;
+  }
+
+  .mod-status-led__text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-muted);
+    transition: color 200ms ease;
+  }
+  .mod-status-led-wrap.is-on .mod-status-led__text {
+    color: var(--sage);
+    font-weight: 500;
+  }
+</style>
