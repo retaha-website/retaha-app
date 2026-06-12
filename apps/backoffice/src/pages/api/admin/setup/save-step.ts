@@ -85,10 +85,48 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     }
     case 'complete': {
       // Vom Schritt 5 (Done) → completed_at setzen
+      const now = new Date().toISOString();
       await admin.from('onboarding_state').upsert({
         hotel_id: hotel.id,
-        completed_at: new Date().toISOString(),
+        completed_at: now,
       }, { onConflict: 'hotel_id' });
+
+      // Seed default FAQ if eve_knowledge is still empty for this hotel
+      const { count } = await admin
+        .from('eve_knowledge')
+        .select('id', { count: 'exact', head: true })
+        .eq('hotel_id', hotel.id);
+      if ((count ?? 0) === 0) {
+        const { data: hotelData } = await admin
+          .from('hotels').select('default_language').eq('id', hotel.id).maybeSingle();
+        const lang = (hotelData?.default_language as string) ?? 'de';
+        await admin.from('eve_knowledge').insert({
+          hotel_id: hotel.id,
+          category: 'faq',
+          language_code: lang,
+          is_published: true,
+          sort_order: 1,
+          question: 'Wann ist Check-out?',
+          answer: 'Check-out ist täglich bis 11:00 Uhr. Ein späterer Check-out ist oft möglich — frag mich gerne.',
+          question_i18n: {
+            de: { value: 'Wann ist Check-out?',          source: 'original', updated_at: now },
+            en: { value: 'What time is check-out?',       source: 'auto',     updated_at: now },
+            fr: { value: 'À quelle heure est le départ ?',source: 'auto',     updated_at: now },
+            es: { value: '¿A qué hora es la salida?',     source: 'auto',     updated_at: now },
+            it: { value: 'A che ora è il check-out?',     source: 'auto',     updated_at: now },
+            nl: { value: 'Hoe laat is het uitchecken?',   source: 'auto',     updated_at: now },
+          },
+          answer_i18n: {
+            de: { value: 'Check-out ist täglich bis 11:00 Uhr. Ein späterer Check-out ist oft möglich — frag mich gerne.',           source: 'original', updated_at: now },
+            en: { value: 'Check-out is daily until 11:00. A late check-out is often possible — just ask me.',                         source: 'auto',     updated_at: now },
+            fr: { value: "Le départ est chaque jour jusqu'à 11h00. Un départ tardif est souvent possible — demandez-moi.",            source: 'auto',     updated_at: now },
+            es: { value: 'La salida es a diario hasta las 11:00. Una salida tardía suele ser posible — no dude en preguntarme.',      source: 'auto',     updated_at: now },
+            it: { value: 'Il check-out è tutti i giorni entro le 11:00. Un check-out posticipato è spesso possibile — chiedimi pure.',source: 'auto',     updated_at: now },
+            nl: { value: 'Uitchecken kan dagelijks tot 11:00 uur. Later uitchecken is vaak mogelijk — vraag het me gerust.',           source: 'auto',     updated_at: now },
+          },
+        });
+      }
+
       return json({ ok: true });
     }
     default:

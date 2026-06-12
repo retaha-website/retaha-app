@@ -49,18 +49,17 @@ if (Astro.request.method === 'POST') {
     if (!question || !answer) {
       message = { type: 'error', text: 'Frage und Antwort sind Pflichtfelder.' };
     } else {
-      const [qI18n, aI18n] = await Promise.all([
-        translateField('eve_knowledge.faq_create.question', null, question),
-        translateField('eve_knowledge.faq_create.answer',   null, answer),
-      ]);
+      // INSERT first with base-language i18n — row is committed before translation
+      const baseQI18n = { [hotelDefaultLang]: makeI18nEntry(question) };
+      const baseAI18n = { [hotelDefaultLang]: makeI18nEntry(answer) };
       const { data, error } = await client
         .from('eve_knowledge')
         .insert({
           hotel_id: hotel.id,
           category: 'faq',
           question, answer,
-          question_i18n: qI18n,
-          answer_i18n: aI18n,
+          question_i18n: baseQI18n,
+          answer_i18n: baseAI18n,
           language_code: hotelDefaultLang,
         })
         .select('id')
@@ -68,8 +67,18 @@ if (Astro.request.method === 'POST') {
       if (error) {
         message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
       } else {
-        message = { type: 'success', text: 'FAQ-Eintrag hinzugefügt.' };
         highlightId = data?.id ?? null;
+        message = { type: 'success', text: 'FAQ-Eintrag hinzugefügt.' };
+        // Translate and update i18n — entry already saved, this is best-effort
+        try {
+          const [qI18n, aI18n] = await Promise.all([
+            translateField('eve_knowledge.faq_create.question', baseQI18n, question),
+            translateField('eve_knowledge.faq_create.answer',   baseAI18n, answer),
+          ]);
+          await client.from('eve_knowledge')
+            .update({ question_i18n: qI18n, answer_i18n: aI18n })
+            .eq('id', data!.id);
+        } catch (_) { /* translation failed — entry saved with base language */ }
       }
     }
   }
@@ -81,30 +90,32 @@ if (Astro.request.method === 'POST') {
     if (!id || !question || !answer) {
       message = { type: 'error', text: 'Fehlende Felder beim Update.' };
     } else {
-      const { data: existingFaq } = await client
+      // UPDATE core text first — saved regardless of translation outcome
+      const { error: coreErr } = await client
         .from('eve_knowledge')
-        .select('question_i18n, answer_i18n')
-        .eq('id', id).eq('hotel_id', hotel.id).maybeSingle();
-      const [qI18n, aI18n] = await Promise.all([
-        translateField(`eve_knowledge.${id}.question`, existingFaq?.question_i18n, question),
-        translateField(`eve_knowledge.${id}.answer`,   existingFaq?.answer_i18n,   answer),
-      ]);
-      const { error } = await client
-        .from('eve_knowledge')
-        .update({
-          question, answer,
-          question_i18n: qI18n,
-          answer_i18n: aI18n,
-          updated_at: NOW(),
-        })
+        .update({ question, answer, updated_at: NOW() })
         .eq('id', id)
         .eq('hotel_id', hotel.id);
-      if (error) {
-        message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+      if (coreErr) {
+        message = { type: 'error', text: `Update fehlgeschlagen: ${coreErr.message}` };
       } else {
-        await invalidateTranslationsForKnowledge(id);
         message = { type: 'success', text: 'FAQ-Eintrag aktualisiert.' };
         highlightId = id;
+        // Translate and update i18n — best-effort after core save
+        try {
+          const { data: existingFaq } = await client
+            .from('eve_knowledge')
+            .select('question_i18n, answer_i18n')
+            .eq('id', id).eq('hotel_id', hotel.id).maybeSingle();
+          const [qI18n, aI18n] = await Promise.all([
+            translateField(`eve_knowledge.${id}.question`, existingFaq?.question_i18n, question),
+            translateField(`eve_knowledge.${id}.answer`,   existingFaq?.answer_i18n,   answer),
+          ]);
+          await client.from('eve_knowledge')
+            .update({ question_i18n: qI18n, answer_i18n: aI18n })
+            .eq('id', id).eq('hotel_id', hotel.id);
+          await invalidateTranslationsForKnowledge(id);
+        } catch (_) { /* translation failed — core text saved */ }
       }
     }
   }
@@ -131,6 +142,7 @@ if (Astro.request.method === 'POST') {
   else if (action === 'rules_save' || action === 'directions_save') {
     const category = action === 'rules_save' ? 'rules' : 'directions';
     const answer = form.get('answer')?.toString().trim() ?? '';
+    const catLabel = category === 'rules' ? 'Hausregeln' : 'Anfahrt';
 
     if (!answer) {
       const { error } = await client
@@ -141,7 +153,7 @@ if (Astro.request.method === 'POST') {
       if (error) {
         message = { type: 'error', text: `Löschen fehlgeschlagen: ${error.message}` };
       } else {
-        message = { type: 'success', text: `${category === 'rules' ? 'Hausregeln' : 'Anfahrt'} gelöscht.` };
+        message = { type: 'success', text: `${catLabel} gelöscht.` };
       }
     } else {
       const { data: existing } = await client
@@ -152,28 +164,48 @@ if (Astro.request.method === 'POST') {
         .maybeSingle();
 
       if (existing?.id) {
-        const { data: existingRow } = await client
-          .from('eve_knowledge')
-          .select('answer_i18n')
-          .eq('id', existing.id).maybeSingle();
-        const aI18n = await translateField(
-          `eve_knowledge.${category}.${existing.id}.answer`,
-          existingRow?.answer_i18n,
-          answer,
-        );
+        // UPDATE core answer first, then translate best-effort
         const { error } = await client
           .from('eve_knowledge')
-          .update({ answer, answer_i18n: aI18n, updated_at: NOW() })
+          .update({ answer, updated_at: NOW() })
           .eq('id', existing.id);
-        if (error) message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
-        else message = { type: 'success', text: `${category === 'rules' ? 'Hausregeln' : 'Anfahrt'} aktualisiert.` };
+        if (error) {
+          message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+        } else {
+          message = { type: 'success', text: `${catLabel} aktualisiert.` };
+          try {
+            const { data: existingRow } = await client
+              .from('eve_knowledge')
+              .select('answer_i18n')
+              .eq('id', existing.id).maybeSingle();
+            const aI18n = await translateField(
+              `eve_knowledge.${category}.${existing.id}.answer`,
+              existingRow?.answer_i18n,
+              answer,
+            );
+            await client.from('eve_knowledge')
+              .update({ answer_i18n: aI18n })
+              .eq('id', existing.id);
+          } catch (_) { /* translation failed — core text saved */ }
+        }
       } else {
-        const aI18n = await translateField(`eve_knowledge.${category}.new.answer`, null, answer);
-        const { error } = await client
+        // INSERT first with base-language i18n, then translate
+        const baseAI18n = { [hotelDefaultLang]: makeI18nEntry(answer) };
+        const { data: newRow, error } = await client
           .from('eve_knowledge')
-          .insert({ hotel_id: hotel.id, category, answer, answer_i18n: aI18n, language_code: hotelDefaultLang });
-        if (error) message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
-        else message = { type: 'success', text: `${category === 'rules' ? 'Hausregeln' : 'Anfahrt'} gespeichert.` };
+          .insert({ hotel_id: hotel.id, category, answer, answer_i18n: baseAI18n, language_code: hotelDefaultLang })
+          .select('id').single();
+        if (error) {
+          message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
+        } else {
+          message = { type: 'success', text: `${catLabel} gespeichert.` };
+          try {
+            const aI18n = await translateField(`eve_knowledge.${category}.new.answer`, baseAI18n, answer);
+            await client.from('eve_knowledge')
+              .update({ answer_i18n: aI18n })
+              .eq('id', newRow!.id);
+          } catch (_) { /* translation failed — entry saved with base language */ }
+        }
       }
     }
   }
@@ -232,10 +264,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
         <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
       </svg>
       <span>
-        <strong>Pflege dein Wissen auf {LANG_LABELS[hotelDefaultLang]}.</strong>
-        {otherEnabledLabel
-          ? ` Eve übersetzt automatisch für ${otherEnabledLabel}.`
-          : ' Eve übersetzt automatisch in alle aktivierten Gast-Sprachen.'}
+        Pflege das Wissen von Eve in deiner Standardsprache (<strong>{LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang}</strong>). Eve übersetzt automatisch in alle verfügbaren Sprachen.
       </span>
     </div>
 
@@ -243,6 +272,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 
       <!-- ── FAQ ── -->
       <section class="s-card" id="faq-section">
+        <p class="ev-section-eyebrow">— 01 / HÄUFIGE FRAGEN —</p>
         <div class="s-card__head">
           <h2 class="s-card__title">Häufige Fragen</h2>
           <span class="s-card__num">FAQ</span>
@@ -336,6 +366,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 
       <!-- ── Hausregeln ── -->
       <section class="s-card">
+        <p class="ev-section-eyebrow">— 02 / HAUSREGELN —</p>
         <div class="s-card__head">
           <h2 class="s-card__title">Hausregeln</h2>
         </div>
@@ -358,6 +389,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 
       <!-- ── Anfahrt ── -->
       <section class="s-card">
+        <p class="ev-section-eyebrow">— 03 / ANFAHRT —</p>
         <div class="s-card__head">
           <h2 class="s-card__title">Anfahrt</h2>
         </div>
@@ -410,8 +442,19 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     transition: border-color 300ms ease, box-shadow 300ms ease;
   }
   .ev-item--highlight {
-    border-color: var(--pink) !important;
-    box-shadow: 0 0 0 3px rgba(255, 74, 130, 0.12);
+    border-color: var(--te-yellow) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-yellow) 30%, transparent);
+  }
+
+  /* Section eyebrow (01 / HÄUFIGE FRAGEN etc.) */
+  .ev-section-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0 0 10px;
+    padding: 0;
   }
 
   .ev-item__view {
