@@ -79,7 +79,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" :class="{ 'is-greeting': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
+    <div class="eve-sheet-avatar" :class="{ 'waving': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
@@ -370,42 +370,45 @@ const conciergeLabel = t('eve.concierge_label', lang);
 </style>
 
 <style is:global>
-  /* ── Avatar-Mikro-Animationen (prefers-reduced-motion geschützt) ──── */
-  /*
-   * CSS-Variablen für einfache Justierung (Taha: ein-Wert-Änderung):
-   *   --avatar-greet-delay:    Wartezeit nach Sheet-Einfahren   (default 900ms)
-   *   --avatar-greet-duration: Länge des Wippens               (default 1800ms)
+  /* ── Avatar-Animationen ──────────────────────────────────────────────
    *
-   * WICHTIG — Transform-Trennung (kein Konflikt mehr):
-   *   is-greeting → animiert .eve-sheet-avatar CONTAINER (rotate, pendulum)
-   *   is-typing   → animiert .eve-sheet-avatar svg (scale+opacity)
-   *   → verschiedene Elemente, kein animation-Override möglich
+   * CSS-Variablen (Taha: Ein-Wert-Justierung):
+   *   --avatar-wave-delay:    Wartezeit nach Sheet-Slide   (default 900ms)
+   *   --avatar-wave-duration: Dauer eines Wink-Zyklus      (default 1.6s)
+   *
+   * Elemente (kein transform-Konflikt):
+   *   .waving .wave-hand → animiert nur die Hand-Gruppe (rotate, wrist pivot)
+   *   .is-typing svg     → animiert das SVG (scale+opacity)
+   *
+   * transform-box: fill-box ist PFLICHT für iOS Safari (sonst falscher Pivot).
    */
   :root {
-    --avatar-greet-delay: 900ms;
-    --avatar-greet-duration: 1800ms;
+    --avatar-wave-delay: 900ms;
+    --avatar-wave-duration: 1.6s;
   }
+
+  /* Pivot-Eigenschaften immer gesetzt (unabhängig von Animation) */
+  .wave-hand {
+    transform-box: fill-box;
+    transform-origin: 12% 96%;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    /* Greeting: Pendel-Wippen auf dem CONTAINER-Kreis */
-    .eve-sheet-avatar.is-greeting {
-      transform-origin: bottom center;
-      animation: eve-greet var(--avatar-greet-duration, 1800ms) ease-in-out var(--avatar-greet-delay, 900ms) both;
+    /* Wink: 2 Zyklen, dann Stopp — Hand dreht sich um Handgelenk */
+    .eve-sheet-avatar.waving .wave-hand {
+      animation: eve-wave var(--avatar-wave-duration, 1.6s) ease-in-out
+                 var(--avatar-wave-delay, 900ms) 2 both;
     }
-    /* Typing-Puls: nur auf dem SVG innen — kein transform-Konflikt */
+    /* Typing-Puls: SVG innen — kein transform-Konflikt mit Hand */
     .eve-sheet-avatar.is-typing svg {
       animation: eve-typing-pulse 1.2s ease-in-out infinite;
     }
   }
-  @keyframes eve-greet {
-    /* Pendel: 3 Bögen, ±9 °, sichtbar auf 40 px — Fußpunkt fixiert */
-    0%   { transform: rotate(0deg)   translateY(0);    }
-    10%  { transform: rotate(-9deg)  translateY(-3px); }
-    28%  { transform: rotate(10deg)  translateY(-5px); }
-    46%  { transform: rotate(-8deg)  translateY(-3px); }
-    62%  { transform: rotate(6deg)   translateY(-1px); }
-    76%  { transform: rotate(-3deg)  translateY(0);    }
-    90%  { transform: rotate(1deg)   translateY(0);    }
-    100% { transform: rotate(0deg)   translateY(0);    }
+  @keyframes eve-wave {
+    0%, 100% { transform: rotate(0deg);   }
+    20%      { transform: rotate(14deg);  }
+    45%      { transform: rotate(-12deg); }
+    70%      { transform: rotate(9deg);   }
   }
   @keyframes eve-typing-pulse {
     0%, 100% { transform: scale(1);    opacity: 1;   }
@@ -424,7 +427,8 @@ const conciergeLabel = t('eve.concierge_label', lang);
     padding: 14px 16px;
     gap: 0;
   }
-  /* Avatar: Eve line-art SVG, inherits hotel accent via currentColor */
+  /* Avatar: Eve line-art SVG, inherits hotel accent via currentColor.
+     KEIN overflow:hidden — Hand ragt bewusst aus dem Ring heraus. */
   [data-theme="bauhaus"] .eve-sheet-avatar {
     width: 40px; height: 40px;
     border-radius: 50%;
@@ -433,10 +437,10 @@ const conciergeLabel = t('eve.concierge_label', lang);
     display: grid; place-items: center;
     color: var(--theme-accent, #FF4A82);
     flex-shrink: 0; justify-self: start;
-    overflow: hidden;
   }
   [data-theme="bauhaus"] .eve-sheet-avatar svg {
     width: 38px; height: 38px;
+    overflow: visible;
   }
   /* Header info: center-aligned */
   [data-theme="bauhaus"] .eve-sheet-header-info {
