@@ -136,8 +136,8 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 <style is:global>
 [x-cloak] { display: none !important; }
 
-/* textarea resize (not in admin-page.css) */
-textarea.s-input { resize: vertical; min-height: 72px; }
+/* textarea resize + auto-grow */
+textarea.s-input { resize: none; min-height: 72px; }
 
 /* iPad touch targets (CC-ADDENDUM) */
 .settings-page .toggle-row { min-height: 44px; }
@@ -165,8 +165,8 @@ textarea.s-input { resize: vertical; min-height: 72px; }
 .bp-drag-handle:active { cursor: grabbing; }
 .bp-drag-handle svg { pointer-events: none; }
 .bp-item-content { flex: 1; display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 0; background: none; border: none; cursor: pointer; text-align: left; min-height: 52px; transition: background 120ms; }
-.bp-item-row:hover .bp-item-content { background: var(--bg-deep, #F5F4F2); }
-.bp-item-row:hover .bp-item-row:active .bp-item-content { background: var(--te-yellow-soft); }
+.bp-item-row:hover { background: var(--bg-deep, #F5F4F2); }
+.bp-item-row:hover .bp-item-content { background: transparent; }
 .bp-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-medium); flex-shrink: 0; }
 .bp-item-dot--on { background: #4CAF50; }
 .bp-item-info { flex: 1; min-width: 0; }
@@ -178,6 +178,17 @@ textarea.s-input { resize: vertical; min-height: 72px; }
 .bp-item-edit { font-size: 11px; color: var(--ink-muted); white-space: nowrap; margin-left: 4px; flex-shrink: 0; }
 .bp-item-row:hover .bp-item-edit { color: var(--ink); }
 .bp-empty { text-align: center; padding: 48px 32px; color: var(--ink-muted); font-size: 14px; font-style: italic; }
+
+/* Slot-Länge stepper */
+.bp-slot-stepper { display: flex; align-items: stretch; }
+.bp-slot-stepper .s-input { text-align: center; width: 64px; border-radius: 0; border-left: none; border-right: none; }
+.bp-slot-stepper .s-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.bp-slot-stepper .s-input::-webkit-outer-spin-button,
+.bp-slot-stepper .s-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.bp-slot-step-btn { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-size: 18px; line-height: 1; color: var(--ink); flex-shrink: 0; user-select: none; transition: background 120ms; }
+.bp-slot-step-btn:first-child { border-radius: var(--r-sm, 4px) 0 0 var(--r-sm, 4px); }
+.bp-slot-step-btn:last-child { border-radius: 0 var(--r-sm, 4px) var(--r-sm, 4px) 0; }
+.bp-slot-step-btn:active { background: var(--te-yellow, #FFE600) !important; color: #0A0A0A; }
 
 /* LMIV notice — reuses shared s-warning-row style */
 
@@ -271,7 +282,17 @@ textarea.s-input { resize: vertical; min-height: 72px; }
               </div>
               <div class="field">
                 <label class="field__label" for="bf-slot">Slot-Länge (Min)</label>
-                <input type="number" id="bf-slot" name="breakfast_slot_minutes" x-model="data.breakfast_slot_minutes" min="5" max="120" step="5" class="s-input" inputmode="numeric" />
+                <div class="bp-slot-stepper">
+                  <button type="button" class="bp-slot-step-btn"
+                    @click="data.breakfast_slot_minutes = String(Math.max(5, (parseInt(data.breakfast_slot_minutes)||30) - 5))"
+                    aria-label="Weniger">−</button>
+                  <input type="number" id="bf-slot" name="breakfast_slot_minutes"
+                    x-model="data.breakfast_slot_minutes" min="5" max="120" step="5"
+                    class="s-input" inputmode="numeric" />
+                  <button type="button" class="bp-slot-step-btn"
+                    @click="data.breakfast_slot_minutes = String(Math.min(120, (parseInt(data.breakfast_slot_minutes)||30) + 5))"
+                    aria-label="Mehr">+</button>
+                </div>
               </div>
             </div>
             <p class="field__hint">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
@@ -292,13 +313,10 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ location_de: locationDe })}, section: 'location' })`}>
           <div class="s-card__body">
-            <div class="field field--row">
-              <label class="field__label" for="bf-location">Deutsch</label>
-              <div class="field__input-wrap">
-                <input type="text" id="bf-location" name="location_de" x-model="data.location_de"
-                  placeholder="z.B. im Wintergarten" class="s-input" />
-                <span class="field__hint">Wird in der Gäste-App angezeigt — automatisch übersetzt.</span>
-              </div>
+            <div class="field">
+              <input type="text" id="bf-location" name="location_de" x-model="data.location_de"
+                placeholder="z.B. im Wintergarten" class="s-input" />
+              <span class="field__hint">Z. B. ‚im Wintergarten, EG' — Gäste sehen das auf der Frühstücksseite.</span>
             </div>
           </div>
           <div class="s-card__footer">
@@ -317,14 +335,12 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ included_de: includedDe })}, section: 'included' })`}>
           <div class="s-card__body">
-            <div class="field field--row">
-              <label class="field__label" for="bf-included">Deutsch</label>
-              <div class="field__input-wrap">
-                <textarea id="bf-included" name="included_de" rows="3" x-model="data.included_de"
-                  placeholder="z.B. Frische Backwaren, regionaler Honig, Bio-Eier, …"
-                  class="s-input"></textarea>
-                <span class="field__hint">Wird automatisch übersetzt.</span>
-              </div>
+            <div class="field">
+              <textarea id="bf-included" name="included_de" rows="3" x-model="data.included_de"
+                placeholder="z.B. Frische Backwaren, regionaler Honig, Bio-Eier, …"
+                class="s-input"
+                @input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"></textarea>
+              <span class="field__hint">Was Gäste beim Frühstück erwartet — kurz und appetitlich.</span>
             </div>
           </div>
           <div class="s-card__footer">
@@ -344,12 +360,15 @@ textarea.s-input { resize: vertical; min-height: 72px; }
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_price_cents: priceCents !== null ? (priceCents / 100).toFixed(2).replace('.', ',') : '' })}, section: 'price' })`}>
           <div class="s-card__body">
             <div class="field field--row">
-              <label class="field__label" for="bf-price">Preis in Euro</label>
+              <label class="field__label" for="bf-price">Preis</label>
               <div class="field__input-wrap">
-                <input type="text" id="bf-price" name="breakfast_price_cents"
-                  x-model="data.breakfast_price_cents"
-                  inputmode="decimal" placeholder="leer = kein Preis"
-                  class="s-input" style="max-width:220px" />
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="text" id="bf-price" name="breakfast_price_cents"
+                    x-model="data.breakfast_price_cents"
+                    inputmode="decimal" placeholder="leer = kein Preis"
+                    class="s-input" style="max-width:180px" />
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">€</span>
+                </div>
                 <span class="field__hint">z.B. 15 oder 15,50 · 0,00 = im Buffet enthalten · leer = kein Preis</span>
               </div>
             </div>
@@ -384,12 +403,15 @@ textarea.s-input { resize: vertical; min-height: 72px; }
             <div x-show="data.breakfast_room_service_enabled === 'true'" class="bp-fee-section"
                  style={roomServiceOn ? '' : 'display:none'}>
               <div class="field field--row">
-                <label class="field__label" for="rs-fee">Aufschlag (Cent)</label>
+                <label class="field__label" for="rs-fee">Aufschlag</label>
                 <div class="field__input-wrap">
-                  <input type="text" id="rs-fee" name="breakfast_room_service_fee_cents"
-                    x-model="data.breakfast_room_service_fee_cents"
-                    inputmode="decimal" class="s-input" style="max-width:220px"
-                    placeholder="0,00" />
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <input type="text" id="rs-fee" name="breakfast_room_service_fee_cents"
+                      x-model="data.breakfast_room_service_fee_cents"
+                      inputmode="decimal" class="s-input" style="max-width:180px"
+                      placeholder="0,00" />
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">€</span>
+                  </div>
                   <span class="field__hint">z.B. 3,00 · 0,00 = kein Aufschlag</span>
                 </div>
               </div>
