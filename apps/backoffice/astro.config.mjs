@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   output: 'server',
-  adapter: vercel(),
+  adapter: vercel({ maxDuration: 60 }),
   server: { port: 4324 },
   vite: {
     plugins: [tailwindcss()],
