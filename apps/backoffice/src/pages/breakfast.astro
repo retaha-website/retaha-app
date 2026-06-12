@@ -183,7 +183,7 @@ textarea.s-input { resize: none; min-height: 72px; }
 .bp-item-row:last-child { border-bottom: none; }
 .bp-item-row.is-drag-over { background: var(--te-yellow-soft); box-shadow: inset 0 2px 0 var(--te-yellow); }
 .bp-item-row.is-dragging { opacity: 0.4; }
-.bp-drag-handle { display: flex; align-items: center; justify-content: center; width: 36px; min-height: 52px; flex-shrink: 0; cursor: grab; color: var(--ink-faint); touch-action: none; user-select: none; }
+.bp-drag-handle { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 52px; flex-shrink: 0; cursor: grab; color: var(--ink-faint); touch-action: none; user-select: none; }
 .bp-drag-handle:hover { color: var(--ink-muted); }
 .bp-drag-handle:active { cursor: grabbing; }
 .bp-drag-handle svg { pointer-events: none; }
@@ -525,16 +525,14 @@ textarea.s-input { resize: none; min-height: 72px; }
                 <template x-for="item in group.items" :key="item.id">
                   <div class="bp-item-row"
                     :class="{'is-drag-over': dragTarget && dragTarget.id === item.id, 'is-dragging': dragItem && dragItem.id === item.id}"
-                    :data-item-id="item.id"
-                    draggable="true"
-                    @dragstart="dndStart($event, item)"
-                    @dragend="dndEnd()"
-                    @dragover.prevent="dndOver(item)"
-                    @drop.prevent="dndDrop(item)"
-                    @touchstart.passive="dndTouchStart($event, item)"
-                    @touchmove.prevent="dndTouchMove($event)"
-                    @touchend="dndTouchEnd()">
-                    <span class="bp-drag-handle" @click.stop aria-label="Ziehen zum Sortieren">
+                    :data-item-id="item.id">
+                    <span class="bp-drag-handle"
+                      @click.stop
+                      @pointerdown="dndPtrDown($event, item)"
+                      @pointermove="dndPtrMove($event)"
+                      @pointerup="dndPtrUp()"
+                      @pointercancel="dndPtrCancel()"
+                      aria-label="Ziehen zum Sortieren">
                       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
                         <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
                         <circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/>
@@ -801,7 +799,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       // Drag & Drop state
       dragItem: null,
       dragTarget: null,
-      _touchDragItem: null,
+      _ptrItem: null,
 
       get groupedItems() {
         const sorted = [...this.items].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
@@ -912,46 +910,36 @@ textarea.s-input { resize: none; min-height: 72px; }
         }
       },
 
-      // ── Drag & Drop ────────────────────────────────────────────────────
-      dndStart(e, item) {
-        this.dragItem = item;
-        e.dataTransfer.effectAllowed = 'move';
-      },
-      dndEnd() {
-        this.dragItem = null;
-        this.dragTarget = null;
-      },
-      dndOver(item) {
-        if (!this.dragItem || this.dragItem.id === item.id) return;
-        this.dragTarget = item;
-      },
-      dndDrop(item) {
-        if (!this.dragItem || this.dragItem.id === item.id) return;
-        this._dndPerform(item);
-      },
-      dndTouchStart(e, item) {
-        this._touchDragItem = item;
+      // ── Drag & Drop (Pointer Events — works on mouse + touch + pen) ───
+      dndPtrDown(e, item) {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        this._ptrItem = item;
         this.dragItem = item;
       },
-      dndTouchMove(e) {
-        if (!this._touchDragItem) return;
-        const touch = e.touches[0];
-        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      dndPtrMove(e) {
+        if (!this._ptrItem) return;
+        const el = document.elementFromPoint(e.clientX, e.clientY);
         const row = el && el.closest('[data-item-id]');
         if (row) {
           const id = parseInt(row.dataset.itemId, 10);
           const target = this.items.find(i => i.id === id);
-          if (target && target.id !== this._touchDragItem.id) this.dragTarget = target;
+          if (target && target.id !== this._ptrItem.id) this.dragTarget = target;
         }
       },
-      dndTouchEnd() {
-        if (this._touchDragItem && this.dragTarget) {
+      dndPtrUp() {
+        if (this._ptrItem && this.dragTarget) {
           this._dndPerform(this.dragTarget);
         } else {
           this.dragItem = null;
           this.dragTarget = null;
         }
-        this._touchDragItem = null;
+        this._ptrItem = null;
+      },
+      dndPtrCancel() {
+        this.dragItem = null;
+        this.dragTarget = null;
+        this._ptrItem = null;
       },
       _dndPerform(target) {
         const fromIdx = this.items.findIndex(i => i.id === this.dragItem.id);
