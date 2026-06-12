@@ -45,19 +45,38 @@ const UNIVERSAL: ChipSet = {
   en: ['Wi-Fi password', 'When is check-out?'],
   fr: ['Mot de passe Wi-Fi', 'À quelle heure le départ ?'],
   es: ['Contraseña Wi-Fi', '¿A qué hora la salida?'],
+  it: ['Password Wi-Fi', 'Quando è il checkout?'],
+  pt: ['Senha de WiFi', 'Quando é o check-out?'],
+  nl: ['WiFi-wachtwoord', 'Wanneer is het vertrek?'],
+  ru: ['Пароль Wi-Fi', 'Когда выезд?'],
+  ar: ['كلمة مرور Wi-Fi', 'متى موعد المغادرة؟'],
+  zh: ['WiFi密码', '退房时间?'],
+};
+
+// Chip-Texte für modul-gesteuerte Smart-Chips (10 Sprachen)
+const MODULE_WIFI: Record<Lang, string> = {
+  de: 'WLAN-Passwort', en: 'Wi-Fi password', fr: 'Mot de passe Wi-Fi', es: 'Contraseña Wi-Fi',
+  it: 'Password Wi-Fi', pt: 'Senha de WiFi', nl: 'WiFi-wachtwoord',
+  ru: 'Пароль Wi-Fi', ar: 'كلمة مرور Wi-Fi', zh: 'WiFi密码',
+};
+const MODULE_BREAKFAST: Record<Lang, string> = {
+  de: 'Wann startet das Frühstück?', en: 'When does breakfast start?',
+  fr: 'Quand commence le petit-déjeuner ?', es: '¿Cuándo empieza el desayuno?',
+  it: 'Quando inizia la colazione?', pt: 'Quando começa o café da manhã?',
+  nl: 'Wanneer begint het ontbijt?', ru: 'Когда начинается завтрак?',
+  ar: 'متى يبدأ الإفطار؟', zh: '早餐几点开始?',
+};
+const MODULE_CHECKOUT: Record<Lang, string> = {
+  de: 'Wann ist Check-out?', en: 'When is check-out?',
+  fr: 'À quelle heure le départ ?', es: '¿A qué hora la salida?',
+  it: 'Quando è il checkout?', pt: 'Quando é o check-out?',
+  nl: 'Wanneer is het vertrek?', ru: 'Когда выезд?',
+  ar: 'متى موعد المغادرة؟', zh: '退房时间?',
 };
 
 /**
  * Returns 4-5 suggestion chips based on hour of day + language.
- *
- * Morning: 06:00–11:00 — Frühstück, Wetter, Tages-Aktivitäten
- * Midday:  11:00–15:00 — Mittagessen, lokale Tipps
- * Evening: 15:00–22:00 — Abend-Restaurant, Bar, Events
- * Night:   22:00–06:00 — Notfall, Morgen-Vorausplanung
- *
- * Plus 2 universelle Chips am Ende: WLAN + Check-out.
- *
- * Fallback bei unklarer Hour: Morning-Set.
+ * Legacy function kept for backward compatibility.
  */
 export function getEveSuggestions(hour: number, lang: Lang): SuggestionChip[] {
   const h = Math.max(0, Math.min(23, Math.floor(hour)));
@@ -72,4 +91,50 @@ export function getEveSuggestions(hour: number, lang: Lang): SuggestionChip[] {
   const main = (dayPart[lang] ?? dayPart.de).map((text, i) => ({ key: `${prefix}_${i}`, text }));
   const universal = (UNIVERSAL[lang] ?? UNIVERSAL.de).map((text, i) => ({ key: `universal_${i}`, text }));
   return [...main, ...universal];
+}
+
+/**
+ * Smart chips: FAQ-Fragen (top 2) → Modul-Chips (wifi/breakfast wenn aktiv) →
+ * Checkout → Tageszeit-Filler. Max 5, dedup by text. Alle 10 Sprachen.
+ */
+export function getEveSmartChips(
+  hour: number,
+  lang: Lang,
+  faqEntries: Array<{ id: string; question: string; question_i18n?: unknown }>,
+  modules: { wifi: boolean; breakfast: boolean },
+): SuggestionChip[] {
+  const chips: SuggestionChip[] = [];
+  const seen = new Set<string>();
+
+  const push = (chip: SuggestionChip) => {
+    if (chips.length >= 5 || seen.has(chip.text)) return;
+    chips.push(chip);
+    seen.add(chip.text);
+  };
+
+  // 1. Top 2 FAQ-Chips in Gast-Sprache
+  for (const faq of faqEntries.slice(0, 2)) {
+    const i18n = faq.question_i18n as Record<string, { value?: string }> | null | undefined;
+    const text = i18n?.[lang]?.value || i18n?.['en']?.value || i18n?.['de']?.value || faq.question;
+    if (text?.trim()) push({ key: `faq_${faq.id}`, text: text.trim() });
+  }
+
+  // 2. Modul-Chips — nur wenn Modul aktiv
+  if (modules.wifi)      push({ key: 'chip_wifi',      text: MODULE_WIFI[lang]      ?? MODULE_WIFI.de });
+  if (modules.breakfast) push({ key: 'chip_breakfast', text: MODULE_BREAKFAST[lang] ?? MODULE_BREAKFAST.de });
+
+  // 3. Check-out immer nützlich
+  push({ key: 'chip_checkout', text: MODULE_CHECKOUT[lang] ?? MODULE_CHECKOUT.de });
+
+  // 4. Tageszeit-Filler (kein Universal mehr — oben bereits gehandhabt)
+  const h = Math.max(0, Math.min(23, Math.floor(hour)));
+  let dayPart: ChipSet;
+  let pfx: string;
+  if (h >= 6 && h < 11)       { dayPart = MORNING; pfx = 'morning'; }
+  else if (h >= 11 && h < 15) { dayPart = MIDDAY;  pfx = 'midday'; }
+  else if (h >= 15 && h < 22) { dayPart = EVENING; pfx = 'evening'; }
+  else                         { dayPart = NIGHT;   pfx = 'night'; }
+  (dayPart[lang] ?? dayPart.de).forEach((text, i) => push({ key: `${pfx}_${i}`, text }));
+
+  return chips;
 }

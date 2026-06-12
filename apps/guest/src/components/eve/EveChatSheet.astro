@@ -79,7 +79,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
+    <div class="eve-sheet-avatar" :class="{ 'is-greeting': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
@@ -370,6 +370,26 @@ const conciergeLabel = t('eve.concierge_label', lang);
 </style>
 
 <style is:global>
+  /* ── Avatar-Mikro-Animationen (prefers-reduced-motion geschützt) ──── */
+  @media (prefers-reduced-motion: no-preference) {
+    .eve-sheet-avatar.is-greeting svg {
+      animation: eve-greet 600ms ease-out forwards;
+    }
+    .eve-sheet-avatar.is-typing svg {
+      animation: eve-typing-pulse 1.2s ease-in-out infinite;
+    }
+  }
+  @keyframes eve-greet {
+    0%   { transform: scale(1) translateY(0); }
+    35%  { transform: scale(1.06) translateY(-3px); }
+    65%  { transform: scale(0.97) translateY(0); }
+    100% { transform: scale(1) translateY(0); }
+  }
+  @keyframes eve-typing-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.04); opacity: 0.8; }
+  }
+
   /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */
 
   /* Header: grid 1fr·auto·1fr → center column always truly centered */

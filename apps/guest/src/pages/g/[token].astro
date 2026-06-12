@@ -15,7 +15,7 @@ import WalletAddSheet from '../../components/sheets/WalletAddSheet.astro';
 import { isWalletConfigured } from '@retaha/wallet';
 import { buildPhotoUrl } from '../../lib/places/google-client';
 import { setStaySessionCookie, getStaySession, computeBrandPalette } from '@retaha/auth';
-import { getEveSuggestions } from '@retaha/eve';
+import { getEveSmartChips } from '@retaha/eve';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@retaha/ui/styles/themes.css';
 import '@retaha/ui/styles/retaha.css';
@@ -191,7 +191,7 @@ try {
   );
   if (!Number.isFinite(localHour)) localHour = 9;
 } catch { localHour = 9; }
-const eveSuggestions = getEveSuggestions(localHour, lang);
+// eveSuggestions wird weiter unten nach wifiConfigured + FAQ-Query berechnet
 
 // Pre-load chat_messages für diesen Stay (letzte 20) — Frontend startet mit
 // History statt leerem Sheet. Wenn 0 Messages: Welcome-Trigger im Frontend.
@@ -364,6 +364,23 @@ const f = (settings as any).features ?? {};
 const wifiSsid: string | null = settings.wifi_ssid || (isShowcase ? 'Demo-Hotel-WLAN' : null);
 const wifiPassword: string = settings.wifi_password || (isShowcase ? 'gast2026' : '');
 const wifiConfigured = !!wifiSsid;
+
+// Smart Chips: Top-3 FAQ-Fragen aus eve_knowledge + Modul-Chips + Tageszeit-Filler
+const { data: _topFaqs } = (settings as any).eve_enabled
+  ? await sbSr
+      .from('eve_knowledge')
+      .select('id, question, question_i18n')
+      .eq('hotel_id', hotel.id)
+      .eq('category', 'faq')
+      .order('created_at', { ascending: true })
+      .limit(3)
+  : { data: [] };
+const eveSuggestions = getEveSmartChips(
+  localHour,
+  lang,
+  (_topFaqs ?? []).map((r: any) => ({ id: r.id, question: r.question as string, question_i18n: r.question_i18n })),
+  { wifi: wifiConfigured, breakfast: f.breakfast !== false },
+);
 
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
 
@@ -626,7 +643,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           )}
 
           {f.eve !== false && (
-            <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+            <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveAvatarGreeting = true; setTimeout(() => { eveAvatarGreeting = false }, 700); eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
               </span>
@@ -851,6 +868,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
+        eveAvatarGreeting: false,
         eveMessages: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.messages)
           ? [...(window as any).__EVE_INITIAL__.messages]
           : [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
@@ -1278,6 +1296,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
               const sheetId = target.replace(/^open_/, '');
               if (sheetId === 'eve') {
                 this.eveOpen = true;
+                this.eveAvatarGreeting = true;
+                setTimeout(() => { (this as any).eveAvatarGreeting = false; }, 700);
                 this.eveSeenBefore = true;
                 try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
                 if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
