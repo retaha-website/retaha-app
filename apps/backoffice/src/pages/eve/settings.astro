@@ -9,7 +9,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 interface TuningRule {
   trigger: string;
   instruction?: string;
-  force_model?: 'haiku' | 'sonnet';
 }
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -67,12 +66,10 @@ if (Astro.request.method === 'POST') {
     if (action === 'tuning_rule_add') {
       const trigger = form.get('trigger')?.toString().trim();
       const instruction = form.get('instruction')?.toString().trim() || undefined;
-      const forceModelRaw = form.get('force_model')?.toString();
-      const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (!trigger || !instruction) {
         message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
       } else {
-        newRules.push({ trigger, instruction, ...(force_model && { force_model }) });
+        newRules.push({ trigger, instruction });
       }
     }
     else if (action === 'tuning_rule_delete') {
@@ -89,14 +86,12 @@ if (Astro.request.method === 'POST') {
       const idx = indexStr ? parseInt(indexStr, 10) : -1;
       const trigger = form.get('trigger')?.toString().trim();
       const instruction = form.get('instruction')?.toString().trim() || undefined;
-      const forceModelRaw = form.get('force_model')?.toString();
-      const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (idx < 0 || idx >= currentRules.length) {
         message = { type: 'error', text: 'Ungültiger Index.' };
       } else if (!trigger || !instruction) {
         message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
       } else {
-        newRules[idx] = { trigger, instruction, ...(force_model && { force_model }) };
+        newRules[idx] = { trigger, instruction };
       }
     }
 
@@ -230,7 +225,7 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                 <div class="field__input-wrap">
                   <textarea
                     id="eve-custom-persona" name="eve_custom_persona" rows="4"
-                    placeholder="z.B. 'Du bist eine erfahrene Concierge mit 20 Jahren Hotellerie-Erfahrung. Du sprichst kurz, präzise, mit einem Schuss Humor.'"
+                    placeholder="z.B. locker und herzlich, duzt immer, erwähnt gern lokale Geheimtipps. Oder: professionell und knapp, nie aufdringlich."
                     class="s-input s-textarea"
                   >{eveCustomPersona}</textarea>
                 </div>
@@ -273,7 +268,7 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
           <h2 class="s-card__title">Eve trainieren</h2>
           <span class="s-card__num">03</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Soft-Rules. Eve nutzt sie wenn Gast-Anfragen einen Trigger-Text enthalten.</p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Verhaltensregeln — was Eve tun soll, wenn bestimmte Themen auftauchen. Beispiel: "Bei Restaurant-Fragen zuerst unser hauseigenes Restaurant nennen." Fakten wie Check-out, WLAN oder Anfahrt gehören in den <a href="/eve/knowledge" class="s-btn-link">Wissens-Tab →</a></p>
 
         <form method="POST">
           <input type="hidden" name="_action" value="tuning_rule_add" />
@@ -297,16 +292,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                 class="s-input s-textarea"
               ></textarea>
             </div>
-            <div class="field field--row">
-              <label class="field__label" for="rule-model">Modell</label>
-              <div class="s-select-wrap">
-                <select id="rule-model" name="force_model" class="s-select">
-                  <option value="">Auto (Router entscheidet)</option>
-                  <option value="sonnet">Sonnet — sorgfältige Antworten</option>
-                  <option value="haiku">Haiku — schnelle, einfache Antworten</option>
-                </select>
-              </div>
-            </div>
           </div>
           <div class="s-card__footer">
             <button type="submit" class="v9-btn">+ Regel hinzufügen</button>
@@ -325,9 +310,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                   <div class="ev-item__content">
                     <p class="ev-rule-trigger">{rule.trigger}</p>
                     <p class="ev-item__a">{rule.instruction}</p>
-                    {rule.force_model && (
-                      <span class="ev-model-badge">{rule.force_model}</span>
-                    )}
                   </div>
                   <div class="ev-item__actions">
                     <button
@@ -353,16 +335,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                     <div class="field field--row">
                       <label class="field__label">Instruction</label>
                       <textarea name="instruction" required rows="3" class="s-input s-textarea">{rule.instruction}</textarea>
-                    </div>
-                    <div class="field field--row">
-                      <label class="field__label">Modell</label>
-                      <div class="s-select-wrap">
-                        <select name="force_model" class="s-select">
-                          <option value="" selected={!rule.force_model}>Auto</option>
-                          <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
-                          <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
@@ -410,15 +382,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
     border: 1px solid var(--border); border-radius: var(--r-sm);
     padding: 2px 8px; display: inline-block; margin-bottom: 6px;
   }
-  .ev-model-badge {
-    display: inline-block; margin-top: 6px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.08em;
-    padding: 2px 8px; border-radius: var(--r-sm);
-    background: var(--te-yellow-soft); color: var(--ink);
-    border: 1px solid color-mix(in srgb, var(--te-yellow) 60%, transparent);
-  }
-
   /* Shared list + item styles */
   .ev-list {
     border-top: 1px solid var(--border);
@@ -472,7 +435,10 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
       card.addEventListener('click', () => {
         group.querySelectorAll('.radio-card').forEach(c => c.classList.remove('is-active'));
         card.classList.add('is-active');
-        if (input) input.checked = true;
+        if (input) {
+          input.checked = true;
+          input.dispatchEvent(new Event('change'));
+        }
       });
     });
   });
