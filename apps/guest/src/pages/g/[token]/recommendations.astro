@@ -207,7 +207,7 @@ const TAB_LABELS: Record<PickCategory, string> = {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{pageTitle}</title>
-    <script>window.__PLACE_DETAILS__ = { cache: JSON.parse(document.getElementById('__pd__')?.textContent||'{}'), lang: document.documentElement.lang };</script>
+    <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang })};`}></script>
     <style>
       *, *::before, *::after { box-sizing: border-box; }
 
@@ -426,9 +426,6 @@ const TAB_LABELS: Record<PickCategory, string> = {
   </head>
   <body x-data="placesPage()" x-init="init()">
 
-    <!-- Place-Detail-Cache (pre-loaded) -->
-    <script id="__pd__" type="application/json" set:html={JSON.stringify(placeDetailCache)} />
-
     <a class="close-btn" href={backHref} data-astro-reload aria-label="Zurück">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -615,7 +612,7 @@ const TAB_LABELS: Record<PickCategory, string> = {
           <span class="place-detail-meta-item" x-show="activeDetailData?.openNow !== null" :class="activeDetailData?.openNow ? 'text-green' : 'text-red'" x-text="activeDetailData?.openNow ? 'Geöffnet' : 'Geschlossen'"></span>
         </div>
 
-        <div x-show="activeDetailData?.hotelNote" class="place-detail-note" x-text="`„${activeDetailData?.hotelNote}"`"></div>
+        <div x-show="activeDetailData?.hotelNote" class="place-detail-note" x-text='`„${activeDetailData?.hotelNote}"`'></div>
 
         <div class="place-detail-actions">
           <a x-show="activeDetailData?.googleMapsUri" :href="activeDetailData?.googleMapsUri" target="_blank" rel="noopener" class="place-detail-action">
@@ -678,13 +675,6 @@ const TAB_LABELS: Record<PickCategory, string> = {
           activeDetailData: null as any,
           detailLoading: false,
           detailError: null as string | null,
-
-          init() {
-            (window as any).__PLACE_DETAILS__ = {
-              cache: JSON.parse(document.getElementById('__pd__')?.textContent ?? '{}'),
-              lang: document.documentElement.lang,
-            };
-          },
 
           async openPlaceDetail(placeId: string) {
             this.detailError = null;
