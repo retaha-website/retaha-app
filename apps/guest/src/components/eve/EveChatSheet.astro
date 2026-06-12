@@ -245,7 +245,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
   .eve-sheet-leave-start { transform: translateY(0); opacity: 1; }
   .eve-sheet-leave-end { transform: translateY(100%); opacity: 0; }
 
-  /* Header */
+  /* Header — overflow:visible explizit: Hand darf aus 40px-Kreis herausragen */
   .eve-sheet-header {
     flex-shrink: 0;
     display: flex;
@@ -254,6 +254,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
     padding: 16px 20px;
     border-bottom: 1px solid var(--theme-border);
     background: var(--theme-bg-primary);
+    overflow: visible;
   }
   .eve-sheet-header-info { display: flex; flex-direction: column; gap: 2px; }
   .eve-sheet-header-eyebrow {
@@ -373,51 +374,76 @@ const conciergeLabel = t('eve.concierge_label', lang);
   /* ── Avatar-Animationen ──────────────────────────────────────────────
    *
    * CSS-Variablen (Taha: Ein-Wert-Justierung):
-   *   --avatar-wave-delay:    Wartezeit nach Sheet-Slide   (default 900ms)
-   *   --avatar-wave-duration: Dauer eines Wink-Zyklus      (default 1.6s)
+   *   --avatar-wave-delay:    Wartezeit nach Sheet-Slide     (default 900ms)
+   *   --avatar-wave-duration: Gesamte Wink-Sequenz (2 Wellen, (default 3.2s)
    *
    * Elemente (kein transform-Konflikt):
-   *   .waving .wave-hand → animiert nur die Hand-Gruppe (rotate, wrist pivot)
-   *   .is-typing svg     → animiert das SVG (scale+opacity)
+   *   .waving .wave-hand → Hand-Gruppe: fade-in → 2× wink → fade-out
+   *   .is-typing svg     → SVG-Element: scale+opacity Puls
    *
-   * transform-box: fill-box ist PFLICHT für iOS Safari (sonst falscher Pivot).
+   * transform-box: fill-box ist PFLICHT für iOS Safari.
    */
   :root {
     --avatar-wave-delay: 900ms;
-    --avatar-wave-duration: 1.6s;
+    --avatar-wave-duration: 3.2s;
   }
 
-  /* Pivot-Eigenschaften immer gesetzt (unabhängig von Animation) */
+  /* Hand ist im Ruhezustand UNSICHTBAR — Figur ohne Hand als Default */
   .wave-hand {
+    opacity: 0;
     transform-box: fill-box;
     transform-origin: 12% 96%;
+    will-change: transform, opacity;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    /* Wink: 2 Zyklen, dann Stopp — Hand dreht sich um Handgelenk */
+    /* Wink-Sequenz: 1 Iteration × 3.2s — fade-in, 2 Wellen, fade-out */
     .eve-sheet-avatar.waving .wave-hand {
-      animation: eve-wave var(--avatar-wave-duration, 1.6s) ease-in-out
-                 var(--avatar-wave-delay, 900ms) 2 both;
+      animation: eve-wave var(--avatar-wave-duration, 3.2s) ease-in-out
+                 var(--avatar-wave-delay, 900ms) 1 both;
     }
-    /* Typing-Puls: SVG innen — kein transform-Konflikt mit Hand */
+    /* Typing-Puls: SVG-Fond — kein transform-Konflikt mit Hand */
     .eve-sheet-avatar.is-typing svg {
       animation: eve-typing-pulse 1.2s ease-in-out infinite;
     }
   }
   @keyframes eve-wave {
-    0%, 100% { transform: rotate(0deg);   }
-    20%      { transform: rotate(14deg);  }
-    45%      { transform: rotate(-12deg); }
-    70%      { transform: rotate(9deg);   }
+    /* Fade in am Anfang, 2 Wellen, Fade out am Ende */
+    0%   { transform: rotate(0deg);   opacity: 0; }
+    5%   { transform: rotate(0deg);   opacity: 1; }
+    /* Welle 1 */
+    18%  { transform: rotate(14deg);  opacity: 1; }
+    36%  { transform: rotate(-12deg); opacity: 1; }
+    52%  { transform: rotate(9deg);   opacity: 1; }
+    /* Welle 2 */
+    62%  { transform: rotate(0deg);   opacity: 1; }
+    72%  { transform: rotate(12deg);  opacity: 1; }
+    84%  { transform: rotate(-9deg);  opacity: 1; }
+    93%  { transform: rotate(0deg);   opacity: 1; }
+    /* Fade out */
+    100% { transform: rotate(0deg);   opacity: 0; }
   }
   @keyframes eve-typing-pulse {
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%       { transform: scale(1.04); opacity: 0.8; }
   }
 
+  /* ─── TEMP DIAGNOSTIC ─────────────────────────────────────────────────
+   * Wenn .waving aktiv: Avatar-Hintergrund leuchtet ROT — unabhängig von
+   * Hand-Opacity/Animation. Taha: siehst du nach ~900ms einen roten Ring?
+   *   JA  → Alpine feuert + CSS erreicht das Element ✓
+   *   NEIN → Alpine-State wird auf iOS gar nicht gesetzt
+   * → nach iOS-Bestätigung diesen Block entfernen.
+   */
+  .eve-sheet-avatar.waving {
+    background: rgba(220, 20, 60, 0.35) !important;
+    outline: 2px solid crimson;
+    border-radius: 50%;
+  }
+
   /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */
 
-  /* Header: grid 1fr·auto·1fr → center column always truly centered */
+  /* Header: grid 1fr·auto·1fr + overflow:visible (Hand ragt aus Ring) */
   [data-theme="bauhaus"] .eve-sheet-header {
     background: #FAFAF6;
     border-bottom-color: #E3E1DA;
@@ -426,6 +452,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
     align-items: center;
     padding: 14px 16px;
     gap: 0;
+    overflow: visible;
   }
   /* Avatar: Eve line-art SVG, inherits hotel accent via currentColor.
      KEIN overflow:hidden — Hand ragt bewusst aus dem Ring heraus. */
