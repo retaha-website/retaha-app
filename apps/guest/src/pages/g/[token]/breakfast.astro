@@ -235,6 +235,7 @@ const labels = {
     bookingPeopleSingular: 'Person',
     sectionWaehlen: 'Wählen', sectionAendern: 'Ändern',
     sectionUeberspringen: 'Überspringen', sectionFertig: 'Fertig',
+    noHinweis: 'Kein Hinweis',
   },
   en: {
     pageTitle: `${hotel.name} · Breakfast`,
@@ -278,6 +279,7 @@ const labels = {
     bookingPeopleSingular: 'person',
     sectionWaehlen: 'Choose', sectionAendern: 'Edit',
     sectionUeberspringen: 'Skip', sectionFertig: 'Done',
+    noHinweis: 'No notes',
   },
   fr: {
     pageTitle: `${hotel.name} · Petit-déjeuner`,
@@ -319,6 +321,7 @@ const labels = {
     bookingPeopleSingular: 'personne',
     sectionWaehlen: 'Choisir', sectionAendern: 'Modifier',
     sectionUeberspringen: 'Passer', sectionFertig: 'Terminé',
+    noHinweis: 'Pas de note',
   },
   es: {
     pageTitle: `${hotel.name} · Desayuno`,
@@ -360,6 +363,7 @@ const labels = {
     bookingPeopleSingular: 'persona',
     sectionWaehlen: 'Elegir', sectionAendern: 'Editar',
     sectionUeberspringen: 'Omitir', sectionFertig: 'Listo',
+    noHinweis: 'Sin nota',
   },
   it: {
     pageTitle: `${hotel.name} · Colazione`,
@@ -401,6 +405,7 @@ const labels = {
     bookingPeopleSingular: 'persona',
     sectionWaehlen: 'Scegli', sectionAendern: 'Modifica',
     sectionUeberspringen: 'Salta', sectionFertig: 'Fatto',
+    noHinweis: 'Nessuna nota',
   },
   pt: {
     pageTitle: `${hotel.name} · Pequeno-almoço`,
@@ -442,6 +447,7 @@ const labels = {
     bookingPeopleSingular: 'pessoa',
     sectionWaehlen: 'Escolher', sectionAendern: 'Editar',
     sectionUeberspringen: 'Saltar', sectionFertig: 'Pronto',
+    noHinweis: 'Sem nota',
   },
   nl: {
     pageTitle: `${hotel.name} · Ontbijt`,
@@ -483,6 +489,7 @@ const labels = {
     bookingPeopleSingular: 'persoon',
     sectionWaehlen: 'Kies', sectionAendern: 'Aanpassen',
     sectionUeberspringen: 'Overslaan', sectionFertig: 'Klaar',
+    noHinweis: 'Geen opmerking',
   },
   ru: {
     pageTitle: `${hotel.name} · Завтрак`,
@@ -524,6 +531,7 @@ const labels = {
     bookingPeopleSingular: 'человек',
     sectionWaehlen: 'Выбрать', sectionAendern: 'Изменить',
     sectionUeberspringen: 'Пропустить', sectionFertig: 'Готово',
+    noHinweis: 'Без заметок',
   },
   ar: {
     pageTitle: `${hotel.name} · الإفطار`,
@@ -565,6 +573,7 @@ const labels = {
     bookingPeopleSingular: 'شخص',
     sectionWaehlen: 'اختر', sectionAendern: 'تعديل',
     sectionUeberspringen: 'تخطي', sectionFertig: 'تم',
+    noHinweis: 'بدون ملاحظة',
   },
   zh: {
     pageTitle: `${hotel.name} · 早餐`,
@@ -606,6 +615,7 @@ const labels = {
     bookingPeopleSingular: '人',
     sectionWaehlen: '选择', sectionAendern: '修改',
     sectionUeberspringen: '跳过', sectionFertig: '完成',
+    noHinweis: '无备注',
   },
 };
 const l = labels[lk];
@@ -1218,14 +1228,10 @@ const sheetData = {
                         <template x-for="opt in tableOptions" :key="opt.value">
                           <button type="button" class="v2-chip"
                             :data-active="form.table_preference === opt.value"
-                            @click="form.table_preference = opt.value"
+                            @click="form.table_preference = opt.value; dNext('tisch')"
                             x-text="opt.label">
                           </button>
                         </template>
-                      </div>
-                      <div style="display:flex;gap:12px;margin-top:10px">
-                        <button type="button" class="d-skip" @click="dNext('tisch')" x-text="labels.sectionUeberspringen"></button>
-                        <button type="button" class="d-done" x-show="form.table_preference" @click="dNext('tisch')" x-text="labels.sectionFertig"></button>
                       </div>
                     </div>
                     <button type="button" class="d-row"
@@ -1234,14 +1240,14 @@ const sheetData = {
                       x-transition:enter-start="row-in-start"
                       x-transition:enter-end="row-in-end"
                       @click="dOpen = 'tisch'">
-                      <span class="d-row-check" x-show="form.table_preference && form.table_preference !== 'any'">✓</span>
-                      <span class="d-row-spacer" x-show="!form.table_preference || form.table_preference === 'any'"></span>
-                      <span class="d-row-value" x-show="form.table_preference && form.table_preference !== 'any'" x-text="tableLabelFor(form.table_preference)"></span>
-                      <span class="d-row-empty" x-show="!form.table_preference || form.table_preference === 'any'">
+                      <span class="d-row-check" x-show="dVisited.includes('tisch')">✓</span>
+                      <span class="d-row-spacer" x-show="!dVisited.includes('tisch')"></span>
+                      <span class="d-row-value" x-show="dVisited.includes('tisch')" x-text="tableLabelFor(form.table_preference)"></span>
+                      <span class="d-row-empty" x-show="!dVisited.includes('tisch')">
                         <span x-text="labels.labelTisch"></span>
                         <span class="d-row-opt" x-text="labels.labelOptional"></span>
                       </span>
-                      <span class="d-row-action" x-text="form.table_preference && form.table_preference !== 'any' ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                      <span class="d-row-action" x-text="dVisited.includes('tisch') ? labels.sectionAendern : labels.sectionWaehlen"></span>
                     </button>
                   </div>
 
@@ -1300,7 +1306,9 @@ const sheetData = {
                         x-model="form.notes"
                         @input="$el.style.height='auto'; $el.style.height=$el.scrollHeight+'px'">
                       </textarea>
-                      <button type="button" class="d-done" @click="dOpen = null" x-text="labels.sectionFertig"></button>
+                      <button type="button" class="d-done" @click="dFinishHinweis()"
+                        x-text="form.notes.trim() ? labels.sectionFertig : labels.sectionUeberspringen">
+                      </button>
                     </div>
                     <button type="button" class="d-row"
                       x-show="dOpen !== 'hinweis'"
@@ -1308,14 +1316,14 @@ const sheetData = {
                       x-transition:enter-start="row-in-start"
                       x-transition:enter-end="row-in-end"
                       @click="dOpen = 'hinweis'">
-                      <span class="d-row-check" x-show="form.notes.trim()">✓</span>
-                      <span class="d-row-spacer" x-show="!form.notes.trim()"></span>
-                      <span class="d-row-value" x-show="form.notes.trim()" x-text="dSummaryHinweis"></span>
-                      <span class="d-row-empty" x-show="!form.notes.trim()">
+                      <span class="d-row-check" x-show="form.notes.trim() || dVisited.includes('hinweis')">✓</span>
+                      <span class="d-row-spacer" x-show="!form.notes.trim() && !dVisited.includes('hinweis')"></span>
+                      <span class="d-row-value" x-show="form.notes.trim() || dVisited.includes('hinweis')" x-text="dSummaryHinweis"></span>
+                      <span class="d-row-empty" x-show="!form.notes.trim() && !dVisited.includes('hinweis')">
                         <span x-text="labels.labelHinweis"></span>
                         <span class="d-row-opt" x-text="labels.labelOptional"></span>
                       </span>
-                      <span class="d-row-action" x-text="form.notes.trim() ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                      <span class="d-row-action" x-text="form.notes.trim() || dVisited.includes('hinweis') ? labels.sectionAendern : labels.sectionWaehlen"></span>
                     </button>
                   </div>
 
@@ -1472,6 +1480,7 @@ const sheetData = {
         hotelCurrency: initial.hotelCurrency ?? 'EUR',
         slotsPerWeekday: initial.slotsPerWeekday ?? null,
         dOpen: 'datum' as string | null,
+        dVisited: [] as string[],
         includedText: initial.includedText || '',
         location: initial.location || '',
 
@@ -1641,8 +1650,17 @@ const sheetData = {
 
         dNext(current: string) {
           const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+          const alreadyVisited = this.dVisited.includes(current);
           // Step a → b: hold 150ms so user sees chip selection; 300ms for reduced-motion
           setTimeout(() => {
+            if (!this.dVisited.includes(current)) {
+              this.dVisited = [...this.dVisited, current];
+            }
+            if (alreadyVisited) {
+              // Re-edit: just collapse, do not advance to next section
+              this.dOpen = null;
+              return;
+            }
             const order = ['datum', 'personen', 'uhrzeit', 'tisch', 'ort', 'hinweis'];
             const idx = order.indexOf(current);
             let next: string | null = null;
@@ -1666,6 +1684,11 @@ const sheetData = {
           }, reduced ? 300 : 150);
         },
 
+        dFinishHinweis() {
+          if (!this.dVisited.includes('hinweis')) this.dVisited = [...this.dVisited, 'hinweis'];
+          this.dOpen = null;
+        },
+
         get dSummaryDate() {
           if (!this.form.date) return '';
           const idx = (this.availableDates as any[]).findIndex((d: any) => d.iso === this.form.date);
@@ -1682,12 +1705,14 @@ const sheetData = {
 
         get dSummaryHinweis() {
           const t = this.form.notes.trim();
+          if (!t) return this.labels.noHinweis;
           return t.length > 40 ? t.slice(0, 40) + '…' : t;
         },
 
         startRebook() {
           this.form = { date: (this.availableDates as any[])[0]?.iso || '', people: 2, time: '', table_preference: 'any', delivery: 'table' as const, room_number: String(initial.roomNumber ?? ''), notes: '' };
           this.dOpen = 'datum';
+          this.dVisited = [];
           this.existingBooking = null;
           this.view = 'form';
         },
