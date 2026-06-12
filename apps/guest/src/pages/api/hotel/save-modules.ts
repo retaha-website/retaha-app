@@ -66,5 +66,19 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return json({ ok: false, error: error.message }, 500);
   }
 
+  // Eve has a legacy boolean column (eve_enabled) used by the chat endpoint gate.
+  // Keep it in sync with features.eve so one toggle controls both.
+  if (key === 'eve') {
+    const { error: syncError } = await sb
+      .from('hotel_settings')
+      .update({ eve_enabled: value })
+      .eq('hotel_id', hotel.id);
+    if (syncError) {
+      // features.eve already saved — log but don't fail the response.
+      // Chat endpoint will 403 until the next toggle or a manual DB fix.
+      console.error('[save-modules] eve_enabled sync failed — features.eve was written', syncError);
+    }
+  }
+
   return json({ ok: true });
 };

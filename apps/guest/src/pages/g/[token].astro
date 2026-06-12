@@ -925,6 +925,21 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           this.detailError = null;
         },
 
+        // Maps raw API/network errors to Eve-voice messages — never show raw JSON/HTTP codes.
+        _friendlyEveError(raw: string): string {
+          const s = (raw ?? '').toLowerCase();
+          if (s.includes('403') || s.includes('nicht aktiviert') || s.includes('not activated')) {
+            return 'Ich bin gerade leider nicht verfügbar. Bitte wende dich an die Rezeption.';
+          }
+          if (s.includes('429') || s.includes('rate limit') || s.includes('zu viele')) {
+            return 'Ich beantworte gerade viele Anfragen — bitte kurz warten und nochmal versuchen.';
+          }
+          if (s.includes('failed to fetch') || s.includes('networkerror') || s.includes('network')) {
+            return 'Keine Verbindung — bitte Netzwerk prüfen und nochmal versuchen.';
+          }
+          return 'Ich bin gerade nicht erreichbar — bitte versuch es gleich nochmal.';
+        },
+
         async eveSend(text: string) {
           const message = (text || '').trim();
           if (!message || this.eveTyping) return;
@@ -946,8 +961,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
               body: JSON.stringify({ message, lang: this._eveLang }),
             });
             if (!res.ok) {
-              const errBody = await res.text().catch(() => '');
-              throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+              throw new Error(`HTTP ${res.status}`);
             }
 
             // Assistant-Bubble pushen + Index tracken. WICHTIG: nach push() greifen
@@ -979,7 +993,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                     this.evePendingAction = ev.action;
                     this._scrollEveBottom();
                   } else if (ev.type === 'error') {
-                    this.eveError = ev.message;
+                    this.eveError = this._friendlyEveError(ev.message);
                   } else if (ev.type === 'message_complete') {
                     this.eveMessages[msgIdx].streaming = false;
                   } else if (ev.type === 'escalating') {
@@ -995,8 +1009,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             this._eveLastConversation = this._buildConversationContext();
           } catch (err) {
             this.eveTyping = false;
-            const msg = (err as Error).message || 'Unbekannter Fehler';
-            this.eveError = msg;
+            const msg = (err as Error).message || '';
+            this.eveError = this._friendlyEveError(msg);
             console.error('[eve] chat failed:', err);
           }
         },
