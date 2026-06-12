@@ -79,7 +79,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" :class="{ 'play-wave': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
+    <div class="eve-sheet-avatar" :class="{ 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
@@ -394,32 +394,30 @@ const conciergeLabel = t('eve.concierge_label', lang);
   .ring-closed { opacity: 1; }
   .ring-open   { opacity: 0; }
   .arm         { opacity: 0; }
-  /* TEMP DIAGNOSTIC — hand immer sichtbar + crimson für iPhone-Ablesen
-   * ERGEBNIS-LEGENDE:
-   *   ROT sichtbar + Ring öffnet sich nach ~2.6s → Trigger OK, Animation läuft
-   *   ROT sichtbar + Ring bleibt geschlossen     → .play-wave wird NICHT gesetzt
-   *   ROT NICHT sichtbar                         → Hand wird geclippt
-   * → nach Diagnose entfernen und opacity:0 wiederherstellen */
-  .wave-hand   { opacity: 1; color: crimson; }
+  .wave-hand   { opacity: 0; }
   .wave-hand .swing {
     transform-box: fill-box;
     transform-origin: 50% 100%;
   }
 
+  /* Animationen selbst-startend — kein Trigger-Klassen-Gate.
+   * Startet wenn das Sheet sichtbar wird (display:none → sichtbar).
+   * JS-Reflow-Reset in $watch(eveOpen) stellt sicher dass sie bei
+   * JEDEM Öffnen von vorne starten (iOS Safari animation-fill-mode-Bug). */
   @media (prefers-reduced-motion: no-preference) {
-    .eve-sheet-avatar.play-wave .ring-closed {
+    .eve-sheet-avatar .ring-closed {
       animation: ring-closed-vis var(--avatar-wave-total) linear forwards;
     }
-    .eve-sheet-avatar.play-wave .ring-open {
+    .eve-sheet-avatar .ring-open {
       animation: ring-open-vis var(--avatar-wave-total) linear forwards;
     }
-    .eve-sheet-avatar.play-wave .arm {
+    .eve-sheet-avatar .arm {
       animation: arm-vis var(--avatar-wave-total) linear forwards;
     }
-    .eve-sheet-avatar.play-wave .wave-hand {
+    .eve-sheet-avatar .wave-hand {
       animation: hand-vis var(--avatar-wave-total) linear forwards;
     }
-    .eve-sheet-avatar.play-wave .wave-hand .swing {
+    .eve-sheet-avatar .wave-hand .swing {
       animation: hand-swing var(--avatar-wave-total) ease-in-out forwards;
     }
     /* Typing-Puls: SVG-Fond — kein transform-Konflikt mit Hand */
@@ -448,9 +446,6 @@ const conciergeLabel = t('eve.concierge_label', lang);
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.04); opacity: 0.8; }
   }
-
-  /* TEMP DIAGNOSTIC — überschreibt hand-vis opacity → Hand bleibt sichtbar während Animation */
-  @keyframes hand-vis { 0%, 100% { opacity: 1; } }
 
   /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */
 

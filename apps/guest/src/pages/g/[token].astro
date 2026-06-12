@@ -643,7 +643,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           )}
 
           {f.eve !== false && (
-            <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveAvatarGreeting = false; setTimeout(() => { eveAvatarGreeting = true; setTimeout(() => { eveAvatarGreeting = false }, 5950); }, 50); eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
+            <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
               </span>
@@ -824,6 +824,23 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           } else {
             setTimeout(() => { this.consentOpen = true; }, 900);
           }
+          // Avatar-Wink: Animations-Reflow bei jedem Sheet-Öffnen.
+          // Nötig weil x-show (display:none-Toggle) auf iOS Safari
+          // animation-fill-mode:forwards nicht zurücksetzt — einmaliger
+          // animation:none + offsetWidth-Trick erzwingt Neustart.
+          this.$watch('eveOpen', (val: boolean) => {
+            if (!val) return;
+            this.$nextTick(() => {
+              const avatar = document.querySelector('.eve-sheet-avatar');
+              if (!avatar) return;
+              avatar.querySelectorAll('.ring-closed,.ring-open,.arm,.wave-hand,.swing')
+                .forEach(el => {
+                  (el as HTMLElement).style.animation = 'none';
+                  void (el as HTMLElement).offsetWidth;
+                  (el as HTMLElement).style.animation = '';
+                });
+            });
+          });
         },
         recSlideIndex: 0,
 
@@ -868,7 +885,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
         // Eve state (Sprint E4 Phase 9 + 10)
         eveOpen: false,
-        eveAvatarGreeting: false,
         eveMessages: (typeof window !== 'undefined' && (window as any).__EVE_INITIAL__?.messages)
           ? [...(window as any).__EVE_INITIAL__.messages]
           : [] as Array<{ role: 'user' | 'assistant'; content: string; streaming?: boolean }>,
@@ -1296,11 +1312,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
               const sheetId = target.replace(/^open_/, '');
               if (sheetId === 'eve') {
                 this.eveOpen = true;
-                (this as any).eveAvatarGreeting = false;
-                setTimeout(() => {
-                  (this as any).eveAvatarGreeting = true;
-                  setTimeout(() => { (this as any).eveAvatarGreeting = false; }, 5950);
-                }, 50);
                 this.eveSeenBefore = true;
                 try { localStorage.setItem('retaha_eve_seen', '1'); } catch (_) {}
                 if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
