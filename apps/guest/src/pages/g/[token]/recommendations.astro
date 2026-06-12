@@ -1,0 +1,751 @@
+---
+// /g/[token]/recommendations — echte SSR-Route für Empfehlungen-Modul
+// Kein Overlay, kein Scrim, keine position:fixed-Sheets auf der Gate-Page.
+// Statusbar-sicher: heller Fond, kein body-Eingriff.
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, t, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
+import { buildPhotoUrl, type PickCategory } from '../../../lib/places/google-client';
+import { haversineMeters, walkingMinutes } from '../../../lib/places/distance';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@retaha/ui-guest/base';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const url = new URL(Astro.request.url);
+const persona = url.searchParams.get('persona') ?? 'in_house';
+const langParam = url.searchParams.get('lang');
+
+// Showcase- oder Echtdaten laden
+let ctx: any = null;
+if (isShowcaseToken(token)) {
+  const showcase = await findShowcaseSessionByToken(token);
+  if (showcase) {
+    const sbSr = createSupabaseServiceRoleInstance();
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary').eq('id', showcase.hotel_id).single(),
+      sbSr.from('hotel_settings').select('features').eq('hotel_id', showcase.hotel_id).single(),
+    ]);
+    if (hotelRow) {
+      ctx = {
+        hotel: hotelRow,
+        guest: { language: hotelRow.default_language ?? 'de' },
+        settings: settingsRow ?? {},
+      };
+    }
+  }
+} else {
+  const loaded = token ? await loadStayByToken(token) : null;
+  if (loaded) {
+    const existingSession = await getStaySession(Astro.cookies);
+    if (!existingSession || existingSession.stay_id !== loaded.stay.id) {
+      await setStaySessionCookie(Astro.cookies, {
+        stay_id: loaded.stay.id,
+        hotel_id: loaded.hotel.id,
+        check_out_utc: loaded.stay.check_out,
+        is_showcase: false,
+      });
+    }
+    ctx = loaded;
+  }
+}
+
+if (!ctx) return Astro.redirect(`/g/${token}`);
+
+const { hotel, settings } = ctx;
+const features = (settings as any).features ?? {};
+if (features.recommendations === false) return Astro.redirect(`/g/${token}?persona=${persona}`);
+
+const lang: Lang = normalizeLang(
+  langParam ?? (ctx.guest as any)?.language ?? (hotel as any).default_language ?? 'de'
+) as Lang;
+
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandStyle = brandPrimary
+  ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
+  : undefined;
+
+const sbSr = createSupabaseServiceRoleInstance();
+const [{ data: hotelGeo }, { data: picksRows }, { data: nearbyRows }] = await Promise.all([
+  sbSr.from('hotels').select('latitude, longitude').eq('id', hotel.id).maybeSingle(),
+  sbSr.from('hotel_place_picks')
+    .select('id, place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, hotel_note_i18n, cached_data, photo_references, sort_order')
+    .eq('hotel_id', hotel.id)
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false }),
+  sbSr.from('hotel_place_nearby_cache')
+    .select('category, cached_places')
+    .eq('hotel_id', hotel.id),
+]);
+
+const hotelLat = (hotelGeo?.latitude as number | null) ?? null;
+const hotelLng = (hotelGeo?.longitude as number | null) ?? null;
+const picks = (picksRows ?? []) as any[];
+const nearby = (nearbyRows ?? []) as any[];
+
+const TABS: PickCategory[] = ['restaurant', 'cafe', 'bar', 'activity', 'sight'];
+
+function noteForLang(p: any): string | undefined {
+  const i18n = p.hotel_note_i18n;
+  if (i18n?.[lang]?.value) return i18n[lang].value.trim() || undefined;
+  if (i18n?.de?.value) return i18n.de.value.trim() || undefined;
+  const field = lang === 'de' ? p.hotel_note
+    : lang === 'en' ? (p.hotel_note_en ?? p.hotel_note)
+    : lang === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
+    : lang === 'es' ? (p.hotel_note_es ?? p.hotel_note)
+    : p.hotel_note;
+  return field?.trim() || undefined;
+}
+
+interface CategoryData {
+  picks: Array<{
+    id: string; place_id: string; name: string; rating?: number;
+    userRatingCount?: number; priceLevel?: string; address?: string;
+    photoUrl?: string; hotelNote?: string; walkingMin?: number;
+  }>;
+  auto: Array<{
+    place_id: string; name: string; rating?: number;
+    userRatingCount?: number; address?: string; photoUrl?: string; walkingMin?: number;
+  }>;
+}
+
+const dataByCategory: Record<string, CategoryData> = {};
+for (const cat of TABS) {
+  const catPicks = picks.filter(p => p.category === cat).map(p => {
+    const cd = p.cached_data ?? {};
+    const photo = p.photo_references?.[0] ? buildPhotoUrl(p.photo_references[0], 800) : undefined;
+    const loc = cd.location;
+    let walking: number | undefined;
+    if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng) {
+      walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
+    }
+    return {
+      id: p.id, place_id: p.place_id,
+      name: cd.name ?? '(no name)',
+      rating: cd.rating, userRatingCount: cd.user_ratings_total,
+      priceLevel: cd.price_level, address: cd.formatted_address,
+      photoUrl: photo, hotelNote: noteForLang(p), walkingMin: walking,
+    };
+  });
+
+  const pickPlaceIds = new Set(catPicks.map((p: any) => p.place_id));
+  const cacheRow = nearby.find((n: any) => n.category === cat);
+  const autoPlaces = ((cacheRow?.cached_places ?? []) as any[])
+    .filter((p: any) => !pickPlaceIds.has(p.placeId))
+    .sort((a: any, b: any) => {
+      const rDiff = (b.rating ?? 0) - (a.rating ?? 0);
+      return rDiff !== 0 ? rDiff : (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+    })
+    .map((p: any) => {
+      const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
+      let walking: number | undefined;
+      if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng) {
+        walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
+      }
+      return {
+        place_id: p.placeId, name: p.name,
+        rating: p.rating, userRatingCount: p.userRatingCount,
+        address: p.formattedAddress, photoUrl: photo, walkingMin: walking,
+      };
+    });
+
+  dataByCategory[cat] = { picks: catPicks, auto: autoPlaces };
+}
+
+const initialTab: PickCategory = TABS.find(c => dataByCategory[c].picks.length > 0) ?? 'restaurant';
+
+// Pre-loaded Pick-Detail-Daten (kein client-fetch für Picks)
+const PRICE_SYMBOLS: Record<string, string> = {
+  PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+  PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+};
+const placeDetailCache: Record<string, any> = {};
+for (const p of picks) {
+  const cd = p.cached_data ?? {};
+  placeDetailCache[p.place_id] = {
+    name: cd.name,
+    rating: cd.rating,
+    userRatingCount: cd.user_ratings_total,
+    priceSymbol: PRICE_SYMBOLS[cd.price_level] ?? '',
+    hotelNote: noteForLang(p) ?? null,
+    formattedAddress: cd.formatted_address,
+    phone: cd.international_phone_number,
+    website: cd.website_uri,
+    googleMapsUri: cd.google_maps_uri,
+    openNow: cd.opening_hours?.openNow ?? null,
+    weekdayDescriptions: cd.opening_hours?.weekdayDescriptions ?? [],
+    reviews: (cd.reviews ?? []).slice(0, 3),
+    photoUrls: (p.photo_references ?? []).slice(0, 8).map((n: string) => buildPhotoUrl(n, 1200)),
+  };
+}
+
+function priceSymbol(level: string | undefined): string {
+  return PRICE_SYMBOLS[level ?? ''] ?? '';
+}
+
+const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
+const pageTitle = `${hotel.name} · ${t('places.title', lang)}`;
+
+const TAB_LABELS: Record<PickCategory, string> = {
+  restaurant: t('places.tab.restaurant', lang),
+  cafe:       t('places.tab.cafe', lang),
+  bar:        t('places.tab.bar', lang),
+  activity:   t('places.tab.activity', lang),
+  sight:      t('places.tab.sight', lang),
+};
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={brandStyle}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{pageTitle}</title>
+    <script>window.__PLACE_DETAILS__ = { cache: JSON.parse(document.getElementById('__pd__')?.textContent||'{}'), lang: document.documentElement.lang };</script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --accent: #FF4A82;
+        --accent-soft: rgba(255,74,130,0.10);
+        --accent-on: #fff;
+        --ink: #0F0F0D;
+        --ink-muted: #6B6B63;
+        --ink-faint: #A8A8A0;
+        --border: #E7E4DD;
+        --bg: #FBFAF7;
+        --surface: #FFFFFF;
+        --radius: 12px;
+        --mono: 'JetBrains Mono', 'Courier New', monospace;
+        --display: 'Space Grotesk', system-ui, sans-serif;
+        --theme-bg-primary: var(--bg);
+        --theme-bg-tertiary: #F0EDE6;
+        --theme-border: var(--border);
+        --theme-border-strong: #D0CCC4;
+        --theme-text-primary: var(--ink);
+        --theme-accent: var(--accent);
+        --theme-accent-rgb: 255,74,130;
+      }
+
+      body {
+        margin: 0; padding: 0;
+        background: var(--bg); color: var(--ink);
+        font-family: var(--display);
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 480px; margin: 0 auto;
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 0 calc(env(safe-area-inset-bottom, 20px) + 48px);
+        animation: page-in 280ms cubic-bezier(0.22,1,0.36,1) both;
+      }
+      @keyframes page-in {
+        from { transform: translateY(-12px); opacity: 0; }
+        to   { transform: translateY(0); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
+
+      .close-btn {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 16px);
+        right: 20px;
+        width: 36px; height: 36px; border-radius: 50%;
+        background: #EFEDE8;
+        display: grid; place-items: center;
+        text-decoration: none; color: var(--ink);
+        transition: background 0.14s ease;
+        z-index: 10;
+      }
+      .close-btn:hover { background: #E0DDD7; }
+      .close-btn svg { width: 16px; height: 16px; }
+
+      .page-hero {
+        padding: 0 22px 24px;
+        border-bottom: 2px solid var(--ink);
+        margin-bottom: 0;
+      }
+      .eyebrow {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+        font-weight: 500; color: var(--accent); margin: 0 0 10px; display: block;
+      }
+      .page-title {
+        font-size: clamp(26px, 7vw, 36px); font-weight: 700;
+        letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 4px; color: var(--ink);
+      }
+      .page-sub { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Tabs ────────────────────────────────────────────────── */
+      [x-cloak] { display: none !important; }
+
+      .places-tabs {
+        display: flex; gap: 4px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; padding: 0 22px;
+      }
+      .places-tabs::-webkit-scrollbar { display: none; }
+      .places-tab {
+        flex-shrink: 0; padding: 10px 16px; font-size: 13px;
+        background: transparent; border: none;
+        border-bottom: 2px solid transparent;
+        color: color-mix(in srgb, var(--ink) 50%, transparent);
+        cursor: pointer; transition: color 0.15s, border-color 0.15s;
+        margin-bottom: -1px; white-space: nowrap;
+      }
+      .places-tab:hover { color: var(--ink); }
+      .places-tab.is-active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+      .places-tab-counter {
+        display: inline-block; margin-left: 4px; font-size: 11px;
+        color: color-mix(in srgb, var(--ink) 40%, transparent);
+      }
+
+      /* ── Panels ──────────────────────────────────────────────── */
+      .places-tab-panel { padding: 24px 22px 0; }
+      .places-section { margin-bottom: 32px; }
+      .places-section-eyebrow {
+        font-size: 10px; letter-spacing: 0.18em;
+        color: color-mix(in srgb, var(--ink) 45%, transparent);
+        margin: 0 0 16px; text-align: center;
+      }
+      .places-empty {
+        font-size: 13px; color: color-mix(in srgb, var(--ink) 50%, transparent);
+        font-style: italic; padding: 20px 0; text-align: center;
+      }
+
+      /* ── Pick-Card (large) ───────────────────────────────────── */
+      .place-card {
+        margin-bottom: 16px; background: var(--surface);
+        border: 1px solid var(--border); border-radius: var(--radius);
+        overflow: hidden; cursor: pointer;
+        transition: box-shadow 0.15s;
+      }
+      .place-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+      .place-card-photo { width: 100%; aspect-ratio: 16/9; background: var(--theme-bg-tertiary); overflow: hidden; }
+      .place-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .place-card-body { padding: 16px; }
+      .place-card-name { margin: 0 0 6px; font-size: 17px; font-weight: 500; color: var(--ink); }
+      .place-card-meta {
+        font-size: 13px; color: color-mix(in srgb, var(--ink) 55%, transparent);
+        display: flex; gap: 6px; flex-wrap: wrap;
+      }
+      .place-card-note {
+        margin: 12px 0 0; padding: 10px 12px;
+        background: var(--accent-soft); border-left: 3px solid var(--accent);
+        font-size: 14px; font-style: italic;
+        color: color-mix(in srgb, var(--ink) 80%, transparent);
+      }
+
+      /* ── List-Item (small) ───────────────────────────────────── */
+      .place-list { list-style: none; padding: 0; margin: 0; }
+      .place-list-item {
+        display: flex; gap: 12px; padding: 10px 0;
+        border-bottom: 1px solid var(--border); cursor: pointer;
+      }
+      .place-list-item:last-child { border-bottom: none; }
+      .place-list-photo { width: 60px; height: 60px; object-fit: cover; flex-shrink: 0; background: var(--theme-bg-tertiary); border-radius: 8px; }
+      .place-list-photo--placeholder { background: var(--border); border-radius: 8px; }
+      .place-list-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+      .place-list-name { margin: 0; font-size: 14px; color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .place-list-meta { margin: 2px 0 0; font-size: 12px; color: color-mix(in srgb, var(--ink) 55%, transparent); }
+      .place-rating { color: var(--ink); }
+      .place-reviews { color: color-mix(in srgb, var(--ink) 40%, transparent); font-size: 11px; }
+
+      .places-show-more {
+        display: block; margin: 16px auto 0; padding: 8px 18px;
+        background: transparent; border: 1px solid var(--border);
+        border-radius: 8px;
+        color: color-mix(in srgb, var(--ink) 70%, transparent);
+        font-size: 13px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      }
+      .places-show-more:hover { background: var(--theme-bg-tertiary); border-color: var(--theme-border-strong); }
+
+      /* ── Place Detail Overlay (within this page) ─────────────── */
+      .place-detail-backdrop {
+        position: fixed; inset: 0; background: rgba(10,10,10,0.45);
+        z-index: 50;
+      }
+      .place-detail-sheet {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        max-height: 90vh; overflow-y: auto;
+        background: var(--bg); border-radius: 20px 20px 0 0;
+        z-index: 51;
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+      }
+      .place-detail-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 20px 20px 12px; border-bottom: 1px solid var(--border);
+        position: sticky; top: 0; background: var(--bg); z-index: 1;
+      }
+      .place-detail-title { font-size: 18px; font-weight: 600; margin: 0; flex: 1; }
+      .place-detail-close {
+        width: 32px; height: 32px; border-radius: 50%; border: none;
+        background: var(--border); color: var(--ink); font-size: 18px; line-height: 1;
+        cursor: pointer; display: grid; place-items: center;
+      }
+      .place-detail-body { padding: 0 20px 24px; }
+      .place-detail-loading { padding: 40px 20px; text-align: center; color: var(--ink-muted); }
+      .place-detail-error { padding: 20px; color: #c0392b; }
+      .photo-carousel { position: relative; width: 100%; aspect-ratio: 4/3; background: var(--border); overflow: hidden; }
+      .photo-carousel-frame { width: 100%; height: 100%; position: relative; }
+      .photo-carousel-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+      .photo-carousel-img.is-active { opacity: 1; }
+      .photo-carousel-btn {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 32px; height: 32px; border-radius: 50%; border: none;
+        background: rgba(255,255,255,0.85); font-size: 18px; cursor: pointer;
+        display: grid; place-items: center;
+      }
+      .photo-carousel-btn--prev { left: 12px; }
+      .photo-carousel-btn--next { right: 12px; }
+      .place-detail-meta { padding: 16px 0 12px; display: flex; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+      .place-detail-meta-item { font-size: 13px; color: var(--ink-muted); }
+      .place-detail-note { padding: 12px 14px; background: var(--accent-soft); border-left: 3px solid var(--accent); font-size: 14px; font-style: italic; margin-bottom: 16px; border-radius: 0 8px 8px 0; }
+      .place-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .place-detail-action {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+        background: var(--surface); color: var(--ink); font-size: 13px;
+        text-decoration: none; cursor: pointer; transition: background 0.15s;
+      }
+      .place-detail-action:hover { background: var(--theme-bg-tertiary); }
+      .place-detail-hours-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 16px 0 8px; }
+      .place-detail-hours li { font-size: 13px; color: var(--ink-muted); padding: 2px 0; list-style: none; }
+      .reviews-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 16px 0 8px; }
+      .review-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+      .review-item:last-child { border-bottom: none; }
+      .review-author { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+      .review-text { font-size: 13px; color: var(--ink-muted); line-height: 1.45; }
+    </style>
+  </head>
+  <body x-data="placesPage()" x-init="init()">
+
+    <!-- Place-Detail-Cache (pre-loaded) -->
+    <script id="__pd__" type="application/json" set:html={JSON.stringify(placeDetailCache)} />
+
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Zurück">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </a>
+
+    <div class="page" x-data={`placesSheet('${initialTab}')`}>
+      <div class="page-hero">
+        <span class="eyebrow">{t('places.subtitle', lang)}</span>
+        <h1 class="page-title">{t('places.title', lang)}</h1>
+        <p class="page-sub">{hotel.name}</p>
+      </div>
+
+      <!-- Tabs -->
+      <nav class="places-tabs" role="tablist" aria-label="Place-Kategorien">
+        {TABS.map(cat => (
+          <button
+            type="button"
+            class="places-tab"
+            :class={`{ 'is-active': activeTab === '${cat}' }`}
+            @click={`activeTab = '${cat}'; showAllAuto = false`}
+          >
+            {TAB_LABELS[cat]}
+            {dataByCategory[cat].picks.length > 0 && (
+              <span class="places-tab-counter">{dataByCategory[cat].picks.length}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      <!-- Pro Kategorie -->
+      {TABS.map(cat => {
+        const data = dataByCategory[cat];
+        const visibleAutoCount = 10;
+        return (
+          <div x-show={`activeTab === '${cat}'`} class="places-tab-panel">
+            <!-- Picks -->
+            <section class="places-section">
+              <h3 class="places-section-eyebrow">{t('places.our_favorites', lang)}</h3>
+              {data.picks.length === 0 && (
+                <p class="places-empty">{t('places.no_picks', lang)}</p>
+              )}
+              {data.picks.map(p => (
+                <article
+                  class="place-card"
+                  tabindex="0"
+                  @click={`openPlaceDetail('${p.place_id}')`}
+                  @keydown.enter={`openPlaceDetail('${p.place_id}')`}
+                >
+                  {p.photoUrl && (
+                    <div class="place-card-photo">
+                      <img src={p.photoUrl} alt={p.name} loading="lazy" />
+                    </div>
+                  )}
+                  <div class="place-card-body">
+                    <h4 class="place-card-name">{p.name}</h4>
+                    <div class="place-card-meta">
+                      {p.rating != null && (
+                        <span class="place-rating">⭐ {p.rating} <span class="place-reviews">({p.userRatingCount ?? 0})</span></span>
+                      )}
+                      {p.priceLevel && <span>· {priceSymbol(p.priceLevel)}</span>}
+                      {p.walkingMin != null && (
+                        <span>· {t('places.distance_minutes', lang).replace('{n}', String(p.walkingMin))}</span>
+                      )}
+                    </div>
+                    {p.hotelNote && <p class="place-card-note">„{p.hotelNote}"</p>}
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <!-- Auto-Empfehlungen -->
+            <section class="places-section">
+              <h3 class="places-section-eyebrow">{t('places.more_nearby', lang)}</h3>
+              {data.auto.length === 0 && (
+                <p class="places-empty">{t('places.no_nearby', lang)}</p>
+              )}
+              <ul class="place-list">
+                {data.auto.slice(0, visibleAutoCount).map(a => (
+                  <li
+                    class="place-list-item"
+                    tabindex="0"
+                    @click={`openPlaceDetail('${a.place_id}')`}
+                    @keydown.enter={`openPlaceDetail('${a.place_id}')`}
+                  >
+                    {a.photoUrl
+                      ? <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
+                      : <div class="place-list-photo place-list-photo--placeholder"></div>
+                    }
+                    <div class="place-list-body">
+                      <p class="place-list-name">{a.name}</p>
+                      <p class="place-list-meta">
+                        {a.rating != null && <span class="place-rating">⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
+                        {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+
+                <template x-if="showAllAuto">
+                  <span>
+                    {data.auto.slice(visibleAutoCount).map(a => (
+                      <li
+                        class="place-list-item"
+                        tabindex="0"
+                        @click={`openPlaceDetail('${a.place_id}')`}
+                        @keydown.enter={`openPlaceDetail('${a.place_id}')`}
+                      >
+                        {a.photoUrl
+                          ? <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
+                          : <div class="place-list-photo place-list-photo--placeholder"></div>
+                        }
+                        <div class="place-list-body">
+                          <p class="place-list-name">{a.name}</p>
+                          <p class="place-list-meta">
+                            {a.rating != null && <span class="place-rating">⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
+                            {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </span>
+                </template>
+              </ul>
+              {data.auto.length > visibleAutoCount && (
+                <button type="button" class="places-show-more" x-show="!showAllAuto" @click="showAllAuto = true">
+                  {t('places.show_more', lang)} ({data.auto.length - visibleAutoCount})
+                </button>
+              )}
+            </section>
+          </div>
+        );
+      })}
+    </div>
+
+    <!-- Place-Detail-Overlay (über dieser Seite — kein Statusbar-Problem) -->
+    <div
+      class="place-detail-backdrop"
+      x-show="activeDetailPlaceId"
+      x-cloak
+      @click="closePlaceDetail()"
+      x-transition:enter.opacity
+      x-transition:leave.opacity
+    ></div>
+
+    <aside
+      class="place-detail-sheet"
+      x-show="activeDetailPlaceId"
+      x-cloak
+      x-transition:enter="place-enter"
+      x-transition:enter-start="place-enter-start"
+      x-transition:enter-end="place-enter-end"
+      x-transition:leave="place-leave"
+      x-transition:leave-start="place-leave-start"
+      x-transition:leave-end="place-leave-end"
+      role="dialog"
+      aria-modal="true"
+    >
+      <header class="place-detail-header">
+        <h2 class="place-detail-title" x-text="activeDetailData?.name || '…'"></h2>
+        <button type="button" class="place-detail-close" @click="closePlaceDetail()" aria-label="Schließen">×</button>
+      </header>
+
+      <div x-show="detailLoading && !activeDetailData" class="place-detail-loading" x-cloak>
+        <p>…</p>
+      </div>
+      <div x-show="detailError" class="place-detail-error" x-cloak x-text="detailError"></div>
+
+      <div x-show="activeDetailData" x-cloak class="place-detail-body">
+        <div class="photo-carousel" x-data="{ idx: 0 }" x-show="(activeDetailData?.photoUrls?.length || 0) > 0">
+          <div class="photo-carousel-frame">
+            <template x-for="(url, i) in (activeDetailData?.photoUrls || [])" :key="url">
+              <img :src="url" :alt="activeDetailData?.name" class="photo-carousel-img" :class="{ 'is-active': i === idx }" loading="lazy" />
+            </template>
+          </div>
+          <button type="button" class="photo-carousel-btn photo-carousel-btn--prev" @click="idx = idx > 0 ? idx - 1 : 0" :disabled="idx === 0" x-show="(activeDetailData?.photoUrls?.length || 0) > 1" aria-label="Vorheriges">‹</button>
+          <button type="button" class="photo-carousel-btn photo-carousel-btn--next" @click="idx = Math.min(idx + 1, (activeDetailData?.photoUrls?.length || 1) - 1)" :disabled="idx >= (activeDetailData?.photoUrls?.length || 1) - 1" x-show="(activeDetailData?.photoUrls?.length || 0) > 1" aria-label="Nächstes">›</button>
+        </div>
+
+        <div class="place-detail-meta">
+          <span class="place-detail-meta-item" x-show="activeDetailData?.rating">⭐ <span x-text="activeDetailData?.rating"></span> (<span x-text="activeDetailData?.userRatingCount"></span>)</span>
+          <span class="place-detail-meta-item" x-show="activeDetailData?.priceSymbol" x-text="activeDetailData?.priceSymbol"></span>
+          <span class="place-detail-meta-item" x-show="activeDetailData?.openNow !== null" :class="activeDetailData?.openNow ? 'text-green' : 'text-red'" x-text="activeDetailData?.openNow ? 'Geöffnet' : 'Geschlossen'"></span>
+        </div>
+
+        <div x-show="activeDetailData?.hotelNote" class="place-detail-note" x-text="`„${activeDetailData?.hotelNote}"`"></div>
+
+        <div class="place-detail-actions">
+          <a x-show="activeDetailData?.googleMapsUri" :href="activeDetailData?.googleMapsUri" target="_blank" rel="noopener" class="place-detail-action">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/></svg>
+            Maps
+          </a>
+          <a x-show="activeDetailData?.phone" :href="`tel:${activeDetailData?.phone}`" class="place-detail-action">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.89 8.19a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.8 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Anrufen
+          </a>
+          <a x-show="activeDetailData?.website" :href="activeDetailData?.website" target="_blank" rel="noopener" class="place-detail-action">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Website
+          </a>
+        </div>
+
+        <p x-show="activeDetailData?.formattedAddress" class="place-detail-meta-item" x-text="activeDetailData?.formattedAddress" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px;"></p>
+
+        <div x-show="(activeDetailData?.weekdayDescriptions?.length || 0) > 0">
+          <p class="place-detail-hours-title">Öffnungszeiten</p>
+          <ul class="place-detail-hours">
+            <template x-for="d in (activeDetailData?.weekdayDescriptions || [])" :key="d">
+              <li x-text="d"></li>
+            </template>
+          </ul>
+        </div>
+
+        <div x-show="(activeDetailData?.reviews?.length || 0) > 0">
+          <p class="reviews-title">Bewertungen</p>
+          <template x-for="r in (activeDetailData?.reviews || [])" :key="r.author">
+            <div class="review-item">
+              <p class="review-author" x-text="r.author + (r.rating ? ' · ' + '⭐'.repeat(r.rating) : '')"></p>
+              <p class="review-text" x-text="r.text"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </aside>
+
+    <style>
+      .place-enter        { transition: transform 0.35s cubic-bezier(0.22,1,0.36,1); }
+      .place-enter-start  { transform: translateY(100%); }
+      .place-enter-end    { transform: translateY(0); }
+      .place-leave        { transition: transform 0.28s ease-in; }
+      .place-leave-start  { transform: translateY(0); }
+      .place-leave-end    { transform: translateY(100%); }
+    </style>
+
+    <script>
+      document.addEventListener('alpine:init', () => {
+        // @ts-expect-error Alpine
+        Alpine.data('placesSheet', (initialTab: string) => ({
+          activeTab: initialTab,
+          showAllAuto: false,
+        }));
+
+        // @ts-expect-error Alpine
+        Alpine.data('placesPage', () => ({
+          activeDetailPlaceId: null as string | null,
+          activeDetailData: null as any,
+          detailLoading: false,
+          detailError: null as string | null,
+
+          init() {
+            (window as any).__PLACE_DETAILS__ = {
+              cache: JSON.parse(document.getElementById('__pd__')?.textContent ?? '{}'),
+              lang: document.documentElement.lang,
+            };
+          },
+
+          async openPlaceDetail(placeId: string) {
+            this.detailError = null;
+            this.activeDetailPlaceId = placeId;
+
+            const cache = (window as any).__PLACE_DETAILS__?.cache ?? {};
+            if (cache[placeId]) {
+              this.activeDetailData = cache[placeId];
+              this.detailLoading = false;
+              return;
+            }
+
+            this.activeDetailData = null;
+            this.detailLoading = true;
+            try {
+              const lang = (window as any).__PLACE_DETAILS__?.lang || 'de';
+              const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}&lang=${lang}`);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const body = await res.json();
+              if (!body.ok) throw new Error(body.error || 'Unknown error');
+              const d = body.details as any;
+              const PRICE: Record<string, string> = {
+                PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€',
+                PRICE_LEVEL_MODERATE: '€€', PRICE_LEVEL_EXPENSIVE: '€€€',
+                PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+              };
+              this.activeDetailData = {
+                name: d.name,
+                rating: d.rating,
+                userRatingCount: d.userRatingCount,
+                priceSymbol: PRICE[d.priceLevel ?? ''] ?? '',
+                hotelNote: null,
+                formattedAddress: d.formattedAddress,
+                phone: d.internationalPhoneNumber,
+                website: d.websiteUri,
+                googleMapsUri: d.googleMapsUri,
+                openNow: d.openingHours?.openNow ?? null,
+                weekdayDescriptions: d.openingHours?.weekdayDescriptions ?? [],
+                reviews: (d.reviews ?? []).slice(0, 3).map((r: any) => ({
+                  author: r.authorAttribution?.displayName ?? 'Gast',
+                  text: r.text?.text ?? '',
+                  rating: r.rating,
+                })),
+                photoUrls: (d.photos ?? []).slice(0, 8).map((ph: any) =>
+                  `/api/places/photo?name=${encodeURIComponent(ph.name ?? ph)}&maxWidth=1200`
+                ),
+              };
+            } catch (err) {
+              this.detailError = `Fehler: ${(err as Error).message}`;
+            } finally {
+              this.detailLoading = false;
+            }
+          },
+
+          closePlaceDetail() {
+            this.activeDetailPlaceId = null;
+            this.activeDetailData = null;
+            this.detailError = null;
+          },
+        }));
+      });
+    </script>
+  </body>
+</html>
