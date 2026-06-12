@@ -111,6 +111,43 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   return json({ ok: true, item: data });
 };
 
+export const PATCH: APIRoute = async ({ cookies, request }) => {
+  const hotels = await getUserHotels(cookies, request);
+  const hotel = hotels?.[0]?.hotel;
+  if (!hotel) return json({ ok: false, error: 'Unauthorized' }, 401);
+
+  let body: Record<string, any>;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'Invalid JSON' }, 400);
+  }
+
+  const ids: unknown[] = body.ids;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return json({ ok: false, error: 'ids array required' }, 400);
+  }
+
+  const supabase = createSupabaseServiceRoleInstance();
+  const results = await Promise.all(
+    ids.map((id, idx) =>
+      supabase
+        .from('breakfast_items')
+        .update({ display_order: idx })
+        .eq('id', id)
+        .eq('hotel_id', hotel.id),
+    ),
+  );
+
+  const failed = results.find(r => r.error);
+  if (failed?.error) {
+    console.error('[breakfast/item PATCH reorder]', failed.error);
+    return json({ ok: false, error: failed.error.message }, 500);
+  }
+
+  return json({ ok: true });
+};
+
 export const DELETE: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
