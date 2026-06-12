@@ -394,7 +394,13 @@ const conciergeLabel = t('eve.concierge_label', lang);
   .ring-closed { opacity: 1; }
   .ring-open   { opacity: 0; }
   .arm         { opacity: 0; }
-  .wave-hand   { opacity: 0; }
+  /* TEMP DIAGNOSTIC — hand immer sichtbar + crimson für iPhone-Ablesen
+   * ERGEBNIS-LEGENDE:
+   *   ROT sichtbar + Ring öffnet sich nach ~2.6s → Trigger OK, Animation läuft
+   *   ROT sichtbar + Ring bleibt geschlossen     → .play-wave wird NICHT gesetzt
+   *   ROT NICHT sichtbar                         → Hand wird geclippt
+   * → nach Diagnose entfernen und opacity:0 wiederherstellen */
+  .wave-hand   { opacity: 1; color: crimson; }
   .wave-hand .swing {
     transform-box: fill-box;
     transform-origin: 50% 100%;
@@ -442,6 +448,9 @@ const conciergeLabel = t('eve.concierge_label', lang);
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.04); opacity: 0.8; }
   }
+
+  /* TEMP DIAGNOSTIC — überschreibt hand-vis opacity → Hand bleibt sichtbar während Animation */
+  @keyframes hand-vis { 0%, 100% { opacity: 1; } }
 
   /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */
 
