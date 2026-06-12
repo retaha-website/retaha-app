@@ -82,7 +82,16 @@ function noteForLang(p: any): string | undefined {
   return f?.trim() || undefined;
 }
 
-const TABS: PickCategory[] = ['restaurant', 'cafe', 'bar', 'activity', 'sight'];
+// Logical tabs (user-facing) → DB category mapping
+// 'explore' merges sight + activity since they are sparsely populated separately
+type TabKey = 'restaurant' | 'cafe' | 'bar' | 'explore';
+const LOGICAL_TABS: TabKey[] = ['restaurant', 'cafe', 'bar', 'explore'];
+const TAB_DB_CATS: Record<TabKey, PickCategory[]> = {
+  restaurant: ['restaurant'],
+  cafe:       ['cafe'],
+  bar:        ['bar'],
+  explore:    ['sight', 'activity'],
+};
 
 interface CatData {
   picks: { id: string; place_id: string; name: string; rating?: number; userRatingCount?: number;
@@ -97,40 +106,51 @@ const PRICE: Record<string, string> = {
 };
 
 const dataByCategory: Record<string, CatData> = {};
-for (const cat of TABS) {
-  const catPicks = picks.filter(p => p.category === cat).map(p => {
-    const cd = p.cached_data ?? {};
-    const photo = p.photo_references?.[0] ? buildPhotoUrl(p.photo_references[0], 800) : undefined;
-    const loc = cd.location;
-    let wm: number | undefined;
-    if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng)
-      wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
-    return { id: p.id, place_id: p.place_id, name: cd.name ?? '(no name)', rating: cd.rating,
-             userRatingCount: cd.user_ratings_total, priceLevel: cd.price_level,
-             address: cd.formatted_address, photoUrl: photo, hotelNote: noteForLang(p), walkingMin: wm };
-  });
+for (const tab of LOGICAL_TABS) {
+  const dbCats = TAB_DB_CATS[tab];
+
+  const catPicks = dbCats.flatMap(cat =>
+    picks.filter(p => p.category === cat).map(p => {
+      const cd = p.cached_data ?? {};
+      const photo = p.photo_references?.[0] ? buildPhotoUrl(p.photo_references[0], 800) : undefined;
+      const loc = cd.location;
+      let wm: number | undefined;
+      if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng)
+        wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
+      return { id: p.id, place_id: p.place_id, name: cd.name ?? '(no name)', rating: cd.rating,
+               userRatingCount: cd.user_ratings_total, priceLevel: cd.price_level,
+               address: cd.formatted_address, photoUrl: photo, hotelNote: noteForLang(p), walkingMin: wm };
+    })
+  );
 
   const pickIds = new Set(catPicks.map((p: any) => p.place_id));
-  const cacheRow = nearby.find((n: any) => n.category === cat);
-  const autoPlaces = ((cacheRow?.cached_places ?? []) as any[])
-    .filter(p => !pickIds.has(p.placeId))
-    .sort((a, b) => {
-      const r = (b.rating ?? 0) - (a.rating ?? 0);
-      return r !== 0 ? r : (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
-    })
-    .map(p => {
-      const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
-      let wm: number | undefined;
-      if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng)
-        wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
-      return { place_id: p.placeId, name: p.name, rating: p.rating,
-               userRatingCount: p.userRatingCount, address: p.formattedAddress, photoUrl: photo, walkingMin: wm };
-    });
+  const autoPlaces = dbCats.flatMap(cat => {
+    const cacheRow = nearby.find((n: any) => n.category === cat);
+    return ((cacheRow?.cached_places ?? []) as any[])
+      .filter(p => !pickIds.has(p.placeId))
+      .map(p => {
+        const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
+        let wm: number | undefined;
+        if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng)
+          wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
+        return { place_id: p.placeId, name: p.name, rating: p.rating,
+                 userRatingCount: p.userRatingCount, address: p.formattedAddress, photoUrl: photo, walkingMin: wm };
+      });
+  }).sort((a, b) => {
+    const r = (b.rating ?? 0) - (a.rating ?? 0);
+    return r !== 0 ? r : (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+  });
 
-  dataByCategory[cat] = { picks: catPicks, auto: autoPlaces };
+  dataByCategory[tab] = { picks: catPicks, auto: autoPlaces };
 }
 
-const initialTab: PickCategory = TABS.find(c => dataByCategory[c].picks.length > 0) ?? 'restaurant';
+// Only show tabs that have at least one place
+const visibleTabs = LOGICAL_TABS.filter(t =>
+  dataByCategory[t].picks.length > 0 || dataByCategory[t].auto.length > 0
+);
+
+// Default: restaurant if it has data, else first non-empty tab
+const initialTab: TabKey = visibleTabs.includes('restaurant') ? 'restaurant' : (visibleTabs[0] ?? 'restaurant');
 
 // Pre-load pick detail cache
 const placeDetailCache: Record<string, any> = {};
@@ -155,12 +175,11 @@ const labels = {
   eyebrow:     _l({ de: '— Tipps & Empfehlungen —', en: '— Tips & Recommendations —', fr: '— Conseils & Recommandations —', es: '— Consejos y Recomendaciones —', it: '— Consigli e Raccomandazioni —', pt: '— Dicas & Recomendações —', nl: '— Tips & Aanbevelingen —', ru: '— Советы и Рекомендации —', ar: '— نصائح وتوصيات —', zh: '— 推荐与建议 —' }),
   title:       _l({ de: 'Entdeckungen', en: 'Discoveries', fr: 'Découvertes', es: 'Descubrimientos', it: 'Scoperte', pt: 'Descobertas', nl: 'Ontdekkingen', ru: 'Открытия', ar: 'اكتشافات', zh: '探索' }),
   titleAccent: '.',
-  subtitle:    _l({ de: `Orte, die das Team persönlich empfiehlt.`, en: `Places personally recommended by the team.`, fr: `Lieux recommandés personnellement par l'équipe.`, es: `Lugares recomendados personalmente por el equipo.`, it: `Luoghi consigliati personalmente dal team.`, pt: `Lugares recomendados pessoalmente pela equipa.`, nl: `Plaatsen persoonlijk aanbevolen door het team.`, ru: `Места, лично рекомендованные командой.`, ar: `أماكن يوصي بها الفريق شخصيًا.`, zh: `团队亲自推荐的地方。` }),
+  subtitle:    `${_l({ de: 'Ganz in der Nähe von', en: 'Right near', fr: 'À deux pas de', es: 'Muy cerca de', it: 'A due passi da', pt: 'Perto de', nl: 'Vlak bij', ru: 'Рядом с', ar: 'بالقرب من', zh: '在附近' })} ${hotel.name}`,
   tabRestaurant: _l({ de: 'Essen', en: 'Food', fr: 'Restauration', es: 'Comida', it: 'Ristoranti', pt: 'Restaurantes', nl: 'Eten', ru: 'Рестораны', ar: 'مطاعم', zh: '美食' }),
   tabCafe:       _l({ de: 'Café', en: 'Café', fr: 'Café', es: 'Café', it: 'Caffè', pt: 'Café', nl: 'Café', ru: 'Кафе', ar: 'مقهى', zh: '咖啡' }),
   tabBar:        _l({ de: 'Bar', en: 'Bar', fr: 'Bar', es: 'Bar', it: 'Bar', pt: 'Bar', nl: 'Bar', ru: 'Бар', ar: 'بار', zh: '酒吧' }),
-  tabActivity:   _l({ de: 'Aktivitäten', en: 'Activities', fr: 'Activités', es: 'Actividades', it: 'Attività', pt: 'Atividades', nl: 'Activiteiten', ru: 'Активности', ar: 'أنشطة', zh: '活动' }),
-  tabSight:      _l({ de: 'Sehenswertes', en: 'Sights', fr: 'Attractions', es: 'Atracciones', it: 'Attrazioni', pt: 'Atrações', nl: 'Bezienswaardigheden', ru: 'Достопримечательности', ar: 'معالم', zh: '景点' }),
+  tabExplore:    _l({ de: 'Sehenswertes', en: 'Explore', fr: 'Explorer', es: 'Explorar', it: 'Esplorare', pt: 'Explorar', nl: 'Ontdekken', ru: 'Открытия', ar: 'استكشاف', zh: '探索' }),
   sectionPicks:  _l({ de: '— Hotel-Tipps —', en: '— Hotel Tips —', fr: '— Coups de cœur —', es: '— Favoritos del hotel —', it: '— Consigli dell\'hotel —', pt: '— Dicas do hotel —', nl: '— Hoteltips —', ru: '— Советы отеля —', ar: '— نصائح الفندق —', zh: '— 酒店推荐 —' }),
   sectionNearby: _l({ de: '— In der Nähe —', en: '— Nearby —', fr: '— À proximité —', es: '— Cerca —', it: '— Nelle vicinanze —', pt: '— Perto daqui —', nl: '— In de buurt —', ru: '— Поблизости —', ar: '— بالقرب منك —', zh: '— 附近 —' }),
   walkMin:       _l({ de: '{n} Min.', en: '{n} min', fr: '{n} min', es: '{n} min', it: '{n} min', pt: '{n} min', nl: '{n} min', ru: '{n} мин', ar: '{n} دق', zh: '{n} 分钟' }),
@@ -169,12 +188,11 @@ const labels = {
   showMore:      _l({ de: 'Weitere anzeigen', en: 'Show more', fr: 'Voir plus', es: 'Ver más', it: 'Mostra altro', pt: 'Ver mais', nl: 'Meer tonen', ru: 'Показать ещё', ar: 'عرض المزيد', zh: '显示更多' }),
 };
 
-const TAB_LABELS: Record<PickCategory, string> = {
+const TAB_LABELS: Record<TabKey, string> = {
   restaurant: labels.tabRestaurant,
   cafe:       labels.tabCafe,
   bar:        labels.tabBar,
-  activity:   labels.tabActivity,
-  sight:      labels.tabSight,
+  explore:    labels.tabExplore,
 };
 
 const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
@@ -191,7 +209,7 @@ function walkLabel(min: number | undefined): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{labels.pageTitle}</title>
-    <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang: lk })};`}></script>
+    <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang: lk, initialTab })};`}></script>
     <style>
       [x-cloak] { display: none !important; }
       *, *::before, *::after { box-sizing: border-box; }
@@ -470,12 +488,12 @@ function walkLabel(min: number | undefined): string {
       <div class="hero g-hero-dot">
         <span class="eyebrow">{labels.eyebrow}</span>
         <h1 class="title">{labels.title}<span class="accent">{labels.titleAccent}</span></h1>
-        <p class="subtitle">{hotel.name}</p>
+        <p class="subtitle">{labels.subtitle}</p>
       </div>
 
       <!-- Category tabs -->
       <div class="tabs" role="tablist">
-        {TABS.map(cat => (
+        {visibleTabs.map(cat => (
           <button
             type="button"
             class="tab-btn"
@@ -492,7 +510,7 @@ function walkLabel(min: number | undefined): string {
       </div>
 
       <!-- Tab panels -->
-      {TABS.map(cat => {
+      {visibleTabs.map(cat => {
         const d = dataByCategory[cat];
         const AUTO_INITIAL = 8;
         return (
@@ -715,8 +733,9 @@ function walkLabel(min: number | undefined): string {
     </aside>
 
     <script>
-      document.addEventListener('alpine:init', () => {
-        Alpine.data('places', () => ({
+      import Alpine from 'alpinejs';
+
+      Alpine.data('places', () => ({
           activeTab: (window as any).__PLACE_DETAILS__?.initialTab ?? 'restaurant',
           showAllExpanded: {} as Record<string, boolean>,
           activeId: null as string | null,
@@ -778,10 +797,9 @@ function walkLabel(min: number | undefined): string {
             this.error = null;
           },
         }));
-      });
-    </script>
 
-    <script is:inline set:html={`window.__PLACE_DETAILS__.initialTab = '${initialTab}';`}></script>
+      Alpine.start();
+    </script>
 
   </body>
 </html>
