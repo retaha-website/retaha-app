@@ -1,9 +1,6 @@
 ---
-// /g/[token]/recommendations — echte SSR-Route für Empfehlungen-Modul
-// Kein Overlay, kein Scrim, keine position:fixed-Sheets auf der Gate-Page.
-// Statusbar-sicher: heller Fond, kein body-Eingriff.
 import { loadStayByToken } from '@retaha/db';
-import { normalizeLang, t, type Lang } from '@retaha/i18n';
+import { normalizeLang, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
 import { buildPhotoUrl, type PickCategory } from '../../../lib/places/google-client';
@@ -18,10 +15,10 @@ const { token } = Astro.params;
 if (!token) return new Response('Token fehlt', { status: 400 });
 
 const url = new URL(Astro.request.url);
-const persona = url.searchParams.get('persona') ?? 'in_house';
+const persona  = url.searchParams.get('persona') ?? 'in_house';
 const langParam = url.searchParams.get('lang');
 
-// Showcase- oder Echtdaten laden
+// ── Auth ──────────────────────────────────────────────────────────────────────
 let ctx: any = null;
 if (isShowcaseToken(token)) {
   const showcase = await findShowcaseSessionByToken(token);
@@ -31,128 +28,103 @@ if (isShowcaseToken(token)) {
       sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary').eq('id', showcase.hotel_id).single(),
       sbSr.from('hotel_settings').select('features').eq('hotel_id', showcase.hotel_id).single(),
     ]);
-    if (hotelRow) {
-      ctx = {
-        hotel: hotelRow,
-        guest: { language: hotelRow.default_language ?? 'de' },
-        settings: settingsRow ?? {},
-      };
-    }
+    if (hotelRow) ctx = { hotel: hotelRow, guest: { language: hotelRow.default_language ?? 'de' }, settings: settingsRow ?? {} };
   }
 } else {
   const loaded = token ? await loadStayByToken(token) : null;
   if (loaded) {
-    const existingSession = await getStaySession(Astro.cookies);
-    if (!existingSession || existingSession.stay_id !== loaded.stay.id) {
-      await setStaySessionCookie(Astro.cookies, {
-        stay_id: loaded.stay.id,
-        hotel_id: loaded.hotel.id,
-        check_out_utc: loaded.stay.check_out,
-        is_showcase: false,
-      });
+    const existing = await getStaySession(Astro.cookies);
+    if (!existing || existing.stay_id !== loaded.stay.id) {
+      await setStaySessionCookie(Astro.cookies, { stay_id: loaded.stay.id, hotel_id: loaded.hotel.id, check_out_utc: loaded.stay.check_out, is_showcase: false });
     }
     ctx = loaded;
   }
 }
-
 if (!ctx) return Astro.redirect(`/g/${token}`);
 
 const { hotel, settings } = ctx;
 const features = (settings as any).features ?? {};
 if (features.recommendations === false) return Astro.redirect(`/g/${token}?persona=${persona}`);
 
-const lang: Lang = normalizeLang(
-  langParam ?? (ctx.guest as any)?.language ?? (hotel as any).default_language ?? 'de'
-) as Lang;
+const lk = normalizeLang(langParam ?? (ctx.guest as any)?.language ?? (hotel as any).default_language ?? 'de') as Lang;
 
+// ── Brand ────────────────────────────────────────────────────────────────────
 const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
 const brandStyle = brandPrimary
   ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
   : undefined;
 
+// ── Data ─────────────────────────────────────────────────────────────────────
 const sbSr = createSupabaseServiceRoleInstance();
 const [{ data: hotelGeo }, { data: picksRows }, { data: nearbyRows }] = await Promise.all([
   sbSr.from('hotels').select('latitude, longitude').eq('id', hotel.id).maybeSingle(),
   sbSr.from('hotel_place_picks')
     .select('id, place_id, category, hotel_note, hotel_note_en, hotel_note_fr, hotel_note_es, hotel_note_i18n, cached_data, photo_references, sort_order')
-    .eq('hotel_id', hotel.id)
-    .eq('is_published', true)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false }),
-  sbSr.from('hotel_place_nearby_cache')
-    .select('category, cached_places')
-    .eq('hotel_id', hotel.id),
+    .eq('hotel_id', hotel.id).eq('is_published', true)
+    .order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
+  sbSr.from('hotel_place_nearby_cache').select('category, cached_places').eq('hotel_id', hotel.id),
 ]);
 
 const hotelLat = (hotelGeo?.latitude as number | null) ?? null;
 const hotelLng = (hotelGeo?.longitude as number | null) ?? null;
-const picks = (picksRows ?? []) as any[];
-const nearby = (nearbyRows ?? []) as any[];
-
-const TABS: PickCategory[] = ['restaurant', 'cafe', 'bar', 'activity', 'sight'];
+const picks    = (picksRows  ?? []) as any[];
+const nearby   = (nearbyRows ?? []) as any[];
 
 function noteForLang(p: any): string | undefined {
   const i18n = p.hotel_note_i18n;
-  if (i18n?.[lang]?.value) return i18n[lang].value.trim() || undefined;
-  if (i18n?.de?.value) return i18n.de.value.trim() || undefined;
-  const field = lang === 'de' ? p.hotel_note
-    : lang === 'en' ? (p.hotel_note_en ?? p.hotel_note)
-    : lang === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
-    : lang === 'es' ? (p.hotel_note_es ?? p.hotel_note)
+  if (i18n?.[lk]?.value)  return i18n[lk].value.trim() || undefined;
+  if (i18n?.de?.value)    return i18n.de.value.trim()   || undefined;
+  const f = lk === 'de' ? p.hotel_note
+    : lk === 'en' ? (p.hotel_note_en ?? p.hotel_note)
+    : lk === 'fr' ? (p.hotel_note_fr ?? p.hotel_note)
+    : lk === 'es' ? (p.hotel_note_es ?? p.hotel_note)
     : p.hotel_note;
-  return field?.trim() || undefined;
+  return f?.trim() || undefined;
 }
 
-interface CategoryData {
-  picks: Array<{
-    id: string; place_id: string; name: string; rating?: number;
-    userRatingCount?: number; priceLevel?: string; address?: string;
-    photoUrl?: string; hotelNote?: string; walkingMin?: number;
-  }>;
-  auto: Array<{
-    place_id: string; name: string; rating?: number;
-    userRatingCount?: number; address?: string; photoUrl?: string; walkingMin?: number;
-  }>;
+const TABS: PickCategory[] = ['restaurant', 'cafe', 'bar', 'activity', 'sight'];
+
+interface CatData {
+  picks: { id: string; place_id: string; name: string; rating?: number; userRatingCount?: number;
+           priceLevel?: string; address?: string; photoUrl?: string; hotelNote?: string; walkingMin?: number }[];
+  auto:  { place_id: string; name: string; rating?: number; userRatingCount?: number;
+           address?: string; photoUrl?: string; walkingMin?: number }[];
 }
 
-const dataByCategory: Record<string, CategoryData> = {};
+const PRICE: Record<string, string> = {
+  PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
+  PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
+};
+
+const dataByCategory: Record<string, CatData> = {};
 for (const cat of TABS) {
   const catPicks = picks.filter(p => p.category === cat).map(p => {
     const cd = p.cached_data ?? {};
     const photo = p.photo_references?.[0] ? buildPhotoUrl(p.photo_references[0], 800) : undefined;
     const loc = cd.location;
-    let walking: number | undefined;
-    if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng) {
-      walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
-    }
-    return {
-      id: p.id, place_id: p.place_id,
-      name: cd.name ?? '(no name)',
-      rating: cd.rating, userRatingCount: cd.user_ratings_total,
-      priceLevel: cd.price_level, address: cd.formatted_address,
-      photoUrl: photo, hotelNote: noteForLang(p), walkingMin: walking,
-    };
+    let wm: number | undefined;
+    if (hotelLat != null && hotelLng != null && loc?.lat && loc?.lng)
+      wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, loc));
+    return { id: p.id, place_id: p.place_id, name: cd.name ?? '(no name)', rating: cd.rating,
+             userRatingCount: cd.user_ratings_total, priceLevel: cd.price_level,
+             address: cd.formatted_address, photoUrl: photo, hotelNote: noteForLang(p), walkingMin: wm };
   });
 
-  const pickPlaceIds = new Set(catPicks.map((p: any) => p.place_id));
+  const pickIds = new Set(catPicks.map((p: any) => p.place_id));
   const cacheRow = nearby.find((n: any) => n.category === cat);
   const autoPlaces = ((cacheRow?.cached_places ?? []) as any[])
-    .filter((p: any) => !pickPlaceIds.has(p.placeId))
-    .sort((a: any, b: any) => {
-      const rDiff = (b.rating ?? 0) - (a.rating ?? 0);
-      return rDiff !== 0 ? rDiff : (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+    .filter(p => !pickIds.has(p.placeId))
+    .sort((a, b) => {
+      const r = (b.rating ?? 0) - (a.rating ?? 0);
+      return r !== 0 ? r : (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
     })
-    .map((p: any) => {
+    .map(p => {
       const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
-      let walking: number | undefined;
-      if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng) {
-        walking = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
-      }
-      return {
-        place_id: p.placeId, name: p.name,
-        rating: p.rating, userRatingCount: p.userRatingCount,
-        address: p.formattedAddress, photoUrl: photo, walkingMin: walking,
-      };
+      let wm: number | undefined;
+      if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng)
+        wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
+      return { place_id: p.placeId, name: p.name, rating: p.rating,
+               userRatingCount: p.userRatingCount, address: p.formattedAddress, photoUrl: photo, walkingMin: wm };
     });
 
   dataByCategory[cat] = { picks: catPicks, auto: autoPlaces };
@@ -160,24 +132,15 @@ for (const cat of TABS) {
 
 const initialTab: PickCategory = TABS.find(c => dataByCategory[c].picks.length > 0) ?? 'restaurant';
 
-// Pre-loaded Pick-Detail-Daten (kein client-fetch für Picks)
-const PRICE_SYMBOLS: Record<string, string> = {
-  PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€',
-  PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
-};
+// Pre-load pick detail cache
 const placeDetailCache: Record<string, any> = {};
 for (const p of picks) {
   const cd = p.cached_data ?? {};
   placeDetailCache[p.place_id] = {
-    name: cd.name,
-    rating: cd.rating,
-    userRatingCount: cd.user_ratings_total,
-    priceSymbol: PRICE_SYMBOLS[cd.price_level] ?? '',
-    hotelNote: noteForLang(p) ?? null,
-    formattedAddress: cd.formatted_address,
-    phone: cd.international_phone_number,
-    website: cd.website_uri,
-    googleMapsUri: cd.google_maps_uri,
+    name: cd.name, rating: cd.rating, userRatingCount: cd.user_ratings_total,
+    priceSymbol: PRICE[cd.price_level] ?? '', hotelNote: noteForLang(p) ?? null,
+    formattedAddress: cd.formatted_address, phone: cd.international_phone_number,
+    website: cd.website_uri, googleMapsUri: cd.google_maps_uri,
     openNow: cd.opening_hours?.openNow ?? null,
     weekdayDescriptions: cd.opening_hours?.weekdayDescriptions ?? [],
     reviews: (cd.reviews ?? []).slice(0, 3),
@@ -185,52 +148,68 @@ for (const p of picks) {
   };
 }
 
-function priceSymbol(level: string | undefined): string {
-  return PRICE_SYMBOLS[level ?? ''] ?? '';
-}
-
-const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
-const pageTitle = `${hotel.name} · ${t('places.title', lang)}`;
+// ── i18n ──────────────────────────────────────────────────────────────────────
+const _l = (d: Record<string, string>) => d[lk] || d.en || '';
+const labels = {
+  pageTitle:   `${hotel.name} · ${_l({ de: 'Empfehlungen', en: 'Recommendations', fr: 'Recommandations', es: 'Recomendaciones', it: 'Consigli', pt: 'Recomendações', nl: 'Aanbevelingen', ru: 'Рекомендации', ar: 'التوصيات', zh: '推荐' })}`,
+  eyebrow:     _l({ de: '— Tipps & Empfehlungen —', en: '— Tips & Recommendations —', fr: '— Conseils & Recommandations —', es: '— Consejos y Recomendaciones —', it: '— Consigli e Raccomandazioni —', pt: '— Dicas & Recomendações —', nl: '— Tips & Aanbevelingen —', ru: '— Советы и Рекомендации —', ar: '— نصائح وتوصيات —', zh: '— 推荐与建议 —' }),
+  title:       _l({ de: 'Entdeckungen', en: 'Discoveries', fr: 'Découvertes', es: 'Descubrimientos', it: 'Scoperte', pt: 'Descobertas', nl: 'Ontdekkingen', ru: 'Открытия', ar: 'اكتشافات', zh: '探索' }),
+  titleAccent: '.',
+  subtitle:    _l({ de: `Orte, die das Team persönlich empfiehlt.`, en: `Places personally recommended by the team.`, fr: `Lieux recommandés personnellement par l'équipe.`, es: `Lugares recomendados personalmente por el equipo.`, it: `Luoghi consigliati personalmente dal team.`, pt: `Lugares recomendados pessoalmente pela equipa.`, nl: `Plaatsen persoonlijk aanbevolen door het team.`, ru: `Места, лично рекомендованные командой.`, ar: `أماكن يوصي بها الفريق شخصيًا.`, zh: `团队亲自推荐的地方。` }),
+  tabRestaurant: _l({ de: 'Essen', en: 'Food', fr: 'Restauration', es: 'Comida', it: 'Ristoranti', pt: 'Restaurantes', nl: 'Eten', ru: 'Рестораны', ar: 'مطاعم', zh: '美食' }),
+  tabCafe:       _l({ de: 'Café', en: 'Café', fr: 'Café', es: 'Café', it: 'Caffè', pt: 'Café', nl: 'Café', ru: 'Кафе', ar: 'مقهى', zh: '咖啡' }),
+  tabBar:        _l({ de: 'Bar', en: 'Bar', fr: 'Bar', es: 'Bar', it: 'Bar', pt: 'Bar', nl: 'Bar', ru: 'Бар', ar: 'بار', zh: '酒吧' }),
+  tabActivity:   _l({ de: 'Aktivitäten', en: 'Activities', fr: 'Activités', es: 'Actividades', it: 'Attività', pt: 'Atividades', nl: 'Activiteiten', ru: 'Активности', ar: 'أنشطة', zh: '活动' }),
+  tabSight:      _l({ de: 'Sehenswertes', en: 'Sights', fr: 'Attractions', es: 'Atracciones', it: 'Attrazioni', pt: 'Atrações', nl: 'Bezienswaardigheden', ru: 'Достопримечательности', ar: 'معالم', zh: '景点' }),
+  sectionPicks:  _l({ de: '— Hotel-Tipps —', en: '— Hotel Tips —', fr: '— Coups de cœur —', es: '— Favoritos del hotel —', it: '— Consigli dell\'hotel —', pt: '— Dicas do hotel —', nl: '— Hoteltips —', ru: '— Советы отеля —', ar: '— نصائح الفندق —', zh: '— 酒店推荐 —' }),
+  sectionNearby: _l({ de: '— In der Nähe —', en: '— Nearby —', fr: '— À proximité —', es: '— Cerca —', it: '— Nelle vicinanze —', pt: '— Perto daqui —', nl: '— In de buurt —', ru: '— Поблизости —', ar: '— بالقرب منك —', zh: '— 附近 —' }),
+  walkMin:       _l({ de: '{n} Min.', en: '{n} min', fr: '{n} min', es: '{n} min', it: '{n} min', pt: '{n} min', nl: '{n} min', ru: '{n} мин', ar: '{n} دق', zh: '{n} 分钟' }),
+  noPicks:       _l({ de: 'Noch keine Hotel-Empfehlungen.', en: 'No hotel picks yet.', fr: 'Pas encore de coups de cœur.', es: 'Aún sin favoritos del hotel.', it: 'Ancora nessun consiglio dell\'hotel.', pt: 'Ainda sem dicas do hotel.', nl: 'Nog geen hoteltips.', ru: 'Пока нет советов от отеля.', ar: 'لا توصيات من الفندق بعد.', zh: '暂无酒店推荐。' }),
+  noNearby:      _l({ de: 'Keine weiteren Orte gefunden.', en: 'No other places found.', fr: 'Aucun autre lieu trouvé.', es: 'No se encontraron otros lugares.', it: 'Nessun altro posto trovato.', pt: 'Nenhum outro lugar encontrado.', nl: 'Geen andere plaatsen gevonden.', ru: 'Других мест не найдено.', ar: 'لم يتم العثور على أماكن أخرى.', zh: '未找到其他地方。' }),
+  showMore:      _l({ de: 'Weitere anzeigen', en: 'Show more', fr: 'Voir plus', es: 'Ver más', it: 'Mostra altro', pt: 'Ver mais', nl: 'Meer tonen', ru: 'Показать ещё', ar: 'عرض المزيد', zh: '显示更多' }),
+};
 
 const TAB_LABELS: Record<PickCategory, string> = {
-  restaurant: t('places.tab.restaurant', lang),
-  cafe:       t('places.tab.cafe', lang),
-  bar:        t('places.tab.bar', lang),
-  activity:   t('places.tab.activity', lang),
-  sight:      t('places.tab.sight', lang),
+  restaurant: labels.tabRestaurant,
+  cafe:       labels.tabCafe,
+  bar:        labels.tabBar,
+  activity:   labels.tabActivity,
+  sight:      labels.tabSight,
 };
+
+const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
+
+function walkLabel(min: number | undefined): string {
+  if (min == null) return '';
+  return labels.walkMin.replace('{n}', String(min));
+}
 ---
 
 <!DOCTYPE html>
-<html lang={lang} style={brandStyle}>
+<html lang={lk} style={brandStyle}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{pageTitle}</title>
-    <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang })};`}></script>
+    <title>{labels.pageTitle}</title>
+    <script is:inline set:html={`window.__PLACE_DETAILS__ = ${JSON.stringify({ cache: placeDetailCache, lang: lk })};`}></script>
     <style>
+      [x-cloak] { display: none !important; }
       *, *::before, *::after { box-sizing: border-box; }
 
       :root {
-        --accent: #FF4A82;
-        --accent-soft: rgba(255,74,130,0.10);
-        --accent-on: #fff;
-        --ink: #0F0F0D;
-        --ink-muted: #6B6B63;
-        --ink-faint: #A8A8A0;
-        --border: #E7E4DD;
-        --bg: #FBFAF7;
-        --surface: #FFFFFF;
-        --radius: 12px;
-        --mono: 'JetBrains Mono', 'Courier New', monospace;
+        --accent:        #0A0A0A;
+        --accent-soft:   rgba(10,10,10,0.08);
+        --ink:           #0F0F0D;
+        --ink-muted:     #6B6B63;
+        --ink-faint:     #A8A8A0;
+        --border:        #E7E4DD;
+        --border-strong: #C8C4BB;
+        --bg:            #FBFAF7;
+        --surface:       #FFFFFF;
+        --success:       #3D8C5C;
+        --radius:        12px;
+        --mono:    'JetBrains Mono', 'Courier New', monospace;
         --display: 'Space Grotesk', system-ui, sans-serif;
-        --theme-bg-primary: var(--bg);
-        --theme-bg-tertiary: #F0EDE6;
-        --theme-border: var(--border);
-        --theme-border-strong: #D0CCC4;
-        --theme-text-primary: var(--ink);
-        --theme-accent: var(--accent);
-        --theme-accent-rgb: 255,74,130;
       }
 
       body {
@@ -239,21 +218,24 @@ const TAB_LABELS: Record<PickCategory, string> = {
         font-family: var(--display);
         min-height: 100dvh;
         -webkit-font-smoothing: antialiased;
+        position: relative;
       }
 
+      /* ── Page layout ──────────────────────────────────────────────────── */
       .page {
         max-width: 480px; margin: 0 auto;
-        padding: calc(env(safe-area-inset-top, 0px) + 72px) 0 calc(env(safe-area-inset-bottom, 20px) + 48px);
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
         animation: page-in 280ms cubic-bezier(0.22,1,0.36,1) both;
       }
       @keyframes page-in {
         from { transform: translateY(-12px); opacity: 0; }
-        to   { transform: translateY(0); opacity: 1; }
+        to   { transform: translateY(0);     opacity: 1; }
       }
       @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
 
+      /* ── Close button ─────────────────────────────────────────────────── */
       .close-btn {
-        position: fixed;
+        position: absolute;
         top: calc(env(safe-area-inset-top, 0px) + 16px);
         right: 20px;
         width: 36px; height: 36px; border-radius: 50%;
@@ -263,218 +245,269 @@ const TAB_LABELS: Record<PickCategory, string> = {
         transition: background 0.14s ease;
         z-index: 10;
       }
-      .close-btn:hover { background: #E0DDD7; }
-      .close-btn svg { width: 16px; height: 16px; }
+      .close-btn:hover  { background: #E0DDD7; }
+      .close-btn:active { transform: none !important; }
+      .close-btn svg    { width: 16px; height: 16px; }
 
-      .page-hero {
-        padding: 0 22px 24px;
+      /* ── Hero ─────────────────────────────────────────────────────────── */
+      .hero {
+        padding: 28px 0 24px;
         border-bottom: 2px solid var(--ink);
-        margin-bottom: 0;
+        margin-bottom: 28px;
       }
       .eyebrow {
-        font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
-        font-weight: 500; color: var(--accent); margin: 0 0 10px; display: block;
+        font-family: var(--mono); font-size: 10px;
+        letter-spacing: 0.16em; font-weight: 500;
+        color: var(--accent); margin: 0 0 14px; display: block;
       }
-      .page-title {
-        font-size: clamp(26px, 7vw, 36px); font-weight: 700;
-        letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 4px; color: var(--ink);
+      .title {
+        font-size: clamp(28px, 7vw, 38px); font-weight: 700;
+        letter-spacing: -0.025em; line-height: 1.05;
+        margin: 0 0 8px; color: var(--ink);
       }
-      .page-sub { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+      .title .accent { color: var(--accent); }
+      .subtitle { font-size: 14px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
 
-      /* ── Tabs ────────────────────────────────────────────────── */
-      [x-cloak] { display: none !important; }
+      /* ── Tabs ─────────────────────────────────────────────────────────── */
+      .tabs {
+        display: flex; gap: 6px; margin-bottom: 24px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab-btn {
+        flex-shrink: 0; min-height: 40px; padding: 7px 13px;
+        background: white; border: 1px solid #D0CCC5; border-radius: 8px;
+        font-family: var(--display); font-size: 13px; font-weight: 500;
+        color: var(--ink); cursor: pointer; white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 80ms, color 80ms, border-color 80ms;
+      }
+      .tab-btn[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+      .tab-btn:hover:not([data-active="true"]) { border-color: #C0BCB5; }
 
-      .places-tabs {
-        display: flex; gap: 4px;
-        border-bottom: 1px solid var(--border);
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-        scrollbar-width: none; padding: 0 22px;
+      /* ── Category section title ───────────────────────────────────────── */
+      .cat-title {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--ink-faint);
+        padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
       }
-      .places-tabs::-webkit-scrollbar { display: none; }
-      .places-tab {
-        flex-shrink: 0; padding: 10px 16px; font-size: 13px;
-        background: transparent; border: none;
-        border-bottom: 2px solid transparent;
-        color: color-mix(in srgb, var(--ink) 50%, transparent);
-        cursor: pointer; transition: color 0.15s, border-color 0.15s;
-        margin-bottom: -1px; white-space: nowrap;
-      }
-      .places-tab:hover { color: var(--ink); }
-      .places-tab.is-active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
-      .places-tab-counter {
-        display: inline-block; margin-left: 4px; font-size: 11px;
-        color: color-mix(in srgb, var(--ink) 40%, transparent);
-      }
+      .cat-section { margin-bottom: 28px; }
 
-      /* ── Panels ──────────────────────────────────────────────── */
-      .places-tab-panel { padding: 24px 22px 0; }
-      .places-section { margin-bottom: 32px; }
-      .places-section-eyebrow {
-        font-size: 10px; letter-spacing: 0.18em;
-        color: color-mix(in srgb, var(--ink) 45%, transparent);
-        margin: 0 0 16px; text-align: center;
-      }
-      .places-empty {
-        font-size: 13px; color: color-mix(in srgb, var(--ink) 50%, transparent);
-        font-style: italic; padding: 20px 0; text-align: center;
-      }
-
-      /* ── Pick-Card (large) ───────────────────────────────────── */
+      /* ── Pick card (hotel recommendations) ───────────────────────────── */
       .place-card {
-        margin-bottom: 16px; background: var(--surface);
-        border: 1px solid var(--border); border-radius: var(--radius);
-        overflow: hidden; cursor: pointer;
-        transition: box-shadow 0.15s;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); overflow: hidden;
+        margin-bottom: 12px; cursor: pointer;
+        transition: border-color 0.12s;
       }
-      .place-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-      .place-card-photo { width: 100%; aspect-ratio: 16/9; background: var(--theme-bg-tertiary); overflow: hidden; }
+      .place-card:hover { border-color: var(--border-strong); }
+      .place-card:active { transform: scale(0.99); }
+      .place-card-photo { width: 100%; aspect-ratio: 16/9; overflow: hidden; background: #F0EDE6; }
       .place-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .place-card-body { padding: 16px; }
-      .place-card-name { margin: 0 0 6px; font-size: 17px; font-weight: 500; color: var(--ink); }
+      .place-card-body { padding: 14px 16px; }
+      .place-card-name {
+        font-size: 16px; font-weight: 600; margin: 0 0 5px; color: var(--ink);
+        letter-spacing: -0.01em;
+      }
       .place-card-meta {
-        font-size: 13px; color: color-mix(in srgb, var(--ink) 55%, transparent);
-        display: flex; gap: 6px; flex-wrap: wrap;
+        font-size: 13px; color: var(--ink-muted); margin: 0 0 0;
+        display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
       }
-      .place-card-note {
-        margin: 12px 0 0; padding: 10px 12px;
-        background: var(--accent-soft); border-left: 3px solid var(--accent);
-        font-size: 14px; font-style: italic;
-        color: color-mix(in srgb, var(--ink) 80%, transparent);
+      .place-card-meta-sep { color: var(--border-strong); }
+      .place-note {
+        margin: 10px 0 0; padding: 8px 12px;
+        background: var(--accent-soft);
+        border-left: 2px solid var(--accent);
+        font-size: 13px; font-style: italic;
+        color: var(--ink-muted); border-radius: 0 4px 4px 0;
+        line-height: 1.45;
       }
 
-      /* ── List-Item (small) ───────────────────────────────────── */
-      .place-list { list-style: none; padding: 0; margin: 0; }
-      .place-list-item {
-        display: flex; gap: 12px; padding: 10px 0;
-        border-bottom: 1px solid var(--border); cursor: pointer;
+      /* ── Auto list (nearby) ───────────────────────────────────────────── */
+      .place-list { margin: 0; padding: 0; }
+      .place-item {
+        display: flex; gap: 12px; align-items: center;
+        padding: 12px 0; border-bottom: 1px solid var(--border);
+        cursor: pointer;
       }
-      .place-list-item:last-child { border-bottom: none; }
-      .place-list-photo { width: 60px; height: 60px; object-fit: cover; flex-shrink: 0; background: var(--theme-bg-tertiary); border-radius: 8px; }
-      .place-list-photo--placeholder { background: var(--border); border-radius: 8px; }
-      .place-list-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-      .place-list-name { margin: 0; font-size: 14px; color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .place-list-meta { margin: 2px 0 0; font-size: 12px; color: color-mix(in srgb, var(--ink) 55%, transparent); }
-      .place-rating { color: var(--ink); }
-      .place-reviews { color: color-mix(in srgb, var(--ink) 40%, transparent); font-size: 11px; }
+      .place-item:last-child { border-bottom: none; }
+      .place-item-photo {
+        width: 52px; height: 52px; flex-shrink: 0;
+        border-radius: 8px; overflow: hidden;
+        background: #F0EDE6;
+      }
+      .place-item-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .place-item-photo-placeholder { width: 100%; height: 100%; background: #ECEAE4; }
+      .place-item-body { flex: 1; min-width: 0; }
+      .place-item-name {
+        font-size: 15px; font-weight: 500; color: var(--ink);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        margin: 0 0 3px;
+      }
+      .place-item-meta { font-size: 12px; color: var(--ink-muted); margin: 0; }
+      .place-item-arrow {
+        font-size: 18px; color: var(--ink-faint); flex-shrink: 0; padding-right: 2px;
+      }
 
-      .places-show-more {
-        display: block; margin: 16px auto 0; padding: 8px 18px;
-        background: transparent; border: 1px solid var(--border);
-        border-radius: 8px;
-        color: color-mix(in srgb, var(--ink) 70%, transparent);
-        font-size: 13px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      /* ── Empty state ──────────────────────────────────────────────────── */
+      .place-empty {
+        padding: 20px 0; font-size: 14px; color: var(--ink-muted); font-style: italic;
       }
-      .places-show-more:hover { background: var(--theme-bg-tertiary); border-color: var(--theme-border-strong); }
 
-      /* ── Place Detail Overlay (within this page) ─────────────── */
-      .place-detail-backdrop {
-        position: fixed; inset: 0; background: rgba(10,10,10,0.45);
-        z-index: 50;
+      /* ── Show-more button ─────────────────────────────────────────────── */
+      .show-more-btn {
+        background: none; border: none; padding: 10px 2px;
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--accent); cursor: pointer;
       }
-      .place-detail-sheet {
-        position: fixed; bottom: 0; left: 0; right: 0;
-        max-height: 90vh; overflow-y: auto;
-        background: var(--bg); border-radius: 20px 20px 0 0;
-        z-index: 51;
+      .show-more-btn:hover { opacity: 0.75; }
+
+      /* ── Place detail overlay ─────────────────────────────────────────── */
+      .detail-backdrop {
+        position: fixed; inset: 0; background: rgba(10,10,10,0.35);
+        z-index: 40;
+      }
+      .detail-sheet {
+        position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+        width: 100%; max-width: 480px;
+        max-height: 88vh; overflow-y: auto;
+        background: var(--bg); border-radius: 16px 16px 0 0;
+        z-index: 41;
         padding-bottom: env(safe-area-inset-bottom, 20px);
       }
-      .place-detail-header {
+      .detail-header {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 20px 20px 12px; border-bottom: 1px solid var(--border);
+        padding: 18px 18px 14px; border-bottom: 1px solid var(--border);
         position: sticky; top: 0; background: var(--bg); z-index: 1;
       }
-      .place-detail-title { font-size: 18px; font-weight: 600; margin: 0; flex: 1; }
-      .place-detail-close {
-        width: 32px; height: 32px; border-radius: 50%; border: none;
-        background: var(--border); color: var(--ink); font-size: 18px; line-height: 1;
-        cursor: pointer; display: grid; place-items: center;
+      .detail-title { font-size: 17px; font-weight: 600; margin: 0; flex: 1; color: var(--ink); }
+      .detail-close {
+        width: 30px; height: 30px; border-radius: 50%; border: none;
+        background: #EFEDE8; color: var(--ink);
+        display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+        font-size: 16px; line-height: 1;
       }
-      .place-detail-body { padding: 0 20px 24px; }
-      .place-detail-loading { padding: 40px 20px; text-align: center; color: var(--ink-muted); }
-      .place-detail-error { padding: 20px; color: #c0392b; }
-      .photo-carousel { position: relative; width: 100%; aspect-ratio: 4/3; background: var(--border); overflow: hidden; }
-      .photo-carousel-frame { width: 100%; height: 100%; position: relative; }
-      .photo-carousel-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
-      .photo-carousel-img.is-active { opacity: 1; }
-      .photo-carousel-btn {
+      .detail-body { padding: 0 18px 20px; }
+      .detail-loading { padding: 32px 18px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+
+      .detail-photos { width: 100%; aspect-ratio: 4/3; background: #F0EDE6; overflow: hidden; }
+      .detail-photo-frame { width: 100%; height: 100%; position: relative; }
+      .detail-photo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+      .detail-photo-img.is-active { opacity: 1; }
+      .detail-photo-prev, .detail-photo-next {
         position: absolute; top: 50%; transform: translateY(-50%);
-        width: 32px; height: 32px; border-radius: 50%; border: none;
-        background: rgba(255,255,255,0.85); font-size: 18px; cursor: pointer;
-        display: grid; place-items: center;
+        width: 30px; height: 30px; border-radius: 50%; border: none;
+        background: rgba(255,255,255,0.85); cursor: pointer;
+        display: grid; place-items: center; font-size: 16px;
       }
-      .photo-carousel-btn--prev { left: 12px; }
-      .photo-carousel-btn--next { right: 12px; }
-      .place-detail-meta { padding: 16px 0 12px; display: flex; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-      .place-detail-meta-item { font-size: 13px; color: var(--ink-muted); }
-      .place-detail-note { padding: 12px 14px; background: var(--accent-soft); border-left: 3px solid var(--accent); font-size: 14px; font-style: italic; margin-bottom: 16px; border-radius: 0 8px 8px 0; }
-      .place-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-      .place-detail-action {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+      .detail-photo-prev { left: 10px; }
+      .detail-photo-next { right: 10px; }
+
+      .detail-meta {
+        display: flex; gap: 14px; flex-wrap: wrap;
+        padding: 14px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+      }
+      .detail-meta-item { font-size: 13px; color: var(--ink-muted); }
+      .detail-note {
+        padding: 10px 12px; background: var(--accent-soft); border-left: 2px solid var(--accent);
+        font-size: 13px; font-style: italic; color: var(--ink-muted);
+        border-radius: 0 4px 4px 0; margin-bottom: 14px; line-height: 1.45;
+      }
+      .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+      .detail-action {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px;
         background: var(--surface); color: var(--ink); font-size: 13px;
-        text-decoration: none; cursor: pointer; transition: background 0.15s;
+        text-decoration: none; transition: border-color 0.12s;
       }
-      .place-detail-action:hover { background: var(--theme-bg-tertiary); }
-      .place-detail-hours-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 16px 0 8px; }
-      .place-detail-hours li { font-size: 13px; color: var(--ink-muted); padding: 2px 0; list-style: none; }
-      .reviews-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 16px 0 8px; }
-      .review-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
-      .review-item:last-child { border-bottom: none; }
-      .review-author { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
-      .review-text { font-size: 13px; color: var(--ink-muted); line-height: 1.45; }
+      .detail-action:hover { border-color: var(--border-strong); }
+
+      .detail-hours-title, .detail-reviews-title {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em;
+        text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 8px;
+      }
+      .detail-hours { list-style: none; margin: 0; padding: 0; }
+      .detail-hours li { font-size: 13px; color: var(--ink-muted); padding: 2px 0; }
+      .detail-review { padding: 10px 0; border-bottom: 1px solid var(--border); }
+      .detail-review:last-child { border-bottom: none; }
+      .detail-review-author { font-size: 13px; font-weight: 500; margin: 0 0 3px; color: var(--ink); }
+      .detail-review-text { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Detail slide transitions ─────────────────────────────────────── */
+      .d-enter        { transition: transform 0.32s cubic-bezier(.32,.72,0,1); }
+      .d-enter-start  { transform: translateY(100%); }
+      .d-enter-end    { transform: translateY(0); }
+      .d-leave        { transition: transform 0.24s ease-in; }
+      .d-leave-start  { transform: translateY(0); }
+      .d-leave-end    { transform: translateY(100%); }
+      .d-fade-enter   { transition: opacity 0.18s; }
+      .d-fade-start   { opacity: 0; }
+      .d-fade-end     { opacity: 1; }
+      .d-fade-leave   { transition: opacity 0.18s; }
+      .d-fade-l-start { opacity: 1; }
+      .d-fade-l-end   { opacity: 0; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .d-enter, .d-leave { transition: none; }
+        .tab-btn { transition: none; }
+        .place-card { transition: none; }
+      }
     </style>
   </head>
-  <body x-data="placesPage()" x-init="init()">
 
-    <a class="close-btn" href={backHref} data-astro-reload aria-label="Zurück">
+  <body x-data="places()" x-init="init()">
+
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Schließen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
         <line x1="18" y1="6" x2="6" y2="18"/>
         <line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
     </a>
 
-    <div class="page" x-data={`placesSheet('${initialTab}')`}>
-      <div class="page-hero">
-        <span class="eyebrow">{t('places.subtitle', lang)}</span>
-        <h1 class="page-title">{t('places.title', lang)}</h1>
-        <p class="page-sub">{hotel.name}</p>
+    <div class="page">
+
+      <!-- Hero -->
+      <div class="hero g-hero-dot">
+        <span class="eyebrow">{labels.eyebrow}</span>
+        <h1 class="title">{labels.title}<span class="accent">{labels.titleAccent}</span></h1>
+        <p class="subtitle">{hotel.name}</p>
       </div>
 
-      <!-- Tabs -->
-      <nav class="places-tabs" role="tablist" aria-label="Place-Kategorien">
+      <!-- Category tabs -->
+      <div class="tabs" role="tablist">
         {TABS.map(cat => (
           <button
             type="button"
-            class="places-tab"
-            :class={`{ 'is-active': activeTab === '${cat}' }`}
-            @click={`activeTab = '${cat}'; showAllAuto = false`}
+            class="tab-btn"
+            :data-active={`activeTab === '${cat}'`}
+            @click={`activeTab = '${cat}'; showAllExpanded['${cat}'] = false`}
+            role="tab"
           >
             {TAB_LABELS[cat]}
             {dataByCategory[cat].picks.length > 0 && (
-              <span class="places-tab-counter">{dataByCategory[cat].picks.length}</span>
+              <sup style="font-size:9px;opacity:0.6;margin-left:3px">{dataByCategory[cat].picks.length}</sup>
             )}
           </button>
         ))}
-      </nav>
+      </div>
 
-      <!-- Pro Kategorie -->
+      <!-- Tab panels -->
       {TABS.map(cat => {
-        const data = dataByCategory[cat];
-        const visibleAutoCount = 10;
+        const d = dataByCategory[cat];
+        const AUTO_INITIAL = 8;
         return (
-          <div x-show={`activeTab === '${cat}'`} class="places-tab-panel">
-            <!-- Picks -->
-            <section class="places-section">
-              <h3 class="places-section-eyebrow">{t('places.our_favorites', lang)}</h3>
-              {data.picks.length === 0 && (
-                <p class="places-empty">{t('places.no_picks', lang)}</p>
-              )}
-              {data.picks.map(p => (
+          <div x-show={`activeTab === '${cat}'`} x-cloak role="tabpanel">
+
+            <!-- Hotel picks -->
+            <section class="cat-section">
+              <p class="cat-title">{labels.sectionPicks}</p>
+              {d.picks.length === 0 && <p class="place-empty">{labels.noPicks}</p>}
+              {d.picks.map(p => (
                 <article
                   class="place-card"
                   tabindex="0"
-                  @click={`openPlaceDetail('${p.place_id}')`}
-                  @keydown.enter={`openPlaceDetail('${p.place_id}')`}
+                  @click={`openDetail('${p.place_id}')`}
+                  @keydown.enter={`openDetail('${p.place_id}')`}
                 >
                   {p.photoUrl && (
                     <div class="place-card-photo">
@@ -482,235 +515,245 @@ const TAB_LABELS: Record<PickCategory, string> = {
                     </div>
                   )}
                   <div class="place-card-body">
-                    <h4 class="place-card-name">{p.name}</h4>
-                    <div class="place-card-meta">
-                      {p.rating != null && (
-                        <span class="place-rating">⭐ {p.rating} <span class="place-reviews">({p.userRatingCount ?? 0})</span></span>
-                      )}
-                      {p.priceLevel && <span>· {priceSymbol(p.priceLevel)}</span>}
-                      {p.walkingMin != null && (
-                        <span>· {t('places.distance_minutes', lang).replace('{n}', String(p.walkingMin))}</span>
-                      )}
-                    </div>
-                    {p.hotelNote && <p class="place-card-note">„{p.hotelNote}"</p>}
+                    <p class="place-card-name">{p.name}</p>
+                    <p class="place-card-meta">
+                      {p.rating != null && <span>⭐ {p.rating}</span>}
+                      {p.rating != null && (p.priceLevel || p.walkingMin != null) && <span class="place-card-meta-sep">·</span>}
+                      {p.priceLevel && <span>{PRICE[p.priceLevel]}</span>}
+                      {p.priceLevel && p.walkingMin != null && <span class="place-card-meta-sep">·</span>}
+                      {p.walkingMin != null && <span>{walkLabel(p.walkingMin)}</span>}
+                    </p>
+                    {p.hotelNote && <p class="place-note">{p.hotelNote}</p>}
                   </div>
                 </article>
               ))}
             </section>
 
-            <!-- Auto-Empfehlungen -->
-            <section class="places-section">
-              <h3 class="places-section-eyebrow">{t('places.more_nearby', lang)}</h3>
-              {data.auto.length === 0 && (
-                <p class="places-empty">{t('places.no_nearby', lang)}</p>
-              )}
-              <ul class="place-list">
-                {data.auto.slice(0, visibleAutoCount).map(a => (
-                  <li
-                    class="place-list-item"
+            <!-- Auto / nearby -->
+            <section class="cat-section">
+              <p class="cat-title">{labels.sectionNearby}</p>
+              {d.auto.length === 0 && <p class="place-empty">{labels.noNearby}</p>}
+              <div class="place-list">
+                {d.auto.slice(0, AUTO_INITIAL).map(a => (
+                  <div
+                    class="place-item"
                     tabindex="0"
-                    @click={`openPlaceDetail('${a.place_id}')`}
-                    @keydown.enter={`openPlaceDetail('${a.place_id}')`}
+                    @click={`openDetail('${a.place_id}')`}
+                    @keydown.enter={`openDetail('${a.place_id}')`}
                   >
-                    {a.photoUrl
-                      ? <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
-                      : <div class="place-list-photo place-list-photo--placeholder"></div>
-                    }
-                    <div class="place-list-body">
-                      <p class="place-list-name">{a.name}</p>
-                      <p class="place-list-meta">
-                        {a.rating != null && <span class="place-rating">⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
-                        {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
+                    <div class="place-item-photo">
+                      {a.photoUrl
+                        ? <img src={a.photoUrl} alt={a.name} loading="lazy" />
+                        : <div class="place-item-photo-placeholder"></div>
+                      }
+                    </div>
+                    <div class="place-item-body">
+                      <p class="place-item-name">{a.name}</p>
+                      <p class="place-item-meta">
+                        {a.rating != null && `⭐ ${a.rating}`}
+                        {a.rating != null && a.walkingMin != null && ' · '}
+                        {a.walkingMin != null && walkLabel(a.walkingMin)}
                       </p>
                     </div>
-                  </li>
+                    <span class="place-item-arrow">›</span>
+                  </div>
                 ))}
 
-                <template x-if="showAllAuto">
-                  <span>
-                    {data.auto.slice(visibleAutoCount).map(a => (
-                      <li
-                        class="place-list-item"
-                        tabindex="0"
-                        @click={`openPlaceDetail('${a.place_id}')`}
-                        @keydown.enter={`openPlaceDetail('${a.place_id}')`}
-                      >
-                        {a.photoUrl
-                          ? <img src={a.photoUrl} alt={a.name} class="place-list-photo" loading="lazy" />
-                          : <div class="place-list-photo place-list-photo--placeholder"></div>
-                        }
-                        <div class="place-list-body">
-                          <p class="place-list-name">{a.name}</p>
-                          <p class="place-list-meta">
-                            {a.rating != null && <span class="place-rating">⭐ {a.rating} <span class="place-reviews">({a.userRatingCount ?? 0})</span></span>}
-                            {a.walkingMin != null && <span> · {t('places.distance_minutes', lang).replace('{n}', String(a.walkingMin))}</span>}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </span>
-                </template>
-              </ul>
-              {data.auto.length > visibleAutoCount && (
-                <button type="button" class="places-show-more" x-show="!showAllAuto" @click="showAllAuto = true">
-                  {t('places.show_more', lang)} ({data.auto.length - visibleAutoCount})
-                </button>
-              )}
+                {d.auto.length > AUTO_INITIAL && (
+                  <div x-show={`!showAllExpanded['${cat}']`}>
+                    <button
+                      type="button"
+                      class="show-more-btn"
+                      @click={`showAllExpanded['${cat}'] = true`}
+                    >
+                      {labels.showMore} ({d.auto.length - AUTO_INITIAL})
+                    </button>
+                  </div>
+                )}
+
+                {d.auto.length > AUTO_INITIAL && d.auto.slice(AUTO_INITIAL).map(a => (
+                  <div
+                    class="place-item"
+                    tabindex="0"
+                    x-show={`showAllExpanded['${cat}']`}
+                    x-cloak
+                    @click={`openDetail('${a.place_id}')`}
+                    @keydown.enter={`openDetail('${a.place_id}')`}
+                  >
+                    <div class="place-item-photo">
+                      {a.photoUrl
+                        ? <img src={a.photoUrl} alt={a.name} loading="lazy" />
+                        : <div class="place-item-photo-placeholder"></div>
+                      }
+                    </div>
+                    <div class="place-item-body">
+                      <p class="place-item-name">{a.name}</p>
+                      <p class="place-item-meta">
+                        {a.rating != null && `⭐ ${a.rating}`}
+                        {a.rating != null && a.walkingMin != null && ' · '}
+                        {a.walkingMin != null && walkLabel(a.walkingMin)}
+                      </p>
+                    </div>
+                    <span class="place-item-arrow">›</span>
+                  </div>
+                ))}
+              </div>
             </section>
+
           </div>
         );
       })}
     </div>
 
-    <!-- Place-Detail-Overlay (über dieser Seite — kein Statusbar-Problem) -->
+    <!-- Place detail overlay -->
     <div
-      class="place-detail-backdrop"
-      x-show="activeDetailPlaceId"
+      class="detail-backdrop"
+      x-show="activeId"
       x-cloak
-      @click="closePlaceDetail()"
-      x-transition:enter.opacity
-      x-transition:leave.opacity
+      @click="closeDetail()"
+      x-transition:enter="d-fade-enter"
+      x-transition:enter-start="d-fade-start"
+      x-transition:enter-end="d-fade-end"
+      x-transition:leave="d-fade-leave"
+      x-transition:leave-start="d-fade-l-start"
+      x-transition:leave-end="d-fade-l-end"
     ></div>
 
     <aside
-      class="place-detail-sheet"
-      x-show="activeDetailPlaceId"
+      class="detail-sheet"
+      x-show="activeId"
       x-cloak
-      x-transition:enter="place-enter"
-      x-transition:enter-start="place-enter-start"
-      x-transition:enter-end="place-enter-end"
-      x-transition:leave="place-leave"
-      x-transition:leave-start="place-leave-start"
-      x-transition:leave-end="place-leave-end"
       role="dialog"
       aria-modal="true"
+      x-transition:enter="d-enter"
+      x-transition:enter-start="d-enter-start"
+      x-transition:enter-end="d-enter-end"
+      x-transition:leave="d-leave"
+      x-transition:leave-start="d-leave-start"
+      x-transition:leave-end="d-leave-end"
     >
-      <header class="place-detail-header">
-        <h2 class="place-detail-title" x-text="activeDetailData?.name || '…'"></h2>
-        <button type="button" class="place-detail-close" @click="closePlaceDetail()" aria-label="Schließen">×</button>
+      <header class="detail-header">
+        <h2 class="detail-title" x-text="data?.name || '…'"></h2>
+        <button type="button" class="detail-close" @click="closeDetail()" aria-label="Schließen">×</button>
       </header>
 
-      <div x-show="detailLoading && !activeDetailData" class="place-detail-loading" x-cloak>
+      <div x-show="loading && !data" class="detail-loading" x-cloak>
         <p>…</p>
       </div>
-      <div x-show="detailError" class="place-detail-error" x-cloak x-text="detailError"></div>
 
-      <div x-show="activeDetailData" x-cloak class="place-detail-body">
-        <div class="photo-carousel" x-data="{ idx: 0 }" x-show="(activeDetailData?.photoUrls?.length || 0) > 0">
-          <div class="photo-carousel-frame">
-            <template x-for="(url, i) in (activeDetailData?.photoUrls || [])" :key="url">
-              <img :src="url" :alt="activeDetailData?.name" class="photo-carousel-img" :class="{ 'is-active': i === idx }" loading="lazy" />
+      <div x-show="data" x-cloak>
+        <!-- Carousel -->
+        <div class="detail-photos" x-data="{ idx: 0 }" x-show="(data?.photoUrls?.length || 0) > 0">
+          <div class="detail-photo-frame">
+            <template x-for="(u, i) in (data?.photoUrls || [])" :key="u">
+              <img :src="u" :alt="data?.name" class="detail-photo-img" :class="{ 'is-active': i === idx }" loading="lazy" />
             </template>
           </div>
-          <button type="button" class="photo-carousel-btn photo-carousel-btn--prev" @click="idx = idx > 0 ? idx - 1 : 0" :disabled="idx === 0" x-show="(activeDetailData?.photoUrls?.length || 0) > 1" aria-label="Vorheriges">‹</button>
-          <button type="button" class="photo-carousel-btn photo-carousel-btn--next" @click="idx = Math.min(idx + 1, (activeDetailData?.photoUrls?.length || 1) - 1)" :disabled="idx >= (activeDetailData?.photoUrls?.length || 1) - 1" x-show="(activeDetailData?.photoUrls?.length || 0) > 1" aria-label="Nächstes">›</button>
+          <button type="button" class="detail-photo-prev" @click="idx = Math.max(0, idx - 1)" :disabled="idx === 0" x-show="(data?.photoUrls?.length || 0) > 1">‹</button>
+          <button type="button" class="detail-photo-next" @click="idx = Math.min(idx + 1, (data?.photoUrls?.length || 1) - 1)" :disabled="idx >= (data?.photoUrls?.length || 1) - 1" x-show="(data?.photoUrls?.length || 0) > 1">›</button>
         </div>
 
-        <div class="place-detail-meta">
-          <span class="place-detail-meta-item" x-show="activeDetailData?.rating">⭐ <span x-text="activeDetailData?.rating"></span> (<span x-text="activeDetailData?.userRatingCount"></span>)</span>
-          <span class="place-detail-meta-item" x-show="activeDetailData?.priceSymbol" x-text="activeDetailData?.priceSymbol"></span>
-          <span class="place-detail-meta-item" x-show="activeDetailData?.openNow !== null" :class="activeDetailData?.openNow ? 'text-green' : 'text-red'" x-text="activeDetailData?.openNow ? 'Geöffnet' : 'Geschlossen'"></span>
-        </div>
+        <div class="detail-body">
+          <!-- Meta row -->
+          <div class="detail-meta">
+            <span class="detail-meta-item" x-show="data?.rating">
+              ⭐ <span x-text="data?.rating"></span>
+              <span x-show="data?.userRatingCount"> (<span x-text="data?.userRatingCount"></span>)</span>
+            </span>
+            <span class="detail-meta-item" x-show="data?.priceSymbol" x-text="data?.priceSymbol"></span>
+            <span class="detail-meta-item"
+              x-show="data?.openNow !== null && data?.openNow !== undefined"
+              :style="data?.openNow ? 'color:var(--success)' : 'color:var(--ink-muted)'"
+              x-text="data?.openNow ? 'Geöffnet' : 'Geschlossen'">
+            </span>
+          </div>
 
-        <div x-show="activeDetailData?.hotelNote" class="place-detail-note" x-text='`„${activeDetailData?.hotelNote}"`'></div>
+          <!-- Hotel note -->
+          <div x-show="data?.hotelNote" class="detail-note" x-text="data?.hotelNote"></div>
 
-        <div class="place-detail-actions">
-          <a x-show="activeDetailData?.googleMapsUri" :href="activeDetailData?.googleMapsUri" target="_blank" rel="noopener" class="place-detail-action">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/></svg>
-            Maps
-          </a>
-          <a x-show="activeDetailData?.phone" :href="`tel:${activeDetailData?.phone}`" class="place-detail-action">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.89 8.19a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.8 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            Anrufen
-          </a>
-          <a x-show="activeDetailData?.website" :href="activeDetailData?.website" target="_blank" rel="noopener" class="place-detail-action">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Website
-          </a>
-        </div>
+          <!-- Action links -->
+          <div class="detail-actions">
+            <a x-show="data?.googleMapsUri" :href="data?.googleMapsUri" target="_blank" rel="noopener" class="detail-action">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/></svg>
+              Maps
+            </a>
+            <a x-show="data?.phone" :href="`tel:${data?.phone}`" class="detail-action">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.89 8.19a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.8 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Anrufen
+            </a>
+            <a x-show="data?.website" :href="data?.website" target="_blank" rel="noopener" class="detail-action">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              Website
+            </a>
+          </div>
 
-        <p x-show="activeDetailData?.formattedAddress" class="place-detail-meta-item" x-text="activeDetailData?.formattedAddress" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px;"></p>
+          <!-- Address -->
+          <p x-show="data?.formattedAddress" class="detail-meta-item" x-text="data?.formattedAddress" style="font-size:13px;color:var(--ink-muted);margin:0 0 4px"></p>
 
-        <div x-show="(activeDetailData?.weekdayDescriptions?.length || 0) > 0">
-          <p class="place-detail-hours-title">Öffnungszeiten</p>
-          <ul class="place-detail-hours">
-            <template x-for="d in (activeDetailData?.weekdayDescriptions || [])" :key="d">
-              <li x-text="d"></li>
+          <!-- Hours -->
+          <div x-show="(data?.weekdayDescriptions?.length || 0) > 0">
+            <p class="detail-hours-title">Öffnungszeiten</p>
+            <ul class="detail-hours">
+              <template x-for="d in (data?.weekdayDescriptions || [])" :key="d">
+                <li x-text="d"></li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- Reviews -->
+          <div x-show="(data?.reviews?.length || 0) > 0">
+            <p class="detail-reviews-title">Bewertungen</p>
+            <template x-for="r in (data?.reviews || [])" :key="r.author">
+              <div class="detail-review">
+                <p class="detail-review-author" x-text="r.author + (r.rating ? '  ·  ' + '★'.repeat(r.rating) : '')"></p>
+                <p class="detail-review-text" x-text="r.text"></p>
+              </div>
             </template>
-          </ul>
-        </div>
-
-        <div x-show="(activeDetailData?.reviews?.length || 0) > 0">
-          <p class="reviews-title">Bewertungen</p>
-          <template x-for="r in (activeDetailData?.reviews || [])" :key="r.author">
-            <div class="review-item">
-              <p class="review-author" x-text="r.author + (r.rating ? ' · ' + '⭐'.repeat(r.rating) : '')"></p>
-              <p class="review-text" x-text="r.text"></p>
-            </div>
-          </template>
+          </div>
         </div>
       </div>
     </aside>
 
-    <style>
-      .place-enter        { transition: transform 0.35s cubic-bezier(0.22,1,0.36,1); }
-      .place-enter-start  { transform: translateY(100%); }
-      .place-enter-end    { transform: translateY(0); }
-      .place-leave        { transition: transform 0.28s ease-in; }
-      .place-leave-start  { transform: translateY(0); }
-      .place-leave-end    { transform: translateY(100%); }
-    </style>
-
     <script>
       document.addEventListener('alpine:init', () => {
-        // @ts-expect-error Alpine
-        Alpine.data('placesSheet', (initialTab: string) => ({
-          activeTab: initialTab,
-          showAllAuto: false,
-        }));
+        Alpine.data('places', () => ({
+          activeTab: (window as any).__PLACE_DETAILS__?.initialTab ?? 'restaurant',
+          showAllExpanded: {} as Record<string, boolean>,
+          activeId: null as string | null,
+          data: null as any,
+          loading: false,
+          error: null as string | null,
 
-        // @ts-expect-error Alpine
-        Alpine.data('placesPage', () => ({
-          activeDetailPlaceId: null as string | null,
-          activeDetailData: null as any,
-          detailLoading: false,
-          detailError: null as string | null,
+          init() {
+            this.activeTab = (window as any).__PLACE_DETAILS__?.initialTab ?? 'restaurant';
+          },
 
-          async openPlaceDetail(placeId: string) {
-            this.detailError = null;
-            this.activeDetailPlaceId = placeId;
+          async openDetail(placeId: string) {
+            this.error = null;
+            this.activeId = placeId;
 
             const cache = (window as any).__PLACE_DETAILS__?.cache ?? {};
             if (cache[placeId]) {
-              this.activeDetailData = cache[placeId];
-              this.detailLoading = false;
+              this.data = cache[placeId];
+              this.loading = false;
               return;
             }
 
-            this.activeDetailData = null;
-            this.detailLoading = true;
+            this.data = null;
+            this.loading = true;
             try {
               const lang = (window as any).__PLACE_DETAILS__?.lang || 'de';
               const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}&lang=${lang}`);
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              const body = await res.json();
-              if (!body.ok) throw new Error(body.error || 'Unknown error');
+              const body = await res.json() as any;
+              if (!body.ok) throw new Error(body.error || 'Unknown');
               const d = body.details as any;
-              const PRICE: Record<string, string> = {
-                PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€',
-                PRICE_LEVEL_MODERATE: '€€', PRICE_LEVEL_EXPENSIVE: '€€€',
-                PRICE_LEVEL_VERY_EXPENSIVE: '€€€€',
-              };
-              this.activeDetailData = {
-                name: d.name,
-                rating: d.rating,
-                userRatingCount: d.userRatingCount,
-                priceSymbol: PRICE[d.priceLevel ?? ''] ?? '',
-                hotelNote: null,
-                formattedAddress: d.formattedAddress,
-                phone: d.internationalPhoneNumber,
-                website: d.websiteUri,
-                googleMapsUri: d.googleMapsUri,
+              const P: Record<string,string> = { PRICE_LEVEL_FREE: '', PRICE_LEVEL_INEXPENSIVE: '€', PRICE_LEVEL_MODERATE: '€€', PRICE_LEVEL_EXPENSIVE: '€€€', PRICE_LEVEL_VERY_EXPENSIVE: '€€€€' };
+              this.data = {
+                name: d.name, rating: d.rating, userRatingCount: d.userRatingCount,
+                priceSymbol: P[d.priceLevel ?? ''] ?? '', hotelNote: null,
+                formattedAddress: d.formattedAddress, phone: d.internationalPhoneNumber,
+                website: d.websiteUri, googleMapsUri: d.googleMapsUri,
                 openNow: d.openingHours?.openNow ?? null,
                 weekdayDescriptions: d.openingHours?.weekdayDescriptions ?? [],
                 reviews: (d.reviews ?? []).slice(0, 3).map((r: any) => ({
@@ -722,20 +765,23 @@ const TAB_LABELS: Record<PickCategory, string> = {
                   `/api/places/photo?name=${encodeURIComponent(ph.name ?? ph)}&maxWidth=1200`
                 ),
               };
-            } catch (err) {
-              this.detailError = `Fehler: ${(err as Error).message}`;
+            } catch (e) {
+              this.error = (e as Error).message;
             } finally {
-              this.detailLoading = false;
+              this.loading = false;
             }
           },
 
-          closePlaceDetail() {
-            this.activeDetailPlaceId = null;
-            this.activeDetailData = null;
-            this.detailError = null;
+          closeDetail() {
+            this.activeId = null;
+            this.data = null;
+            this.error = null;
           },
         }));
       });
     </script>
+
+    <script is:inline set:html={`window.__PLACE_DETAILS__.initialTab = '${initialTab}';`}></script>
+
   </body>
 </html>
