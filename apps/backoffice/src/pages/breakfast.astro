@@ -188,7 +188,7 @@ textarea.s-input { resize: none; min-height: 72px; }
 /* items list */
 .bp-item-group { margin-bottom: 4px; }
 .bp-item-cat { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted); padding: 14px 4px 4px; }
-.bp-item-list { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; }
+.bp-item-list { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; touch-action: none; }
 .bp-item-row { display: flex; align-items: center; border-bottom: 1px solid var(--border); transition: background 120ms; }
 .bp-item-row:last-child { border-bottom: none; }
 .bp-item-row.is-drag-over { background: var(--te-yellow-soft); box-shadow: inset 0 2px 0 var(--te-yellow); }
@@ -547,9 +547,6 @@ textarea.s-input { resize: none; min-height: 72px; }
                     <span class="bp-drag-handle"
                       @click.stop
                       @pointerdown="dndPtrDown($event, item)"
-                      @pointermove="dndPtrMove($event)"
-                      @pointerup="dndPtrUp()"
-                      @pointercancel="dndPtrCancel()"
                       aria-label="Ziehen zum Sortieren">
                       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
                         <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
@@ -818,6 +815,8 @@ textarea.s-input { resize: none; min-height: 72px; }
       dragItem: null,
       dragTarget: null,
       _ptrItem: null,
+      _ptrMoveHandler: null,
+      _ptrUpHandler: null,
 
       // ── Debug (TEMPORÄR — nach Diagnose entfernen) ─────────────────────
       _dbgDown: 0,
@@ -933,43 +932,50 @@ textarea.s-input { resize: none; min-height: 72px; }
         }
       },
 
-      // ── Drag & Drop (Pointer Events — works on mouse + touch + pen) ───
+      // ── Drag & Drop (Pointer Events, window-listener — kein setPointerCapture)
+      // iOS: setPointerCapture lässt elementFromPoint immer das Handle zurückgeben
+      // statt der visuellen Row unter dem Finger → dragTarget wird nie gesetzt.
+      // Fix: move+up auf window registrieren, kein capture nötig.
       dndPtrDown(e, item) {
         this._dbgDown++;
         e.preventDefault();
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          this._dbgCapture = 'ok';
-        } catch (err) {
-          this._dbgCapture = 'fail:' + (err && err.message ? err.message.slice(0, 24) : '?');
-        }
+        this._dbgCapture = 'win';
         this._ptrItem = item;
         this.dragItem = item;
-      },
-      dndPtrMove(e) {
-        this._dbgMove++;
-        if (!this._ptrItem) return;
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        const row = el && el.closest('[data-item-id]');
-        if (row) {
-          const id = parseInt(row.dataset.itemId, 10);
-          const target = this.items.find(i => i.id === id);
-          if (target && target.id !== this._ptrItem.id) this.dragTarget = target;
-        }
-      },
-      dndPtrUp() {
-        if (this._ptrItem && this.dragTarget) {
-          this._dndPerform(this.dragTarget);
-        } else {
-          this.dragItem = null;
-          this.dragTarget = null;
-        }
-        this._ptrItem = null;
-      },
-      dndPtrCancel() {
-        this.dragItem = null;
-        this.dragTarget = null;
-        this._ptrItem = null;
+        const pid = e.pointerId;
+
+        this._ptrMoveHandler = (ev) => {
+          if (ev.pointerId !== pid) return;
+          ev.preventDefault();
+          this._dbgMove++;
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const row = el && el.closest('[data-item-id]');
+          if (row) {
+            const idStr = row.dataset.itemId;
+            const target = this.items.find(i => String(i.id) === idStr);
+            if (target && String(target.id) !== String(this._ptrItem?.id)) {
+              this.dragTarget = target;
+            }
+          }
+        };
+        this._ptrUpHandler = (ev) => {
+          if (ev.pointerId !== pid) return;
+          window.removeEventListener('pointermove', this._ptrMoveHandler);
+          window.removeEventListener('pointerup', this._ptrUpHandler);
+          window.removeEventListener('pointercancel', this._ptrUpHandler);
+          if (this._ptrItem && this.dragTarget) {
+            this._dndPerform(this.dragTarget);
+          } else {
+            this.dragItem = null;
+            this.dragTarget = null;
+          }
+          this._ptrItem = null;
+          this._ptrMoveHandler = null;
+          this._ptrUpHandler = null;
+        };
+        window.addEventListener('pointermove', this._ptrMoveHandler, { passive: false });
+        window.addEventListener('pointerup', this._ptrUpHandler);
+        window.addEventListener('pointercancel', this._ptrUpHandler);
       },
       _dndPerform(target) {
         const fromIdx = this.items.findIndex(i => i.id === this.dragItem.id);
