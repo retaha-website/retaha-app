@@ -1,10 +1,10 @@
 export interface PreviewState {
   persona: 'arrival' | 'in_house' | 'departure';
-  view: 'home' | 'eve' | 'empfehlungen' | 'service';
+  view: 'home' | 'eve' | 'recommendations' | 'service';
   branding: { theme: 'coffee' | 'ocean' | 'forest' };
   modules: {
     eve: boolean;
-    empfehlungen: boolean;
+    recommendations: boolean;
     service: boolean;
     breakfast: boolean;
     conference: boolean;
@@ -24,7 +24,7 @@ export const initialState: PreviewState = {
   branding: { theme: 'coffee' },
   modules: {
     eve: true,
-    empfehlungen: true,
+    recommendations: true,
     service: true,
     breakfast: true,
     conference: true,

@@ -49,7 +49,7 @@ export const menuSections: MenuSection[] = [
       {
         label: 'Empfehlungen',
         sub: 'Google Places · Tipps',
-        href: '/gast-vorschau',
+        href: '/places',
         icon: icon('<circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>'),
       },
       {
