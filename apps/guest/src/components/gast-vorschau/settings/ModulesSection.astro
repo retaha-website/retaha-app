@@ -143,15 +143,31 @@ const groups = [
     if (state === 'saved') statusTimer = setTimeout(() => setStatus('', ''), 2500);
   }
 
+  // Sync preview state from SSR-rendered DOM — initialState has all-true hardcoded,
+  // reading DOM gives us the real DB values the server rendered.
+  const domModules: Partial<ReturnType<typeof getState>['modules']> = {};
+  document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
+    const k = btn.dataset.moduleKey as ModuleKey | undefined;
+    if (k) domModules[k] = btn.classList.contains('is-on');
+  });
+  updateState({ modules: { ...getState().modules, ...domModules } });
+
   document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
     btn.addEventListener('click', async () => {
       const key = btn.dataset.moduleKey as ModuleKey | undefined;
-      if (!key) return;
-      const current = getState().modules;
-      const newVal = !current[key];
+      if (!key || btn.dataset.loading) return;
+
+      // Read current state from DOM (not from initialState which hardcodes all-true)
+      const wasOn = btn.classList.contains('is-on');
+      const newVal = !wasOn;
+
+      // Optimistic update
       btn.classList.toggle('is-on', newVal);
       btn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
-      updateState({ modules: { ...current, [key]: newVal } });
+      updateState({ modules: { ...getState().modules, [key]: newVal } });
+      btn.dataset.loading = 'true';
+      setStatus('', '');
+
       try {
         const res = await fetch('/api/hotel/save-modules', {
           method: 'POST',
@@ -162,7 +178,13 @@ const groups = [
         if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
         setStatus('saved', '✓ Gespeichert');
       } catch {
-        setStatus('error', 'Fehler beim Speichern');
+        // Rollback visual + state on failure
+        btn.classList.toggle('is-on', wasOn);
+        btn.setAttribute('aria-pressed', wasOn ? 'true' : 'false');
+        updateState({ modules: { ...getState().modules, [key]: wasOn } });
+        setStatus('error', 'Fehler — bitte neu laden');
+      } finally {
+        delete btn.dataset.loading;
       }
     });
   });

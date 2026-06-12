@@ -38,11 +38,16 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   }
 
   const sb = createSupabaseServerInstance(cookies, request);
-  const { data: current } = await sb
+  const { data: current, error: selectError } = await sb
     .from('hotel_settings')
     .select('features')
     .eq('hotel_id', hotel.id)
     .maybeSingle();
+
+  if (selectError) {
+    console.error('[save-modules] SELECT failed — refusing to write', key, selectError);
+    return json({ ok: false, error: 'DB-Lesefehler — bitte neu laden' }, 500);
+  }
 
   const newFeatures = {
     ...((current?.features as Record<string, unknown>) ?? {}),

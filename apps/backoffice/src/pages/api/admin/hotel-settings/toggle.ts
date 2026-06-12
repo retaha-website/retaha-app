@@ -52,11 +52,15 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   // hotel_settings.features JSONB — read-modify-write
   if (field in SETTINGS_JSON_FIELDS) {
     const jsonKey = SETTINGS_JSON_FIELDS[field];
-    const { data: current } = await supabase
+    const { data: current, error: selectError } = await supabase
       .from('hotel_settings')
       .select('features')
       .eq('hotel_id', hotel.id)
       .maybeSingle();
+    if (selectError) {
+      console.error('[hotel-settings/toggle] SELECT failed — refusing to write', field, selectError);
+      return json({ ok: false, error: 'DB-Lesefehler' }, 500);
+    }
     const newFeatures = {
       ...((current?.features as Record<string, unknown>) ?? {}),
       [jsonKey]: value,

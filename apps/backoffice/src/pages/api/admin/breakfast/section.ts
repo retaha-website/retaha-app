@@ -109,7 +109,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
     if (section === 'module') {
       const value = body.features_breakfast === 'true';
-      const { data: cur } = await supabase.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle();
+      const { data: cur, error: selectErr } = await supabase.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle();
+      if (selectErr) { console.error('[breakfast/section module] SELECT failed', selectErr); return json({ ok: false, error: 'DB-Lesefehler' }, 500); }
       const newFeatures = { ...((cur?.features as Record<string, unknown>) ?? {}), breakfast: value };
       const { error } = await ups({ features: newFeatures });
       if (error) { console.error('[breakfast/section module]', error); return json({ ok: false, error: error.message }, 500); }
