@@ -14,6 +14,7 @@ if (!token) return new Response('Token fehlt', { status: 400 });
 const url = new URL(Astro.request.url);
 const persona = url.searchParams.get('persona') ?? 'in_house';
 const langParam = url.searchParams.get('lang');
+const isV2 = url.searchParams.get('ui') === 'v2';
 
 // Showcase- oder Echtdaten laden
 let ctx: any = null;
@@ -227,6 +228,11 @@ const labels = {
     menuFlagVegetarian: 'vegetarisch', menuFlagVegan: 'vegan', menuFlagOrganic: 'bio',
     menuAllergensPrefix: 'Allergene:', menuEmpty: 'Noch keine Speisen im Angebot.',
     menuDisclaimer: 'Angaben durch das Hotel — bei Unsicherheit bitte direkt mit dem Service sprechen.',
+    labelDatum: 'DATUM', labelPersonen: 'PERSONEN', labelUhrzeit: 'UHRZEIT',
+    labelTisch: 'TISCH', labelOrt: 'ORT', labelHinweis: 'HINWEIS',
+    labelOptional: 'optional', labelPreis: 'PREIS', labelGesamt: 'Gesamt',
+    submitRoom: 'Aufs Zimmer bestellen',
+    ctaPickDate: 'Datum wählen', ctaPickTime: 'Uhrzeit wählen',
   },
   en: {
     pageTitle: `${hotel.name} · Breakfast`,
@@ -262,6 +268,11 @@ const labels = {
     menuFlagVegetarian: 'vegetarian', menuFlagVegan: 'vegan', menuFlagOrganic: 'organic',
     menuAllergensPrefix: 'Allergens:', menuEmpty: 'No dishes available yet.',
     menuDisclaimer: 'Information provided by the hotel — please ask service for any uncertainty.',
+    labelDatum: 'DATE', labelPersonen: 'PEOPLE', labelUhrzeit: 'TIME',
+    labelTisch: 'TABLE', labelOrt: 'WHERE', labelHinweis: 'NOTE',
+    labelOptional: 'optional', labelPreis: 'PRICE', labelGesamt: 'Total',
+    submitRoom: 'Order to room',
+    ctaPickDate: 'Choose date', ctaPickTime: 'Choose time',
   },
   fr: {
     pageTitle: `${hotel.name} · Petit-déjeuner`,
@@ -295,6 +306,11 @@ const labels = {
     menuFlagVegetarian: 'végétarien', menuFlagVegan: 'végan', menuFlagOrganic: 'bio',
     menuAllergensPrefix: 'Allergènes :', menuEmpty: "Aucun plat disponible pour l'instant.",
     menuDisclaimer: 'Informations fournies par l\'hôtel — en cas de doute, parlez au service.',
+    labelDatum: 'DATE', labelPersonen: 'PERSONNES', labelUhrzeit: 'HEURE',
+    labelTisch: 'TABLE', labelOrt: 'OÙ', labelHinweis: 'NOTE',
+    labelOptional: 'facultatif', labelPreis: 'PRIX', labelGesamt: 'Total',
+    submitRoom: 'Commander en chambre',
+    ctaPickDate: 'Choisir une date', ctaPickTime: "Choisir l'heure",
   },
   es: {
     pageTitle: `${hotel.name} · Desayuno`,
@@ -328,6 +344,11 @@ const labels = {
     menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegano', menuFlagOrganic: 'ecológico',
     menuAllergensPrefix: 'Alérgenos:', menuEmpty: 'Aún no hay platos disponibles.',
     menuDisclaimer: 'Datos proporcionados por el hotel — en caso de duda, hable con el servicio.',
+    labelDatum: 'FECHA', labelPersonen: 'PERSONAS', labelUhrzeit: 'HORA',
+    labelTisch: 'MESA', labelOrt: 'DÓNDE', labelHinweis: 'NOTA',
+    labelOptional: 'opcional', labelPreis: 'PRECIO', labelGesamt: 'Total',
+    submitRoom: 'Pedir a la habitación',
+    ctaPickDate: 'Elegir fecha', ctaPickTime: 'Elegir hora',
   },
   it: {
     pageTitle: `${hotel.name} · Colazione`,
@@ -361,6 +382,11 @@ const labels = {
     menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegano', menuFlagOrganic: 'biologico',
     menuAllergensPrefix: 'Allergeni:', menuEmpty: 'Nessun piatto disponibile al momento.',
     menuDisclaimer: "Informazioni fornite dall'hotel — in caso di dubbio, parlare con il servizio.",
+    labelDatum: 'DATA', labelPersonen: 'PERSONE', labelUhrzeit: 'ORA',
+    labelTisch: 'TAVOLO', labelOrt: 'DOVE', labelHinweis: 'NOTA',
+    labelOptional: 'opzionale', labelPreis: 'PREZZO', labelGesamt: 'Totale',
+    submitRoom: 'Ordina in camera',
+    ctaPickDate: 'Scegli data', ctaPickTime: 'Scegli orario',
   },
   pt: {
     pageTitle: `${hotel.name} · Pequeno-almoço`,
@@ -394,6 +420,11 @@ const labels = {
     menuFlagVegetarian: 'vegetariano', menuFlagVegan: 'vegan', menuFlagOrganic: 'biológico',
     menuAllergensPrefix: 'Alergénios:', menuEmpty: 'Ainda não há pratos disponíveis.',
     menuDisclaimer: 'Informações fornecidas pelo hotel — em caso de dúvida, fale com o serviço.',
+    labelDatum: 'DATA', labelPersonen: 'PESSOAS', labelUhrzeit: 'HORA',
+    labelTisch: 'MESA', labelOrt: 'ONDE', labelHinweis: 'NOTA',
+    labelOptional: 'opcional', labelPreis: 'PREÇO', labelGesamt: 'Total',
+    submitRoom: 'Pedir ao quarto',
+    ctaPickDate: 'Escolha a data', ctaPickTime: 'Escolha a hora',
   },
   nl: {
     pageTitle: `${hotel.name} · Ontbijt`,
@@ -427,6 +458,11 @@ const labels = {
     menuFlagVegetarian: 'vegetarisch', menuFlagVegan: 'veganistisch', menuFlagOrganic: 'biologisch',
     menuAllergensPrefix: 'Allergenen:', menuEmpty: 'Nog geen gerechten beschikbaar.',
     menuDisclaimer: 'Informatie verstrekt door het hotel — bij twijfel, spreek met de bediening.',
+    labelDatum: 'DATUM', labelPersonen: 'PERSONEN', labelUhrzeit: 'TIJD',
+    labelTisch: 'TAFEL', labelOrt: 'WAAR', labelHinweis: 'OPMERKING',
+    labelOptional: 'optioneel', labelPreis: 'PRIJS', labelGesamt: 'Totaal',
+    submitRoom: 'Bestel op kamer',
+    ctaPickDate: 'Kies datum', ctaPickTime: 'Kies tijd',
   },
   ru: {
     pageTitle: `${hotel.name} · Завтрак`,
@@ -460,6 +496,11 @@ const labels = {
     menuFlagVegetarian: 'вегетарианское', menuFlagVegan: 'веганское', menuFlagOrganic: 'органическое',
     menuAllergensPrefix: 'Аллергены:', menuEmpty: 'Блюда пока не добавлены.',
     menuDisclaimer: 'Информация предоставлена отелем — при сомнениях обратитесь к персоналу.',
+    labelDatum: 'ДАТА', labelPersonen: 'ГОСТИ', labelUhrzeit: 'ВРЕМЯ',
+    labelTisch: 'СТОЛ', labelOrt: 'МЕСТО', labelHinweis: 'ЗАМЕТКА',
+    labelOptional: 'необяз.', labelPreis: 'ЦЕНА', labelGesamt: 'Итого',
+    submitRoom: 'Заказать в номер',
+    ctaPickDate: 'Выберите дату', ctaPickTime: 'Выберите время',
   },
   ar: {
     pageTitle: `${hotel.name} · الإفطار`,
@@ -493,6 +534,11 @@ const labels = {
     menuFlagVegetarian: 'نباتي', menuFlagVegan: 'نباتي صرف', menuFlagOrganic: 'عضوي',
     menuAllergensPrefix: 'مسببات الحساسية:', menuEmpty: 'لا توجد أطباق متاحة حالياً.',
     menuDisclaimer: 'المعلومات مقدمة من الفندق — في حالة الشك يرجى التحدث مع الموظفين.',
+    labelDatum: 'التاريخ', labelPersonen: 'أشخاص', labelUhrzeit: 'الوقت',
+    labelTisch: 'الطاولة', labelOrt: 'المكان', labelHinweis: 'ملاحظة',
+    labelOptional: 'اختياري', labelPreis: 'السعر', labelGesamt: 'الإجمالي',
+    submitRoom: 'اطلب للغرفة',
+    ctaPickDate: 'اختر التاريخ', ctaPickTime: 'اختر الوقت',
   },
   zh: {
     pageTitle: `${hotel.name} · 早餐`,
@@ -526,6 +572,11 @@ const labels = {
     menuFlagVegetarian: '素食', menuFlagVegan: '纯素', menuFlagOrganic: '有机',
     menuAllergensPrefix: '过敏原:', menuEmpty: '暂无菜品。',
     menuDisclaimer: '信息由酒店提供——如有疑问，请直接与服务人员沟通。',
+    labelDatum: '日期', labelPersonen: '人数', labelUhrzeit: '时间',
+    labelTisch: '桌位', labelOrt: '位置', labelHinweis: '备注',
+    labelOptional: '可选', labelPreis: '价格', labelGesamt: '总计',
+    submitRoom: '送至房间',
+    ctaPickDate: '选择日期', ctaPickTime: '选择时间',
   },
 };
 const l = labels[lk];
@@ -561,6 +612,7 @@ const sheetData = {
   menuItems: localizedItems,
   allergenLabels,
   allergenKeys: ALLERGEN_KEYS,
+  isV2,
 };
 ---
 
@@ -828,8 +880,78 @@ const sheetData = {
         margin-top: 16px; line-height: 1.4;
       }
 
+      /* ── v2 Card Form ───────────────────────────────────────────────── */
+      .v2-card {
+        background: white; border: 1px solid var(--border);
+        border-radius: 12px; overflow: hidden; margin-bottom: 16px;
+      }
+      .v2-row {
+        padding: 13px 16px; border-bottom: 1px solid var(--border);
+      }
+      .v2-row:last-child { border-bottom: none; }
+      .v2-row-label {
+        display: flex; align-items: center; gap: 6px;
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+        font-weight: 600; text-transform: uppercase;
+        color: var(--ink-faint); margin-bottom: 9px;
+      }
+      .v2-row-label-opt {
+        font-weight: 400; font-size: 8px; opacity: 0.8; letter-spacing: 0.08em;
+      }
+      .v2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .v2-chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 7px 13px; min-height: 40px;
+        background: white; border: 1px solid #D0CCC5;
+        border-radius: 8px; font-family: var(--display); font-size: 13px;
+        font-weight: 500; color: var(--ink);
+        cursor: pointer; white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+        transition: border-color 80ms, background 80ms, color 80ms;
+      }
+      .v2-chip:active { transform: scale(0.96); }
+      .v2-chip[data-active="true"] {
+        background: #0A0A0A; border-color: #0A0A0A; color: #fff;
+      }
+      .v2-textarea {
+        width: 100%; padding: 2px 0; margin: 0;
+        background: transparent; border: none;
+        font-family: var(--display); font-size: 14px;
+        color: var(--ink); resize: none; outline: none;
+        min-height: 26px; overflow: hidden;
+        field-sizing: content;
+      }
+      .v2-textarea::placeholder { color: var(--ink-faint); }
+      .v2-room-input {
+        width: 100%; padding: 4px 0; margin: 0;
+        background: transparent; border: none; border-bottom: 1px solid var(--border);
+        font-family: var(--display); font-size: 14px;
+        color: var(--ink); outline: none;
+      }
+      .v2-room-input::placeholder { color: var(--ink-faint); }
+      .v2-room-input:focus { border-bottom-color: var(--ink); }
+      .v2-submit-incomplete {
+        display: block; width: 100%; margin-top: 12px;
+        padding: 15px 20px; background: transparent; color: var(--ink-muted);
+        border: 1.5px solid var(--border); border-radius: 10px;
+        font-family: var(--mono); font-size: 10px;
+        letter-spacing: 0.14em; text-transform: uppercase;
+        font-weight: 500; cursor: default; text-align: center;
+      }
+      .v2-submit-complete {
+        display: block; width: 100%; margin-top: 12px;
+        padding: 15px 20px; background: #0A0A0A; color: white;
+        border: none; border-radius: 10px;
+        font-family: var(--display); font-size: 15px; font-weight: 600;
+        letter-spacing: -0.01em; cursor: pointer;
+        transition: background 0.14s;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .v2-submit-complete:hover { background: #2A2A2A; }
+      .v2-submit-complete:active { background: var(--accent); }
+
       @media (prefers-reduced-motion: reduce) {
-        .chip, .submit-btn, .filter-chip { transition: none; }
+        .chip, .submit-btn, .filter-chip, .v2-chip, .v2-submit-complete { transition: none; }
       }
     </style>
   </head>
@@ -933,7 +1055,7 @@ const sheetData = {
                   </div>
                 </div>
               </template>
-              <form @submit.prevent="submitBooking()" x-show="availableDates.length > 0">
+              <form @submit.prevent="submitBooking()" x-show="!isV2 && availableDates.length > 0">
 
                 <!-- Wann -->
                 <div class="booking-section">
@@ -1045,6 +1167,152 @@ const sheetData = {
                   x-text="submitting ? labels.submitting : labels.submit">
                 </button>
               </form>
+
+              <!-- ── v2 Form ──────────────────────────────────────────── -->
+              <div x-show="isV2 && availableDates.length > 0">
+                <div class="v2-card">
+
+                  <!-- DATUM -->
+                  <div class="v2-row">
+                    <div class="v2-row-label" x-text="labels.labelDatum"></div>
+                    <div class="v2-chips">
+                      <template x-for="(date, i) in availableDates" :key="date.iso">
+                        <button type="button" class="v2-chip"
+                          :data-active="form.date === date.iso"
+                          @click="setDate(date.iso)">
+                          <span x-text="dateLabels[i]"></span>
+                          <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- PERSONEN -->
+                  <div class="v2-row">
+                    <div class="v2-row-label" x-text="labels.labelPersonen"></div>
+                    <div class="v2-chips">
+                      <template x-for="n in peopleOptions" :key="n">
+                        <button type="button" class="v2-chip"
+                          :data-active="form.people === n"
+                          @click="form.people = n"
+                          x-text="n">
+                        </button>
+                      </template>
+                      <button type="button" class="v2-chip"
+                        :data-active="form.people > 4"
+                        @click="form.people = 5">5+</button>
+                    </div>
+                  </div>
+
+                  <!-- UHRZEIT -->
+                  <div class="v2-row">
+                    <div class="v2-row-label" x-text="labels.labelUhrzeit"></div>
+                    <div class="v2-chips">
+                      <template x-for="slot in slots" :key="slot">
+                        <button type="button" class="v2-chip"
+                          :data-active="form.time === slot"
+                          @click="form.time = slot"
+                          x-text="slot">
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- TISCH (optional) -->
+                  <div class="v2-row">
+                    <div class="v2-row-label">
+                      <span x-text="labels.labelTisch"></span>
+                      <span class="v2-row-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                    </div>
+                    <div class="v2-chips">
+                      <template x-for="opt in tableOptions" :key="opt.value">
+                        <button type="button" class="v2-chip"
+                          :data-active="form.table_preference === opt.value"
+                          @click="form.table_preference = opt.value"
+                          x-text="opt.label">
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- ORT (nur wenn roomServiceEnabled) -->
+                  <div class="v2-row" x-show="roomServiceEnabled">
+                    <div class="v2-row-label" x-text="labels.labelOrt"></div>
+                    <div class="v2-chips">
+                      <button type="button" class="v2-chip"
+                        :data-active="form.delivery === 'table'"
+                        @click="form.delivery = 'table'"
+                        x-text="labels.deliveryTable">
+                      </button>
+                      <button type="button" class="v2-chip"
+                        :data-active="form.delivery === 'room'"
+                        @click="form.delivery = 'room'"
+                        x-text="labels.deliveryRoom">
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- ZIMMER (nur wenn delivery=room) -->
+                  <div class="v2-row" x-show="roomServiceEnabled && form.delivery === 'room'">
+                    <div class="v2-row-label" x-text="labels.roomNumberLabel"></div>
+                    <input type="text" class="v2-room-input"
+                      x-model="form.room_number"
+                      :placeholder="labels.roomNumberLabel">
+                  </div>
+
+                  <!-- HINWEIS (optional) -->
+                  <div class="v2-row">
+                    <div class="v2-row-label">
+                      <span x-text="labels.labelHinweis"></span>
+                      <span class="v2-row-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                    </div>
+                    <textarea class="v2-textarea" rows="1"
+                      :placeholder="labels.notesPlaceholder"
+                      x-model="form.notes"
+                      @input="$el.style.height='auto'; $el.style.height=$el.scrollHeight+'px'">
+                    </textarea>
+                  </div>
+
+                  <!-- PREIS -->
+                  <div class="v2-row" x-show="totalPrice !== null">
+                    <div class="v2-row-label" x-text="labels.labelPreis"></div>
+                    <p style="margin:0;font-size:14px;color:var(--ink);line-height:1.6">
+                      <span x-text="formatPrice(priceCents)"></span><span style="color:var(--ink-muted)" x-text="' ' + labels.priceSuffix + ' · '"></span><span style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-faint)" x-text="labels.labelGesamt + ' '"></span><strong x-text="formatPrice(totalPrice)"></strong>
+                    </p>
+                    <p x-show="roomServiceEnabled && form.delivery === 'room' && roomServiceFeeCents > 0"
+                      style="margin:4px 0 0;font-size:11px;color:var(--ink-muted)" x-text="labels.priceRoomFee"></p>
+                  </div>
+
+                  <!-- BUFFET badge -->
+                  <div class="v2-row" x-show="priceCents === 0">
+                    <span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 10px;border-radius:4px;font-family:var(--mono);letter-spacing:0.05em" x-text="labels.buffetIncluded"></span>
+                  </div>
+
+                </div>
+
+                <div x-show="errorMsg" class="booking-error" x-text="errorMsg" style="margin-top:12px"></div>
+
+                <!-- CTA: unvollständig = Outline-Hinweis -->
+                <button type="button" class="v2-submit-incomplete"
+                  x-show="!canSubmit && !submitting"
+                  x-text="!form.date ? labels.ctaPickDate : (!form.time ? labels.ctaPickTime : labels.roomNumberLabel)">
+                </button>
+                <!-- CTA: vollständig = Ink-filled, delivery-aware Label -->
+                <button type="button" class="v2-submit-complete"
+                  x-show="canSubmit && !submitting"
+                  @click="submitBooking()"
+                  x-text="roomServiceEnabled && form.delivery === 'room' ? labels.submitRoom : labels.submit">
+                </button>
+                <!-- CTA: wird verarbeitet -->
+                <button type="button" class="v2-submit-complete"
+                  x-show="submitting"
+                  disabled
+                  style="opacity:0.6;cursor:not-allowed"
+                  x-text="labels.submitting">
+                </button>
+
+              </div>
+
             </div>
           </template>
 
@@ -1156,6 +1424,7 @@ const sheetData = {
         roomServiceFeeCents: initial.roomServiceFeeCents ?? 0,
         hotelCurrency: initial.hotelCurrency ?? 'EUR',
         slotsPerWeekday: initial.slotsPerWeekday ?? null,
+        isV2: initial.isV2 === true,
         includedText: initial.includedText || '',
         location: initial.location || '',
 
