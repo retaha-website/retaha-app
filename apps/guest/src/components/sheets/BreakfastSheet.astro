@@ -1,0 +1,732 @@
+---
+interface Props {
+  sheetData: string; // JSON.stringify(breakfastSheetData)
+  eyebrow: string;
+  title: string;
+  titleAccent: string;
+  subtitle: string;
+}
+const { sheetData, eyebrow, title, titleAccent, subtitle } = Astro.props;
+---
+
+<template x-teleport="body">
+<div
+  class="sheet-overlay sheet--module"
+  :class="{ open: activeSheet === 'breakfast' }"
+  @click.self="closeSheet()"
+>
+  <div
+    class="sheet bf-sheet"
+    :class="{ dragging: sheetIsDragging }"
+    :style="activeSheet === 'breakfast' && sheetDragOffset > 0 ? `transform: translateY(${sheetDragOffset}px)` : ''"
+  >
+    <div
+      class="sheet-handle-area"
+      @pointerdown="startSheetDrag($event)"
+      @touchstart.passive="startSheetDragTouch($event)"
+    >
+      <div class="sheet-handle"></div>
+    </div>
+    <button class="sheet-close" @click="closeSheet()" type="button" aria-label="Schließen">×</button>
+
+    <div class="bf-body sheet-body">
+      <div class="bf-hero">
+        <span class="bf-eyebrow">{eyebrow}</span>
+        <h2 class="bf-title">{title}<span class="bf-accent">{titleAccent}</span></h2>
+        <p class="bf-subtitle">{subtitle}</p>
+      </div>
+
+      <div x-data={`breakfast(${sheetData})`} x-cloak>
+
+        <!-- Tabs: nur wenn Menü-Einträge vorhanden -->
+        <div class="tabs" x-show="menuItems.length > 0">
+          <button type="button" class="tab-btn" :data-active="tab === 'main'" @click="tab = 'main'">
+            <span x-text="reservationEnabled ? labels.menuTabReservation : labels.menuTabInfo"></span>
+          </button>
+          <button type="button" class="tab-btn" :data-active="tab === 'menu'" @click="tab = 'menu'">
+            <span x-text="labels.menuTabMenu"></span>
+          </button>
+        </div>
+
+        <!-- ── Haupt-Tab ── -->
+        <div x-show="tab === 'main'">
+
+          <!-- View: Status (existingBooking vorhanden) -->
+          <template x-if="view === 'status'">
+            <div class="status-card">
+              <div class="status-icon" :class="statusInfo.iconClass">
+                <template x-if="statusInfo.icon === 'check'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </template>
+                <template x-if="statusInfo.icon === 'clock'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+                </template>
+                <template x-if="statusInfo.icon === 'cross'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </template>
+              </div>
+              <p class="status-title" x-text="statusInfo.title"></p>
+              <p class="status-sub"   x-text="statusInfo.sub"></p>
+              <div class="summary-card">
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingDate"></span>
+                  <span class="summary-value" x-text="formatDate(existingBooking.details.date)"></span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingTime"></span>
+                  <span class="summary-value" x-text="existingBooking.details.time"></span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label" x-text="labels.bookingPeople"></span>
+                  <span class="summary-value" x-text="existingBooking.details.people"></span>
+                </div>
+                <div class="summary-row"
+                  x-show="existingBooking.details.table_preference && existingBooking.details.table_preference !== 'any'">
+                  <span class="summary-label" x-text="labels.bookingTable"></span>
+                  <span class="summary-value" x-text="tableLabelFor(existingBooking.details.table_preference)"></span>
+                </div>
+                <div class="summary-row" x-show="existingBooking.details.delivery">
+                  <span class="summary-label" x-text="labels.bookingDelivery"></span>
+                  <span class="summary-value" x-text="existingBooking.details.delivery === 'room' ? (labels.deliveryRoom + (existingBooking.details.room_number ? ' ' + existingBooking.details.room_number : '')) : labels.deliveryTable"></span>
+                </div>
+              </div>
+              <button type="button" class="rebook-btn"
+                x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
+                x-text="labels.rebookBtn"
+                @click="startRebook()">
+              </button>
+            </div>
+          </template>
+
+          <!-- View: Formular (Design D) -->
+          <template x-if="view === 'form'">
+            <div>
+              <template x-if="availableDates.length === 0">
+                <div class="info-card">
+                  <div class="info-row">
+                    <div class="info-label" x-text="labels.infoTimeLabel"></div>
+                    <div class="info-value" x-text="labels.noFutureDates"></div>
+                  </div>
+                  <div class="info-row" x-show="location">
+                    <div class="info-label" x-text="labels.infoLocationLabel"></div>
+                    <div class="info-value" x-text="location"></div>
+                  </div>
+                </div>
+              </template>
+
+              <div x-show="availableDates.length > 0">
+                <div class="d-sections">
+
+                  <!-- DATUM -->
+                  <div data-dsection="datum">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'datum'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label" x-text="labels.labelDatum"></div>
+                      <div class="v2-chips">
+                        <template x-for="(date, i) in availableDates" :key="date.iso">
+                          <button type="button" class="v2-chip" :data-active="form.date === date.iso" @click="setDate(date.iso); dNext('datum')">
+                            <span x-text="dateLabels[i]"></span>
+                            <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'datum'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'datum'">
+                      <span class="d-row-check" x-show="form.date">✓</span>
+                      <span class="d-row-spacer" x-show="!form.date"></span>
+                      <span class="d-row-value" x-show="form.date" x-text="dSummaryDate"></span>
+                      <span class="d-row-empty" x-show="!form.date" x-text="labels.ctaPickDate"></span>
+                      <span class="d-row-action" x-text="form.date ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
+                  </div>
+
+                  <!-- PERSONEN -->
+                  <div data-dsection="personen">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'personen'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label" x-text="labels.labelPersonen"></div>
+                      <div class="v2-chips">
+                        <template x-for="n in peopleOptions" :key="n">
+                          <button type="button" class="v2-chip" :data-active="form.people === n" @click="form.people = n; dNext('personen')">
+                            <span x-text="n"></span>
+                          </button>
+                        </template>
+                        <button type="button" class="v2-chip" :data-active="form.people > 4" @click="form.people = 5; dNext('personen')">5+</button>
+                      </div>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'personen'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'personen'">
+                      <span class="d-row-check">✓</span>
+                      <span class="d-row-value" x-text="dSummaryPeople"></span>
+                      <span class="d-row-action" x-text="labels.sectionAendern"></span>
+                    </button>
+                  </div>
+
+                  <!-- UHRZEIT -->
+                  <div data-dsection="uhrzeit">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'uhrzeit'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label" x-text="labels.labelUhrzeit"></div>
+                      <div class="v2-chips">
+                        <template x-for="slot in slots" :key="slot">
+                          <button type="button" class="v2-chip" :data-active="form.time === slot" @click="form.time = slot; dNext('uhrzeit')" x-text="slot"></button>
+                        </template>
+                        <span x-show="slots.length === 0" style="font-size:13px;color:var(--bf-ink-muted)" x-text="labels.noFutureDates"></span>
+                      </div>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'uhrzeit'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'uhrzeit'">
+                      <span class="d-row-check" x-show="form.time">✓</span>
+                      <span class="d-row-spacer" x-show="!form.time"></span>
+                      <span class="d-row-value" x-show="form.time" x-text="form.time"></span>
+                      <span class="d-row-empty" x-show="!form.time" x-text="labels.ctaPickTime"></span>
+                      <span class="d-row-action" x-text="form.time ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
+                  </div>
+
+                  <!-- TISCH (optional) -->
+                  <div data-dsection="tisch">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'tisch'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label">
+                        <span x-text="labels.labelTisch"></span>
+                        <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                      </div>
+                      <div class="v2-chips">
+                        <template x-for="opt in tableOptions" :key="opt.value">
+                          <button type="button" class="v2-chip" :data-active="form.table_preference === opt.value" @click="form.table_preference = opt.value; dNext('tisch')" x-text="opt.label"></button>
+                        </template>
+                      </div>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'tisch'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'tisch'">
+                      <span class="d-row-check" x-show="dVisited.includes('tisch')">✓</span>
+                      <span class="d-row-spacer" x-show="!dVisited.includes('tisch')"></span>
+                      <span class="d-row-value" x-show="dVisited.includes('tisch')" x-text="tableLabelFor(form.table_preference)"></span>
+                      <span class="d-row-empty" x-show="!dVisited.includes('tisch')">
+                        <span x-text="labels.labelTisch"></span>
+                        <span class="d-row-opt" x-text="labels.labelOptional"></span>
+                      </span>
+                      <span class="d-row-action" x-text="dVisited.includes('tisch') ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
+                  </div>
+
+                  <!-- ORT (nur wenn roomServiceEnabled) -->
+                  <div x-show="roomServiceEnabled" data-dsection="ort">
+                    <div class="d-section-open"
+                      x-show="roomServiceEnabled && dOpen === 'ort'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label" x-text="labels.labelOrt"></div>
+                      <div class="v2-chips">
+                        <button type="button" class="v2-chip" :data-active="form.delivery === 'table'" @click="form.delivery = 'table'; dNext('ort')" x-text="labels.deliveryTable"></button>
+                        <button type="button" class="v2-chip" :data-active="form.delivery === 'room'" @click="form.delivery = 'room'; dNext('ort')" x-text="labels.deliveryRoom"></button>
+                      </div>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="roomServiceEnabled && dOpen !== 'ort'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'ort'">
+                      <span class="d-row-check">✓</span>
+                      <span class="d-row-value" x-text="form.delivery === 'room' ? labels.deliveryRoom : labels.deliveryTable"></span>
+                      <span class="d-row-action" x-text="labels.sectionAendern"></span>
+                    </button>
+                  </div>
+
+                  <!-- HINWEIS (optional) -->
+                  <div data-dsection="hinweis">
+                    <div class="d-section-open"
+                      x-show="dOpen === 'hinweis'"
+                      x-transition:enter="sect-enter" x-transition:enter-start="sect-enter-start" x-transition:enter-end="sect-enter-end"
+                      x-transition:leave="sect-leave" x-transition:leave-start="sect-leave-start" x-transition:leave-end="sect-leave-end">
+                      <div class="d-section-label">
+                        <span x-text="labels.labelHinweis"></span>
+                        <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                      </div>
+                      <textarea class="v2-textarea" rows="2"
+                        :placeholder="labels.notesPlaceholder"
+                        x-model="form.notes"
+                        @input="$el.style.height='auto'; $el.style.height=$el.scrollHeight+'px'">
+                      </textarea>
+                      <button type="button" class="d-done" @click="dFinishHinweis()"
+                        x-text="form.notes.trim() ? labels.sectionFertig : labels.sectionUeberspringen">
+                      </button>
+                    </div>
+                    <button type="button" class="d-row"
+                      x-show="dOpen !== 'hinweis'"
+                      x-transition:enter="row-in" x-transition:enter-start="row-in-start" x-transition:enter-end="row-in-end"
+                      @click="dOpen = 'hinweis'">
+                      <span class="d-row-check" x-show="form.notes.trim() || dVisited.includes('hinweis')">✓</span>
+                      <span class="d-row-spacer" x-show="!form.notes.trim() && !dVisited.includes('hinweis')"></span>
+                      <span class="d-row-value" x-show="form.notes.trim() || dVisited.includes('hinweis')" x-text="dSummaryHinweis"></span>
+                      <span class="d-row-empty" x-show="!form.notes.trim() && !dVisited.includes('hinweis')">
+                        <span x-text="labels.labelHinweis"></span>
+                        <span class="d-row-opt" x-text="labels.labelOptional"></span>
+                      </span>
+                      <span class="d-row-action" x-text="form.notes.trim() || dVisited.includes('hinweis') ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
+                  </div>
+
+                </div>
+
+                <div x-show="errorMsg" class="booking-error" x-text="errorMsg" style="margin-bottom:8px"></div>
+
+                <!-- Sticky summary + CTA -->
+                <div class="d-sticky">
+                  <div class="d-sticky-price">
+                    <template x-if="totalPrice !== null && priceCents > 0">
+                      <div>
+                        <div class="d-sticky-label" x-text="labels.labelGesamt"></div>
+                        <div class="d-sticky-total" x-text="formatPrice(totalPrice)"></div>
+                        <div class="d-sticky-sub" x-show="form.people > 0">
+                          <span x-text="formatPrice(priceCents) + ' / ' + (form.people === 1 ? labels.bookingPeopleSingular : labels.bookingPeople)"></span>
+                          <span x-show="roomServiceEnabled && form.delivery === 'room' && roomServiceFeeCents > 0" x-text="' · ' + labels.priceRoomFee"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="priceCents === 0">
+                      <div class="d-sticky-label" x-text="labels.buffetIncluded"></div>
+                    </template>
+                  </div>
+                  <div class="d-sticky-cta">
+                    <button type="button" class="d-cta-incomplete"
+                      x-show="!canSubmit && !submitting"
+                      x-text="!form.date ? labels.ctaPickDate : (!form.time ? labels.ctaPickTime : labels.submit)">
+                    </button>
+                    <button type="button" class="d-cta-complete"
+                      x-show="canSubmit && !submitting"
+                      @click="submitBooking()"
+                      x-text="roomServiceEnabled && form.delivery === 'room' ? labels.submitRoom : labels.submit">
+                    </button>
+                    <button type="button" class="d-cta-complete"
+                      x-show="submitting"
+                      disabled style="opacity:0.6;cursor:not-allowed"
+                      x-text="labels.submitting">
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </template>
+
+          <!-- View: Info (Reservierung deaktiviert) -->
+          <template x-if="view === 'info'">
+            <div class="info-card">
+              <div class="info-row">
+                <div class="info-label" x-text="labels.infoTimeLabel"></div>
+                <div class="info-value" x-text="labels.infoTimeValue"></div>
+              </div>
+              <div class="info-row">
+                <div class="info-label" x-text="labels.infoLocationLabel"></div>
+                <div class="info-value" x-text="location"></div>
+              </div>
+              <div class="info-row" x-show="includedText">
+                <div class="info-label" x-text="labels.infoIncludedLabel"></div>
+                <div class="info-value info-value--multi" x-text="includedText"></div>
+              </div>
+            </div>
+          </template>
+
+        </div>
+
+        <!-- ── Menü-Tab ── -->
+        <div x-show="tab === 'menu'">
+          <div class="filter-section">
+            <div class="filter-title" x-text="labels.menuFilterTitle"></div>
+            <p class="filter-hint" x-text="labels.menuFilterHint"></p>
+            <div class="filter-chips">
+              <template x-for="key in allergenKeys" :key="key">
+                <button type="button" class="filter-chip"
+                  :class="{ active: selectedAllergens.includes(key) }"
+                  @click="toggleAllergen(key)"
+                  x-text="allergenLabels[key]">
+                </button>
+              </template>
+            </div>
+            <button type="button" class="filter-reset"
+              x-show="selectedAllergens.length > 0"
+              x-text="labels.menuFilterHideShow"
+              @click="clearAllergenFilter()">
+            </button>
+          </div>
+
+          <template x-if="menuItems.length === 0">
+            <div class="menu-empty" x-text="labels.menuEmpty"></div>
+          </template>
+
+          <template x-for="(items, category) in groupedMenuItems" :key="category">
+            <div class="menu-category">
+              <div class="menu-category-title" x-text="category"></div>
+              <div>
+                <template x-for="item in items" :key="item.id">
+                  <div class="menu-item">
+                    <div class="menu-item-header">
+                      <div class="menu-item-name" x-text="item.name"></div>
+                      <div class="menu-item-flags">
+                        <template x-if="item.isVegan"><span class="menu-flag" x-text="labels.menuFlagVegan"></span></template>
+                        <template x-if="!item.isVegan && item.isVegetarian"><span class="menu-flag" x-text="labels.menuFlagVegetarian"></span></template>
+                        <template x-if="item.isOrganic"><span class="menu-flag organic" x-text="labels.menuFlagOrganic"></span></template>
+                      </div>
+                    </div>
+                    <div class="menu-item-desc" x-text="item.description" x-show="item.description"></div>
+                    <template x-if="getMatchingAllergens(item).length > 0">
+                      <div class="menu-item-warning">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 0 0 1.74-3l-6.93-12a2 2 0 0 0-3.48 0L3.34 16a2 2 0 0 0 1.73 3z"/>
+                        </svg>
+                        <span>
+                          <span x-text="labels.menuWarningPrefix"></span>
+                          <span x-text="getMatchingAllergens(item).map(k => allergenLabels[k]).join(', ')"></span>
+                        </span>
+                      </div>
+                    </template>
+                    <template x-if="item.allergens.length > 0 && selectedAllergens.length === 0">
+                      <div class="menu-item-allergens">
+                        <span x-text="labels.menuAllergensPrefix"></span>
+                        <span x-text="item.allergens.map(k => allergenLabels[k]).join(', ')"></span>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <div class="menu-disclaimer" x-text="labels.menuDisclaimer"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+  /* CSS variables scoped to the breakfast sheet panel */
+  .bf-sheet {
+    --bf-accent: #0A0A0A;
+    --bf-accent-soft: rgba(10,10,10,0.08);
+    --bf-ink: #0F0F0D;
+    --bf-ink-muted: #6B6B63;
+    --bf-ink-faint: #A8A8A0;
+    --bf-border: #E7E4DD;
+    --bf-border-strong: #C8C4BB;
+    --bf-surface: #FFFFFF;
+    --bf-success: #3D8C5C;
+    --bf-radius: 12px;
+    --bf-mono: 'JetBrains Mono', 'Courier New', monospace;
+    --bf-display: 'Space Grotesk', system-ui, sans-serif;
+    --bf-ease: cubic-bezier(.32,.72,0,1);
+    --bf-feedback: 200ms;
+    --bf-collapse: 300ms;
+    --bf-open: 300ms;
+    max-height: 90dvh;
+    font-family: var(--bf-display);
+    color: var(--bf-ink);
+    background: #FBFAF7;
+  }
+
+  /* Override sheet-body padding for full-bleed sticky bar */
+  .bf-sheet .bf-body.sheet-body {
+    padding: 4px 22px 0;
+    background: #FBFAF7;
+  }
+
+  /* Hero */
+  .bf-hero {
+    padding: 8px 0 20px;
+    border-bottom: 2px solid var(--bf-ink);
+    margin-bottom: 20px;
+  }
+  .bf-eyebrow {
+    font-family: var(--bf-mono);
+    font-size: 10px; letter-spacing: 0.16em; font-weight: 500;
+    color: var(--bf-accent); margin: 0 0 10px; display: block;
+  }
+  .bf-title {
+    font-size: clamp(22px, 6vw, 30px); font-weight: 700;
+    letter-spacing: -0.025em; line-height: 1.05;
+    margin: 0 0 6px; color: var(--bf-ink);
+  }
+  .bf-accent { color: var(--bf-accent); }
+  .bf-subtitle { font-size: 13px; color: var(--bf-ink-muted); margin: 0; line-height: 1.45; }
+
+  /* Tabs */
+  .bf-sheet .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .bf-sheet .tab-btn {
+    flex: 1; min-height: 40px; padding: 7px 13px;
+    background: white; border: 1px solid #D0CCC5; border-radius: 8px;
+    font-family: var(--bf-display); font-size: 13px; font-weight: 500;
+    color: var(--bf-ink); cursor: pointer; text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 80ms, color 80ms, border-color 80ms;
+  }
+  .bf-sheet .tab-btn[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+  .bf-sheet .tab-btn:hover:not([data-active="true"]) { border-color: #C0BCB5; }
+
+  /* Error */
+  .bf-sheet .booking-error {
+    padding: 10px 14px; background: #FFF0F0; border: 1px solid #F5C6C6;
+    border-radius: 6px; color: #8C2128; font-size: 13px;
+  }
+
+  /* Status card */
+  .bf-sheet .status-card { text-align: center; padding: 8px 0 24px; }
+  .bf-sheet .status-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--bf-accent); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .bf-sheet .status-icon.confirmed { background: var(--bf-success); }
+  .bf-sheet .status-icon.cancelled { background: var(--bf-ink-muted); }
+  .bf-sheet .status-icon svg { width: 22px; height: 22px; }
+  .bf-sheet .status-title { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+  .bf-sheet .status-sub   { font-size: 14px; color: var(--bf-ink-muted); margin: 0 0 24px; line-height: 1.4; }
+
+  .bf-sheet .summary-card {
+    background: var(--bf-surface); border: 1px solid var(--bf-border);
+    border-radius: var(--bf-radius); overflow: hidden; margin-bottom: 20px;
+  }
+  .bf-sheet .summary-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 12px 16px; border-bottom: 1px solid var(--bf-border);
+  }
+  .bf-sheet .summary-row:last-child { border-bottom: none; }
+  .bf-sheet .summary-label {
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--bf-ink-faint);
+  }
+  .bf-sheet .summary-value { font-size: 14px; font-weight: 500; color: var(--bf-ink); }
+
+  .bf-sheet .rebook-btn {
+    width: 100%; padding: 13px; border: 1px solid var(--bf-border);
+    border-radius: 8px; background: transparent; color: var(--bf-ink-muted);
+    font-family: var(--bf-display); font-size: 14px; cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .bf-sheet .rebook-btn:hover { border-color: var(--bf-accent); color: var(--bf-accent); }
+
+  /* Info card */
+  .bf-sheet .info-card {
+    background: var(--bf-surface); border: 1px solid var(--bf-border);
+    border-radius: var(--bf-radius); overflow: hidden;
+  }
+  .bf-sheet .info-row {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 14px 18px; border-bottom: 1px solid var(--bf-border);
+  }
+  .bf-sheet .info-row:last-child { border-bottom: none; }
+  .bf-sheet .info-label {
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--bf-ink-faint);
+  }
+  .bf-sheet .info-value { font-size: 15px; font-weight: 500; color: var(--bf-ink); }
+  .bf-sheet .info-value--multi { white-space: pre-line; font-weight: 400; font-size: 14px; line-height: 1.55; }
+
+  /* Menu tab */
+  .bf-sheet .filter-section { margin-bottom: 20px; }
+  .bf-sheet .filter-title {
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.14em;
+    font-weight: 500; text-transform: uppercase; color: var(--bf-ink-muted); margin-bottom: 8px;
+  }
+  .bf-sheet .filter-hint { font-size: 12px; color: var(--bf-ink-muted); margin: 0 0 12px; line-height: 1.4; }
+  .bf-sheet .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .bf-sheet .filter-chip {
+    padding: 5px 11px; border-radius: 20px; border: 1px solid var(--bf-border);
+    background: var(--bf-surface); font-size: 12px; color: var(--bf-ink-muted);
+    cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .bf-sheet .filter-chip.active { background: var(--bf-accent); border-color: var(--bf-accent); color: #fff; }
+  .bf-sheet .filter-reset {
+    padding: 6px 0; background: none; border: none;
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--bf-accent); cursor: pointer;
+  }
+  .bf-sheet .menu-empty { padding: 24px; text-align: center; color: var(--bf-ink-muted); font-size: 14px; }
+  .bf-sheet .menu-category { margin-bottom: 24px; }
+  .bf-sheet .menu-category-title {
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--bf-ink-faint);
+    padding-bottom: 8px; border-bottom: 1px solid var(--bf-border); margin-bottom: 12px;
+  }
+  .bf-sheet .menu-item { padding: 12px 0; border-bottom: 1px solid var(--bf-border); }
+  .bf-sheet .menu-item:last-child { border-bottom: none; }
+  .bf-sheet .menu-item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+  .bf-sheet .menu-item-name { font-size: 15px; font-weight: 500; color: var(--bf-ink); }
+  .bf-sheet .menu-item-flags { display: flex; gap: 4px; flex-shrink: 0; }
+  .bf-sheet .menu-flag {
+    font-family: var(--bf-mono); font-size: 8px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+    background: rgba(61,140,92,0.10); color: var(--bf-success);
+  }
+  .bf-sheet .menu-flag.organic { background: rgba(180,140,40,0.10); color: #8B6914; }
+  .bf-sheet .menu-item-desc { font-size: 13px; color: var(--bf-ink-muted); line-height: 1.4; margin-bottom: 6px; }
+  .bf-sheet .menu-item-warning {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; color: #C05000; padding: 5px 8px;
+    background: rgba(192,80,0,0.07); border-radius: 4px; margin-top: 6px;
+  }
+  .bf-sheet .menu-item-warning svg { flex-shrink: 0; }
+  .bf-sheet .menu-item-allergens {
+    font-size: 11px; color: var(--bf-ink-faint); margin-top: 4px;
+    font-family: var(--bf-mono);
+  }
+  .bf-sheet .menu-disclaimer {
+    font-size: 11px; color: var(--bf-ink-faint); font-style: italic;
+    margin-top: 16px; line-height: 1.4; padding-bottom: 16px;
+  }
+
+  /* Shared chips */
+  .bf-sheet .v2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bf-sheet .v2-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 13px; min-height: 40px;
+    background: white; border: 1px solid #D0CCC5; border-radius: 8px;
+    font-family: var(--bf-display); font-size: 13px; font-weight: 500;
+    color: var(--bf-ink); cursor: pointer; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 80ms, background 80ms, color 80ms;
+  }
+  .bf-sheet .v2-chip:active { transform: scale(0.96); }
+  .bf-sheet .v2-chip[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+  .bf-sheet .chip-sub {
+    font-family: var(--bf-mono); font-size: 10px; letter-spacing: 0.06em; color: inherit; opacity: 0.65;
+  }
+  .bf-sheet .v2-chip[data-active="true"] .chip-sub { opacity: 0.75; }
+  .bf-sheet .v2-textarea {
+    width: 100%; padding: 2px 0; margin: 0;
+    background: transparent; border: none;
+    font-family: var(--bf-display); font-size: 14px;
+    color: var(--bf-ink); resize: none; outline: none;
+    min-height: 26px; overflow: hidden; field-sizing: content;
+  }
+  .bf-sheet .v2-textarea::placeholder { color: var(--bf-ink-faint); }
+
+  /* Design D: collapsing sections */
+  .bf-sheet .d-sections { display: grid; gap: 10px; padding-bottom: 130px; }
+  .bf-sheet .d-section-open {
+    background: white; border: 1.5px solid var(--bf-ink);
+    border-radius: 12px; padding: 14px 14px 16px; overflow: hidden;
+  }
+  .bf-sheet .d-section-label {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.15em;
+    font-weight: 600; text-transform: uppercase;
+    color: var(--bf-ink-faint); margin-bottom: 10px;
+  }
+  .bf-sheet .d-section-label-opt { font-weight: 400; font-size: 8px; opacity: 0.8; }
+  .bf-sheet .d-row {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    text-align: left; background: white; border: 1px solid var(--bf-border);
+    border-radius: 12px; padding: 13px 14px; cursor: pointer;
+    transition: border-color 0.12s; font-family: var(--bf-display); color: var(--bf-ink); font-size: 14px;
+  }
+  .bf-sheet .d-row:hover { border-color: #C0BCB5; }
+  .bf-sheet .d-row-check { color: var(--bf-accent); font-size: 13px; line-height: 1; flex-shrink: 0; }
+  .bf-sheet .d-row-spacer { width: 13px; flex-shrink: 0; }
+  .bf-sheet .d-row-value { font-weight: 600; flex: 1; }
+  .bf-sheet .d-row-empty { color: var(--bf-ink-muted); flex: 1; display: flex; align-items: center; gap: 5px; }
+  .bf-sheet .d-row-opt { font-size: 11px; color: var(--bf-ink-faint); }
+  .bf-sheet .d-row-action {
+    font-family: var(--bf-mono); font-size: 9px; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--bf-ink-faint); margin-left: auto; flex-shrink: 0;
+  }
+  .bf-sheet .d-skip {
+    background: none; border: none; padding: 10px 2px 0;
+    font-family: var(--bf-display); font-size: 13px; color: var(--bf-ink-muted); cursor: pointer;
+  }
+  .bf-sheet .d-skip:hover { color: var(--bf-ink); }
+  .bf-sheet .d-done {
+    background: none; border: none; padding: 10px 2px 0;
+    font-family: var(--bf-mono); font-size: 10px; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--bf-accent); cursor: pointer;
+  }
+
+  /* Sticky summary bar — bleed out of 22px padding */
+  .bf-sheet .d-sticky {
+    position: sticky; bottom: 0;
+    background: white; border-top: 1px solid var(--bf-border);
+    padding: 12px 22px calc(env(safe-area-inset-bottom, 0px) + 8px);
+    margin: 4px -22px 0;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .bf-sheet .d-sticky-price { flex-shrink: 0; min-width: 80px; }
+  .bf-sheet .d-sticky-label {
+    font-family: var(--bf-mono); font-size: 8.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--bf-ink-faint);
+  }
+  .bf-sheet .d-sticky-total {
+    font-family: var(--bf-display); font-size: 20px; font-weight: 700;
+    color: var(--bf-ink); line-height: 1.1;
+  }
+  .bf-sheet .d-sticky-sub { font-size: 10px; color: var(--bf-ink-muted); margin-top: 1px; }
+  .bf-sheet .d-sticky-cta { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .bf-sheet .d-cta-incomplete {
+    width: 100%; padding: 13px 14px; background: transparent;
+    color: var(--bf-ink-muted); border: 1.5px dashed #CFCBC1;
+    border-radius: 10px; font-family: var(--bf-mono); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    font-weight: 500; cursor: default; text-align: center;
+  }
+  .bf-sheet .d-cta-complete {
+    width: 100%; padding: 13px 14px; background: #0A0A0A; color: white;
+    border: none; border-radius: 10px;
+    font-family: var(--bf-display); font-size: 14px; font-weight: 700;
+    cursor: pointer; text-align: center;
+    transition: background 0.14s; -webkit-tap-highlight-color: transparent;
+  }
+  .bf-sheet .d-cta-complete:hover { background: #2A2A2A; }
+  .bf-sheet .d-cta-complete:active { background: var(--bf-accent); }
+
+  /* Transitions */
+  .bf-sheet .sect-enter {
+    overflow: hidden;
+    transition: opacity var(--bf-open) var(--bf-ease),
+                transform var(--bf-open) var(--bf-ease),
+                max-height var(--bf-open) var(--bf-ease);
+  }
+  .bf-sheet .sect-enter-start { opacity: 0; transform: translateY(-4px); max-height: 0; }
+  .bf-sheet .sect-enter-end   { opacity: 1; transform: translateY(0);    max-height: 700px; }
+  .bf-sheet .sect-leave {
+    overflow: hidden;
+    transition: opacity var(--bf-collapse) var(--bf-ease),
+                max-height var(--bf-collapse) var(--bf-ease),
+                padding-top var(--bf-collapse) var(--bf-ease),
+                padding-bottom var(--bf-collapse) var(--bf-ease);
+  }
+  .bf-sheet .sect-leave-start { opacity: 1; max-height: 700px; }
+  .bf-sheet .sect-leave-end   { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  .bf-sheet .row-in       { transition: opacity 180ms var(--bf-ease); }
+  .bf-sheet .row-in-start { opacity: 0; }
+  .bf-sheet .row-in-end   { opacity: 1; }
+
+  @keyframes chip-active-pulse {
+    0% { transform: scale(1); } 40% { transform: scale(0.96); } 100% { transform: scale(1); }
+  }
+  .bf-sheet .v2-chip[data-active="true"] { animation: chip-active-pulse var(--bf-feedback) var(--bf-ease); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bf-sheet .v2-chip, .bf-sheet .d-cta-complete, .bf-sheet .filter-chip, .bf-sheet .tab-btn { transition: none; }
+    .bf-sheet .v2-chip[data-active="true"] { animation: none; }
+    .bf-sheet .sect-enter, .bf-sheet .sect-leave, .bf-sheet .row-in { transition: none; }
+  }
+</style>

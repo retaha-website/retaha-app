@@ -1,0 +1,279 @@
+---
+interface Props {
+  wifiSsid: string;
+  wifiPassword: string;
+  speedMbits: number;
+  qrDataUrl: string | null;
+  lang: string;
+}
+const { wifiSsid, wifiPassword, speedMbits, qrDataUrl, lang } = Astro.props;
+
+type LK = 'de' | 'en' | 'fr' | 'es' | 'it' | 'pt' | 'nl' | 'ru' | 'ar' | 'zh';
+const lk = (['de','en','fr','es','it','pt','nl','ru','ar','zh'].includes(lang) ? lang : 'de') as LK;
+
+const labels: Record<LK, {
+  eyebrow: string; title: string; titleAccent: string; subtitle: string;
+  network: string; password: string; speed: string; copy: string; copied: string; qrHint: string;
+}> = {
+  de: { eyebrow: '— Verbindung —', title: 'WLAN ist', titleAccent: 'bereit.', subtitle: 'Schnell verbunden — direkt loslegen.', network: 'Netzwerk', password: 'Passwort', speed: 'Geschwindigkeit', copy: 'Kopieren', copied: 'Kopiert', qrHint: 'Mit Handy-Kamera scannen für automatische Verbindung.' },
+  en: { eyebrow: '— Connection —', title: 'Wi-Fi is', titleAccent: 'ready.', subtitle: 'Connect fast — get started right away.', network: 'Network', password: 'Password', speed: 'Speed', copy: 'Copy', copied: 'Copied', qrHint: 'Scan with your phone camera to connect automatically.' },
+  fr: { eyebrow: '— Connexion —', title: 'Wi-Fi est', titleAccent: 'prêt.', subtitle: "Connexion rapide — c'est parti.", network: 'Réseau', password: 'Mot de passe', speed: 'Vitesse', copy: 'Copier', copied: 'Copié', qrHint: "Scannez avec l'appareil photo pour vous connecter automatiquement." },
+  es: { eyebrow: '— Conexión —', title: 'Wi-Fi está', titleAccent: 'listo.', subtitle: 'Conéctate rápido — empieza ya.', network: 'Red', password: 'Contraseña', speed: 'Velocidad', copy: 'Copiar', copied: 'Copiado', qrHint: 'Escanea con la cámara para conectar automáticamente.' },
+  it: { eyebrow: '— Connessione —', title: 'Wi-Fi è', titleAccent: 'pronto.', subtitle: 'Connettiti subito — inizia senza attese.', network: 'Rete', password: 'Password', speed: 'Velocità', copy: 'Copia', copied: 'Copiato', qrHint: 'Scansiona con la fotocamera per connetterti automaticamente.' },
+  pt: { eyebrow: '— Ligação —', title: 'Wi-Fi está', titleAccent: 'pronto.', subtitle: 'Conecta-te rápido — começa já.', network: 'Rede', password: 'Senha', speed: 'Velocidade', copy: 'Copiar', copied: 'Copiado', qrHint: 'Digitaliza com a câmara para te conectares automaticamente.' },
+  nl: { eyebrow: '— Verbinding —', title: 'Wi-Fi is', titleAccent: 'klaar.', subtitle: 'Verbind snel — ga meteen aan de slag.', network: 'Netwerk', password: 'Wachtwoord', speed: 'Snelheid', copy: 'Kopiëren', copied: 'Gekopieerd', qrHint: 'Scan met je telefoon camera voor automatische verbinding.' },
+  ru: { eyebrow: '— Подключение —', title: 'Wi-Fi', titleAccent: 'готов.', subtitle: 'Подключайтесь быстро — начинайте сразу.', network: 'Сеть', password: 'Пароль', speed: 'Скорость', copy: 'Копировать', copied: 'Скопировано', qrHint: 'Сканируйте камерой телефона для автоматического подключения.' },
+  ar: { eyebrow: '— الاتصال —', title: 'الواي فاي', titleAccent: 'جاهز.', subtitle: 'اتصل بسرعة — ابدأ فوراً.', network: 'الشبكة', password: 'كلمة المرور', speed: 'السرعة', copy: 'نسخ', copied: 'تم النسخ', qrHint: 'امسح بكاميرا هاتفك للاتصال التلقائي.' },
+  zh: { eyebrow: '— 网络连接 —', title: 'Wi-Fi', titleAccent: '已就绪。', subtitle: '快速连接 — 立即开始。', network: '网络', password: '密码', speed: '速度', copy: '复制', copied: '已复制', qrHint: '用手机相机扫描自动连接。' },
+};
+const l = labels[lk];
+---
+
+<template x-teleport="body">
+<div
+  class="sheet-overlay sheet--module"
+  :class="{ open: activeSheet === 'wifi' }"
+  @click.self="closeSheet()"
+>
+  <div
+    class="sheet wifi-sheet"
+    :class="{ dragging: sheetIsDragging }"
+    :style="activeSheet === 'wifi' && sheetDragOffset > 0 ? `transform: translateY(${sheetDragOffset}px)` : ''"
+  >
+    <div
+      class="sheet-handle-area"
+      @pointerdown="startSheetDrag($event)"
+      @touchstart.passive="startSheetDragTouch($event)"
+    >
+      <div class="sheet-handle"></div>
+    </div>
+    <button class="sheet-close" @click="closeSheet()" type="button" aria-label="Schließen">×</button>
+
+    <div class="wifi-body sheet-body">
+      <div class="wifi-hero">
+        <span class="wifi-eyebrow">{l.eyebrow}</span>
+        <h2 class="wifi-title">{l.title} <span class="wifi-accent">{l.titleAccent}</span></h2>
+        <p class="wifi-subtitle">{l.subtitle}</p>
+      </div>
+
+      <div class="wifi-card">
+        <!-- Netzwerk -->
+        <div class="wifi-row">
+          <div class="wifi-row-body">
+            <div class="wifi-row-label">{l.network}</div>
+            <div class="wifi-row-value">{wifiSsid}</div>
+          </div>
+          <button
+            class="wifi-copy-btn"
+            type="button"
+            aria-label={l.copy}
+            data-copy={wifiSsid}
+            onclick="wifiSheetCopy(this)"
+          >
+            <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Passwort -->
+        <div class="wifi-row">
+          <div class="wifi-row-body">
+            <div class="wifi-row-label">{l.password}</div>
+            <div class="wifi-row-value wifi-row-value--pw">{wifiPassword || '—'}</div>
+          </div>
+          {wifiPassword && (
+            <button
+              class="wifi-copy-btn"
+              type="button"
+              aria-label={l.copy}
+              data-copy={wifiPassword}
+              onclick="wifiSheetCopy(this)"
+            >
+              <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <!-- Geschwindigkeit -->
+        <div class="wifi-row">
+          <div class="wifi-row-body">
+            <div class="wifi-row-label">{l.speed}</div>
+            <div class="wifi-row-value">{speedMbits} Mbit/s</div>
+          </div>
+        </div>
+      </div>
+
+      {qrDataUrl && (
+        <div class="wifi-qr-section">
+          <p class="wifi-qr-hint">{l.qrHint}</p>
+          <div class="wifi-qr-frame">
+            <img src={qrDataUrl} alt="WiFi QR Code" width="150" height="150" />
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+  .wifi-sheet {
+    --wifi-accent: var(--accent, #FF4A82);
+    --wifi-accent-soft: rgba(255, 74, 130, 0.10);
+    --wifi-ink: #0F0F0D;
+    --wifi-ink-muted: #6B6B63;
+    --wifi-ink-faint: #A8A8A0;
+    --wifi-border: #E7E4DD;
+    --wifi-surface: #FFFFFF;
+    --wifi-radius: 12px;
+    --wifi-mono: 'JetBrains Mono', 'Courier New', monospace;
+    max-height: 85dvh;
+  }
+
+  .wifi-body {
+    padding: 4px 24px 32px;
+  }
+
+  .wifi-hero {
+    padding: 4px 0 20px;
+    border-bottom: 1.5px solid var(--wifi-ink);
+    margin-bottom: 20px;
+  }
+
+  .wifi-eyebrow {
+    font-family: var(--wifi-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    font-weight: 500;
+    color: var(--wifi-accent);
+    margin: 0 0 10px;
+    display: block;
+  }
+
+  .wifi-title {
+    font-size: clamp(22px, 6vw, 30px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0 0 6px;
+    color: var(--wifi-ink);
+  }
+
+  .wifi-accent { color: var(--wifi-accent); }
+
+  .wifi-subtitle {
+    font-size: 13px;
+    color: var(--wifi-ink-muted);
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  .wifi-card {
+    background: var(--wifi-surface);
+    border: 1px solid var(--wifi-border);
+    border-radius: var(--wifi-radius);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .wifi-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--wifi-border);
+  }
+  .wifi-row:last-child { border-bottom: none; }
+  .wifi-row-body { flex: 1; min-width: 0; }
+
+  .wifi-row-label {
+    font-family: var(--wifi-mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--wifi-ink-faint);
+    margin-bottom: 3px;
+  }
+
+  .wifi-row-value {
+    font-family: var(--wifi-mono);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--wifi-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wifi-row-value--pw { letter-spacing: 0.04em; }
+
+  .wifi-copy-btn {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--wifi-border);
+    background: var(--wifi-accent-soft);
+    color: var(--wifi-accent);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  .wifi-copy-btn svg { width: 15px; height: 15px; }
+  .wifi-copy-btn .icon-check { display: none; }
+  .wifi-copy-btn:hover { background: color-mix(in srgb, var(--wifi-accent) 18%, transparent); border-color: var(--wifi-accent); }
+  .wifi-copy-btn[data-copied] { background: var(--wifi-accent); border-color: var(--wifi-accent); color: #fff; }
+  .wifi-copy-btn[data-copied] .icon-copy  { display: none; }
+  .wifi-copy-btn[data-copied] .icon-check { display: block; }
+
+  .wifi-qr-section { text-align: center; margin-top: 4px; }
+
+  .wifi-qr-hint {
+    font-family: var(--wifi-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--wifi-ink-muted);
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+
+  .wifi-qr-frame {
+    display: inline-block;
+    padding: 10px;
+    background: var(--wifi-surface);
+    border: 1px solid var(--wifi-border);
+    border-radius: 10px;
+  }
+  .wifi-qr-frame img { display: block; width: 140px; height: 140px; }
+</style>
+
+<script is:inline>
+  function wifiSheetCopy(btn) {
+    var text = btn.dataset.copy || '';
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function() {
+      btn.dataset.copied = '1';
+      setTimeout(function() { delete btn.dataset.copied; }, 1800);
+    }).catch(function() {
+      var tmp = document.createElement('input');
+      tmp.value = text;
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+      btn.dataset.copied = '1';
+      setTimeout(function() { delete btn.dataset.copied; }, 1800);
+    });
+  }
+</script>
