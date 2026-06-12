@@ -9,6 +9,9 @@ interface Props {
 
 const { branding } = Astro.props;
 
+// Set to true to re-enable Editorial + Maison in the theme picker
+const SHOW_ALL_IDENTITIES = false;
+
 const raw = branding.design_identity ?? 'bauhaus';
 const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus';
 ---
@@ -41,38 +44,42 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
           </div>
         </button>
 
-        <button
-          class="di-card"
-          type="button"
-          :class="theme === 'editorial' ? 'is-active' : ''"
-          @click="theme = 'editorial'"
-        >
-          <div class="di-card__hint di-card__hint--editorial">
-            <span class="ed-name">Editorial</span>
-          </div>
-          <div class="di-card__body">
-            <div class="di-card__title editorial-title">Editorial</div>
-            <div class="di-card__desc">Magazinhaft · Storytelling</div>
-            <div class="di-card__meta">Cormorant Garamond · Olive</div>
-          </div>
-        </button>
+        {SHOW_ALL_IDENTITIES && (
+          <>
+            <button
+              class="di-card"
+              type="button"
+              :class="theme === 'editorial' ? 'is-active' : ''"
+              @click="theme = 'editorial'"
+            >
+              <div class="di-card__hint di-card__hint--editorial">
+                <span class="ed-name">Editorial</span>
+              </div>
+              <div class="di-card__body">
+                <div class="di-card__title editorial-title">Editorial</div>
+                <div class="di-card__desc">Magazinhaft · Storytelling</div>
+                <div class="di-card__meta">Cormorant Garamond · Olive</div>
+              </div>
+            </button>
 
-        <button
-          class="di-card"
-          type="button"
-          :class="theme === 'maison' ? 'is-active' : ''"
-          @click="theme = 'maison'"
-        >
-          <div class="di-card__hint di-card__hint--maison">
-            <span class="ms-name">MAISON</span>
-            <span class="ms-rhombus"></span>
-          </div>
-          <div class="di-card__body">
-            <div class="di-card__title maison-title">Maison</div>
-            <div class="di-card__desc">Klassisch · Opulent</div>
-            <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
-          </div>
-        </button>
+            <button
+              class="di-card"
+              type="button"
+              :class="theme === 'maison' ? 'is-active' : ''"
+              @click="theme = 'maison'"
+            >
+              <div class="di-card__hint di-card__hint--maison">
+                <span class="ms-name">MAISON</span>
+                <span class="ms-rhombus"></span>
+              </div>
+              <div class="di-card__body">
+                <div class="di-card__title maison-title">Maison</div>
+                <div class="di-card__desc">Klassisch · Opulent</div>
+                <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
+              </div>
+            </button>
+          </>
+        )}
 
       </div>
 

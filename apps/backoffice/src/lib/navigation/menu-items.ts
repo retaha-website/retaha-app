@@ -34,6 +34,42 @@ export const menuSections: MenuSection[] = [
         href: '/breakfast',
         icon: icon('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'),
       },
+      {
+        label: 'Eve Concierge',
+        sub: 'KI-Chat für Gäste',
+        href: '/gast-vorschau',
+        icon: icon('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>'),
+      },
+      {
+        label: 'Service-Anfragen',
+        sub: 'Zimmerwünsche · Buchungen',
+        href: '/gast-vorschau',
+        icon: icon('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v5H2z"/><line x1="6" y1="1" x2="6" y2="8"/><line x1="10" y1="1" x2="10" y2="8"/>'),
+      },
+      {
+        label: 'Empfehlungen',
+        sub: 'Google Places · Tipps',
+        href: '/gast-vorschau',
+        icon: icon('<circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>'),
+      },
+      {
+        label: 'Self-Checkout',
+        sub: 'Digitale Abreise',
+        href: '/self-checkout',
+        icon: icon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
+      },
+      {
+        label: 'Wallet-Pass',
+        sub: 'Apple & Google Wallet',
+        href: '/wallet-keys',
+        icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
+      },
+      {
+        label: 'Hero-Slider',
+        sub: 'Swipeable Karten-Feed',
+        href: '/gast-vorschau',
+        icon: icon('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'),
+      },
     ],
   },
   {
