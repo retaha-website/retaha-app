@@ -159,15 +159,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 <style is:global>
 [x-cloak] { display: none !important; }
 
-/* ── DnD Debug (TEMPORÄR) ───────────────────────────────────────────── */
-.dnd-dbg {
-  position: fixed; bottom: 24px; right: 16px; z-index: 9999;
-  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-  background: #111; color: #0f0; border-radius: 10px;
-  font-family: monospace; font-size: 13px; line-height: 1;
-  pointer-events: auto; box-shadow: 0 4px 20px rgba(0,0,0,.5);
-}
-.dnd-dbg strong { color: #fff; }
 
 /* textarea resize + auto-grow */
 textarea.s-input { resize: none; min-height: 72px; }
@@ -267,14 +258,6 @@ textarea.s-input { resize: none; min-height: 72px; }
 </style>
 
 <div class="settings-page" x-data="bfPage()">
-
-  <!-- ── DnD Debug-Overlay (TEMPORÄR) ──────────────────────────────────── -->
-  <div class="dnd-dbg" x-show="_dbgDown > 0 || _dbgCapture !== '–'" x-cloak>
-    <span>down: <strong x-text="_dbgDown"></strong></span>
-    <span>move: <strong x-text="_dbgMove"></strong></span>
-    <span>capture: <strong x-text="_dbgCapture"></strong></span>
-    <button onclick="this.closest('.dnd-dbg').remove()" style="background:none;border:none;color:#0f0;cursor:pointer;padding:0 0 0 8px;font-size:14px">✕</button>
-  </div>
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
     <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
@@ -818,11 +801,6 @@ textarea.s-input { resize: none; min-height: 72px; }
       _ptrMoveHandler: null,
       _ptrUpHandler: null,
 
-      // ── Debug (TEMPORÄR — nach Diagnose entfernen) ─────────────────────
-      _dbgDown: 0,
-      _dbgMove: 0,
-      _dbgCapture: '–',
-
       get groupedItems() {
         const sorted = [...this.items].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
         const groups = {};
@@ -937,9 +915,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       // statt der visuellen Row unter dem Finger → dragTarget wird nie gesetzt.
       // Fix: move+up auf window registrieren, kein capture nötig.
       dndPtrDown(e, item) {
-        this._dbgDown++;
         e.preventDefault();
-        this._dbgCapture = 'win';
         this._ptrItem = item;
         this.dragItem = item;
         const pid = e.pointerId;
@@ -947,7 +923,6 @@ textarea.s-input { resize: none; min-height: 72px; }
         this._ptrMoveHandler = (ev) => {
           if (ev.pointerId !== pid) return;
           ev.preventDefault();
-          this._dbgMove++;
           const el = document.elementFromPoint(ev.clientX, ev.clientY);
           const row = el && el.closest('[data-item-id]');
           if (row) {
