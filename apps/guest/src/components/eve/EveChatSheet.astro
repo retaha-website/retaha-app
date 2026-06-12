@@ -79,7 +79,7 @@ const conciergeLabel = t('eve.concierge_label', lang);
 >
   <!-- Header -->
   <header class="eve-sheet-header">
-    <div class="eve-sheet-avatar" :class="{ 'waving': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
+    <div class="eve-sheet-avatar" :class="{ 'play-wave': eveAvatarGreeting, 'is-typing': eveTyping }" role="img" aria-label="Eve, Concierge" set:html={eveAvatarRaw}></div>
     <div class="eve-sheet-header-info">
       <span class="eve-sheet-header-eyebrow themed-eyebrow-flank">{conciergeLabel}</span>
       <h2 class="eve-sheet-header-name">{eveName}<span class="eve-name-dot">.</span></h2>
@@ -371,74 +371,76 @@ const conciergeLabel = t('eve.concierge_label', lang);
 </style>
 
 <style is:global>
-  /* ── Avatar-Animationen ──────────────────────────────────────────────
+  /* ── Avatar-Wink-Sequenz ────────────────────────────────────────────
+   *
+   * Ruhezustand: geschlossener Kreis (ring-closed), kein Arm, keine Hand.
+   * Nach .play-wave: Ring öffnet sich, Arm + Hand erscheinen, Hand winkt,
+   * danach alles zurück — 1× pro Chat-Öffnen, keine Endlosschleife.
    *
    * CSS-Variablen (Taha: Ein-Wert-Justierung):
-   *   --avatar-wave-delay:    Wartezeit nach Sheet-Slide     (default 900ms)
-   *   --avatar-wave-duration: Gesamte Wink-Sequenz (2 Wellen, (default 3.2s)
+   *   --wave-start-delay  Wartezeit vor dem Winken    (default 2600ms)
+   *   --wave-active       Dauer der Wink-Phase         (default 2600ms)
+   *   --avatar-wave-total = delay + active + 700ms Outro = ~5.9s
    *
-   * Elemente (kein transform-Konflikt):
-   *   .waving .wave-hand → Hand-Gruppe: fade-in → 2× wink → fade-out
-   *   .is-typing svg     → SVG-Element: scale+opacity Puls
-   *
-   * transform-box: fill-box ist PFLICHT für iOS Safari.
+   * transform-box: fill-box ist PFLICHT für iOS Safari (Pivot-Berechnung).
    */
   :root {
-    --avatar-wave-delay: 900ms;
-    --avatar-wave-duration: 3.2s;
+    --wave-start-delay:   2600ms;
+    --wave-active:        2600ms;
+    --avatar-wave-total:  5900ms;
   }
 
-  /* Hand ist im Ruhezustand UNSICHTBAR — Figur ohne Hand als Default */
-  .wave-hand {
-    opacity: 0;
+  /* Ruhezustand aller animierten Elemente */
+  .ring-closed { opacity: 1; }
+  .ring-open   { opacity: 0; }
+  .arm         { opacity: 0; }
+  .wave-hand   { opacity: 0; }
+  .wave-hand .swing {
     transform-box: fill-box;
-    transform-origin: 12% 96%;
-    will-change: transform, opacity;
+    transform-origin: 50% 100%;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    /* Wink-Sequenz: 1 Iteration × 3.2s — fade-in, 2 Wellen, fade-out */
-    .eve-sheet-avatar.waving .wave-hand {
-      animation: eve-wave var(--avatar-wave-duration, 3.2s) ease-in-out
-                 var(--avatar-wave-delay, 900ms) 1 both;
+    .eve-sheet-avatar.play-wave .ring-closed {
+      animation: ring-closed-vis var(--avatar-wave-total) linear forwards;
+    }
+    .eve-sheet-avatar.play-wave .ring-open {
+      animation: ring-open-vis var(--avatar-wave-total) linear forwards;
+    }
+    .eve-sheet-avatar.play-wave .arm {
+      animation: arm-vis var(--avatar-wave-total) linear forwards;
+    }
+    .eve-sheet-avatar.play-wave .wave-hand {
+      animation: hand-vis var(--avatar-wave-total) linear forwards;
+    }
+    .eve-sheet-avatar.play-wave .wave-hand .swing {
+      animation: hand-swing var(--avatar-wave-total) ease-in-out forwards;
     }
     /* Typing-Puls: SVG-Fond — kein transform-Konflikt mit Hand */
     .eve-sheet-avatar.is-typing svg {
       animation: eve-typing-pulse 1.2s ease-in-out infinite;
     }
   }
-  @keyframes eve-wave {
-    /* Fade in am Anfang, 2 Wellen, Fade out am Ende */
-    0%   { transform: rotate(0deg);   opacity: 0; }
-    5%   { transform: rotate(0deg);   opacity: 1; }
-    /* Welle 1 */
-    18%  { transform: rotate(14deg);  opacity: 1; }
-    36%  { transform: rotate(-12deg); opacity: 1; }
-    52%  { transform: rotate(9deg);   opacity: 1; }
-    /* Welle 2 */
-    62%  { transform: rotate(0deg);   opacity: 1; }
-    72%  { transform: rotate(12deg);  opacity: 1; }
-    84%  { transform: rotate(-9deg);  opacity: 1; }
-    93%  { transform: rotate(0deg);   opacity: 1; }
-    /* Fade out */
-    100% { transform: rotate(0deg);   opacity: 0; }
-  }
-  @keyframes eve-typing-pulse {
-    0%, 100% { transform: scale(1);    opacity: 1;   }
-    50%       { transform: scale(1.04); opacity: 0.8; }
+
+  /* Sichtbarkeits-Fenster — % von --avatar-wave-total (5900ms)
+     ~48% = 2832ms (Ende Wartezeit), ~86% = 5074ms (Ende Wink), ~90% = 5310ms (Kreis zu) */
+  @keyframes ring-closed-vis { 0%,48%{opacity:1} 52%,86%{opacity:0} 90%,100%{opacity:1} }
+  @keyframes ring-open-vis   { 0%,48%{opacity:0} 52%,86%{opacity:1} 90%,100%{opacity:0} }
+  @keyframes arm-vis         { 0%,48%{opacity:0} 53%,86%{opacity:1} 90%,100%{opacity:0} }
+  @keyframes hand-vis        { 0%,49%{opacity:0} 54%,86%{opacity:1} 90%,100%{opacity:0} }
+
+  @keyframes hand-swing {
+    0%,50%   { transform: rotate(0deg);  }
+    58%      { transform: rotate(16deg); }
+    66%      { transform: rotate(-13deg);}
+    74%      { transform: rotate(11deg); }
+    82%      { transform: rotate(-7deg); }
+    86%,100% { transform: rotate(0deg);  }
   }
 
-  /* ─── TEMP DIAGNOSTIC ─────────────────────────────────────────────────
-   * Wenn .waving aktiv: Avatar-Hintergrund leuchtet ROT — unabhängig von
-   * Hand-Opacity/Animation. Taha: siehst du nach ~900ms einen roten Ring?
-   *   JA  → Alpine feuert + CSS erreicht das Element ✓
-   *   NEIN → Alpine-State wird auf iOS gar nicht gesetzt
-   * → nach iOS-Bestätigung diesen Block entfernen.
-   */
-  .eve-sheet-avatar.waving {
-    background: rgba(220, 20, 60, 0.35) !important;
-    outline: 2px solid crimson;
-    border-radius: 50%;
+  @keyframes eve-typing-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1;   }
+    50%      { transform: scale(1.04); opacity: 0.8; }
   }
 
   /* ── BAUHAUS · Karten-Variant ───────────────────────────────────────── */

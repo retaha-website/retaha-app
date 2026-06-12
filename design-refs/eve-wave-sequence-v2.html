@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eve – Wink-Sequenz v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=JetBrains+Mono:wght@600&family=Inter:wght@400;500&display=swap');
+
+  :root{
+    --hotel-accent:#243149;
+    /* ====== Diese Werte justiert Taha ====== */
+    --wave-start-delay: 2600ms;   /* lange statisch BEVOR gewinkt wird (deutlich später) */
+    --wave-active:      2600ms;   /* Dauer des Winkens */
+    /* ======================================= */
+    --total: calc(var(--wave-start-delay) + var(--wave-active) + 700ms);
+  }
+
+  body{
+    margin:0; min-height:100vh; background:#FBFAF7; color:#0A0A0A;
+    font-family:'Inter',sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:40px 20px 64px; gap:30px;
+  }
+  .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.2em; color:#8A877F; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-size:26px; margin:6px 0 0; }
+  .sub{ font-size:13px; color:#6E6B64; max-width:440px; text-align:center; line-height:1.5; }
+
+  .stage{ display:flex; gap:26px; align-items:flex-end; flex-wrap:wrap; justify-content:center; }
+  .cell{ display:flex; flex-direction:column; align-items:center; gap:9px; }
+  .tag{ font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.14em; color:#A5A29A; }
+
+  /* kein border-radius / kein overflow:hidden am Container */
+  .avatar{ display:block; color:var(--hotel-accent); }
+  .avatar svg{ display:block; width:100%; height:100%; overflow:visible; }
+
+  /* Ruhezustand: geschlossener Kreis sichtbar, offener Ring + Arm + Hand unsichtbar */
+  .ring-closed{ opacity:1; animation: ring-closed-vis var(--total) linear forwards; }
+  .ring-open  { opacity:0; animation: ring-open-vis  var(--total) linear forwards; }
+  .arm        { opacity:0; animation: arm-vis        var(--total) linear forwards; }
+  .wave-hand  { opacity:0; animation: hand-vis       var(--total) linear forwards; }
+  .wave-hand .swing{
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: hand-swing var(--total) ease-in-out forwards;
+  }
+
+  /* Sichtbarkeits-Fenster (Prozente relativ zu --total).
+     delay endet bei ~50% (2600 von 5900). Winken ~50%..86%. Danach zurück. */
+  @keyframes ring-closed-vis{ 0%,48%{opacity:1} 52%,86%{opacity:0} 90%,100%{opacity:1} }
+  @keyframes ring-open-vis  { 0%,48%{opacity:0} 52%,86%{opacity:1} 90%,100%{opacity:0} }
+  @keyframes arm-vis        { 0%,48%{opacity:0} 53%,86%{opacity:1} 90%,100%{opacity:0} }
+  @keyframes hand-vis       { 0%,49%{opacity:0} 54%,86%{opacity:1} 90%,100%{opacity:0} }
+
+  @keyframes hand-swing{
+    0%,50%   { transform: rotate(0deg); }
+    58%      { transform: rotate(16deg); }
+    66%      { transform: rotate(-13deg); }
+    74%      { transform: rotate(11deg); }
+    82%      { transform: rotate(-7deg); }
+    86%,100% { transform: rotate(0deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ring-closed{ opacity:1; animation:none; }
+    .ring-open,.arm,.wave-hand{ opacity:0; animation:none; }
+    .wave-hand .swing{ animation:none; }
+  }
+
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; margin-top:4px;}
+  button.btn{ font-family:'Inter',sans-serif; font-size:13px; font-weight:500; padding:9px 16px; border-radius:12px; border:1px solid #0A0A0A; background:#0A0A0A; color:#FBFAF7; cursor:pointer; }
+  .swatch{ width:22px;height:22px;border-radius:50%;border:2px solid #FBFAF7;outline:1px solid #E7E4DD;cursor:pointer;}
+  .swatch.active{ outline:2px solid #0A0A0A; }
+  .note{ font-size:12px;color:#8A877F;max-width:460px;text-align:center;line-height:1.55;}
+  code{ font-family:'JetBrains Mono',monospace;font-size:11px;background:#F0EEE9;padding:1px 5px;border-radius:5px;}
+</style>
+</head>
+<body>
+  <div style="text-align:center">
+    <div class="eyebrow">RETAHA HOSPITALITY · AVATAR</div>
+    <h1>Marleen winkt – Sequenz v2.</h1>
+    <p class="sub">Ruhezustand = geschlossener Kreis, kein Arm. Nach einer deutlichen Pause öffnet sich der Ring, Arm + Hand erscheinen, die Hand winkt – danach alles zurück zum geschlossenen Kreis.</p>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="replay">Sequenz wiederholen</button>
+    <span class="eyebrow" style="margin-left:6px">AKZENT</span>
+    <button class="swatch" style="background:#0A0A0A" data-c="#0A0A0A"></button>
+    <button class="swatch active" style="background:#243149" data-c="#243149"></button>
+    <button class="swatch" style="background:#8C2128" data-c="#8C2128"></button>
+    <button class="swatch" style="background:#5C9070" data-c="#5C9070"></button>
+  </div>
+
+  <div class="stage" id="stage"></div>
+
+  <p class="note">Timing oben in <code>:root</code>: <code>--wave-start-delay</code> (Pause vor dem Winken) und <code>--wave-active</code>. Aktuell: 2,6&thinsp;s warten, 2,6&thinsp;s winken.</p>
+
+<script>
+  let n=0;
+  const SVG = () => { const id='fr'+(++n); return `
+  <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <defs><clipPath id="${id}"><circle cx="24" cy="24" r="21.5"/></clipPath></defs>
+
+    <!-- Ruhe: geschlossener Kreis -->
+    <circle class="ring-closed" cx="24" cy="24" r="21.5" stroke-width="2"/>
+    <!-- Winken: offener Ring (Öffnung oben rechts, wo die Hand austritt) -->
+    <path class="ring-open" d="M42.8 13.6 A21.5 21.5 0 1 1 36.6 6.6" stroke-width="2"/>
+
+    <!-- Kopf/Gesicht/Körper: immer sichtbar -->
+    <circle cx="24" cy="10.8" r="2.6"/>
+    <circle cx="24" cy="20" r="7"/>
+    <path d="M19.9 19 C20.6 17.7 22.2 17.7 22.9 19" stroke-width="1.8"/>
+    <path d="M25.1 19 C25.8 17.7 27.4 17.7 28.1 19" stroke-width="1.8"/>
+    <path d="M21.3 22 C22.5 24 25.5 24 26.7 22" stroke-width="1.9"/>
+    <g clip-path="url(#${id})"><path d="M8.5 40 C10 32.5 16.5 29.5 24 29.5 C31.5 29.5 38 32.5 39.5 40"/></g>
+    <path d="M19.5 30.5 L24 36.5 L28.5 30.5"/>
+
+    <!-- Arm: nur während Winken -->
+    <path class="arm" d="M31.2 30.3 C34.8 27.4 36.9 23 38 13.8"/>
+    <!-- Hand: nur während Winken, pendelt -->
+    <g class="wave-hand">
+      <g class="swing">
+        <g transform="translate(38 13) rotate(32)">
+          <path d="M-4.2 -0.2 L-4.2 -2.0 C-6.2 -2.5 -7.0 -4.2 -6.0 -5.2 C-5.3 -5.9 -4.4 -5.5 -4.2 -4.4 L-4.2 -6.8 A1.4 1.4 0 0 1 -1.4 -6.8 L-1.4 -5.2 L-1.4 -7.8 A1.4 1.4 0 0 1 1.4 -7.8 L1.4 -5.2 L1.4 -6.4 A1.4 1.4 0 0 1 4.2 -6.4 L4.2 -0.2 Z" stroke-width="1.9"/>
+        </g>
+      </g>
+    </g>
+  </svg>`; };
+
+  const stage=document.getElementById('stage');
+  [['150PX',150],['48PX',48],['40PX',40]].forEach(([tag,px])=>{
+    const cell=document.createElement('div'); cell.className='cell';
+    cell.innerHTML=`<div class="avatar" style="width:${px}px;height:${px}px">${SVG()}</div><span class="tag">${tag}</span>`;
+    stage.appendChild(cell);
+  });
+
+  document.getElementById('replay').addEventListener('click',()=>{
+    document.querySelectorAll('.ring-closed,.ring-open,.arm,.wave-hand,.swing').forEach(el=>{
+      el.style.animation='none'; void el.offsetWidth; el.style.animation='';
+    });
+  });
+  document.querySelectorAll('.swatch').forEach(s=>{
+    s.addEventListener('click',()=>{
+      document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+      s.classList.add('active');
+      document.documentElement.style.setProperty('--hotel-accent', s.dataset.c);
+    });
+  });
+</script>
+</body>
+</html>
