@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import ModStatusLed from '../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { buildPhotoUrl, type PickCategory } from '../lib/places/google-client';
 import { addPickToHotel } from '../lib/places/pick-actions';
@@ -13,6 +14,7 @@ const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 const { data: hotelLangRow } = await client
   .from('hotels')
@@ -29,6 +31,15 @@ const LANGUAGE_LABELS: Record<string, string> = {
 };
 const otherEnabled = hotelEnabledLangs.filter(l => l !== hotelDefaultLang);
 const otherEnabledLabel = otherEnabled.map(l => LANGUAGE_LABELS[l] || l).join(', ');
+
+// Modul-Status aus hotel_settings.features.recommendations
+const { data: settingsRow } = await client
+  .from('hotel_settings')
+  .select('features')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+const features = ((settingsRow?.features as Record<string, unknown>) ?? {});
+const recommendationsOn = features.recommendations !== false;
 
 let message: { type: 'success' | 'error'; text: string } | null = null;
 
@@ -118,7 +129,26 @@ if (Astro.request.method === 'POST') {
   }
 }
 
-const activeCategory = (Astro.url.searchParams.get('cat') as PickCategory) || 'restaurant';
+// Tab logic: UI tab 'explore' = DB categories sight + activity combined
+// This mirrors the guest app's TAB_DB_CATS mapping in recommendations.astro
+type BackofficeTabKey = 'restaurant' | 'cafe' | 'bar' | 'explore';
+const TABS: Array<{ key: BackofficeTabKey; label: string }> = [
+  { key: 'restaurant', label: 'Restaurants' },
+  { key: 'cafe',       label: 'Cafés' },
+  { key: 'bar',        label: 'Bars' },
+  { key: 'explore',    label: 'Sehenswertes' }, // DB: sight + activity
+];
+const VALID_TABS: BackofficeTabKey[] = ['restaurant', 'cafe', 'bar', 'explore'];
+
+const rawCat = Astro.url.searchParams.get('cat') ?? '';
+// Normalize legacy/DB categories (sight, activity) to the 'explore' UI tab
+const activeTab: BackofficeTabKey =
+  rawCat === 'sight' || rawCat === 'activity' ? 'explore' :
+  VALID_TABS.includes(rawCat as BackofficeTabKey) ? rawCat as BackofficeTabKey :
+  'restaurant';
+
+// DB category for new picks on the explore tab — store as 'sight' by default
+const activeDbCategory: PickCategory = activeTab === 'explore' ? 'sight' : activeTab;
 
 const { data: hotelRow } = await client
   .from('hotels')
@@ -134,32 +164,44 @@ const { data: allPicks } = await client
   .order('sort_order', { ascending: true })
   .order('created_at', { ascending: false });
 
-const picksByCategory: Record<string, any[]> = {};
+// Group picks by UI tab key (sight + activity both map to 'explore')
+const picksByTab: Record<string, any[]> = {};
 for (const p of allPicks ?? []) {
-  if (!picksByCategory[p.category]) picksByCategory[p.category] = [];
-  picksByCategory[p.category].push(p);
+  const tabKey: BackofficeTabKey =
+    (p.category === 'sight' || p.category === 'activity') ? 'explore' : p.category as BackofficeTabKey;
+  if (!picksByTab[tabKey]) picksByTab[tabKey] = [];
+  picksByTab[tabKey].push(p);
 }
-const activePicks = picksByCategory[activeCategory] ?? [];
+const activePicks = picksByTab[activeTab] ?? [];
 
-const { data: nearbyCache } = await client
-  .from('hotel_place_nearby_cache')
-  .select('category, cached_places, last_refresh')
-  .eq('hotel_id', hotel.id)
-  .eq('category', activeCategory)
-  .maybeSingle();
+// Nearby cache: for 'explore' fetch both sight + activity rows and merge
+let nearbyHasCache = false;
+let nearbyPlaces: any[] = [];
+
+if (activeTab === 'explore') {
+  const { data: exploreCaches } = await client
+    .from('hotel_place_nearby_cache')
+    .select('cached_places')
+    .eq('hotel_id', hotel.id)
+    .in('category', ['sight', 'activity']);
+  if (exploreCaches && exploreCaches.length > 0) {
+    nearbyHasCache = true;
+    nearbyPlaces = exploreCaches.flatMap(c => (c.cached_places as any[]) ?? []);
+  }
+} else {
+  const { data: nc } = await client
+    .from('hotel_place_nearby_cache')
+    .select('cached_places')
+    .eq('hotel_id', hotel.id)
+    .eq('category', activeTab)
+    .maybeSingle();
+  if (nc) { nearbyHasCache = true; nearbyPlaces = (nc.cached_places as any[]) ?? []; }
+}
 
 const pickPlaceIds = new Set(activePicks.map((p: any) => p.place_id));
-const autoSuggestions = ((nearbyCache?.cached_places as any[]) ?? [])
+const autoSuggestions = nearbyPlaces
   .filter((p: any) => !pickPlaceIds.has(p.placeId ?? p.place_id))
   .slice(0, 10);
-
-const TABS: Array<{ key: PickCategory; label: string }> = [
-  { key: 'restaurant', label: 'Restaurants' },
-  { key: 'cafe',       label: 'Cafés' },
-  { key: 'bar',        label: 'Bars' },
-  { key: 'activity',   label: 'Aktivitäten' },
-  { key: 'sight',      label: 'Sehenswertes' },
-];
 
 const savedParam = Astro.url.searchParams.get('saved');
 if (savedParam === 'pick_added' && !message) {
@@ -172,11 +214,23 @@ const totalPicks = (allPicks ?? []).length;
 <Layout title="Empfehlungen" activeTab="backoffice">
   <div class="settings-page">
 
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Empfehlungen</span>
+    </nav>
+
     <section class="settings-hero">
       <span class="settings-hero__eyebrow">Gäste-Module · Empfehlungen</span>
       <h1 class="settings-hero__title">Deine Empfehlungen<span class="dot-pink">.</span></h1>
       <p class="settings-hero__sub">Restaurants, Cafés, Bars und Sehenswertes. Eve zeigt deine Picks zuerst.</p>
     </section>
+
+    {message && (
+      <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
+        {message.text}
+      </div>
+    )}
 
     {!hasAddress && (
       <div class="s-warning-row">
@@ -185,237 +239,250 @@ const totalPicks = (allPicks ?? []).length;
       </div>
     )}
 
-    <!-- Kategorie-Tabs -->
-    <nav class="places-tabs" aria-label="Kategorien">
-      {TABS.map(tab => (
-        <a
-          href={`/places?cat=${tab.key}`}
-          class:list={['places-tab', { 'is-active': activeCategory === tab.key }]}
-          aria-current={activeCategory === tab.key ? 'page' : undefined}
-        >
-          {tab.label}
-          {(picksByCategory[tab.key]?.length ?? 0) > 0 && (
-            <span class="places-tab__count">{picksByCategory[tab.key].length}</span>
-          )}
-        </a>
-      ))}
-    </nav>
+    <div class="settings-sections">
 
-    <!-- Suche & Hinzufügen -->
-    <section class="s-card" id="add-pick">
-      <div class="s-card__head">
-        <h2 class="s-card__title">{TABS.find(t => t.key === activeCategory)?.label} suchen</h2>
-        <span class="s-card__num">01</span>
-      </div>
-
-      {message && (
-        <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
-          {message.text}
+      <!-- 01 Modul -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Empfehlungsmodul</h2>
+          <span class="s-card__num">01</span>
         </div>
-      )}
-
-      <div class="s-card__body" x-data={`placesAutocomplete('${activeCategory}', ${hasAddress ? 'true' : 'false'})`}>
-        <div class="s-input-wrap" style="position:relative">
-          <input
-            type="text"
-            x-model="query"
-            x-on:input.debounce.300ms="search()"
-            placeholder={hasAddress ? `${TABS.find(t => t.key === activeCategory)?.label} suchen…` : 'Erst Adresse in Einstellungen hinterlegen…'}
-            :disabled="!hasAddress || pending"
-            class="s-input"
-            autocomplete="off"
-          />
-          <span x-show="pending" x-cloak class="places-search-spinner">…</span>
-
-          <div
-            x-show="suggestions.length > 0"
-            x-cloak
-            class="places-dropdown"
-          >
-            <template x-for="s in suggestions" :key="s.placeId">
-              <form method="POST" class="places-dropdown-item">
-                <input type="hidden" name="_action" value="pick_add" />
-                <input type="hidden" name="category" :value="category" />
-                <input type="hidden" name="place_id" :value="s.placeId" />
-                <button type="submit" class="places-dropdown-btn">
-                  <span class="places-dropdown-main" x-text="s.mainText"></span>
-                  <span class="places-dropdown-sub" x-text="s.secondaryText"></span>
-                </button>
-              </form>
-            </template>
+        <div class="s-card__body">
+          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <ModStatusLed on={recommendationsOn} />
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
           </div>
         </div>
-        <p class="s-hint">Name eingeben (mind. 2 Zeichen). Eve empfiehlt deine Picks zuerst.</p>
-      </div>
-    </section>
+      </section>
 
-    <!-- Deine Picks -->
-    <section class="s-card" id="picks-list">
-      <div class="s-card__head">
-        <h2 class="s-card__title">
-          Deine Picks
-          {activePicks.length > 0 && <span class="s-card__title-count">({activePicks.length})</span>}
-        </h2>
-        <span class="s-card__num">02</span>
-      </div>
-
-      <div class="s-card__body">
-        {activePicks.length === 0 && (
-          <p class="places-empty">Noch keine Picks in dieser Kategorie. Suche oben nach einem Ort.</p>
-        )}
-
-        <div class="picks-list">
-          {activePicks.map((pick: any, idx: number) => {
-            const cd = (pick.cached_data ?? {}) as any;
-            const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 200) : null;
-            const currentNote = pick.hotel_note_i18n?.[hotelDefaultLang]?.value ?? pick.hotel_note ?? '';
-            return (
-              <article class="pick-card" x-data={`pickCardRefresh('${pick.id}')`}>
-                <div x-show="!editing" class="pick-card__view">
-                  {photoUrl && (
-                    <img src={photoUrl} alt={cd.name ?? ''} class="pick-card__photo" loading="lazy" />
-                  )}
-                  <div class="pick-card__info">
-                    <div class="pick-card__top">
-                      <h3 class="pick-card__name">{cd.name ?? '(Name fehlt)'}</h3>
-                      <div class="pick-card__actions">
-                        {idx > 0 && (
-                          <form method="POST" class="pick-action-form">
-                            <input type="hidden" name="_action" value="pick_move" />
-                            <input type="hidden" name="id" value={pick.id} />
-                            <input type="hidden" name="direction" value="up" />
-                            <button type="submit" class="pick-action-btn" aria-label="Nach oben">↑</button>
-                          </form>
-                        )}
-                        {idx < activePicks.length - 1 && (
-                          <form method="POST" class="pick-action-form">
-                            <input type="hidden" name="_action" value="pick_move" />
-                            <input type="hidden" name="id" value={pick.id} />
-                            <input type="hidden" name="direction" value="down" />
-                            <button type="submit" class="pick-action-btn" aria-label="Nach unten">↓</button>
-                          </form>
-                        )}
-                        <button type="button" x-on:click="editing = true" class="pick-action-btn">Notiz</button>
-                        <button
-                          type="button"
-                          class="pick-action-btn"
-                          :disabled="refreshing"
-                          x-on:click="refresh()"
-                          :title="refreshing ? '…' : 'Google-Daten aktualisieren'"
-                          aria-label="Aktualisieren"
-                        >↻</button>
-                        <form method="POST" class="pick-action-form" x-on:submit.prevent="if(confirm('Diesen Pick wirklich entfernen?')) $el.submit()">
-                          <input type="hidden" name="_action" value="pick_delete" />
-                          <input type="hidden" name="id" value={pick.id} />
-                          <button type="submit" class="pick-action-btn pick-action-btn--danger">×</button>
-                        </form>
-                      </div>
-                    </div>
-                    <p class="pick-card__meta">
-                      {cd.rating && <span>⭐ {cd.rating} ({cd.user_ratings_total ?? 0})</span>}
-                      {cd.price_level && <span> · {cd.price_level.replace('PRICE_LEVEL_', '').toLowerCase()}</span>}
-                    </p>
-                    <p class="pick-card__address">{cd.formatted_address ?? ''}</p>
-                    {currentNote && (
-                      <p class="pick-card__note">„{currentNote}"</p>
-                    )}
-                  </div>
-                </div>
-
-                <form x-show="editing" x-cloak method="POST" class="pick-card__edit">
-                  <input type="hidden" name="_action" value="pick_update" />
-                  <input type="hidden" name="id" value={pick.id} />
-                  <div class="s-field">
-                    <label class="s-label">
-                      Hotel-Notiz ({LANGUAGE_LABELS[hotelDefaultLang] ?? hotelDefaultLang})
-                    </label>
-                    <textarea
-                      name="hotel_note_default"
-                      rows={2}
-                      placeholder='z.B. „Unser Lieblings-Italiener für Geschäftsessen — bitte Risotto probieren!"'
-                      class="s-textarea"
-                    >{currentNote}</textarea>
-                    {otherEnabled.length > 0 && (
-                      <p class="s-hint">Wird automatisch in {otherEnabledLabel} übersetzt.</p>
-                    )}
-                  </div>
-                  <div class="s-card__footer">
-                    <button type="submit" class="v9-btn v9-btn--ink">Speichern</button>
-                    <button type="button" x-on:click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
-                  </div>
-                </form>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-
-    <!-- Auto-Empfehlungen -->
-    <section class="s-card" id="nearby" x-data={`placesRefresh('${activeCategory}')`}>
-      <div class="s-card__head">
-        <h2 class="s-card__title">
-          Mehr in der Nähe
-          {autoSuggestions.length > 0 && <span class="s-card__title-count">({autoSuggestions.length})</span>}
-        </h2>
-        <span class="s-card__num">03</span>
-      </div>
-
-      <div class="s-card__body">
-        <div class="places-nearby-head">
-          <p class="s-hint">Automatische Vorschläge aus Google Places in deiner Umgebung.</p>
-          <button
-            type="button"
-            class="v9-btn v9-btn--ghost"
-            :disabled="refreshing"
-            x-on:click="refreshNearby()"
+      <!-- Kategorie-Tabs -->
+      <nav class="places-tabs" aria-label="Kategorien">
+        {TABS.map(tab => (
+          <a
+            href={`/places?cat=${tab.key}`}
+            class:list={['places-tab', { 'is-active': activeTab === tab.key }]}
+            aria-current={activeTab === tab.key ? 'page' : undefined}
           >
-            <span x-show="!refreshing">↻ Aktualisieren</span>
-            <span x-show="refreshing" x-cloak>… aktualisiere</span>
-          </button>
+            {tab.label}
+            {(picksByTab[tab.key]?.length ?? 0) > 0 && (
+              <span class="places-tab__count">{picksByTab[tab.key].length}</span>
+            )}
+          </a>
+        ))}
+      </nav>
+
+      <!-- 02 Suche & Hinzufügen -->
+      <section class="s-card" id="add-pick">
+        <div class="s-card__head">
+          <h2 class="s-card__title">{TABS.find(t => t.key === activeTab)?.label} suchen</h2>
+          <span class="s-card__num">02</span>
         </div>
 
-        <p
-          x-show="refreshMessage"
-          x-cloak
-          class="s-flash"
-          :class="refreshOk ? 's-flash--ok' : 's-flash--err'"
-          x-text="refreshMessage"
-        ></p>
+        <div class="s-card__body" x-data={`placesAutocomplete('${activeDbCategory}', ${hasAddress ? 'true' : 'false'})`}>
+          <div class="s-input-wrap" style="position:relative">
+            <input
+              type="text"
+              x-model="query"
+              x-on:input.debounce.300ms="search()"
+              placeholder={hasAddress ? `${TABS.find(t => t.key === activeTab)?.label} suchen…` : 'Erst Adresse in Einstellungen hinterlegen…'}
+              :disabled="!hasAddress || pending"
+              class="s-input"
+              autocomplete="off"
+            />
+            <span x-show="pending" x-cloak class="places-search-spinner">…</span>
 
-        {!nearbyCache && (
-          <p class="places-empty">
-            Noch keine Auto-Empfehlungen. Klick auf "Aktualisieren" um Google Places abzufragen.
-          </p>
-        )}
-
-        {autoSuggestions.length === 0 && nearbyCache && (
-          <p class="places-empty">Alle Vorschläge sind bereits in deinen Picks.</p>
-        )}
-
-        <div class="nearby-list">
-          {autoSuggestions.map((s: any) => (
-            <div class="nearby-item">
-              <div class="nearby-item__info">
-                <span class="nearby-item__name">
-                  {s.name ?? '(kein Name)'}
-                  {s.rating && <span class="nearby-item__rating"> ⭐ {s.rating} ({s.userRatingCount ?? 0})</span>}
-                </span>
-                <span class="nearby-item__addr">{s.formattedAddress ?? s.address ?? ''}</span>
-              </div>
-              <form method="POST">
-                <input type="hidden" name="_action" value="pick_add" />
-                <input type="hidden" name="category" value={activeCategory} />
-                <input type="hidden" name="place_id" value={s.placeId ?? s.place_id} />
-                <button type="submit" class="v9-btn v9-btn--ghost v9-btn--sm">+ Zu Picks</button>
-              </form>
+            <div
+              x-show="suggestions.length > 0"
+              x-cloak
+              class="places-dropdown"
+            >
+              <template x-for="s in suggestions" :key="s.placeId">
+                <form method="POST" class="places-dropdown-item">
+                  <input type="hidden" name="_action" value="pick_add" />
+                  <input type="hidden" name="category" :value="category" />
+                  <input type="hidden" name="place_id" :value="s.placeId" />
+                  <button type="submit" class="places-dropdown-btn">
+                    <span class="places-dropdown-main" x-text="s.mainText"></span>
+                    <span class="places-dropdown-sub" x-text="s.secondaryText"></span>
+                  </button>
+                </form>
+              </template>
             </div>
-          ))}
+          </div>
+          <p class="s-hint">Name eingeben (mind. 2 Zeichen). Eve empfiehlt deine Picks zuerst.</p>
         </div>
-      </div>
-    </section>
+      </section>
 
-  </div>
+      <!-- 03 Deine Picks -->
+      <section class="s-card" id="picks-list">
+        <div class="s-card__head">
+          <h2 class="s-card__title">
+            Deine Picks
+            {activePicks.length > 0 && <span class="s-card__title-count">({activePicks.length})</span>}
+          </h2>
+          <span class="s-card__num">03</span>
+        </div>
+
+        <div class="s-card__body">
+          {activePicks.length === 0 && (
+            <p class="places-empty">Noch keine Picks in dieser Kategorie. Suche oben nach einem Ort.</p>
+          )}
+
+          <div class="picks-list">
+            {activePicks.map((pick: any, idx: number) => {
+              const cd = (pick.cached_data ?? {}) as any;
+              const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 200) : null;
+              const currentNote = pick.hotel_note_i18n?.[hotelDefaultLang]?.value ?? pick.hotel_note ?? '';
+              return (
+                <article class="pick-card" x-data={`pickCardRefresh('${pick.id}')`}>
+                  <div x-show="!editing" class="pick-card__view">
+                    {photoUrl && (
+                      <img src={photoUrl} alt={cd.name ?? ''} class="pick-card__photo" loading="lazy" />
+                    )}
+                    <div class="pick-card__info">
+                      <div class="pick-card__top">
+                        <h3 class="pick-card__name">{cd.name ?? '(Name fehlt)'}</h3>
+                        <div class="pick-card__actions">
+                          {idx > 0 && (
+                            <form method="POST" class="pick-action-form">
+                              <input type="hidden" name="_action" value="pick_move" />
+                              <input type="hidden" name="id" value={pick.id} />
+                              <input type="hidden" name="direction" value="up" />
+                              <button type="submit" class="pick-action-btn" aria-label="Nach oben">↑</button>
+                            </form>
+                          )}
+                          {idx < activePicks.length - 1 && (
+                            <form method="POST" class="pick-action-form">
+                              <input type="hidden" name="_action" value="pick_move" />
+                              <input type="hidden" name="id" value={pick.id} />
+                              <input type="hidden" name="direction" value="down" />
+                              <button type="submit" class="pick-action-btn" aria-label="Nach unten">↓</button>
+                            </form>
+                          )}
+                          <button type="button" x-on:click="editing = true" class="pick-action-btn">Notiz</button>
+                          <button
+                            type="button"
+                            class="pick-action-btn"
+                            :disabled="refreshing"
+                            x-on:click="refresh()"
+                            :title="refreshing ? '…' : 'Google-Daten aktualisieren'"
+                            aria-label="Aktualisieren"
+                          >↻</button>
+                          <form method="POST" class="pick-action-form" x-on:submit.prevent="if(confirm('Diesen Pick wirklich entfernen?')) $el.submit()">
+                            <input type="hidden" name="_action" value="pick_delete" />
+                            <input type="hidden" name="id" value={pick.id} />
+                            <button type="submit" class="pick-action-btn pick-action-btn--danger">×</button>
+                          </form>
+                        </div>
+                      </div>
+                      <p class="pick-card__meta">
+                        {cd.rating && <span>⭐ {cd.rating} ({cd.user_ratings_total ?? 0})</span>}
+                        {cd.price_level && <span> · {cd.price_level.replace('PRICE_LEVEL_', '').toLowerCase()}</span>}
+                      </p>
+                      <p class="pick-card__address">{cd.formatted_address ?? ''}</p>
+                      {currentNote && (
+                        <p class="pick-card__note">„{currentNote}"</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <form x-show="editing" x-cloak method="POST" class="pick-card__edit">
+                    <input type="hidden" name="_action" value="pick_update" />
+                    <input type="hidden" name="id" value={pick.id} />
+                    <div class="s-field">
+                      <label class="s-label">
+                        Hotel-Notiz ({LANGUAGE_LABELS[hotelDefaultLang] ?? hotelDefaultLang})
+                      </label>
+                      <textarea
+                        name="hotel_note_default"
+                        rows={2}
+                        placeholder='z.B. „Unser Lieblings-Italiener für Geschäftsessen — bitte Risotto probieren!"'
+                        class="s-textarea"
+                      >{currentNote}</textarea>
+                      {otherEnabled.length > 0 && (
+                        <p class="s-hint">Wird automatisch in {otherEnabledLabel} übersetzt.</p>
+                      )}
+                    </div>
+                    <div class="s-card__footer">
+                      <button type="submit" class="v9-btn v9-btn--ink">Speichern</button>
+                      <button type="button" x-on:click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                    </div>
+                  </form>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 Auto-Empfehlungen -->
+      <section class="s-card" id="nearby" x-data={`placesRefresh('${activeTab}')`}>
+        <div class="s-card__head">
+          <h2 class="s-card__title">
+            Mehr in der Nähe
+            {autoSuggestions.length > 0 && <span class="s-card__title-count">({autoSuggestions.length})</span>}
+          </h2>
+          <span class="s-card__num">04</span>
+        </div>
+
+        <div class="s-card__body">
+          <div class="places-nearby-head">
+            <p class="s-hint">Automatische Vorschläge aus Google Places in deiner Umgebung.</p>
+            <button
+              type="button"
+              class="v9-btn v9-btn--ghost"
+              :disabled="refreshing"
+              x-on:click="refreshNearby()"
+            >
+              <span x-show="!refreshing">↻ Aktualisieren</span>
+              <span x-show="refreshing" x-cloak>… aktualisiere</span>
+            </button>
+          </div>
+
+          <p
+            x-show="refreshMessage"
+            x-cloak
+            class="s-flash"
+            :class="refreshOk ? 's-flash--ok' : 's-flash--err'"
+            x-text="refreshMessage"
+          ></p>
+
+          {!nearbyHasCache && (
+            <p class="places-empty">
+              Noch keine Auto-Empfehlungen. Klick auf "Aktualisieren" um Google Places abzufragen.
+            </p>
+          )}
+
+          {autoSuggestions.length === 0 && nearbyHasCache && (
+            <p class="places-empty">Alle Vorschläge sind bereits in deinen Picks.</p>
+          )}
+
+          <div class="nearby-list">
+            {autoSuggestions.map((s: any) => (
+              <div class="nearby-item">
+                <div class="nearby-item__info">
+                  <span class="nearby-item__name">
+                    {s.name ?? '(kein Name)'}
+                    {s.rating && <span class="nearby-item__rating"> ⭐ {s.rating} ({s.userRatingCount ?? 0})</span>}
+                  </span>
+                  <span class="nearby-item__addr">{s.formattedAddress ?? s.address ?? ''}</span>
+                </div>
+                <form method="POST">
+                  <input type="hidden" name="_action" value="pick_add" />
+                  <input type="hidden" name="category" value={activeDbCategory} />
+                  <input type="hidden" name="place_id" value={s.placeId ?? s.place_id} />
+                  <button type="submit" class="v9-btn v9-btn--ghost v9-btn--sm">+ Zu Picks</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+    </div><!-- .settings-sections -->
+
+  </div><!-- .settings-page -->
 </Layout>
 
 <script>
@@ -455,19 +522,25 @@ const totalPicks = (allPicks ?? []).length;
         this.refreshing = true;
         this.refreshMessage = '';
         try {
-          const res = await fetch('/api/admin/places/refresh-nearby', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category: this.category }),
-          });
-          const body = await res.json();
-          if (body.ok) {
-            this.refreshOk = true;
-            this.refreshMessage = `Aktualisiert — ${body.total_places_cached ?? 0} Places gefunden. (Seite neu laden für Anzeige.)`;
-          } else {
-            this.refreshOk = false;
-            this.refreshMessage = `Fehler: ${body.error ?? 'unbekannt'}`;
+          // 'explore' tab maps to DB categories sight + activity — refresh both
+          const cats: string[] = this.category === 'explore' ? ['sight', 'activity'] : [this.category];
+          let total = 0;
+          for (const cat of cats) {
+            const res = await fetch('/api/admin/places/refresh-nearby', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category: cat }),
+            });
+            const body = await res.json();
+            if (!body.ok) {
+              this.refreshOk = false;
+              this.refreshMessage = `Fehler: ${body.error ?? 'unbekannt'}`;
+              return;
+            }
+            total += body.total_places_cached ?? 0;
           }
+          this.refreshOk = true;
+          this.refreshMessage = `Aktualisiert — ${total} Places gefunden. (Seite neu laden für Anzeige.)`;
         } catch (err) {
           this.refreshOk = false;
           this.refreshMessage = `Netzwerk-Fehler: ${(err as Error).message}`;
