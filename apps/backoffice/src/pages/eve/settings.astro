@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
@@ -145,241 +144,370 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
 ---
 
 <Layout title="Eve · Persönlichkeit" activeTab="backoffice">
-  <div class="-mt-10">
-    <EditorialPageHeader
-      sectionNumber="06"
-      sectionLabel="Eve · KI-Concierge"
-      headlineLight="Eve's"
-      headlineBold="Persönlichkeit"
-      subtitle="Name, Tonalität und Verhaltens-Regeln. Was Eve weiß steht im Wissens-Tab."
-    />
-  </div>
+  <div class="settings-page">
 
-  <EveSubNav currentPath={Astro.url.pathname} />
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/eve/knowledge" class="breadcrumb__crumb">Eve Concierge</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Persönlichkeit</span>
+    </nav>
 
-  <div class="max-w-3xl mx-auto px-6 pb-24">
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">— EVE · KI-CONCIERGE —</span>
+      <h1 class="settings-hero__title">Eve's Persönlichkeit<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Name, Tonalität und Verhaltens-Regeln. Was Eve weiß steht im Wissens-Tab.</p>
+    </section>
+
+    <EveSubNav currentPath={Astro.url.pathname} />
 
     {message && (
-      <div class={`mb-6 px-4 py-3 text-sm ${
-        message.type === 'success'
-          ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
-          : 'bg-red-50 border-l-4 border-red-700 text-red-800'
-      }`}>
+      <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
         {message.text}
       </div>
     )}
 
-    <!-- Master-Switch -->
-    <section class="mb-12 p-5 border-l-4 border-pink-shock/60 bg-anthrazit/5">
-      <div class="flex items-start justify-between gap-6">
-        <div class="flex-1">
-          <h2 class="text-xl font-light mb-1">Eve aktivieren</h2>
-          {eveEnabled ? (
-            <p class="text-sm text-anthrazit/80 leading-relaxed">
-              <span class="inline-block w-2 h-2 rounded-full bg-green-600 mr-1.5 align-middle"></span>
-              <strong>Eve ist aktiv</strong> und im Gast-Frontend sichtbar.
-            </p>
-          ) : (
-            <p class="text-sm text-anthrazit/55 leading-relaxed">
-              <span class="inline-block w-2 h-2 rounded-full bg-anthrazit/30 mr-1.5 align-middle"></span>
-              Eve ist deaktiviert. Der Concierge-Tile bleibt im Gast-Frontend ausgeblendet.
-            </p>
-          )}
-        </div>
-        <form method="POST" class="shrink-0">
-          <input type="hidden" name="_action" value="toggle_enabled" />
-          <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
-          <button type="submit"
-            class={`px-5 py-2 text-sm font-medium transition-colors ${
-              eveEnabled
-                ? 'bg-white border border-stein text-anthrazit hover:bg-anthrazit/5'
-                : 'bg-anthrazit text-white hover:bg-pink-shock'
-            }`}>
-            {eveEnabled ? 'Deaktivieren' : 'Aktivieren'}
-          </button>
-        </form>
-      </div>
-    </section>
+    <div class="settings-sections">
 
-    <!-- Persona -->
-    <section class="mb-12">
-      <h2 class="text-2xl font-light mb-2">Persönlichkeit</h2>
-      <p class="text-sm text-anthrazit/55 mb-6">Wie Eve sich präsentiert und spricht.</p>
-
-      <form method="POST" class="space-y-6" x-data={`{ tonality: '${eveTonality}' }`}>
-        <input type="hidden" name="_action" value="save_persona" />
-
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Name</label>
-          <input type="text" name="eve_name" value={eveName} required maxlength="40"
-            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm"
-            autocomplete="off" />
-          <p class="text-xs text-anthrazit/55 mt-1 italic">Wie soll deine KI-Concierge heißen? Beispiele: Eve, Maria, Anton, Sophie.</p>
+      <!-- ── Eve aktivieren ── -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Eve aktivieren</h2>
+          <span class="s-card__num">Status</span>
         </div>
 
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-2 uppercase tracking-wider">Tonalität</label>
-          <div class="space-y-2">
-            <label class="flex items-start gap-3 cursor-pointer p-3 border border-stein hover:bg-anthrazit/5 transition-colors">
-              <input type="radio" name="eve_tonality" value="warm_formal" checked={eveTonality === 'warm_formal'} @change="tonality = 'warm_formal'" class="mt-0.5" />
-              <div class="flex-1">
-                <div class="text-sm font-medium">Warm-formal</div>
-                <div class="text-xs text-anthrazit/55 mt-0.5">Premium-Concierge: professionell, aufmerksam, diskret. Default.</div>
-              </div>
-            </label>
-            <label class="flex items-start gap-3 cursor-pointer p-3 border border-stein hover:bg-anthrazit/5 transition-colors">
-              <input type="radio" name="eve_tonality" value="casual" checked={eveTonality === 'casual'} @change="tonality = 'casual'" class="mt-0.5" />
-              <div class="flex-1">
-                <div class="text-sm font-medium">Casual</div>
-                <div class="text-xs text-anthrazit/55 mt-0.5">Locker und freundlich, wie ein hilfsbereiter Freund. Für junge Boutique-Hotels.</div>
-              </div>
-            </label>
-            <label class="flex items-start gap-3 cursor-pointer p-3 border border-stein hover:bg-anthrazit/5 transition-colors">
-              <input type="radio" name="eve_tonality" value="custom" checked={eveTonality === 'custom'} @change="tonality = 'custom'" class="mt-0.5" />
-              <div class="flex-1">
-                <div class="text-sm font-medium">Eigene Beschreibung</div>
-                <div class="text-xs text-anthrazit/55 mt-0.5">Frei-Text-Persona. Volle Kontrolle.</div>
-              </div>
-            </label>
+        <div class="ev-status-row">
+          <div class="ev-status-info">
+            <span class={`ev-status-dot ev-status-dot--${eveEnabled ? 'on' : 'off'}`}></span>
+            {eveEnabled ? (
+              <span class="ev-status-label ev-status-label--on">Eve ist aktiv und im Gast-Frontend sichtbar.</span>
+            ) : (
+              <span class="ev-status-label">Eve ist deaktiviert. Der Concierge-Tile bleibt ausgeblendet.</span>
+            )}
           </div>
-          <div x-show="tonality === 'custom'" x-cloak class="mt-4">
-            <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Custom-Persona-Beschreibung</label>
-            <textarea name="eve_custom_persona" rows="4"
-              placeholder="z.B. 'Du bist eine erfahrene Concierge mit 20 Jahren Hotellerie-Erfahrung. Du sprichst kurz, präzise, mit einem Schuss Humor.'"
-              class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical"
-            >{eveCustomPersona}</textarea>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Anrede an Gast</label>
-          <div class="px-3 py-2 border border-stein bg-anthrazit/5 text-sm">
-            <span class="font-medium">{guestAddressForm === 'du' ? 'Du' : 'Sie'}</span>
-            <span class="text-anthrazit/55"> · </span>
-            <a href="/admin/settings" class="text-xs text-anthrazit/55 hover:text-pink-shock underline">
-              In Allgemeinen Einstellungen ändern
-            </a>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Online bis</label>
-          <input type="time" name="eve_online_until" value={eveOnlineUntil}
-            class="px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm font-mono" />
-          <p class="text-xs text-anthrazit/55 mt-1 italic">
-            Anzeige-Hint im Gast-Frontend ("online bis 22:00"). Eve ist technisch 24/7 verfügbar — das ist nur das Service-Versprechen.
-          </p>
-        </div>
-
-        <button type="submit"
-          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">
-          Persönlichkeit speichern
-        </button>
-      </form>
-    </section>
-
-    <!-- Tuning-Rules -->
-    <section class="mb-12">
-      <h2 class="text-2xl font-light mb-2">Eve trainieren</h2>
-      <p class="text-sm text-anthrazit/55 mb-6">Soft-Rules. Eve nutzt sie wenn Gast-Anfragen einen Trigger-Text enthalten.</p>
-
-      <form method="POST" class="mb-8 p-5 border border-stein bg-white space-y-4">
-        <input type="hidden" name="_action" value="tuning_rule_add" />
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Wenn Gast fragt nach</label>
-          <input type="text" name="trigger" required placeholder="z.B. restaurant-empfehlung"
-            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm font-mono"
-            autocomplete="off" />
-          <p class="text-xs text-anthrazit/55 mt-1 italic">
-            Substring-Match (case-insensitive). Wenn die Gast-Anfrage diesen Text enthält (z.B. "restaurant"), gilt diese Regel.
-          </p>
-        </div>
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Antworte so</label>
-          <textarea name="instruction" required rows="3"
-            placeholder="z.B. 'Empfiehl immer erst unser hauseigenes Restaurant Maria. Falls Gast was anderes will, empfiehl die Picks aus der Empfehlungs-Liste.'"
-            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical"
-          ></textarea>
-        </div>
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Modell für diese Regel</label>
-          <select name="force_model" class="px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm">
-            <option value="">Auto (Router entscheidet)</option>
-            <option value="sonnet">Sonnet (für besonders sorgfältige Antworten)</option>
-            <option value="haiku">Haiku (für schnelle, einfache Antworten)</option>
-          </select>
-        </div>
-        <button type="submit"
-          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">
-          + Regel hinzufügen
-        </button>
-      </form>
-
-      {tuningRules.length === 0 && (
-        <p class="text-sm italic text-anthrazit/55 text-center py-8">Noch keine Regeln angelegt.</p>
-      )}
-
-      {tuningRules.map((rule, index) => (
-        <article class="mb-3 border border-stein bg-white" x-data="{ editing: false }">
-          <div x-show="!editing" class="p-5">
-            <div class="flex justify-between items-start gap-4 mb-2">
-              <div class="flex-1">
-                <p class="text-xs text-anthrazit/55 uppercase tracking-wider mb-1">Trigger</p>
-                <p class="font-mono text-sm text-anthrazit mb-3">{rule.trigger}</p>
-                <p class="text-xs text-anthrazit/55 uppercase tracking-wider mb-1">Instruction</p>
-                <p class="text-sm text-anthrazit/80 leading-relaxed whitespace-pre-wrap">{rule.instruction}</p>
-                {rule.force_model && (
-                  <p class="text-xs text-anthrazit/55 mt-2">
-                    <span class="inline-block px-2 py-0.5 bg-pink-shock/10 text-pink-shock">{rule.force_model}</span>
-                    <span class="italic ml-1">— Modell-Override aktiv</span>
-                  </p>
-                )}
-              </div>
-              <div class="flex gap-2 shrink-0">
-                <button type="button" @click="editing = true" class="text-xs text-anthrazit/55 hover:text-pink-shock transition-colors">Bearbeiten</button>
-                <form method="POST" class="inline" onsubmit="return confirm('Diese Regel wirklich löschen?')">
-                  <input type="hidden" name="_action" value="tuning_rule_delete" />
-                  <input type="hidden" name="rule_index" value={index} />
-                  <button type="submit" class="text-xs text-anthrazit/55 hover:text-red-600 transition-colors">Löschen</button>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          <form x-show="editing" method="POST" class="p-5 space-y-4" x-cloak>
-            <input type="hidden" name="_action" value="tuning_rule_update" />
-            <input type="hidden" name="rule_index" value={index} />
-            <div>
-              <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Trigger</label>
-              <input type="text" name="trigger" value={rule.trigger} required
-                class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm font-mono" />
-            </div>
-            <div>
-              <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Instruction</label>
-              <textarea name="instruction" required rows="3"
-                class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical"
-              >{rule.instruction}</textarea>
-            </div>
-            <div>
-              <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Modell</label>
-              <select name="force_model" class="px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm">
-                <option value="" selected={!rule.force_model}>Auto</option>
-                <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
-                <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
-              </select>
-            </div>
-            <div class="flex gap-3">
-              <button type="submit" class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">Speichern</button>
-              <button type="button" @click="editing = false" class="px-5 py-2 text-anthrazit/55 hover:text-anthrazit text-sm">Abbrechen</button>
-            </div>
+          <form method="POST" class="shrink-0">
+            <input type="hidden" name="_action" value="toggle_enabled" />
+            <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
+            <button type="submit" class={`v9-btn ${eveEnabled ? 'v9-btn--ghost' : ''}`}>
+              {eveEnabled ? 'Deaktivieren' : 'Aktivieren'}
+            </button>
           </form>
-        </article>
-      ))}
-    </section>
+        </div>
+      </section>
 
+      <!-- ── Persona ── -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Persönlichkeit</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Wie Eve sich präsentiert und spricht.</p>
+
+        <form method="POST" x-data={`{ tonality: '${eveTonality}' }`}>
+          <input type="hidden" name="_action" value="save_persona" />
+          <div class="s-card__body">
+
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="eve-name">Name</label>
+              <div class="field__input-wrap">
+                <input
+                  type="text" id="eve-name" name="eve_name"
+                  value={eveName} required maxlength="40"
+                  class="s-input" autocomplete="off"
+                />
+                <span class="field__hint">Wie soll deine KI-Concierge heißen? Beispiele: Eve, Maria, Anton, Sophie.</span>
+              </div>
+            </div>
+
+            <div class="field field--row">
+              <span class="field__label">Tonalität</span>
+              <div class="radio-cards" role="radiogroup">
+                {[
+                  ['warm_formal', 'Warm-formal', 'Premium-Concierge: professionell, aufmerksam, diskret.'],
+                  ['casual', 'Casual', 'Locker und freundlich — für junge Boutique-Hotels.'],
+                  ['custom', 'Eigene', 'Frei-Text-Persona. Volle Kontrolle.'],
+                ].map(([val, label, hint]) => (
+                  <label class={`radio-card ${eveTonality === val ? 'is-active' : ''}`} title={hint}>
+                    <input
+                      type="radio" name="eve_tonality" value={val}
+                      checked={eveTonality === val}
+                      @change={`tonality = '${val}'`}
+                      class="sr-only"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div x-show="tonality === 'custom'" x-cloak>
+              <div class="field field--row">
+                <label class="field__label" for="eve-custom-persona">Persona-Text</label>
+                <div class="field__input-wrap">
+                  <textarea
+                    id="eve-custom-persona" name="eve_custom_persona" rows="4"
+                    placeholder="z.B. 'Du bist eine erfahrene Concierge mit 20 Jahren Hotellerie-Erfahrung. Du sprichst kurz, präzise, mit einem Schuss Humor.'"
+                    class="s-input s-textarea"
+                  >{eveCustomPersona}</textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="field field--row">
+              <span class="field__label">Anrede an Gast</span>
+              <div>
+                <div class="ev-readonly-field">
+                  <span>{guestAddressForm === 'du' ? 'Du' : 'Sie'}</span>
+                  <a href="/admin/settings" class="s-btn-link">In Allgemeinen Einstellungen ändern ↗</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="eve-online-until">Online bis</label>
+              <div class="field__input-wrap">
+                <input
+                  type="time" id="eve-online-until" name="eve_online_until"
+                  value={eveOnlineUntil} class="s-input ev-time-input"
+                />
+                <span class="field__hint">
+                  Anzeige-Hint im Gast-Frontend ("online bis 22:00"). Eve ist technisch 24/7 verfügbar.
+                </span>
+              </div>
+            </div>
+
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Persönlichkeit speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── Tuning-Rules ── -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Eve trainieren</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Soft-Rules. Eve nutzt sie wenn Gast-Anfragen einen Trigger-Text enthalten.</p>
+
+        <form method="POST">
+          <input type="hidden" name="_action" value="tuning_rule_add" />
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="rule-trigger">Wenn Gast fragt nach</label>
+              <div class="field__input-wrap">
+                <input
+                  type="text" id="rule-trigger" name="trigger" required
+                  placeholder="z.B. restaurant-empfehlung"
+                  class="s-input ev-mono-input" autocomplete="off"
+                />
+                <span class="field__hint">Substring-Match (case-insensitive). Wenn die Gast-Anfrage diesen Text enthält, gilt diese Regel.</span>
+              </div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="rule-instruction">Antworte so</label>
+              <textarea
+                id="rule-instruction" name="instruction" required rows="3"
+                placeholder="z.B. 'Empfiehl immer erst unser hauseigenes Restaurant Maria.'"
+                class="s-input s-textarea"
+              ></textarea>
+            </div>
+            <div class="field field--row">
+              <label class="field__label" for="rule-model">Modell</label>
+              <div class="s-select-wrap">
+                <select id="rule-model" name="force_model" class="s-select">
+                  <option value="">Auto (Router entscheidet)</option>
+                  <option value="sonnet">Sonnet — sorgfältige Antworten</option>
+                  <option value="haiku">Haiku — schnelle, einfache Antworten</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">+ Regel hinzufügen</button>
+          </div>
+        </form>
+
+        {tuningRules.length === 0 && (
+          <p class="ev-empty-hint">Noch keine Regeln angelegt.</p>
+        )}
+
+        {tuningRules.length > 0 && (
+          <div class="ev-list">
+            {tuningRules.map((rule, index) => (
+              <article class="ev-item" x-data="{ editing: false }">
+                <div x-show="!editing" class="ev-item__view">
+                  <div class="ev-item__content">
+                    <p class="ev-rule-trigger">{rule.trigger}</p>
+                    <p class="ev-item__a">{rule.instruction}</p>
+                    {rule.force_model && (
+                      <span class="ev-model-badge">{rule.force_model}</span>
+                    )}
+                  </div>
+                  <div class="ev-item__actions">
+                    <button
+                      type="button" @click="editing = true"
+                      class="v9-btn v9-btn--ghost ev-action-btn"
+                    >Bearbeiten</button>
+                    <form method="POST" class="inline" onsubmit="return confirm('Diese Regel wirklich löschen?')">
+                      <input type="hidden" name="_action" value="tuning_rule_delete" />
+                      <input type="hidden" name="rule_index" value={index} />
+                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">Löschen</button>
+                    </form>
+                  </div>
+                </div>
+
+                <form x-show="editing" method="POST" x-cloak>
+                  <input type="hidden" name="_action" value="tuning_rule_update" />
+                  <input type="hidden" name="rule_index" value={index} />
+                  <div class="ev-item__edit-body">
+                    <div class="field field--row">
+                      <label class="field__label">Trigger</label>
+                      <input type="text" name="trigger" value={rule.trigger} required class="s-input ev-mono-input" />
+                    </div>
+                    <div class="field field--row">
+                      <label class="field__label">Instruction</label>
+                      <textarea name="instruction" required rows="3" class="s-input s-textarea">{rule.instruction}</textarea>
+                    </div>
+                    <div class="field field--row">
+                      <label class="field__label">Modell</label>
+                      <div class="s-select-wrap">
+                        <select name="force_model" class="s-select">
+                          <option value="" selected={!rule.force_model}>Auto</option>
+                          <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
+                          <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ev-item__edit-footer">
+                    <button type="submit" class="v9-btn">Speichern</button>
+                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                  </div>
+                </form>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+    </div>
   </div>
 </Layout>
 
 <style>
   [x-cloak] { display: none !important; }
+
+  /* Touch-target & active state (iPad) */
+  .v9-btn { min-height: 44px; }
+  .v9-btn:active:not(:disabled) { background: var(--te-yellow); color: #0A0A0A; }
+  .v9-btn.v9-btn--ghost:active:not(:disabled) { background: var(--bg-deep); color: var(--ink); }
+
+  /* Textarea / time input */
+  .s-textarea { resize: vertical; min-height: 80px; }
+  .ev-time-input { max-width: 120px; font-family: 'JetBrains Mono', monospace; }
+  .ev-mono-input { font-family: 'JetBrains Mono', monospace; }
+
+  /* Eve status row */
+  .ev-status-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+  }
+  .ev-status-info { display: flex; align-items: center; gap: 10px; }
+  .ev-status-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .ev-status-dot--on  { background: var(--sage); }
+  .ev-status-dot--off { background: var(--ink-faint); }
+  .ev-status-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; color: var(--ink-soft);
+  }
+  .ev-status-label--on { color: var(--ink); }
+
+  /* Read-only field row */
+  .ev-readonly-field {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--ink);
+  }
+
+  /* Rule item */
+  .ev-rule-trigger {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 500;
+    color: var(--ink); background: var(--bg-deep);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 2px 8px; display: inline-block; margin-bottom: 6px;
+  }
+  .ev-model-badge {
+    display: inline-block; margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.08em;
+    padding: 2px 8px; border-radius: var(--r-sm);
+    background: var(--te-yellow-soft); color: var(--ink);
+    border: 1px solid color-mix(in srgb, var(--te-yellow) 60%, transparent);
+  }
+
+  /* Shared list + item styles */
+  .ev-list {
+    border-top: 1px solid var(--border);
+    margin-top: 24px; padding-top: 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .ev-item {
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--bg);
+  }
+  .ev-item__view {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 16px;
+    padding: 14px 16px;
+  }
+  .ev-item__content { flex: 1; min-width: 0; }
+  .ev-item__a {
+    font-size: 13px; color: var(--ink-soft);
+    line-height: 1.55; margin: 0; white-space: pre-wrap;
+  }
+  .ev-item__actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  .ev-action-btn {
+    padding: 6px 12px !important; min-height: 36px !important; font-size: 10px !important;
+  }
+  .ev-action-btn--delete {
+    color: var(--burgund) !important;
+    border-color: color-mix(in srgb, var(--burgund) 30%, transparent) !important;
+  }
+  .ev-action-btn--delete:hover { background: var(--burgund-soft) !important; }
+
+  .ev-item__edit-body {
+    display: flex; flex-direction: column; gap: 16px; padding: 14px 16px 0;
+  }
+  .ev-item__edit-footer {
+    display: flex; gap: 8px; padding: 12px 16px;
+    border-top: 1px solid var(--border); margin-top: 14px;
+  }
+  .ev-empty-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-muted);
+    text-align: center; padding: 24px; margin: 16px 0 0;
+    border-top: 1px solid var(--border);
+  }
 </style>
+
+<script>
+  /* Radio-card active state (same pattern as /settings) */
+  document.querySelectorAll('[role="radiogroup"]').forEach(group => {
+    group.querySelectorAll<HTMLLabelElement>('.radio-card').forEach(card => {
+      const input = card.querySelector('input[type="radio"]') as HTMLInputElement;
+      card.addEventListener('click', () => {
+        group.querySelectorAll('.radio-card').forEach(c => c.classList.remove('is-active'));
+        card.classList.add('is-active');
+        if (input) input.checked = true;
+      });
+    });
+  });
+</script>

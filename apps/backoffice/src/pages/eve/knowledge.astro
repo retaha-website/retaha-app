@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { invalidateTranslationsForKnowledge } from '@retaha/eve';
@@ -198,155 +197,269 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 ---
 
 <Layout title="Eve · Wissen" activeTab="backoffice">
-  <div class="-mt-10">
-    <EditorialPageHeader
-      sectionNumber="06"
-      sectionLabel="Eve · KI-Concierge"
-      headlineLight="Eve's"
-      headlineBold="Wissen"
-      subtitle="Pflege Frage-Antwort-Paare, Hausregeln und Anfahrt. Eve nutzt das im Gast-Chat."
-    />
-  </div>
+  <div
+    class="settings-page"
+    x-data={`{ highlightId: ${JSON.stringify(highlightId)} }`}
+    x-init="if (highlightId) { setTimeout(() => { const el = document.getElementById('faq-' + highlightId); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 100); setTimeout(() => { highlightId = null }, 2500) }"
+  >
 
-  <EveSubNav currentPath={Astro.url.pathname} />
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/eve/knowledge" class="breadcrumb__crumb">Eve Concierge</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Wissen</span>
+    </nav>
 
-  <div class="max-w-3xl mx-auto px-6 pb-24" x-data={`{ highlightId: ${JSON.stringify(highlightId)} }`} x-init="if (highlightId) { setTimeout(() => { const el = document.getElementById('faq-' + highlightId); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 100); setTimeout(() => { highlightId = null }, 2500) }">
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">— EVE · KI-CONCIERGE —</span>
+      <h1 class="settings-hero__title">Eve's Wissen<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Pflege Frage-Antwort-Paare, Hausregeln und Anfahrt. Eve nutzt das im Gast-Chat.</p>
+    </section>
+
+    <EveSubNav currentPath={Astro.url.pathname} />
 
     {message && (
-      <div class={`mb-6 px-4 py-3 text-sm ${
-        message.type === 'success'
-          ? 'bg-green-50 border-l-4 border-green-700 text-green-800'
-          : 'bg-red-50 border-l-4 border-red-700 text-red-800'
-      }`}>
+      <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
         {message.text}
       </div>
     )}
 
-    <div class="mb-12 p-5 border-l-4 border-pink-shock/60 bg-anthrazit/5">
-      <p class="text-sm text-anthrazit/80 leading-relaxed">
-        <strong>Pflege dein Wissen auf {LANG_LABELS[hotelDefaultLang]}.</strong> Eve übersetzt
-        automatisch {otherEnabledLabel ? `für ${otherEnabledLabel}` : 'in alle aktivierten Gast-Sprachen'} —
-        und cached die Übersetzung für spätere Anfragen.
-      </p>
+    <div class="s-warning-row" style="margin-bottom: 20px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+      </svg>
+      <span>
+        <strong>Pflege dein Wissen auf {LANG_LABELS[hotelDefaultLang]}.</strong>
+        {otherEnabledLabel
+          ? ` Eve übersetzt automatisch für ${otherEnabledLabel}.`
+          : ' Eve übersetzt automatisch in alle aktivierten Gast-Sprachen.'}
+      </span>
     </div>
 
-    <!-- FAQ -->
-    <section class="mb-16">
-      <h2 class="text-2xl font-light mb-2">Häufige Fragen</h2>
-      <p class="text-sm text-anthrazit/55 mb-6">Q&A-Paare die Eve direkt beantworten kann.</p>
+    <div class="settings-sections">
 
-      <form method="POST" class="mb-8 p-5 border border-stein bg-white space-y-4">
-        <input type="hidden" name="_action" value="faq_create" />
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Frage</label>
-          <input type="text" name="question" required placeholder="z.B. Wann ist Check-out?"
-            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm"
-            autocomplete="off" />
+      <!-- ── FAQ ── -->
+      <section class="s-card" id="faq-section">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Häufige Fragen</h2>
+          <span class="s-card__num">FAQ</span>
         </div>
-        <div>
-          <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Antwort</label>
-          <textarea name="answer" required rows="3"
-            placeholder="z.B. 11:00 Uhr. Late-Check-out bis 13:00 für €15 möglich."
-            class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical"
-          ></textarea>
-        </div>
-        <button type="submit"
-          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">
-          + FAQ hinzufügen
-        </button>
-      </form>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Q&A-Paare die Eve direkt beantworten kann.</p>
 
-      {faqs.length === 0 && (
-        <p class="text-sm italic text-anthrazit/55 text-center py-8">Noch keine FAQs angelegt.</p>
-      )}
-
-      {faqs.map(faq => (
-        <article
-          id={`faq-${faq.id}`}
-          class="mb-3 border border-stein bg-white"
-          x-data={`{ editing: false, highlight: highlightId === '${faq.id}' }`}
-          x-init="if (highlight) { setTimeout(() => { highlight = false }, 2500) }"
-          :class="highlight ? 'border-pink-shock shadow-lg' : ''"
-        >
-          <div x-show="!editing" class="p-5">
-            <div class="flex justify-between items-start gap-4 mb-2">
-              <h3 class="font-medium text-anthrazit flex-1">{pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}</h3>
-              <div class="flex gap-2 shrink-0">
-                <button type="button" @click="editing = true"
-                  class="text-xs text-anthrazit/55 hover:text-pink-shock transition-colors">Bearbeiten</button>
-                <form method="POST" class="inline" onsubmit="return confirm('Diesen Eintrag wirklich löschen?')">
-                  <input type="hidden" name="_action" value="faq_delete" />
-                  <input type="hidden" name="id" value={faq.id} />
-                  <button type="submit"
-                    class="text-xs text-anthrazit/55 hover:text-red-600 transition-colors">Löschen</button>
-                </form>
-              </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="faq_create" />
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="faq-question">Frage</label>
+              <input
+                type="text" id="faq-question" name="question" required
+                placeholder="z.B. Wann ist Check-out?"
+                class="s-input" autocomplete="off"
+              />
             </div>
-            <p class="text-sm text-anthrazit/80 leading-relaxed whitespace-pre-wrap">{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</p>
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="faq-answer">Antwort</label>
+              <textarea
+                id="faq-answer" name="answer" required rows="3"
+                placeholder="z.B. 11:00 Uhr. Late-Check-out bis 13:00 für €15 möglich."
+                class="s-input s-textarea"
+              ></textarea>
+            </div>
           </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">+ FAQ hinzufügen</button>
+          </div>
+        </form>
 
-          <form x-show="editing" method="POST" class="p-5 space-y-4" x-cloak>
-            <input type="hidden" name="_action" value="faq_update" />
-            <input type="hidden" name="id" value={faq.id} />
-            <div>
-              <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Frage</label>
-              <input type="text" name="question" value={pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}
-                required class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm" />
-            </div>
-            <div>
-              <label class="block text-xs text-anthrazit/55 mb-1 uppercase tracking-wider">Antwort</label>
-              <textarea name="answer" required rows="3"
-                class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical"
-              >{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</textarea>
-            </div>
-            <div class="flex gap-3">
-              <button type="submit"
-                class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">Speichern</button>
-              <button type="button" @click="editing = false"
-                class="px-5 py-2 text-anthrazit/55 hover:text-anthrazit text-sm">Abbrechen</button>
-            </div>
-          </form>
-        </article>
-      ))}
-    </section>
+        {faqs.length === 0 && (
+          <p class="ev-empty-hint">Noch keine FAQs angelegt.</p>
+        )}
 
-    <!-- Hausregeln -->
-    <section class="mb-16">
-      <h2 class="text-2xl font-light mb-2">Hausregeln</h2>
-      <p class="text-sm text-anthrazit/55 mb-6">Frei-Text. Eve referenziert das wenn Gäste nach Regeln fragen (Rauchen, Haustiere, Ruhezeit, etc.).</p>
-      <form method="POST" class="space-y-4">
-        <input type="hidden" name="_action" value="rules_save" />
-        <textarea name="answer" rows="6"
-          placeholder="z.B. Rauchen ist im gesamten Hotel verboten. Haustiere sind willkommen (Anmeldung vor Anreise). Ruhezeit 22:00–07:00."
-          class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical bg-white"
-        >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
-        <button type="submit"
-          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">
-          Hausregeln speichern
-        </button>
-      </form>
-    </section>
+        {faqs.length > 0 && (
+          <div class="ev-list">
+            {faqs.map(faq => (
+              <article
+                id={`faq-${faq.id}`}
+                class="ev-item"
+                x-data={`{ editing: false, highlight: highlightId === '${faq.id}' }`}
+                x-init="if (highlight) { setTimeout(() => { highlight = false }, 2500) }"
+                :class="highlight ? 'ev-item--highlight' : ''"
+              >
+                <div x-show="!editing" class="ev-item__view">
+                  <div class="ev-item__content">
+                    <p class="ev-item__q">{pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}</p>
+                    <p class="ev-item__a">{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</p>
+                  </div>
+                  <div class="ev-item__actions">
+                    <button
+                      type="button" @click="editing = true"
+                      class="v9-btn v9-btn--ghost ev-action-btn"
+                    >Bearbeiten</button>
+                    <form method="POST" class="inline" onsubmit="return confirm('Diesen Eintrag wirklich löschen?')">
+                      <input type="hidden" name="_action" value="faq_delete" />
+                      <input type="hidden" name="id" value={faq.id} />
+                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">Löschen</button>
+                    </form>
+                  </div>
+                </div>
 
-    <!-- Anfahrt -->
-    <section class="mb-16">
-      <h2 class="text-2xl font-light mb-2">Anfahrt</h2>
-      <p class="text-sm text-anthrazit/55 mb-6">Wie kommt der Gast ans Hotel? ÖPNV-Tipps, Parkplatz-Info, Flughafen-Verbindung.</p>
-      <form method="POST" class="space-y-4">
-        <input type="hidden" name="_action" value="directions_save" />
-        <textarea name="answer" rows="6"
-          placeholder="z.B. Vom Flughafen BER: S-Bahn S9 bis Zoologischer Garten, dann U-Bahn U1 zur Uhlandstraße. Parkplätze im Innenhof (18€/Nacht)."
-          class="w-full px-3 py-2 border border-stein focus:border-pink-shock focus:outline-none text-sm resize-vertical bg-white"
-        >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
-        <button type="submit"
-          class="px-5 py-2 bg-anthrazit text-white text-sm font-medium hover:bg-pink-shock transition-colors">
-          Anfahrt speichern
-        </button>
-      </form>
-    </section>
+                <form x-show="editing" method="POST" x-cloak>
+                  <input type="hidden" name="_action" value="faq_update" />
+                  <input type="hidden" name="id" value={faq.id} />
+                  <div class="ev-item__edit-body">
+                    <div class="field field--row">
+                      <label class="field__label">Frage</label>
+                      <input
+                        type="text" name="question" required class="s-input"
+                        value={pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}
+                      />
+                    </div>
+                    <div class="field field--row">
+                      <label class="field__label">Antwort</label>
+                      <textarea name="answer" required rows="3" class="s-input s-textarea"
+                      >{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</textarea>
+                    </div>
+                  </div>
+                  <div class="ev-item__edit-footer">
+                    <button type="submit" class="v9-btn">Speichern</button>
+                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                  </div>
+                </form>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
+      <!-- ── Hausregeln ── -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Hausregeln</h2>
+        </div>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Frei-Text. Eve referenziert das wenn Gäste nach Regeln fragen (Rauchen, Haustiere, Ruhezeit, etc.).</p>
+
+        <form method="POST">
+          <input type="hidden" name="_action" value="rules_save" />
+          <div class="s-card__body">
+            <textarea
+              name="answer" rows="6"
+              placeholder="z.B. Rauchen ist im gesamten Hotel verboten. Haustiere sind willkommen (Anmeldung vor Anreise). Ruhezeit 22:00–07:00."
+              class="s-input s-textarea"
+            >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Hausregeln speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── Anfahrt ── -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Anfahrt</h2>
+        </div>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">Wie kommt der Gast ans Hotel? ÖPNV-Tipps, Parkplatz-Info, Flughafen-Verbindung.</p>
+
+        <form method="POST">
+          <input type="hidden" name="_action" value="directions_save" />
+          <div class="s-card__body">
+            <textarea
+              name="answer" rows="6"
+              placeholder="z.B. Vom Flughafen BER: S-Bahn S9 bis Zoologischer Garten, dann U-Bahn U1 zur Uhlandstraße. Parkplätze im Innenhof (18€/Nacht)."
+              class="s-input s-textarea"
+            >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Anfahrt speichern</button>
+          </div>
+        </form>
+      </section>
+
+    </div>
   </div>
 </Layout>
 
 <style>
   [x-cloak] { display: none !important; }
+
+  /* Touch-target & active state (iPad) */
+  .v9-btn { min-height: 44px; }
+  .v9-btn:active:not(:disabled) { background: var(--te-yellow); color: #0A0A0A; }
+  .v9-btn.v9-btn--ghost:active:not(:disabled) { background: var(--bg-deep); color: var(--ink); }
+
+  /* Textarea variant */
+  .s-textarea { resize: vertical; min-height: 80px; }
+
+  /* FAQ List */
+  .ev-list {
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ev-item {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    transition: border-color 300ms ease, box-shadow 300ms ease;
+  }
+  .ev-item--highlight {
+    border-color: var(--pink) !important;
+    box-shadow: 0 0 0 3px rgba(255, 74, 130, 0.12);
+  }
+
+  .ev-item__view {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+  }
+  .ev-item__content { flex: 1; min-width: 0; }
+  .ev-item__q {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--ink); margin: 0 0 6px;
+  }
+  .ev-item__a {
+    font-size: 13px; color: var(--ink-soft);
+    line-height: 1.55; margin: 0;
+    white-space: pre-wrap;
+  }
+  .ev-item__actions {
+    display: flex; gap: 6px; flex-shrink: 0; align-items: center;
+  }
+
+  .ev-action-btn {
+    padding: 6px 12px !important;
+    min-height: 36px !important;
+    font-size: 10px !important;
+  }
+  .ev-action-btn--delete {
+    color: var(--burgund) !important;
+    border-color: color-mix(in srgb, var(--burgund) 30%, transparent) !important;
+  }
+  .ev-action-btn--delete:hover { background: var(--burgund-soft) !important; }
+
+  .ev-item__edit-body {
+    display: flex; flex-direction: column; gap: 16px;
+    padding: 14px 16px 0;
+  }
+  .ev-item__edit-footer {
+    display: flex; gap: 8px; padding: 12px 16px;
+    border-top: 1px solid var(--border); margin-top: 14px;
+  }
+
+  .ev-empty-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-muted);
+    text-align: center; padding: 24px; margin: 16px 0 0;
+    border-top: 1px solid var(--border);
+  }
 </style>

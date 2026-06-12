@@ -71,97 +71,175 @@ if (rows.length > 0 && stayIds.length > 0) {
 ---
 
 <Layout title="Eve · Feedback" activeTab="backoffice">
-  <EveSubNav currentPath={Astro.url.pathname} />
+  <div class="settings-page">
 
-  <div class="ev-page">
-    <header class="ev-header">
-      <p class="ev-eyebrow">— Eve · Feedback —</p>
-      <h1 class="ev-title">Wie kommt Eve bei deinen Gästen an<span class="ev-dot">?</span></h1>
-      <p class="ev-sub">Gäste können einzelne Antworten mit Daumen hoch/runter bewerten. Filter unten zeigt was schief läuft.</p>
-    </header>
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/eve/knowledge" class="breadcrumb__crumb">Eve Concierge</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Feedback</span>
+    </nav>
 
-    <div class="ev-tabs">
-      <a href="?filter=negative" class={`ev-tab${filter === -1 ? ' is-active' : ''}`}>
-        👎 Nicht hilfreich <span class="ev-tab-counter">({negativeCount ?? 0})</span>
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">— EVE · KI-CONCIERGE —</span>
+      <h1 class="settings-hero__title">Eve's Feedback<span class="dot-pink">?</span></h1>
+      <p class="settings-hero__sub">Gäste können einzelne Antworten mit Daumen hoch/runter bewerten. Filter zeigt was schief läuft.</p>
+    </section>
+
+    <EveSubNav currentPath={Astro.url.pathname} />
+
+    <!-- Filter-Tabs -->
+    <div class="evf-tabs">
+      <a href="?filter=negative" class={`evf-tab${filter === -1 ? ' is-active' : ''}`}>
+        <span class="evf-tab-icon">👎</span>
+        Nicht hilfreich
+        <span class="evf-tab-count">{negativeCount ?? 0}</span>
       </a>
-      <a href="?filter=positive" class={`ev-tab${filter === 1 ? ' is-active' : ''}`}>
-        👍 Hilfreich <span class="ev-tab-counter">({positiveCount ?? 0})</span>
+      <a href="?filter=positive" class={`evf-tab${filter === 1 ? ' is-active' : ''}`}>
+        <span class="evf-tab-icon">👍</span>
+        Hilfreich
+        <span class="evf-tab-count">{positiveCount ?? 0}</span>
       </a>
     </div>
 
     {rows.length === 0 ? (
-      <div class="ev-empty">
+      <div class="evf-empty">
         <p>{filter === -1
-          ? 'Keine negativen Bewertungen. Eve macht ihren Job ✓'
+          ? 'Keine negativen Bewertungen — Eve macht ihren Job ✓'
           : 'Noch keine positiven Bewertungen.'}
         </p>
       </div>
     ) : (
-      <div class="ev-list">
+      <div class="settings-sections">
         {rows.map((r: any) => {
           const prior = priorByMessageId[r.message?.id];
-          const guestName = r.stay?.guest ? [r.stay.guest.first_name, r.stay.guest.last_name].filter(Boolean).join(' ') : 'Gast';
+          const guestName = r.stay?.guest
+            ? [r.stay.guest.first_name, r.stay.guest.last_name].filter(Boolean).join(' ')
+            : 'Gast';
+          const dateStr = new Date(r.created_at).toLocaleString('de-DE', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+          });
           return (
-            <article class="ev-card">
-              <div class="ev-card-head">
-                <span class={`ev-rating-badge ev-rating-badge--${r.rating === 1 ? 'pos' : 'neg'}`}>
+            <article class="s-card evf-card">
+              <div class="s-card__head">
+                <span class={`evf-badge evf-badge--${r.rating === 1 ? 'pos' : 'neg'}`}>
                   {r.rating === 1 ? '👍 Hilfreich' : '👎 Nicht hilfreich'}
                 </span>
-                <span class="ev-card-meta">{guestName} · {new Date(r.created_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span class="s-card__num">{guestName} · {dateStr}</span>
               </div>
-              {prior && (
-                <div class="ev-prior">
-                  <p class="ev-prior-label">Gast fragte:</p>
-                  <p class="ev-prior-text">„{prior.content}"</p>
+
+              <div class="s-card__body">
+                {prior && (
+                  <div class="evf-msg evf-msg--user">
+                    <p class="evf-msg-label">Gast fragte:</p>
+                    <p class="evf-msg-text">„{prior.content}"</p>
+                  </div>
+                )}
+                <div class="evf-msg evf-msg--eve">
+                  <p class="evf-msg-label">Eve antwortete:</p>
+                  <p class="evf-msg-text">{r.message?.content ?? '(Message gelöscht)'}</p>
                 </div>
-              )}
-              <div class="ev-message">
-                <p class="ev-message-label">Eve antwortete:</p>
-                <p class="ev-message-text">{r.message?.content ?? '(Message gelöscht)'}</p>
+                {r.optional_comment && (
+                  <div class="evf-msg evf-msg--comment">
+                    <p class="evf-msg-label">Gast-Kommentar:</p>
+                    <p class="evf-msg-text">„{r.optional_comment}"</p>
+                  </div>
+                )}
               </div>
-              {r.optional_comment && (
-                <div class="ev-comment">
-                  <p class="ev-comment-label">Gast-Kommentar:</p>
-                  <p class="ev-comment-text">„{r.optional_comment}"</p>
-                </div>
-              )}
             </article>
           );
         })}
       </div>
     )}
+
   </div>
-
-  <style>
-    .ev-page { max-width: 900px; margin: 0 auto; padding: 0 24px 60px; }
-    .ev-header { margin: 20px 0 24px; }
-    .ev-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin: 0 0 6px; }
-    .ev-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; letter-spacing: -0.01em; }
-    .ev-dot { color: var(--theme-accent); }
-    .ev-sub { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
-
-    .ev-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--theme-border); }
-    .ev-tab { padding: 10px 14px; font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-    .ev-tab:hover { color: var(--theme-text-primary); }
-    .ev-tab.is-active { color: var(--theme-text-primary); border-bottom-color: var(--theme-accent); font-weight: 500; }
-    .ev-tab-counter { color: color-mix(in srgb, var(--theme-text-primary) .4, transparent); margin-left: 4px; font-size: 12px; }
-
-    .ev-empty { padding: 60px 24px; background: var(--theme-bg-primary); border: 1px dashed var(--theme-border); text-align: center; font-style: italic; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
-
-    .ev-list { display: flex; flex-direction: column; gap: 12px; }
-    .ev-card { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 16px; }
-    .ev-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
-    .ev-rating-badge { font-size: 11px; padding: 4px 10px; letter-spacing: 0.04em; }
-    .ev-rating-badge--pos { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
-    .ev-rating-badge--neg { background: #fdeaea; color: #7a1515; border: 1px solid #f3b8b8; }
-    .ev-card-meta { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); }
-
-    .ev-prior, .ev-message, .ev-comment { padding: 8px 12px; margin: 8px 0; font-size: 14px; }
-    .ev-prior { background: color-mix(in srgb, var(--theme-text-primary) .04, transparent); border-left: 3px solid color-mix(in srgb, var(--theme-text-primary) .3, transparent); }
-    .ev-message { background: rgba(var(--theme-accent-rgb), .04); border-left: 3px solid var(--theme-accent); }
-    .ev-comment { background: #fff8e1; border-left: 3px solid #f5d77a; }
-    .ev-prior-label, .ev-message-label, .ev-comment-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin: 0 0 4px; }
-    .ev-prior-text, .ev-message-text, .ev-comment-text { margin: 0; line-height: 1.5; color: var(--theme-text-primary); }
-    .ev-prior-text, .ev-comment-text { font-style: italic; }
-  </style>
 </Layout>
+
+<style>
+  /* Filter-Tabs */
+  .evf-tabs {
+    display: flex; gap: 0; margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .evf-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 20px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 400;
+    color: var(--ink-muted); text-decoration: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 150ms, border-color 150ms;
+    min-height: 44px;
+  }
+  .evf-tab:hover { color: var(--ink); }
+  .evf-tab.is-active {
+    color: var(--ink); border-bottom-color: var(--ink);
+    font-weight: 500;
+  }
+  .evf-tab-icon { font-size: 15px; }
+  .evf-tab-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; padding: 1px 7px;
+    border-radius: var(--r-pill);
+    background: var(--bg-deep); color: var(--ink-muted);
+  }
+  .evf-tab.is-active .evf-tab-count {
+    background: var(--ink); color: var(--bg);
+  }
+
+  /* Empty state */
+  .evf-empty {
+    padding: 60px 24px;
+    background: var(--surface); border: 1px dashed var(--border);
+    border-radius: var(--r); text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink-muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* Feedback card */
+  .evf-card .s-card__head { align-items: center; }
+
+  .evf-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.04em;
+    padding: 4px 10px; border-radius: var(--r-sm);
+  }
+  .evf-badge--pos {
+    background: var(--sage-soft); color: var(--sage-strong);
+    border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
+  }
+  .evf-badge--neg {
+    background: var(--burgund-soft); color: var(--burgund);
+    border: 1px solid color-mix(in srgb, var(--burgund) 30%, transparent);
+  }
+
+  /* Message blocks */
+  .evf-msg {
+    padding: 10px 14px; border-radius: var(--r-sm);
+  }
+  .evf-msg--user {
+    background: var(--bg-deep);
+    border-left: 3px solid var(--border-medium);
+  }
+  .evf-msg--eve {
+    background: var(--te-yellow-soft);
+    border-left: 3px solid var(--te-yellow);
+  }
+  .evf-msg--comment {
+    background: var(--sage-soft);
+    border-left: 3px solid color-mix(in srgb, var(--sage) 50%, transparent);
+  }
+  .evf-msg-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-muted); margin: 0 0 5px;
+  }
+  .evf-msg-text {
+    margin: 0; font-size: 14px; line-height: 1.55;
+    color: var(--ink);
+  }
+  .evf-msg--user .evf-msg-text,
+  .evf-msg--comment .evf-msg-text { font-style: italic; }
+</style>
