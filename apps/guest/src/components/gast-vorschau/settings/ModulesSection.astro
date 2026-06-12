@@ -1,4 +1,14 @@
 ---
+interface Props {
+  features?: Record<string, unknown>;
+}
+const { features = {} } = Astro.props;
+
+// Same logic as guest Startseite: key !== false → on (undefined/null/true → on)
+function isOn(key: string): boolean {
+  return features[key] !== false;
+}
+
 const groups = [
   {
     label: 'Gäste-Services',
@@ -48,14 +58,14 @@ const groups = [
               <span class="module-row__sub">{mod.sub}</span>
             </div>
             <button
-              class="module-toggle is-on"
+              class:list={['module-toggle', { 'is-on': isOn(mod.key) }]}
               data-module-key={mod.key}
-              aria-pressed="true"
+              aria-pressed={String(isOn(mod.key))}
               aria-label={`${mod.label} ein/aus`}
               type="button"
             >
               <span class="module-toggle__led"></span>
-              <span class="module-toggle__label">an</span>
+              <span class="module-toggle__label">{isOn(mod.key) ? 'an' : 'aus'}</span>
             </button>
           </div>
         ))}
@@ -110,7 +120,7 @@ const groups = [
   import { updateState, getState } from '../../../lib/gast-vorschau/state';
   type ModuleKey = keyof ReturnType<typeof getState>['modules'];
   document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const key = btn.dataset.moduleKey as ModuleKey | undefined;
       if (!key) return;
       const current = getState().modules;
@@ -120,6 +130,11 @@ const groups = [
       const lbl = btn.querySelector('.module-toggle__label');
       if (lbl) lbl.textContent = newVal ? 'an' : 'aus';
       updateState({ modules: { ...current, [key]: newVal } });
+      await fetch('/api/hotel/save-modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: newVal }),
+      });
     });
   });
 </script>
