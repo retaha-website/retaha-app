@@ -14,7 +14,6 @@ if (!token) return new Response('Token fehlt', { status: 400 });
 const url = new URL(Astro.request.url);
 const persona = url.searchParams.get('persona') ?? 'in_house';
 const langParam = url.searchParams.get('lang');
-const isV2 = url.searchParams.get('ui') === 'v2';
 
 // Showcase- oder Echtdaten laden
 let ctx: any = null;
@@ -233,6 +232,9 @@ const labels = {
     labelOptional: 'optional', labelPreis: 'PREIS', labelGesamt: 'Gesamt',
     submitRoom: 'Aufs Zimmer bestellen',
     ctaPickDate: 'Datum wählen', ctaPickTime: 'Uhrzeit wählen',
+    bookingPeopleSingular: 'Person',
+    sectionWaehlen: 'Wählen', sectionAendern: 'Ändern',
+    sectionUeberspringen: 'Überspringen', sectionFertig: 'Fertig',
   },
   en: {
     pageTitle: `${hotel.name} · Breakfast`,
@@ -273,6 +275,9 @@ const labels = {
     labelOptional: 'optional', labelPreis: 'PRICE', labelGesamt: 'Total',
     submitRoom: 'Order to room',
     ctaPickDate: 'Choose date', ctaPickTime: 'Choose time',
+    bookingPeopleSingular: 'person',
+    sectionWaehlen: 'Choose', sectionAendern: 'Edit',
+    sectionUeberspringen: 'Skip', sectionFertig: 'Done',
   },
   fr: {
     pageTitle: `${hotel.name} · Petit-déjeuner`,
@@ -311,6 +316,9 @@ const labels = {
     labelOptional: 'facultatif', labelPreis: 'PRIX', labelGesamt: 'Total',
     submitRoom: 'Commander en chambre',
     ctaPickDate: 'Choisir une date', ctaPickTime: "Choisir l'heure",
+    bookingPeopleSingular: 'personne',
+    sectionWaehlen: 'Choisir', sectionAendern: 'Modifier',
+    sectionUeberspringen: 'Passer', sectionFertig: 'Terminé',
   },
   es: {
     pageTitle: `${hotel.name} · Desayuno`,
@@ -349,6 +357,9 @@ const labels = {
     labelOptional: 'opcional', labelPreis: 'PRECIO', labelGesamt: 'Total',
     submitRoom: 'Pedir a la habitación',
     ctaPickDate: 'Elegir fecha', ctaPickTime: 'Elegir hora',
+    bookingPeopleSingular: 'persona',
+    sectionWaehlen: 'Elegir', sectionAendern: 'Editar',
+    sectionUeberspringen: 'Omitir', sectionFertig: 'Listo',
   },
   it: {
     pageTitle: `${hotel.name} · Colazione`,
@@ -387,6 +398,9 @@ const labels = {
     labelOptional: 'opzionale', labelPreis: 'PREZZO', labelGesamt: 'Totale',
     submitRoom: 'Ordina in camera',
     ctaPickDate: 'Scegli data', ctaPickTime: 'Scegli orario',
+    bookingPeopleSingular: 'persona',
+    sectionWaehlen: 'Scegli', sectionAendern: 'Modifica',
+    sectionUeberspringen: 'Salta', sectionFertig: 'Fatto',
   },
   pt: {
     pageTitle: `${hotel.name} · Pequeno-almoço`,
@@ -425,6 +439,9 @@ const labels = {
     labelOptional: 'opcional', labelPreis: 'PREÇO', labelGesamt: 'Total',
     submitRoom: 'Pedir ao quarto',
     ctaPickDate: 'Escolha a data', ctaPickTime: 'Escolha a hora',
+    bookingPeopleSingular: 'pessoa',
+    sectionWaehlen: 'Escolher', sectionAendern: 'Editar',
+    sectionUeberspringen: 'Saltar', sectionFertig: 'Pronto',
   },
   nl: {
     pageTitle: `${hotel.name} · Ontbijt`,
@@ -463,6 +480,9 @@ const labels = {
     labelOptional: 'optioneel', labelPreis: 'PRIJS', labelGesamt: 'Totaal',
     submitRoom: 'Bestel op kamer',
     ctaPickDate: 'Kies datum', ctaPickTime: 'Kies tijd',
+    bookingPeopleSingular: 'persoon',
+    sectionWaehlen: 'Kies', sectionAendern: 'Aanpassen',
+    sectionUeberspringen: 'Overslaan', sectionFertig: 'Klaar',
   },
   ru: {
     pageTitle: `${hotel.name} · Завтрак`,
@@ -501,6 +521,9 @@ const labels = {
     labelOptional: 'необяз.', labelPreis: 'ЦЕНА', labelGesamt: 'Итого',
     submitRoom: 'Заказать в номер',
     ctaPickDate: 'Выберите дату', ctaPickTime: 'Выберите время',
+    bookingPeopleSingular: 'человек',
+    sectionWaehlen: 'Выбрать', sectionAendern: 'Изменить',
+    sectionUeberspringen: 'Пропустить', sectionFertig: 'Готово',
   },
   ar: {
     pageTitle: `${hotel.name} · الإفطار`,
@@ -539,6 +562,9 @@ const labels = {
     labelOptional: 'اختياري', labelPreis: 'السعر', labelGesamt: 'الإجمالي',
     submitRoom: 'اطلب للغرفة',
     ctaPickDate: 'اختر التاريخ', ctaPickTime: 'اختر الوقت',
+    bookingPeopleSingular: 'شخص',
+    sectionWaehlen: 'اختر', sectionAendern: 'تعديل',
+    sectionUeberspringen: 'تخطي', sectionFertig: 'تم',
   },
   zh: {
     pageTitle: `${hotel.name} · 早餐`,
@@ -577,6 +603,9 @@ const labels = {
     labelOptional: '可选', labelPreis: '价格', labelGesamt: '总计',
     submitRoom: '送至房间',
     ctaPickDate: '选择日期', ctaPickTime: '选择时间',
+    bookingPeopleSingular: '人',
+    sectionWaehlen: '选择', sectionAendern: '修改',
+    sectionUeberspringen: '跳过', sectionFertig: '完成',
   },
 };
 const l = labels[lk];
@@ -612,7 +641,6 @@ const sheetData = {
   menuItems: localizedItems,
   allergenLabels,
   allergenKeys: ALLERGEN_KEYS,
-  isV2,
 };
 ---
 
@@ -627,8 +655,8 @@ const sheetData = {
       *, *::before, *::after { box-sizing: border-box; }
 
       :root {
-        --accent:      #FF4A82;
-        --accent-soft: rgba(255,74,130,0.10);
+        --accent:      #0A0A0A;
+        --accent-soft: rgba(10,10,10,0.08);
         --ink:         #0F0F0D;
         --ink-muted:   #6B6B63;
         --ink-faint:   #A8A8A0;
@@ -708,64 +736,11 @@ const sheetData = {
       .tab-btn.active, .tab-btn[data-active="true"] { color: var(--ink); border-bottom-color: var(--ink); }
       .tab-btn:hover { color: var(--ink); }
 
-      /* ── Section label ──────────────────────────────────────────────── */
-      .section-label {
-        font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
-        font-weight: 500; text-transform: uppercase;
-        color: var(--ink-faint); margin: 0 0 10px;
-        padding-bottom: 8px; border-bottom: 1px solid var(--border);
-      }
-
-      /* ── Chip row + chips ───────────────────────────────────────────── */
-      .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-      .chip {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 8px 14px; min-height: 38px;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; font-family: var(--display); font-size: 14px;
-        font-weight: 500; color: var(--ink); cursor: pointer;
-        transition: border-color 0.12s, background 0.12s, color 0.12s;
-        white-space: nowrap;
-      }
-      .chip:hover { border-color: var(--accent); }
-      .chip[data-active="true"] {
-        background: var(--accent); border-color: var(--accent); color: #fff;
-      }
-      .chip-sub {
-        font-family: var(--mono); font-size: 10px;
-        letter-spacing: 0.06em; color: inherit; opacity: 0.65;
-      }
-      .chip[data-active="true"] .chip-sub { opacity: 0.85; }
-
-      /* ── Booking section ────────────────────────────────────────────── */
-      .booking-section { margin-bottom: 22px; }
-
-      /* ── Textarea ───────────────────────────────────────────────────── */
-      .booking-textarea {
-        width: 100%; padding: 12px 14px;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; font-family: var(--display); font-size: 14px;
-        color: var(--ink); resize: none; outline: none;
-        transition: border-color 0.12s;
-      }
-      .booking-textarea:focus { border-color: var(--accent); }
-
       /* ── Error ──────────────────────────────────────────────────────── */
       .booking-error {
         padding: 10px 14px; background: #FFF0F0; border: 1px solid #F5C6C6;
-        border-radius: 6px; color: #8C2128; font-size: 13px; margin-bottom: 14px;
+        border-radius: 6px; color: #8C2128; font-size: 13px;
       }
-
-      /* ── Submit button ──────────────────────────────────────────────── */
-      .submit-btn {
-        width: 100%; padding: 15px; border: none; border-radius: 10px;
-        background: var(--ink); color: var(--bg);
-        font-family: var(--display); font-size: 15px; font-weight: 600;
-        letter-spacing: -0.01em; cursor: pointer;
-        transition: background 0.14s;
-      }
-      .submit-btn:hover:not(:disabled) { background: var(--accent); }
-      .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
       /* ── Status card ────────────────────────────────────────────────── */
       .status-card { text-align: center; padding: 8px 0 24px; }
@@ -880,24 +855,7 @@ const sheetData = {
         margin-top: 16px; line-height: 1.4;
       }
 
-      /* ── v2 Card Form ───────────────────────────────────────────────── */
-      .v2-card {
-        background: white; border: 1px solid var(--border);
-        border-radius: 12px; overflow: hidden; margin-bottom: 16px;
-      }
-      .v2-row {
-        padding: 13px 16px; border-bottom: 1px solid var(--border);
-      }
-      .v2-row:last-child { border-bottom: none; }
-      .v2-row-label {
-        display: flex; align-items: center; gap: 6px;
-        font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
-        font-weight: 600; text-transform: uppercase;
-        color: var(--ink-faint); margin-bottom: 9px;
-      }
-      .v2-row-label-opt {
-        font-weight: 400; font-size: 8px; opacity: 0.8; letter-spacing: 0.08em;
-      }
+      /* ── Shared chips (Design D + legacy) ──────────────────────────── */
       .v2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
       .v2-chip {
         display: inline-flex; align-items: center; gap: 5px;
@@ -910,48 +868,101 @@ const sheetData = {
         transition: border-color 80ms, background 80ms, color 80ms;
       }
       .v2-chip:active { transform: scale(0.96); }
-      .v2-chip[data-active="true"] {
-        background: #0A0A0A; border-color: #0A0A0A; color: #fff;
+      .v2-chip[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+      .chip-sub {
+        font-family: var(--mono); font-size: 10px;
+        letter-spacing: 0.06em; color: inherit; opacity: 0.65;
       }
+      .v2-chip[data-active="true"] .chip-sub { opacity: 0.75; }
       .v2-textarea {
         width: 100%; padding: 2px 0; margin: 0;
         background: transparent; border: none;
         font-family: var(--display); font-size: 14px;
         color: var(--ink); resize: none; outline: none;
-        min-height: 26px; overflow: hidden;
-        field-sizing: content;
+        min-height: 26px; overflow: hidden; field-sizing: content;
       }
       .v2-textarea::placeholder { color: var(--ink-faint); }
-      .v2-room-input {
-        width: 100%; padding: 4px 0; margin: 0;
-        background: transparent; border: none; border-bottom: 1px solid var(--border);
-        font-family: var(--display); font-size: 14px;
-        color: var(--ink); outline: none;
+
+      /* ── Design D: Collapsing sections + Sticky bar ─────────────────── */
+      .d-sections { display: grid; gap: 10px; padding-bottom: 130px; }
+      .d-section-open {
+        background: white; border: 1.5px solid var(--ink);
+        border-radius: 12px; padding: 14px 14px 16px;
       }
-      .v2-room-input::placeholder { color: var(--ink-faint); }
-      .v2-room-input:focus { border-bottom-color: var(--ink); }
-      .v2-submit-incomplete {
-        display: block; width: 100%; margin-top: 12px;
-        padding: 15px 20px; background: transparent; color: var(--ink-muted);
-        border: 1.5px solid var(--border); border-radius: 10px;
-        font-family: var(--mono); font-size: 10px;
-        letter-spacing: 0.14em; text-transform: uppercase;
+      .d-section-label {
+        display: flex; align-items: center; gap: 6px;
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+        font-weight: 600; text-transform: uppercase;
+        color: var(--ink-faint); margin-bottom: 10px;
+      }
+      .d-section-label-opt { font-weight: 400; font-size: 8px; opacity: 0.8; }
+      .d-row {
+        width: 100%; display: flex; align-items: center; gap: 10px;
+        text-align: left; background: white; border: 1px solid var(--border);
+        border-radius: 12px; padding: 13px 14px;
+        cursor: pointer; transition: border-color 0.12s;
+        font-family: var(--display); color: var(--ink); font-size: 14px;
+      }
+      .d-row:hover { border-color: #C0BCB5; }
+      .d-row-check { color: var(--accent); font-size: 13px; line-height: 1; flex-shrink: 0; }
+      .d-row-spacer { width: 13px; flex-shrink: 0; }
+      .d-row-value { font-weight: 600; flex: 1; }
+      .d-row-empty { color: var(--ink-muted); flex: 1; display: flex; align-items: center; gap: 5px; }
+      .d-row-opt { font-size: 11px; color: var(--ink-faint); }
+      .d-row-action {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--ink-faint); margin-left: auto; flex-shrink: 0;
+      }
+      .d-skip {
+        background: none; border: none; padding: 10px 2px 0;
+        font-family: var(--display); font-size: 13px; color: var(--ink-muted);
+        cursor: pointer;
+      }
+      .d-skip:hover { color: var(--ink); }
+      .d-done {
+        background: none; border: none; padding: 10px 2px 0;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--accent); cursor: pointer;
+      }
+
+      /* Sticky summary bar */
+      .d-sticky {
+        position: sticky; bottom: 0;
+        background: white; border-top: 1px solid var(--border);
+        padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 8px);
+        display: flex; align-items: center; gap: 12px;
+        margin-top: 4px;
+      }
+      .d-sticky-price { flex-shrink: 0; min-width: 80px; }
+      .d-sticky-label {
+        font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--ink-faint);
+      }
+      .d-sticky-total {
+        font-family: var(--display); font-size: 20px; font-weight: 700;
+        color: var(--ink); line-height: 1.1;
+      }
+      .d-sticky-sub { font-size: 10px; color: var(--ink-muted); margin-top: 1px; }
+      .d-sticky-cta { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+      .d-cta-incomplete {
+        width: 100%; padding: 13px 14px; background: transparent;
+        color: var(--ink-muted); border: 1.5px dashed #CFCBC1;
+        border-radius: 10px; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 0.12em; text-transform: uppercase;
         font-weight: 500; cursor: default; text-align: center;
       }
-      .v2-submit-complete {
-        display: block; width: 100%; margin-top: 12px;
-        padding: 15px 20px; background: #0A0A0A; color: white;
+      .d-cta-complete {
+        width: 100%; padding: 13px 14px; background: #0A0A0A; color: white;
         border: none; border-radius: 10px;
-        font-family: var(--display); font-size: 15px; font-weight: 600;
-        letter-spacing: -0.01em; cursor: pointer;
-        transition: background 0.14s;
-        -webkit-tap-highlight-color: transparent;
+        font-family: var(--display); font-size: 14px; font-weight: 700;
+        cursor: pointer; text-align: center;
+        transition: background 0.14s; -webkit-tap-highlight-color: transparent;
       }
-      .v2-submit-complete:hover { background: #2A2A2A; }
-      .v2-submit-complete:active { background: var(--accent); }
+      .d-cta-complete:hover { background: #2A2A2A; }
+      .d-cta-complete:active { background: var(--accent); }
 
       @media (prefers-reduced-motion: reduce) {
-        .chip, .submit-btn, .filter-chip, .v2-chip, .v2-submit-complete { transition: none; }
+        .v2-chip, .d-cta-complete, .filter-chip { transition: none; }
       }
     </style>
   </head>
@@ -1040,7 +1051,7 @@ const sheetData = {
             </div>
           </template>
 
-          <!-- View: Formular -->
+          <!-- View: Formular (Design D) -->
           <template x-if="view === 'form'">
             <div>
               <template x-if="availableDates.length === 0">
@@ -1055,264 +1066,204 @@ const sheetData = {
                   </div>
                 </div>
               </template>
-              <form @submit.prevent="submitBooking()" x-show="!isV2 && availableDates.length > 0">
 
-                <!-- Wann -->
-                <div class="booking-section">
-                  <div class="section-label" x-text="labels.whenLabel"></div>
-                  <div class="chip-row">
-                    <template x-for="(date, i) in availableDates" :key="date.iso">
-                      <button type="button" class="chip"
-                        :data-active="form.date === date.iso"
-                        @click="setDate(date.iso)">
-                        <span x-text="dateLabels[i]"></span>
-                        <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
-                      </button>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- Personen -->
-                <div class="booking-section">
-                  <div class="section-label" x-text="labels.peopleLabel"></div>
-                  <div class="chip-row">
-                    <template x-for="n in peopleOptions" :key="n">
-                      <button type="button" class="chip"
-                        :data-active="form.people === n"
-                        @click="form.people = n"
-                        x-text="n">
-                      </button>
-                    </template>
-                    <button type="button" class="chip"
-                      :data-active="form.people > 4"
-                      @click="form.people = 5">5+</button>
-                  </div>
-                </div>
-
-                <!-- Uhrzeit -->
-                <div class="booking-section">
-                  <div class="section-label" x-text="labels.timeLabel"></div>
-                  <div class="chip-row">
-                    <template x-for="slot in slots" :key="slot">
-                      <button type="button" class="chip"
-                        :data-active="form.time === slot"
-                        @click="form.time = slot"
-                        x-text="slot">
-                      </button>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- Tisch -->
-                <div class="booking-section">
-                  <div class="section-label" x-text="labels.tableLabel"></div>
-                  <div class="chip-row">
-                    <template x-for="opt in tableOptions" :key="opt.value">
-                      <button type="button" class="chip"
-                        :data-active="form.table_preference === opt.value"
-                        @click="form.table_preference = opt.value"
-                        x-text="opt.label">
-                      </button>
-                    </template>
-                  </div>
-                </div>
-
-                <!-- Wo? (nur wenn roomServiceEnabled) -->
-                <div class="booking-section" x-show="roomServiceEnabled">
-                  <div class="section-label" x-text="labels.deliveryLabel"></div>
-                  <div class="chip-row">
-                    <button type="button" class="chip"
-                      :data-active="form.delivery === 'table'"
-                      @click="form.delivery = 'table'"
-                      x-text="labels.deliveryTable">
-                    </button>
-                    <button type="button" class="chip"
-                      :data-active="form.delivery === 'room'"
-                      @click="form.delivery = 'room'"
-                      x-text="labels.deliveryRoom">
-                    </button>
-                  </div>
-                  <div x-show="form.delivery === 'room'" style="margin-top:12px">
-                    <div class="section-label" x-text="labels.roomNumberLabel"></div>
-                    <input type="text" class="booking-textarea"
-                      style="resize:none;height:auto;padding:10px 14px"
-                      x-model="form.room_number"
-                      :placeholder="labels.roomNumberLabel">
-                  </div>
-                </div>
-
-                <!-- Notizen -->
-                <div class="booking-section">
-                  <div class="section-label" x-text="labels.notesLabel"></div>
-                  <textarea class="booking-textarea" rows="3"
-                    :placeholder="labels.notesPlaceholder"
-                    x-model="form.notes">
-                  </textarea>
-                </div>
-
-                <!-- Preis-Anzeige -->
-                <div x-show="totalPrice !== null" style="margin-bottom:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:baseline">
-                  <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)" x-text="priceCents !== null && roomServiceFeeCents > 0 && form.delivery === 'room' ? labels.priceRoomFee : labels.priceSuffix"></span>
-                  <span style="font-size:16px;font-weight:600;color:var(--ink)" x-text="formatPrice(totalPrice)"></span>
-                </div>
-                <!-- Buffet-Badge: priceCents===0 = im Paket enthalten, kein Einzelpreis -->
-                <div x-show="priceCents === 0" style="margin-bottom:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center">
-                  <span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 10px;border-radius:4px;font-family:var(--mono);letter-spacing:0.05em" x-text="labels.buffetIncluded"></span>
-                </div>
-
-                <div x-show="errorMsg" class="booking-error" x-text="errorMsg"></div>
-
-                <button type="submit" class="submit-btn"
-                  :disabled="!canSubmit || submitting"
-                  x-text="submitting ? labels.submitting : labels.submit">
-                </button>
-              </form>
-
-              <!-- ── v2 Form ──────────────────────────────────────────── -->
-              <div x-show="isV2 && availableDates.length > 0">
-                <div class="v2-card">
+              <!-- Design D: Collapsing Sections + Sticky Summary -->
+              <div x-show="availableDates.length > 0">
+                <div class="d-sections">
 
                   <!-- DATUM -->
-                  <div class="v2-row">
-                    <div class="v2-row-label" x-text="labels.labelDatum"></div>
-                    <div class="v2-chips">
-                      <template x-for="(date, i) in availableDates" :key="date.iso">
-                        <button type="button" class="v2-chip"
-                          :data-active="form.date === date.iso"
-                          @click="setDate(date.iso)">
-                          <span x-text="dateLabels[i]"></span>
-                          <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
-                        </button>
-                      </template>
+                  <div data-dsection="datum">
+                    <div class="d-section-open" x-show="dOpen === 'datum'">
+                      <div class="d-section-label" x-text="labels.labelDatum"></div>
+                      <div class="v2-chips">
+                        <template x-for="(date, i) in availableDates" :key="date.iso">
+                          <button type="button" class="v2-chip"
+                            :data-active="form.date === date.iso"
+                            @click="setDate(date.iso); dNext('datum')">
+                            <span x-text="dateLabels[i]"></span>
+                            <span class="chip-sub" x-text="formatDateShort(date.iso)"></span>
+                          </button>
+                        </template>
+                      </div>
                     </div>
+                    <button type="button" class="d-row" x-show="dOpen !== 'datum'" @click="dOpen = 'datum'">
+                      <span class="d-row-check" x-show="form.date">✓</span>
+                      <span class="d-row-spacer" x-show="!form.date"></span>
+                      <span class="d-row-value" x-show="form.date" x-text="dSummaryDate"></span>
+                      <span class="d-row-empty" x-show="!form.date" x-text="labels.ctaPickDate"></span>
+                      <span class="d-row-action" x-text="form.date ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
                   </div>
 
                   <!-- PERSONEN -->
-                  <div class="v2-row">
-                    <div class="v2-row-label" x-text="labels.labelPersonen"></div>
-                    <div class="v2-chips">
-                      <template x-for="n in peopleOptions" :key="n">
+                  <div data-dsection="personen">
+                    <div class="d-section-open" x-show="dOpen === 'personen'">
+                      <div class="d-section-label" x-text="labels.labelPersonen"></div>
+                      <div class="v2-chips">
+                        <template x-for="n in peopleOptions" :key="n">
+                          <button type="button" class="v2-chip"
+                            :data-active="form.people === n"
+                            @click="form.people = n; dNext('personen')">
+                            <span x-text="n"></span>
+                          </button>
+                        </template>
                         <button type="button" class="v2-chip"
-                          :data-active="form.people === n"
-                          @click="form.people = n"
-                          x-text="n">
-                        </button>
-                      </template>
-                      <button type="button" class="v2-chip"
-                        :data-active="form.people > 4"
-                        @click="form.people = 5">5+</button>
+                          :data-active="form.people > 4"
+                          @click="form.people = 5; dNext('personen')">5+</button>
+                      </div>
                     </div>
+                    <button type="button" class="d-row" x-show="dOpen !== 'personen'" @click="dOpen = 'personen'">
+                      <span class="d-row-check">✓</span>
+                      <span class="d-row-value" x-text="dSummaryPeople"></span>
+                      <span class="d-row-action" x-text="labels.sectionAendern"></span>
+                    </button>
                   </div>
 
                   <!-- UHRZEIT -->
-                  <div class="v2-row">
-                    <div class="v2-row-label" x-text="labels.labelUhrzeit"></div>
-                    <div class="v2-chips">
-                      <template x-for="slot in slots" :key="slot">
-                        <button type="button" class="v2-chip"
-                          :data-active="form.time === slot"
-                          @click="form.time = slot"
-                          x-text="slot">
-                        </button>
-                      </template>
+                  <div data-dsection="uhrzeit">
+                    <div class="d-section-open" x-show="dOpen === 'uhrzeit'">
+                      <div class="d-section-label" x-text="labels.labelUhrzeit"></div>
+                      <div class="v2-chips">
+                        <template x-for="slot in slots" :key="slot">
+                          <button type="button" class="v2-chip"
+                            :data-active="form.time === slot"
+                            @click="form.time = slot; dNext('uhrzeit')"
+                            x-text="slot">
+                          </button>
+                        </template>
+                        <span x-show="slots.length === 0" style="font-size:13px;color:var(--ink-muted)" x-text="labels.noFutureDates"></span>
+                      </div>
                     </div>
+                    <button type="button" class="d-row" x-show="dOpen !== 'uhrzeit'" @click="dOpen = 'uhrzeit'">
+                      <span class="d-row-check" x-show="form.time">✓</span>
+                      <span class="d-row-spacer" x-show="!form.time"></span>
+                      <span class="d-row-value" x-show="form.time" x-text="form.time"></span>
+                      <span class="d-row-empty" x-show="!form.time" x-text="labels.ctaPickTime"></span>
+                      <span class="d-row-action" x-text="form.time ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
                   </div>
 
                   <!-- TISCH (optional) -->
-                  <div class="v2-row">
-                    <div class="v2-row-label">
-                      <span x-text="labels.labelTisch"></span>
-                      <span class="v2-row-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                  <div data-dsection="tisch">
+                    <div class="d-section-open" x-show="dOpen === 'tisch'">
+                      <div class="d-section-label">
+                        <span x-text="labels.labelTisch"></span>
+                        <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                      </div>
+                      <div class="v2-chips">
+                        <template x-for="opt in tableOptions" :key="opt.value">
+                          <button type="button" class="v2-chip"
+                            :data-active="form.table_preference === opt.value"
+                            @click="form.table_preference = opt.value; dNext('tisch')"
+                            x-text="opt.label">
+                          </button>
+                        </template>
+                      </div>
+                      <button type="button" class="d-skip" @click="dNext('tisch')" x-text="labels.sectionUeberspringen"></button>
                     </div>
-                    <div class="v2-chips">
-                      <template x-for="opt in tableOptions" :key="opt.value">
-                        <button type="button" class="v2-chip"
-                          :data-active="form.table_preference === opt.value"
-                          @click="form.table_preference = opt.value"
-                          x-text="opt.label">
-                        </button>
-                      </template>
-                    </div>
+                    <button type="button" class="d-row" x-show="dOpen !== 'tisch'" @click="dOpen = 'tisch'">
+                      <span class="d-row-check" x-show="form.table_preference && form.table_preference !== 'any'">✓</span>
+                      <span class="d-row-spacer" x-show="!form.table_preference || form.table_preference === 'any'"></span>
+                      <span class="d-row-value" x-show="form.table_preference && form.table_preference !== 'any'" x-text="tableLabelFor(form.table_preference)"></span>
+                      <span class="d-row-empty" x-show="!form.table_preference || form.table_preference === 'any'">
+                        <span x-text="labels.labelTisch"></span>
+                        <span class="d-row-opt" x-text="labels.labelOptional"></span>
+                      </span>
+                      <span class="d-row-action" x-text="form.table_preference && form.table_preference !== 'any' ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
                   </div>
 
                   <!-- ORT (nur wenn roomServiceEnabled) -->
-                  <div class="v2-row" x-show="roomServiceEnabled">
-                    <div class="v2-row-label" x-text="labels.labelOrt"></div>
-                    <div class="v2-chips">
-                      <button type="button" class="v2-chip"
-                        :data-active="form.delivery === 'table'"
-                        @click="form.delivery = 'table'"
-                        x-text="labels.deliveryTable">
-                      </button>
-                      <button type="button" class="v2-chip"
-                        :data-active="form.delivery === 'room'"
-                        @click="form.delivery = 'room'"
-                        x-text="labels.deliveryRoom">
-                      </button>
+                  <div x-show="roomServiceEnabled" data-dsection="ort">
+                    <div class="d-section-open" x-show="roomServiceEnabled && dOpen === 'ort'">
+                      <div class="d-section-label" x-text="labels.labelOrt"></div>
+                      <div class="v2-chips">
+                        <button type="button" class="v2-chip"
+                          :data-active="form.delivery === 'table'"
+                          @click="form.delivery = 'table'; dNext('ort')"
+                          x-text="labels.deliveryTable">
+                        </button>
+                        <button type="button" class="v2-chip"
+                          :data-active="form.delivery === 'room'"
+                          @click="form.delivery = 'room'; dNext('ort')"
+                          x-text="labels.deliveryRoom">
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  <!-- ZIMMER (nur wenn delivery=room) -->
-                  <div class="v2-row" x-show="roomServiceEnabled && form.delivery === 'room'">
-                    <div class="v2-row-label" x-text="labels.roomNumberLabel"></div>
-                    <input type="text" class="v2-room-input"
-                      x-model="form.room_number"
-                      :placeholder="labels.roomNumberLabel">
+                    <button type="button" class="d-row" x-show="roomServiceEnabled && dOpen !== 'ort'" @click="dOpen = 'ort'">
+                      <span class="d-row-check">✓</span>
+                      <span class="d-row-value" x-text="form.delivery === 'room' ? labels.deliveryRoom : labels.deliveryTable"></span>
+                      <span class="d-row-action" x-text="labels.sectionAendern"></span>
+                    </button>
                   </div>
 
                   <!-- HINWEIS (optional) -->
-                  <div class="v2-row">
-                    <div class="v2-row-label">
-                      <span x-text="labels.labelHinweis"></span>
-                      <span class="v2-row-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                  <div data-dsection="hinweis">
+                    <div class="d-section-open" x-show="dOpen === 'hinweis'">
+                      <div class="d-section-label">
+                        <span x-text="labels.labelHinweis"></span>
+                        <span class="d-section-label-opt" x-text="'· ' + labels.labelOptional"></span>
+                      </div>
+                      <textarea class="v2-textarea" rows="2"
+                        :placeholder="labels.notesPlaceholder"
+                        x-model="form.notes"
+                        @input="$el.style.height='auto'; $el.style.height=$el.scrollHeight+'px'">
+                      </textarea>
+                      <button type="button" class="d-done" @click="dOpen = null" x-text="labels.sectionFertig"></button>
                     </div>
-                    <textarea class="v2-textarea" rows="1"
-                      :placeholder="labels.notesPlaceholder"
-                      x-model="form.notes"
-                      @input="$el.style.height='auto'; $el.style.height=$el.scrollHeight+'px'">
-                    </textarea>
-                  </div>
-
-                  <!-- PREIS -->
-                  <div class="v2-row" x-show="totalPrice !== null">
-                    <div class="v2-row-label" x-text="labels.labelPreis"></div>
-                    <p style="margin:0;font-size:14px;color:var(--ink);line-height:1.6">
-                      <span x-text="formatPrice(priceCents)"></span><span style="color:var(--ink-muted)" x-text="' ' + labels.priceSuffix + ' · '"></span><span style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-faint)" x-text="labels.labelGesamt + ' '"></span><strong x-text="formatPrice(totalPrice)"></strong>
-                    </p>
-                    <p x-show="roomServiceEnabled && form.delivery === 'room' && roomServiceFeeCents > 0"
-                      style="margin:4px 0 0;font-size:11px;color:var(--ink-muted)" x-text="labels.priceRoomFee"></p>
-                  </div>
-
-                  <!-- BUFFET badge -->
-                  <div class="v2-row" x-show="priceCents === 0">
-                    <span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 10px;border-radius:4px;font-family:var(--mono);letter-spacing:0.05em" x-text="labels.buffetIncluded"></span>
+                    <button type="button" class="d-row" x-show="dOpen !== 'hinweis'" @click="dOpen = 'hinweis'">
+                      <span class="d-row-check" x-show="form.notes.trim()">✓</span>
+                      <span class="d-row-spacer" x-show="!form.notes.trim()"></span>
+                      <span class="d-row-value" x-show="form.notes.trim()" x-text="dSummaryHinweis"></span>
+                      <span class="d-row-empty" x-show="!form.notes.trim()">
+                        <span x-text="labels.labelHinweis"></span>
+                        <span class="d-row-opt" x-text="labels.labelOptional"></span>
+                      </span>
+                      <span class="d-row-action" x-text="form.notes.trim() ? labels.sectionAendern : labels.sectionWaehlen"></span>
+                    </button>
                   </div>
 
                 </div>
 
-                <div x-show="errorMsg" class="booking-error" x-text="errorMsg" style="margin-top:12px"></div>
+                <div x-show="errorMsg" class="booking-error" x-text="errorMsg" style="margin-bottom:8px"></div>
 
-                <!-- CTA: unvollständig = Outline-Hinweis -->
-                <button type="button" class="v2-submit-incomplete"
-                  x-show="!canSubmit && !submitting"
-                  x-text="!form.date ? labels.ctaPickDate : (!form.time ? labels.ctaPickTime : labels.roomNumberLabel)">
-                </button>
-                <!-- CTA: vollständig = Ink-filled, delivery-aware Label -->
-                <button type="button" class="v2-submit-complete"
-                  x-show="canSubmit && !submitting"
-                  @click="submitBooking()"
-                  x-text="roomServiceEnabled && form.delivery === 'room' ? labels.submitRoom : labels.submit">
-                </button>
-                <!-- CTA: wird verarbeitet -->
-                <button type="button" class="v2-submit-complete"
-                  x-show="submitting"
-                  disabled
-                  style="opacity:0.6;cursor:not-allowed"
-                  x-text="labels.submitting">
-                </button>
+                <!-- Sticky summary + CTA -->
+                <div class="d-sticky">
+                  <div class="d-sticky-price">
+                    <template x-if="totalPrice !== null && priceCents > 0">
+                      <div>
+                        <div class="d-sticky-label" x-text="labels.labelGesamt"></div>
+                        <div class="d-sticky-total" x-text="formatPrice(totalPrice)"></div>
+                        <div class="d-sticky-sub" x-show="form.people > 0">
+                          <span x-text="formatPrice(priceCents) + ' / ' + (form.people === 1 ? labels.bookingPeopleSingular : labels.bookingPeople)"></span>
+                          <span x-show="roomServiceEnabled && form.delivery === 'room' && roomServiceFeeCents > 0" x-text="' · ' + labels.priceRoomFee"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="priceCents === 0">
+                      <div class="d-sticky-label" x-text="labels.buffetIncluded"></div>
+                    </template>
+                  </div>
+                  <div class="d-sticky-cta">
+                    <button type="button" class="d-cta-incomplete"
+                      x-show="!canSubmit && !submitting"
+                      x-text="!form.date ? labels.ctaPickDate : (!form.time ? labels.ctaPickTime : labels.submit)">
+                    </button>
+                    <button type="button" class="d-cta-complete"
+                      x-show="canSubmit && !submitting"
+                      @click="submitBooking()"
+                      x-text="roomServiceEnabled && form.delivery === 'room' ? labels.submitRoom : labels.submit">
+                    </button>
+                    <button type="button" class="d-cta-complete"
+                      x-show="submitting"
+                      disabled
+                      style="opacity:0.6;cursor:not-allowed"
+                      x-text="labels.submitting">
+                    </button>
+                  </div>
+                </div>
 
               </div>
-
             </div>
           </template>
 
@@ -1424,7 +1375,7 @@ const sheetData = {
         roomServiceFeeCents: initial.roomServiceFeeCents ?? 0,
         hotelCurrency: initial.hotelCurrency ?? 'EUR',
         slotsPerWeekday: initial.slotsPerWeekday ?? null,
-        isV2: initial.isV2 === true,
+        dOpen: 'datum' as string | null,
         includedText: initial.includedText || '',
         location: initial.location || '',
 
@@ -1566,7 +1517,6 @@ const sheetData = {
 
         get canSubmit() {
           if (!this.form.date || !this.form.time || this.form.people <= 0) return false;
-          if (this.roomServiceEnabled && this.form.delivery === 'room' && !this.form.room_number.trim()) return false;
           return true;
         },
 
@@ -1593,8 +1543,45 @@ const sheetData = {
           return opt ? opt.label : value;
         },
 
+        dNext(current: string) {
+          const order = ['datum', 'personen', 'uhrzeit', 'tisch', 'ort', 'hinweis'];
+          const idx = order.indexOf(current);
+          let next: string | null = null;
+          for (let i = idx + 1; i < order.length; i++) {
+            if (order[i] === 'ort' && !this.roomServiceEnabled) continue;
+            next = order[i];
+            break;
+          }
+          this.dOpen = next;
+          if (next) {
+            this.$nextTick(() => {
+              document.querySelector(`[data-dsection="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+          }
+        },
+
+        get dSummaryDate() {
+          if (!this.form.date) return '';
+          const idx = (this.availableDates as any[]).findIndex((d: any) => d.iso === this.form.date);
+          const label = idx >= 0 ? (this.dateLabels as any[])[idx] : '';
+          const short = this.formatDateShort(this.form.date);
+          return label ? `${label} · ${short}` : short;
+        },
+
+        get dSummaryPeople() {
+          const n = this.form.people;
+          if (!n) return '';
+          return `${n} ${n === 1 ? this.labels.bookingPeopleSingular : this.labels.bookingPeople}`;
+        },
+
+        get dSummaryHinweis() {
+          const t = this.form.notes.trim();
+          return t.length > 40 ? t.slice(0, 40) + '…' : t;
+        },
+
         startRebook() {
           this.form = { date: (this.availableDates as any[])[0]?.iso || '', people: 2, time: '', table_preference: 'any', delivery: 'table' as const, room_number: String(initial.roomNumber ?? ''), notes: '' };
+          this.dOpen = 'datum';
           this.existingBooking = null;
           this.view = 'form';
         },
