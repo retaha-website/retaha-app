@@ -21,15 +21,11 @@ const { data: hotelLangRow } = await client
   .from('hotels').select('default_language, enabled_languages')
   .eq('id', hotel.id).maybeSingle();
 const hotelDefaultLang = (hotelLangRow?.default_language as string | undefined) ?? 'de';
-const hotelEnabledLangs: string[] = Array.isArray(hotelLangRow?.enabled_languages)
-  ? hotelLangRow.enabled_languages : ['de','en','fr','es'];
 const LANG_LABELS: Record<string, string> = {
   de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
   it: 'Italiano', pt: 'Português', nl: 'Nederlands',
   ru: 'Русский', ar: 'العربية', zh: '中文',
 };
-const otherEnabledLabel = hotelEnabledLangs.filter(l => l !== hotelDefaultLang)
-  .map(l => LANG_LABELS[l] || l).join(', ');
 
 const NOW = () => new Date().toISOString();
 const makeI18nEntry = (value: string) => ({ value, source: 'original', updated_at: NOW() });
@@ -248,9 +244,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     <nav class="breadcrumb" aria-label="Breadcrumb">
       <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/eve/knowledge" class="breadcrumb__crumb">Eve Concierge</a>
-      <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Wissen</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Eve Concierge</span>
     </nav>
 
     <section class="settings-hero">
