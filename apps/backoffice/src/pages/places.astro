@@ -622,11 +622,18 @@ if (savedParam === 'pick_added' && !message) {
     // Drag & Drop — exakt wie breakfast.astro (Pointer Events auf window, kein setPointerCapture wegen iOS)
     A.data('picksSort', function () {
       return {
+        _listEl: null,   // captured in init: $el = div.picks-list (NOT the drag-handle span)
         dragItem: null,
         dragTarget: null,
         _ptrItem: null,
         _ptrMoveHandler: null,
         _ptrUpHandler: null,
+
+        init: function () {
+          // @pointerdown auf span.pc-drag ergibt $el = span → querySelectorAll findet nichts.
+          // init() wird mit el = div.picks-list ausgewertet → $el ist hier korrekt.
+          this._listEl = this.$el;
+        },
 
         dndPtrDown: function (e, pickId) {
           e.preventDefault();
@@ -668,7 +675,8 @@ if (savedParam === 'pick_added' && !message) {
         },
 
         _dndPerform: async function (targetId) {
-          var list = this.$el;
+          var list = this._listEl;
+          if (!list) { this.dragItem = null; this.dragTarget = null; return; }
           var items = Array.from(list.querySelectorAll('[data-pick-id]'));
           var fromEl = items.find(function (el) { return el.dataset.pickId === this.dragItem; }, this);
           var toEl   = items.find(function (el) { return el.dataset.pickId === targetId; });
