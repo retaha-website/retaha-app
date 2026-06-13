@@ -353,9 +353,9 @@ if (savedParam === 'pick_added' && !message) {
                   x-data={`pickCardRefresh('${pick.id}', ${JSON.stringify(currentNote)})`}
                   :class={`{'pc-drag-over': dragTarget === '${pick.id}', 'pc-dragging': dragItem === '${pick.id}'}`}
                 >
-                  <!-- Photo -->
+                  <!-- Photo (cinematic) -->
                   <div
-                    class="pc-photo"
+                    class:list={['pc-photo', !photoUrl && 'pc-photo--nophoto']}
                     role="img"
                     aria-label={cd.name ?? ''}
                     style={photoUrl ? `background-image:url(${photoUrl})` : undefined}
@@ -381,20 +381,15 @@ if (savedParam === 'pick_added' && !message) {
                         {cd.rating} · {cd.user_ratings_total ?? 0}
                       </span>
                     )}
-                    {openNow !== null && (
-                      <span class={openNow ? 'pc-status pc-status--open' : 'pc-status pc-status--closed'}>
-                        {openNow ? 'GEÖFFNET' : 'GESCHLOSSEN'}
-                      </span>
-                    )}
+                    <div class="pc-cap">
+                      <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
+                      <div class="pc-addr">{cd.formatted_address ?? ''}</div>
+                    </div>
                   </div>
 
                   <!-- Body -->
                   <div class="pc-body">
                     <div class="pc-toprow">
-                      <div class="pc-info">
-                        <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
-                        <div class="pc-addr">{cd.formatted_address ?? ''}</div>
-                      </div>
                       <div class="pc-kebab-wrap">
                         <button
                           type="button"
@@ -888,11 +883,18 @@ if (savedParam === 'pick_added' && !message) {
   .pc.pc-dragging { opacity: 0.4; }
 
   .pc-photo {
-    position: relative; aspect-ratio: 16/10; width: 100%;
-    background: #4a3f33 center/cover no-repeat;
-    /* Foto auf Karten-Radius zuschneiden (hier, nicht auf .pc, damit Dropdown frei ist) */
+    position: relative; height: 210px; width: 100%;
+    background: #1a1a1a center/cover no-repeat;
     border-radius: 11px 11px 0 0; overflow: hidden;
   }
+  .pc-photo::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(8,8,8,.86) 0%, rgba(8,8,8,.5) 40%, rgba(8,8,8,.32) 72%, rgba(8,8,8,.32) 100%);
+  }
+  .pc-photo--nophoto {
+    background: radial-gradient(120% 120% at 80% 0%, #2a3344 0%, #0A0A0A 60%);
+  }
+  .pc-photo--nophoto::after { display: none; }
   .pc-rank {
     position: absolute; top: 9px; left: 9px;
     font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px;
@@ -907,26 +909,26 @@ if (savedParam === 'pick_added' && !message) {
   .pc-drag:active { cursor: grabbing; }
   .pc-drag svg { pointer-events: none; }
   .pc-rating {
-    position: absolute; bottom: 9px; left: 9px;
+    position: absolute; bottom: 9px; right: 9px;
     font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600;
     color: #fff; background: rgba(10,10,10,.6); backdrop-filter: blur(5px);
     padding: 2px 7px; border-radius: 5px; display: flex; align-items: center; gap: 4px; line-height: 1;
   }
   .pc-rating-star { color: #FFE600; display: flex; align-items: center; }
   .pc-rating-star svg { width: 11px; height: 11px; display: block; }
-  .pc-status {
-    position: absolute; bottom: 9px; right: 9px;
-    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: .06em;
-    padding: 3px 7px; border-radius: 5px; color: #fff; backdrop-filter: blur(5px);
+  .pc-cap { position: absolute; left: 9px; right: 76px; bottom: 9px; z-index: 3; }
+  .pc-name {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px;
+    line-height: 1.15; color: #fff; text-shadow: 0 1px 10px rgba(0,0,0,.55);
   }
-  .pc-status--open   { background: rgba(92,144,112,.85); }
-  .pc-status--closed { background: rgba(10,10,10,.55); }  /* neutral dark — kein Burgund */
+  .pc-addr {
+    font-size: 11px; color: #fff; opacity: 0.82; margin-top: 3px;
+    text-shadow: 0 1px 8px rgba(0,0,0,.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   .pc-body { padding: 11px 12px 12px; }
-  .pc-toprow { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .pc-info { min-width: 0; flex: 1; }
-  .pc-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; line-height: 1.2; }
-  .pc-addr { font-size: 11px; color: var(--ink-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-toprow { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 
   /* Kebab menu */
   .pc-kebab-wrap { position: relative; flex: 0 0 auto; }
@@ -1043,5 +1045,5 @@ if (savedParam === 'pick_added' && !message) {
     box-shadow: 0 4px 14px rgba(0,0,0,.28);
     transition: transform .15s ease;
   }
-  .nb-add:hover { transform: scale(1.06); }
+  .nb-add:hover { background: #FFE600; color: #0A0A0A; transform: scale(1.06); }
 </style>
