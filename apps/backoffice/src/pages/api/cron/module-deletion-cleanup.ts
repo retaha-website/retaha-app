@@ -58,37 +58,56 @@ async function deleteModuleData(
     }
 
     case 'marketing': {
-      // Reihenfolge: Drips → Steps + State via CASCADE, dann Campaigns → Sends via CASCADE
-      // marketing_drip_steps und marketing_drip_state cascaden aus marketing_drips (drip_id FK)
-      // marketing_sends cascadet aus marketing_campaigns (campaign_id FK)
-      // templates zuletzt (marketing_drip_steps.template_id ON DELETE RESTRICT)
+      // Reihenfolge ist zwingend durch zwei FK-Constraints:
+      //
+      // 1. marketing_drips löschen ZUERST:
+      //    drip_id-FK (ON DELETE CASCADE) → löscht marketing_drip_steps automatisch.
+      //    Das ist kritisch, weil marketing_drip_steps.template_id → marketing_templates
+      //    ON DELETE RESTRICT ist: Templates können NICHT gelöscht werden solange noch
+      //    drip_steps auf sie zeigen. Der CASCADE über drips macht den Weg frei.
+      //
+      // 2. marketing_templates ZULETZT (nachdem drip_steps bereits weg sind).
+      //
+      // marketing_consents (wallet_pass_id FK): kein direkter hotel_id-Bezug,
+      // werden bei wallet-Löschung kaskadiert oder bleiben erhalten wenn nur marketing
+      // gelöscht wird (Consent-Records für noch aktive wallet_passes).
+
+      // Schritt 1: Drips → CASCADE löscht drip_steps (drip_id) + drip_state (drip_id)
       await sb.from('marketing_drips').delete().eq('hotel_id', hotelId);
-      // → CASCADE: marketing_drip_steps (drip_id), marketing_drip_state (drip_id)
+
+      // Schritt 2: Campaigns → CASCADE löscht marketing_sends (campaign_id)
       await sb.from('marketing_campaigns').delete().eq('hotel_id', hotelId);
-      // → CASCADE: marketing_sends (campaign_id)
+
+      // Schritt 3: Templates — jetzt sicher, weil drip_steps (RESTRICT) bereits weg
       await sb.from('marketing_templates').delete().eq('hotel_id', hotelId);
-      // marketing_consents: wallet_pass_id FK — werden bei wallet-Löschung kaskadiert
-      // oder bleiben erhalten wenn nur marketing gelöscht wird (keine direkte hotel_id)
       break;
     }
 
     case 'wallet': {
+      // CASCADE-SCHUTZ: wallet_passes löschen reißt via wallet_pass_id-FKs
+      // automatisch marketing_consents, marketing_sends, marketing_drip_state mit.
+      // Das ist nur akzeptabel wenn marketing EBENFALLS in diesem Lauf gelöscht wird.
+      //
+      // Wenn NUR wallet weg ist (marketing noch aktiv): wallet_passes-ZEILE
+      // NICHT löschen — würde DSGVO-Einwilligungen (marketing_consents) und
+      // aktive Drip-States mitreißen. Stattdessen: PII anonymisieren, Zeile erhalten.
       const marketingAlsoDeleted = allModulesThisHotel.includes('marketing');
 
       if (marketingAlsoDeleted) {
-        // Marketing wurde bereits in dieser Runde gelöscht.
-        // Löschen der wallet_passes cascadet noch verbleibende:
-        //   marketing_consents (wallet_pass_id), marketing_sends (wallet_pass_id),
-        //   marketing_drip_state (wallet_pass_id) — alle bereits via marketing-Schritt weg.
+        // Marketing wurde bereits in dieser Runde gelöscht (DELETE_ORDER stellt das sicher).
+        // CASCADE via wallet_pass_id räumt verbleibende Einträge auf:
+        //   marketing_consents, marketing_sends, marketing_drip_state
+        // (alle bereits via marketing-Schritt weg — CASCADE ist Sicherheitsnetz).
         await sb.from('wallet_passes').delete().eq('hotel_id', hotelId);
       } else {
-        // Marketing ist noch aktiv! wallet_passes NICHT löschen — würde
-        // marketing_consents/sends/drip_state kaskadiert mitreißen.
-        // Stattdessen: PII-Felder nullen, Pass-Status auf 'expired' setzen.
+        // Marketing ist NOCH AKTIV → wallet_passes-Zeilen bleiben erhalten.
+        // Nur PII-Felder nullen + Status auf 'expired' → Wallet funktioniert nicht mehr,
+        // aber marketing_consents/sends/drip_state bleiben via FK intakt.
         console.warn(
           `[module-deletion] wallet ohne marketing für hotel=${hotelId} → anonymisiere statt lösche`,
         );
-        await sb.from('wallet_passes')
+        await sb
+          .from('wallet_passes')
           .update({
             guest_email: 'deleted@retaha.invalid',
             guest_first_name: null,
