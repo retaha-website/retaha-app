@@ -97,7 +97,7 @@ interface CatData {
   picks: { id: string; place_id: string; name: string; rating?: number; userRatingCount?: number;
            priceLevel?: string; address?: string; photoUrl?: string; hotelNote?: string; walkingMin?: number }[];
   auto:  { place_id: string; name: string; rating?: number; userRatingCount?: number;
-           address?: string; photoUrl?: string; walkingMin?: number }[];
+           address?: string; photoUrl?: string; walkingMin?: number; openNow?: boolean | null }[];
 }
 
 const PRICE: Record<string, string> = {
@@ -129,12 +129,13 @@ for (const tab of LOGICAL_TABS) {
     return ((cacheRow?.cached_places ?? []) as any[])
       .filter(p => !pickIds.has(p.placeId))
       .map(p => {
-        const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 200) : undefined;
+        const photo = p.photoNames?.[0] ? buildPhotoUrl(p.photoNames[0], 680) : undefined;
         let wm: number | undefined;
         if (hotelLat != null && hotelLng != null && p.location?.lat && p.location?.lng)
           wm = walkingMinutes(haversineMeters({ lat: hotelLat, lng: hotelLng }, p.location));
         return { place_id: p.placeId, name: p.name, rating: p.rating,
-                 userRatingCount: p.userRatingCount, address: p.formattedAddress, photoUrl: photo, walkingMin: wm };
+                 userRatingCount: p.userRatingCount, address: p.formattedAddress, photoUrl: photo,
+                 walkingMin: wm, openNow: (p.openNow as boolean | undefined) ?? null };
       });
   }).sort((a, b) => {
     const r = (b.rating ?? 0) - (a.rating ?? 0);
@@ -186,6 +187,8 @@ const labels = {
   noPicks:       _l({ de: 'Noch keine Hotel-Empfehlungen.', en: 'No hotel picks yet.', fr: 'Pas encore de coups de cœur.', es: 'Aún sin favoritos del hotel.', it: 'Ancora nessun consiglio dell\'hotel.', pt: 'Ainda sem dicas do hotel.', nl: 'Nog geen hoteltips.', ru: 'Пока нет советов от отеля.', ar: 'لا توصيات من الفندق بعد.', zh: '暂无酒店推荐。' }),
   noNearby:      _l({ de: 'Keine weiteren Orte gefunden.', en: 'No other places found.', fr: 'Aucun autre lieu trouvé.', es: 'No se encontraron otros lugares.', it: 'Nessun altro posto trovato.', pt: 'Nenhum outro lugar encontrado.', nl: 'Geen andere plaatsen gevonden.', ru: 'Других мест не найдено.', ar: 'لم يتم العثور على أماكن أخرى.', zh: '未找到其他地方。' }),
   showMore:      _l({ de: 'Weitere anzeigen', en: 'Show more', fr: 'Voir plus', es: 'Ver más', it: 'Mostra altro', pt: 'Ver mais', nl: 'Meer tonen', ru: 'Показать ещё', ar: 'عرض المزيد', zh: '显示更多' }),
+  open:          _l({ de: 'Geöffnet', en: 'Open', fr: 'Ouvert', es: 'Abierto', it: 'Aperto', pt: 'Aberto', nl: 'Geopend', ru: 'Открыто', ar: 'مفتوح', zh: '营业中' }),
+  closed:        _l({ de: 'Geschlossen', en: 'Closed', fr: 'Fermé', es: 'Cerrado', it: 'Chiuso', pt: 'Fechado', nl: 'Gesloten', ru: 'Закрыто', ar: 'مغلق', zh: '已关闭' }),
 };
 
 const TAB_LABELS: Record<TabKey, string> = {
@@ -341,30 +344,52 @@ function walkLabel(min: number | undefined): string {
         line-height: 1.45;
       }
 
-      /* ── Auto list (nearby) ───────────────────────────────────────────── */
-      .place-list { margin: 0; padding: 0; }
-      .place-item {
-        display: flex; gap: 12px; align-items: center;
-        padding: 12px 0; border-bottom: 1px solid var(--border);
-        cursor: pointer;
+      /* ── Cinematic nearby cards ───────────────────────────────────────── */
+      .nearby-list { display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 0; }
+      .nearby-card {
+        position: relative; height: 212px; border-radius: 18px; overflow: hidden;
+        background-color: #0A0A0A; background-size: cover; background-position: center;
+        cursor: pointer; -webkit-tap-highlight-color: transparent;
       }
-      .place-item:last-child { border-bottom: none; }
-      .place-item-photo {
-        width: 52px; height: 52px; flex-shrink: 0;
-        border-radius: 8px; overflow: hidden;
-        background: #F0EDE6;
+      /* Dimming overlay: ~32% top → ~88% bottom — name legible on any photo */
+      .nearby-card::after {
+        content: ''; position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(to top, rgba(8,8,8,.88) 0%, rgba(8,8,8,.55) 38%, rgba(8,8,8,.34) 70%, rgba(8,8,8,.34) 100%);
       }
-      .place-item-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .place-item-photo-placeholder { width: 100%; height: 100%; background: #ECEAE4; }
-      .place-item-body { flex: 1; min-width: 0; }
-      .place-item-name {
-        font-size: 15px; font-weight: 500; color: var(--ink);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        margin: 0 0 3px;
+      /* Fallback: solid dark gradient when no photo available */
+      .nearby-card[data-photo="false"] {
+        background: radial-gradient(120% 120% at 80% 0%, #2a3344 0%, #0A0A0A 60%);
       }
-      .place-item-meta { font-size: 12px; color: var(--ink-muted); margin: 0; }
-      .place-item-arrow {
-        font-size: 18px; color: var(--ink-faint); flex-shrink: 0; padding-right: 2px;
+      .nearby-card[data-photo="false"]::after { display: none; }
+      /* Status chip — top left */
+      .nearby-ribbon {
+        position: absolute; top: 14px; left: 14px; z-index: 3;
+        font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+        text-transform: uppercase; font-weight: 600; padding: 6px 11px; border-radius: 9px;
+      }
+      /* Open = hotel accent fill; closed = frosted glass (always distinct from any accent) */
+      .nearby-ribbon-open { background: var(--accent); color: var(--accent-on, #fff); }
+      .nearby-ribbon-closed {
+        background: rgba(255,255,255,.15); color: #fff;
+        border: 1px solid rgba(255,255,255,.30); backdrop-filter: blur(6px);
+      }
+      /* Rating chip — top right */
+      .nearby-rate {
+        position: absolute; top: 14px; right: 14px; z-index: 3;
+        font-family: var(--mono); font-size: 13px; font-weight: 500;
+        background: rgba(255,255,255,.96); color: #111;
+        padding: 6px 11px; border-radius: 9px; display: flex; align-items: center; gap: 5px;
+      }
+      .nearby-rate .star { font-size: 13px; }
+      /* Caption — bottom overlay area */
+      .nearby-cap { position: absolute; left: 17px; right: 17px; bottom: 16px; z-index: 3; }
+      .nearby-name {
+        font-family: var(--display); font-weight: 600; font-size: 23px; line-height: 1.08;
+        color: #fff; margin: 0; text-shadow: 0 1px 10px rgba(0,0,0,.55);
+      }
+      .nearby-meta {
+        font-family: var(--mono); font-size: 13px; margin: 7px 0 0;
+        color: #fff; opacity: .96; text-shadow: 0 1px 8px rgba(0,0,0,.6);
       }
 
       /* ── Empty state ──────────────────────────────────────────────────── */
@@ -569,29 +594,31 @@ function walkLabel(min: number | undefined): string {
             <section class="cat-section">
               <p class="cat-title">{labels.sectionNearby}</p>
               {d.auto.length === 0 && <p class="place-empty">{labels.noNearby}</p>}
-              <div class="place-list">
+              <div class="nearby-list">
                 {d.auto.slice(0, AUTO_INITIAL).map(a => (
                   <div
-                    class="place-item"
+                    class="nearby-card"
+                    data-photo={a.photoUrl ? 'true' : 'false'}
+                    style={a.photoUrl ? `background-image:url('${a.photoUrl}')` : undefined}
                     tabindex="0"
                     @click={`openDetail('${a.place_id}')`}
                     @keydown.enter={`openDetail('${a.place_id}')`}
                   >
-                    <div class="place-item-photo">
-                      {a.photoUrl
-                        ? <img src={a.photoUrl} alt={a.name} loading="lazy" />
-                        : <div class="place-item-photo-placeholder"></div>
-                      }
+                    {a.openNow !== null && a.openNow !== undefined && (
+                      <span class={`nearby-ribbon ${a.openNow ? 'nearby-ribbon-open' : 'nearby-ribbon-closed'}`}>
+                        {a.openNow ? labels.open : labels.closed}
+                      </span>
+                    )}
+                    {a.rating != null && (
+                      <span class="nearby-rate">
+                        <span class="star" aria-hidden="true">★</span>
+                        {a.rating}
+                      </span>
+                    )}
+                    <div class="nearby-cap">
+                      <p class="nearby-name">{a.name}</p>
+                      {a.walkingMin != null && <p class="nearby-meta">{walkLabel(a.walkingMin)}</p>}
                     </div>
-                    <div class="place-item-body">
-                      <p class="place-item-name">{a.name}</p>
-                      <p class="place-item-meta">
-                        {a.rating != null && <><span class="star" aria-hidden="true">★</span> {a.rating}</>}
-                        {a.rating != null && a.walkingMin != null && ' · '}
-                        {a.walkingMin != null && walkLabel(a.walkingMin)}
-                      </p>
-                    </div>
-                    <span class="place-item-arrow">›</span>
                   </div>
                 ))}
 
@@ -609,28 +636,30 @@ function walkLabel(min: number | undefined): string {
 
                 {d.auto.length > AUTO_INITIAL && d.auto.slice(AUTO_INITIAL).map(a => (
                   <div
-                    class="place-item"
+                    class="nearby-card"
+                    data-photo={a.photoUrl ? 'true' : 'false'}
+                    style={a.photoUrl ? `background-image:url('${a.photoUrl}')` : undefined}
                     tabindex="0"
                     x-show={`showAllExpanded['${cat}']`}
                     x-cloak
                     @click={`openDetail('${a.place_id}')`}
                     @keydown.enter={`openDetail('${a.place_id}')`}
                   >
-                    <div class="place-item-photo">
-                      {a.photoUrl
-                        ? <img src={a.photoUrl} alt={a.name} loading="lazy" />
-                        : <div class="place-item-photo-placeholder"></div>
-                      }
+                    {a.openNow !== null && a.openNow !== undefined && (
+                      <span class={`nearby-ribbon ${a.openNow ? 'nearby-ribbon-open' : 'nearby-ribbon-closed'}`}>
+                        {a.openNow ? labels.open : labels.closed}
+                      </span>
+                    )}
+                    {a.rating != null && (
+                      <span class="nearby-rate">
+                        <span class="star" aria-hidden="true">★</span>
+                        {a.rating}
+                      </span>
+                    )}
+                    <div class="nearby-cap">
+                      <p class="nearby-name">{a.name}</p>
+                      {a.walkingMin != null && <p class="nearby-meta">{walkLabel(a.walkingMin)}</p>}
                     </div>
-                    <div class="place-item-body">
-                      <p class="place-item-name">{a.name}</p>
-                      <p class="place-item-meta">
-                        {a.rating != null && <><span class="star" aria-hidden="true">★</span> {a.rating}</>}
-                        {a.rating != null && a.walkingMin != null && ' · '}
-                        {a.walkingMin != null && walkLabel(a.walkingMin)}
-                      </p>
-                    </div>
-                    <span class="place-item-arrow">›</span>
                   </div>
                 ))}
               </div>
