@@ -27,6 +27,7 @@ const PLANS = [
     popular: false,
     price: '49',
     priceYear: '470,40',
+    priceYearlyPerMonth: '39,20',
     modules: [
       'Willkommens-Hub', 'WLAN-Info (QR)', 'Frühstück-Buchung',
       'Service-Anfragen', 'Post-Stay Feedback', 'Action-Cards (5 Kacheln)',
@@ -39,6 +40,7 @@ const PLANS = [
     popular: false,
     price: '249',
     priceYear: '2.390,40',
+    priceYearlyPerMonth: '199,20',
     modules: [
       'Alles in Lite',
       'Empfehlungen (Google Places)', '10 Sprachen automatisch',
@@ -51,6 +53,7 @@ const PLANS = [
     tagline: 'Volle Suite mit KI',
     price: '549',
     priceYear: '5.270,40',
+    priceYearlyPerMonth: '439,20',
     popular: true,
     modules: [
       'Alles in Pro',
@@ -66,6 +69,7 @@ const PLANS = [
     popular: false,
     price: null,
     priceYear: null,
+    priceYearlyPerMonth: null,
     modules: [
       'Alles in Premium',
       'Multi-Property Management', 'White-Label App',
@@ -89,7 +93,48 @@ const hasEveAddon  = currentAddons.includes('eve');
   hotelName={hotel.name}
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
 >
-  <div class="sub-page">
+  <div
+    class="sub-page"
+    x-data="{
+      interval: 'monthly',
+      loading: '',
+      checkoutError: '',
+      async checkout(plan) {
+        this.loading = plan;
+        this.checkoutError = '';
+        try {
+          const res = await fetch('/api/stripe/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan, interval: this.interval })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
+          window.location.href = data.url;
+        } catch(e) {
+          this.checkoutError = e.message;
+          this.loading = '';
+        }
+      },
+      async checkoutAddon(addon) {
+        this.loading = addon;
+        this.checkoutError = '';
+        try {
+          const res = await fetch('/api/stripe/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addon })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
+          window.location.href = data.url;
+        } catch(e) {
+          this.checkoutError = e.message;
+          this.loading = '';
+        }
+      }
+    }"
+  >
 
     <!-- Breadcrumb -->
     <nav class="sub-breadcrumb">
@@ -114,21 +159,50 @@ const hasEveAddon  = currentAddons.includes('eve');
       </p>
     </section>
 
+    <!-- Interval Toggle -->
+    <div class="interval-toggle">
+      <button
+        type="button"
+        @click="interval = 'monthly'"
+        :class="interval === 'monthly' ? 'toggle-btn toggle-btn--active' : 'toggle-btn'"
+      >
+        Monatlich
+      </button>
+      <button
+        type="button"
+        @click="interval = 'yearly'"
+        :class="interval === 'yearly' ? 'toggle-btn toggle-btn--active' : 'toggle-btn'"
+      >
+        Jährlich <span class="toggle-discount">−20 %</span>
+      </button>
+    </div>
+
+    <!-- Checkout-Fehler -->
+    <div
+      x-show="checkoutError !== ''"
+      style="display:none"
+      class="checkout-error"
+      role="alert"
+    >
+      <span x-text="checkoutError"></span>
+      <button type="button" @click="checkoutError = ''" class="checkout-error__close" aria-label="Schließen">×</button>
+    </div>
+
     <!-- Plan Cards -->
     <div class="plans-grid">
       {PLANS.map(plan => {
         const rank = TIER_RANK[plan.key] ?? 0;
         const curRank = TIER_RANK[currentPlan] ?? 0;
-        const isCurrent  = plan.key === currentPlan;
-        const isUpgrade  = rank > curRank;
+        const isCurrent   = plan.key === currentPlan;
+        const isUpgrade   = rank > curRank;
         const isDowngrade = rank < curRank;
 
         return (
           <div class={[
             'plan-card',
-            isCurrent  ? 'plan-card--current'  : '',
-            isUpgrade  ? 'plan-card--upgrade'   : '',
-            isDowngrade ? 'plan-card--downgrade' : '',
+            isCurrent   ? 'plan-card--current'   : '',
+            isUpgrade   ? 'plan-card--upgrade'    : '',
+            isDowngrade ? 'plan-card--downgrade'  : '',
             plan.popular && !isCurrent ? 'plan-card--popular' : '',
           ].filter(Boolean).join(' ')}>
 
@@ -147,10 +221,21 @@ const hasEveAddon  = currentAddons.includes('eve');
             <div class="plan-card__price">
               {plan.price !== null ? (
                 <>
-                  <span class="plan-card__price-num">{plan.price} €</span>
-                  <span class="plan-card__price-per">/Monat</span>
-                  <div class="plan-card__price-year">
-                    oder {plan.priceYear} €/Jahr <span class="plan-card__price-discount">−20 %</span>
+                  {/* Monthly price */}
+                  <div x-show="interval === 'monthly'">
+                    <span class="plan-card__price-num">{plan.price} €</span>
+                    <span class="plan-card__price-per">/Monat</span>
+                    <div class="plan-card__price-year">
+                      Jährlich: {plan.priceYear} € <span class="plan-card__price-discount">−20 %</span>
+                    </div>
+                  </div>
+                  {/* Yearly price */}
+                  <div x-show="interval === 'yearly'" style="display:none">
+                    <span class="plan-card__price-num">{plan.priceYearlyPerMonth} €</span>
+                    <span class="plan-card__price-per">/Monat</span>
+                    <div class="plan-card__price-year">
+                      {plan.priceYear} €/Jahr · <span class="plan-card__price-discount">20 % gespart</span>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -173,12 +258,19 @@ const hasEveAddon  = currentAddons.includes('eve');
                   Aktueller Plan
                 </button>
               ) : plan.key === 'enterprise' ? (
-                <button type="button" class="plan-btn plan-btn--contact" disabled>
+                <a href="mailto:hallo@retaha.de" class="plan-btn plan-btn--contact">
                   Kontakt aufnehmen
-                </button>
+                </a>
               ) : isUpgrade ? (
-                <button type="button" class="plan-btn plan-btn--upgrade" disabled title="Stripe-Integration kommt bald">
-                  Upgrade auf {plan.label} — kommt bald
+                <button
+                  type="button"
+                  class="plan-btn plan-btn--upgrade"
+                  @click={`checkout('${plan.key}')`}
+                  :disabled="loading !== ''"
+                  :class={`loading === '${plan.key}' ? 'plan-btn plan-btn--upgrade plan-btn--loading' : 'plan-btn plan-btn--upgrade'`}
+                >
+                  <span x-show={`loading !== '${plan.key}'`}>Upgrade auf {plan.label}</span>
+                  <span x-show={`loading === '${plan.key}'`} style="display:none">Wird vorbereitet…</span>
                 </button>
               ) : (
                 <button type="button" class="plan-btn plan-btn--downgrade" disabled>
@@ -217,8 +309,15 @@ const hasEveAddon  = currentAddons.includes('eve');
             {hasEveAddon ? (
               <span class="addon-badge addon-badge--active">Aktiv</span>
             ) : (
-              <button type="button" class="plan-btn plan-btn--addon" disabled title="Stripe-Integration kommt bald">
-                Hinzufügen — kommt bald
+              <button
+                type="button"
+                class="plan-btn plan-btn--addon"
+                @click="checkoutAddon('eve')"
+                :disabled="loading !== ''"
+                :class="loading === 'eve' ? 'plan-btn plan-btn--addon plan-btn--loading' : 'plan-btn plan-btn--addon'"
+              >
+                <span x-show="loading !== 'eve'">Hinzufügen</span>
+                <span x-show="loading === 'eve'" style="display:none">Wird vorbereitet…</span>
               </button>
             )}
           </div>
@@ -229,7 +328,7 @@ const hasEveAddon  = currentAddons.includes('eve');
     <!-- Footer-Notiz -->
     <div class="sub-footer">
       <p class="sub-footer__note">
-        Stripe-Integration wird in Kürze freigeschaltet — Buttons werden aktiv.
+        Sichere Zahlung via Stripe. Monatlich kündbar, keine versteckten Gebühren.
         Fragen? <a href="mailto:hallo@retaha.de" class="sub-footer__link">hallo@retaha.de</a>
       </p>
       <a href="/uebersicht" class="sub-footer__back">← Zurück zur Übersicht</a>
@@ -263,7 +362,7 @@ const hasEveAddon  = currentAddons.includes('eve');
   .sub-hero {
     padding: 40px 0 36px;
     border-bottom: 1px solid #e5e5e5;
-    margin-bottom: 40px;
+    margin-bottom: 28px;
   }
   .sub-hero__eyebrow-row {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -296,6 +395,48 @@ const hasEveAddon  = currentAddons.includes('eve');
   .sub-hero__sub {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px; color: #777; letter-spacing: 0.03em; line-height: 1.6;
+  }
+
+  /* Interval Toggle */
+  .interval-toggle {
+    display: flex; gap: 4px;
+    margin-bottom: 24px;
+    background: #f5f5f5;
+    padding: 4px;
+    border-radius: 10px;
+    width: fit-content;
+  }
+  .toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer;
+    background: transparent; color: #888;
+    transition: all 150ms; display: flex; align-items: center; gap: 6px;
+  }
+  .toggle-btn--active {
+    background: #fff; color: #1a1a1a;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+  }
+  .toggle-discount {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 500; letter-spacing: 0.06em;
+    color: #2e7d4f; background: #edf7f0;
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* Checkout Error */
+  .checkout-error {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 16px; margin-bottom: 16px;
+    border: 1px solid #fca5a5; border-radius: 8px;
+    background: #fef2f2;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: #b91c1c; letter-spacing: 0.02em;
+  }
+  .checkout-error__close {
+    background: none; border: none; cursor: pointer;
+    font-size: 16px; color: #b91c1c; line-height: 1;
+    padding: 0; flex-shrink: 0;
   }
 
   /* Plans Grid */
@@ -402,15 +543,21 @@ const hasEveAddon  = currentAddons.includes('eve');
     font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
     border-radius: 8px; cursor: pointer; border: 1px solid;
     transition: all 150ms; white-space: nowrap;
+    display: block; text-align: center; text-decoration: none;
   }
   .plan-btn:disabled { cursor: not-allowed; }
 
   .plan-btn--current  { background: #f5f5f5; color: #888; border-color: #ddd; }
-  .plan-btn--upgrade  { background: #1a1a1a; color: #fff; border-color: #1a1a1a; opacity: 0.7; }
+  .plan-btn--upgrade  { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .plan-btn--upgrade:not(:disabled):hover { background: #333; }
+  .plan-btn--upgrade:disabled { opacity: 0.5; cursor: not-allowed; }
+  .plan-btn--loading  { opacity: 0.65; }
   .plan-btn--downgrade { background: transparent; color: #ccc; border-color: #eee; }
-  .plan-btn--contact  { background: transparent; color: #888; border-color: #ddd; }
-  .plan-btn--addon    { background: #1a1a1a; color: #fff; border-color: #1a1a1a; opacity: 0.7; }
+  .plan-btn--contact  { background: transparent; color: #555; border-color: #ccc; }
+  .plan-btn--contact:hover { color: #1a1a1a; border-color: #888; }
+  .plan-btn--addon    { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
   .plan-btn--addon:not(:disabled):hover { background: #F5DF4D; color: #1a1a1a; border-color: #F5DF4D; }
+  .plan-btn--addon:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Eve Add-on */
   .addon-section { margin-bottom: 40px; }

@@ -1,0 +1,138 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+// session_id ist in der URL, aber wir nutzen sie hier nicht.
+// Der Plan-Update passiert ausschließlich über den Stripe-Webhook (Phase 5) —
+// die Erfolgsseite zeigt nur eine Bestätigung.
+---
+
+<Layout
+  title="Zahlung erfolgreich"
+  activeTab="backoffice"
+  hotelName={hotel.name}
+  hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
+>
+  <div class="success-page">
+
+    <nav class="success-breadcrumb">
+      <a href="/uebersicht" class="success-breadcrumb__crumb">Übersicht</a>
+      <span class="success-breadcrumb__sep">/</span>
+      <a href="/subscription" class="success-breadcrumb__crumb">Plan & Pakete</a>
+      <span class="success-breadcrumb__sep">/</span>
+      <span class="success-breadcrumb__crumb success-breadcrumb__crumb--current">Bestätigung</span>
+    </nav>
+
+    <div class="success-card">
+      <div class="success-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+
+      <h1 class="success-title">Zahlung erfolgreich<span class="success-dot">.</span></h1>
+
+      <p class="success-sub">
+        Deine Zahlung wurde von Stripe bestätigt. Dein Plan wird in wenigen
+        Sekunden aktualisiert — du erhältst eine Bestätigung per E-Mail.
+      </p>
+
+      <p class="success-note">
+        Falls sich dein Plan im Backoffice noch nicht geändert hat, lade die
+        Seite nach 10–20 Sekunden neu.
+      </p>
+
+      <div class="success-actions">
+        <a href="/subscription" class="success-btn success-btn--primary">Plan ansehen</a>
+        <a href="/uebersicht" class="success-btn success-btn--secondary">Zurück zur Übersicht</a>
+      </div>
+    </div>
+
+  </div>
+</Layout>
+
+<style>
+  .success-page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+  @media (max-width: 640px) { .success-page { padding: 0 20px 64px; } }
+
+  .success-breadcrumb {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #888;
+  }
+  .success-breadcrumb__sep { color: #ccc; }
+  .success-breadcrumb__crumb { color: #888; text-decoration: none; transition: color 150ms; }
+  .success-breadcrumb__crumb:hover { color: #1a1a1a; }
+  .success-breadcrumb__crumb--current { color: #1a1a1a; font-weight: 500; }
+
+  .success-card {
+    margin-top: 48px;
+    padding: 48px 40px;
+    border: 1px solid #e5e5e5;
+    border-radius: 16px;
+    background: #fff;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+  }
+  @media (max-width: 480px) { .success-card { padding: 32px 24px; } }
+
+  .success-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: #edf7f0;
+    color: #2e7d4f;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .success-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(24px, 4vw, 36px); font-weight: 400;
+    line-height: 1.1; letter-spacing: -0.02em;
+    color: #1a1a1a; margin: 0 0 16px;
+  }
+  .success-dot { color: #2e7d4f; }
+
+  .success-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: #555; line-height: 1.7;
+    letter-spacing: 0.02em; margin: 0 0 12px;
+    max-width: 420px;
+  }
+
+  .success-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #999; line-height: 1.6;
+    letter-spacing: 0.02em; margin: 0 0 36px;
+    max-width: 380px;
+  }
+
+  .success-actions {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+
+  .success-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 11px 20px; border-radius: 8px; text-decoration: none;
+    transition: all 150ms; border: 1px solid; white-space: nowrap;
+  }
+  .success-btn--primary  { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .success-btn--primary:hover  { background: #000; }
+  .success-btn--secondary { background: transparent; color: #888; border-color: #ddd; }
+  .success-btn--secondary:hover { color: #1a1a1a; border-color: #aaa; }
+</style>
