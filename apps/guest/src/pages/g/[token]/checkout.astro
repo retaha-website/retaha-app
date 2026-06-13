@@ -1,7 +1,14 @@
 ---
 // Self-Checkout-Sheet
-// Zugängig via Tile-Klick auf der Hauptseite: /g/[token]/checkout
 // Feature-Gate: features.self_checkout
+//
+// Billing-Logik:
+//   Test (jetzt): stays.raw_mews_data._retaha_sim  →  { currency, balance_cents, total_cents, items }
+//   TODO Mews live: Saldo + Posten aus Mews-API lesen; _retaha_sim-Block entfernen/ignorieren.
+//
+// Pfade:
+//   balance_cents === 0  →  Zustand A: Self-Checkout erlaubt
+//   balance_cents  > 0  →  Zustand B: gesperrt, Rezeption aufsuchen
 
 import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
@@ -38,7 +45,7 @@ if (!existingSession || existingSession.stay_id !== stay.id) {
 }
 
 // Checkout-Datum formatieren
-const localeMap: Record<Lang, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+const localeMap = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as Record<Lang, string>;
 const checkoutDate = new Date(stay.check_out);
 const checkoutDateLabel = checkoutDate.toLocaleDateString(localeMap[lang], {
   weekday: 'long', day: '2-digit', month: 'long',
@@ -51,108 +58,178 @@ const guestName = guest?.first_name ?? null;
 const isCheckoutDay = new Date().toDateString() === checkoutDate.toDateString();
 const alreadyPast = Date.parse(stay.check_out) < Date.now();
 
-// Check ob schon ausgecheckt
+// Stay-Daten + Billing in einem Query
 const sbSr = createSupabaseServiceRoleInstance();
 const { data: stayRow } = await sbSr
   .from('stays')
-  .select('checked_out_at')
+  .select('checked_out_at, raw_mews_data')
   .eq('id', stay.id)
   .maybeSingle();
+
 const alreadyCheckedOut = !!(stayRow as any)?.checked_out_at;
 
+// --- Billing ---------------------------------------------------------------
+// TODO: Mews live-Anbindung hier — dann _retaha_sim-Block ersetzen.
+interface SimItem    { label: string; amount_cents: number; }
+interface SimBilling { currency: string; balance_cents: number; total_cents: number; items: SimItem[]; }
+
+const simBilling: SimBilling | null = (stayRow as any)?.raw_mews_data?._retaha_sim ?? null;
+const balanceCents  = simBilling?.balance_cents ?? 0;
+const totalCents    = simBilling?.total_cents   ?? 0;
+const billItems     = simBilling?.items         ?? [];
+const billCurrency  = simBilling?.currency      ?? (hotel as any).currency ?? 'EUR';
+const isBalanceOpen = balanceCents > 0;
+
+function fmtMoney(cents: number): string {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency', currency: billCurrency, minimumFractionDigits: 2,
+  }).format(cents / 100);
+}
+// ---------------------------------------------------------------------------
+
+const hotelPhone: string | null = (hotel as any).phone ?? null;
 const backHref = `/g/${token}`;
 
 type LabelSet = {
-  eyebrow: string; title: string; titleFallback: string; sub: string;
-  step1Title: string; step1Sub: string;
+  eyebrow: string;
+  title: string; titleOpen: string;
+  sub: string; subOpen: string;
+  step1BillTitle: string;
+  billPaidLabel: string; billOpenLabel: string;
+  billTotal: string; billOpenTotal: string;
+  billNote: string; billNoteOpen: string;
+  attnLabel: string; attnMsg: string;
   step2Title: string; step2Sub: string;
   step3Title: string; step3Sub: string;
   btnLabel: string; hintLabel: string;
+  btnCallLabel: string; callHint: string;
   doneTitle: string; doneSub: string;
   notYetTitle: string; notYetSub: string;
   back: string;
 };
 
-const labels: Record<Lang, LabelSet> = {
+const labels = {
   de: {
-    eyebrow: `Abreise · ${checkoutDateLabel} · ${checkoutTime} Uhr`,
-    title: `Auf Wiedersehen${guestName ? `, ${guestName}` : ''}`,
-    titleFallback: 'Auf Wiedersehen',
-    sub: 'Danke für deinen Aufenthalt — wir hoffen, es hat dir gefallen.',
-    step1Title: 'Rechnung prüfen',
-    step1Sub: 'Alles automatisch erfasst. Fragen? Ruf die Rezeption kurz an.',
-    step2Title: 'Schlüsselkarten abgeben',
-    step2Sub: 'Briefkasten am Empfang — kein Warten an der Rezeption nötig.',
-    step3Title: 'Auschecken bestätigen',
-    step3Sub: 'Ein Klick — du erhältst eine Bestätigungs-Email.',
-    btnLabel: 'Jetzt auschecken',
-    hintLabel: 'Du erhältst eine kurze Bestätigung per E-Mail.',
-    doneTitle: 'Erfolgreich ausgecheckt.',
-    doneSub: 'Gute Reise — wir hoffen, dich bald wieder begrüßen zu dürfen.',
-    notYetTitle: 'Checkout noch nicht möglich.',
-    notYetSub: `Dein Abreise-Tag ist ${checkoutDateLabel}. Bis dahin — genieß deinen Aufenthalt!`,
-    back: '← zurück',
+    eyebrow:       `Abreise · ${checkoutDateLabel} · ${checkoutTime} Uhr`,
+    title:         `Auf Wiedersehen${guestName ? `, ${guestName}` : ''}`,
+    titleOpen:     `Fast geschafft${guestName ? `, ${guestName}` : ''}`,
+    sub:           'Danke für deinen Aufenthalt — wir hoffen, es hat dir gefallen.',
+    subOpen:       'Vor der Abreise ist noch ein offener Betrag zu begleichen.',
+    step1BillTitle: 'Rechnung',
+    billPaidLabel:  'Beglichen',
+    billOpenLabel:  'Offen',
+    billTotal:      'Gesamt',
+    billOpenTotal:  'Offener Betrag',
+    billNote:       'Die offizielle Rechnung erhältst du per E-Mail.',
+    billNoteOpen:   'Die offizielle Rechnung erhältst du an der Rezeption oder per E-Mail.',
+    attnLabel:      'Noch offen',
+    attnMsg:        'Self-Checkout ist erst möglich, wenn die Rechnung beglichen ist. Bitte checke an der Rezeption aus — unser Team hilft dir gern.',
+    step2Title:    'Schlüsselkarte',
+    step2Sub:      'Einfach im Zimmer lassen oder an der Rezeption abgeben.',
+    step3Title:    'Auschecken bestätigen',
+    step3Sub:      'Ein Klick — du erhältst eine Bestätigungs-E-Mail.',
+    btnLabel:      'Jetzt auschecken',
+    hintLabel:     'Du erhältst eine kurze Bestätigung per E-Mail.',
+    btnCallLabel:  'Rezeption anrufen',
+    callHint:      'Self-Checkout wird nach Begleichung wieder freigeschaltet.',
+    doneTitle:     'Erfolgreich ausgecheckt.',
+    doneSub:       'Gute Reise — wir hoffen, dich bald wieder begrüßen zu dürfen.',
+    notYetTitle:   'Checkout noch nicht möglich.',
+    notYetSub:     `Dein Abreise-Tag ist ${checkoutDateLabel}. Bis dahin — genieß deinen Aufenthalt!`,
+    back:          '← zurück',
   },
   en: {
-    eyebrow: `Check-out · ${checkoutDateLabel} · ${checkoutTime}`,
-    title: `Goodbye${guestName ? `, ${guestName}` : ''}`,
-    titleFallback: 'Goodbye',
-    sub: 'Thank you for your stay — we hope you enjoyed it.',
-    step1Title: 'Review your bill',
-    step1Sub: 'Everything is captured automatically. Questions? Call reception.',
-    step2Title: 'Return key cards',
-    step2Sub: 'Drop them in the box at reception — no waiting required.',
-    step3Title: 'Confirm check-out',
-    step3Sub: "One click — you'll receive a confirmation email.",
-    btnLabel: 'Check out now',
-    hintLabel: "You'll receive a short confirmation by email.",
-    doneTitle: 'Successfully checked out.',
-    doneSub: 'Safe travels — we hope to welcome you back soon.',
-    notYetTitle: 'Check-out not yet available.',
-    notYetSub: `Your check-out date is ${checkoutDateLabel}. Until then — enjoy your stay!`,
-    back: '← back',
+    eyebrow:       `Check-out · ${checkoutDateLabel} · ${checkoutTime}`,
+    title:         `Goodbye${guestName ? `, ${guestName}` : ''}`,
+    titleOpen:     `Almost there${guestName ? `, ${guestName}` : ''}`,
+    sub:           'Thank you for your stay — we hope you enjoyed it.',
+    subOpen:       'There is an outstanding balance to settle before departure.',
+    step1BillTitle: 'Invoice',
+    billPaidLabel:  'Settled',
+    billOpenLabel:  'Open',
+    billTotal:      'Total',
+    billOpenTotal:  'Outstanding',
+    billNote:       'Your official receipt will be sent by e-mail.',
+    billNoteOpen:   'Your official receipt is available at reception or by e-mail.',
+    attnLabel:      'Outstanding',
+    attnMsg:        'Self-checkout is only available once the balance is settled. Please check out at reception — our team is happy to help.',
+    step2Title:    'Key card',
+    step2Sub:      'Leave it in the room or hand it to reception.',
+    step3Title:    'Confirm check-out',
+    step3Sub:      "One click — you'll receive a confirmation email.",
+    btnLabel:      'Check out now',
+    hintLabel:     "You'll receive a short confirmation by email.",
+    btnCallLabel:  'Call reception',
+    callHint:      'Self-checkout will be available once the balance is settled.',
+    doneTitle:     'Successfully checked out.',
+    doneSub:       'Safe travels — we hope to welcome you back soon.',
+    notYetTitle:   'Check-out not yet available.',
+    notYetSub:     `Your check-out date is ${checkoutDateLabel}. Until then — enjoy your stay!`,
+    back:          '← back',
   },
   fr: {
-    eyebrow: `Départ · ${checkoutDateLabel} · ${checkoutTime}`,
-    title: `Au revoir${guestName ? `, ${guestName}` : ''}`,
-    titleFallback: 'Au revoir',
-    sub: 'Merci pour votre séjour — nous espérons vous revoir bientôt.',
-    step1Title: 'Vérifier la facture',
-    step1Sub: 'Tout est capturé automatiquement. Questions? Appelez la réception.',
-    step2Title: 'Rendre les clés',
-    step2Sub: 'Glissez-les dans la boîte à la réception — sans attente.',
-    step3Title: 'Confirmer le départ',
-    step3Sub: "Un clic — vous recevrez un e-mail de confirmation.",
-    btnLabel: 'Partir maintenant',
-    hintLabel: "Vous recevrez une confirmation par e-mail.",
-    doneTitle: 'Départ confirmé.',
-    doneSub: 'Bon voyage — à bientôt!',
-    notYetTitle: 'Départ pas encore disponible.',
-    notYetSub: `Votre date de départ est le ${checkoutDateLabel}.`,
-    back: '← retour',
+    eyebrow:       `Départ · ${checkoutDateLabel} · ${checkoutTime}`,
+    title:         `Au revoir${guestName ? `, ${guestName}` : ''}`,
+    titleOpen:     `Presque là${guestName ? `, ${guestName}` : ''}`,
+    sub:           'Merci pour votre séjour — nous espérons vous revoir bientôt.',
+    subOpen:       'Un solde est encore à régler avant votre départ.',
+    step1BillTitle: 'Facture',
+    billPaidLabel:  'Réglée',
+    billOpenLabel:  'Ouverte',
+    billTotal:      'Total',
+    billOpenTotal:  'Solde dû',
+    billNote:       'Votre reçu officiel vous sera envoyé par e-mail.',
+    billNoteOpen:   'Votre reçu officiel est disponible à la réception ou par e-mail.',
+    attnLabel:      'Solde dû',
+    attnMsg:        'Le départ autonome est disponible une fois le solde réglé. Veuillez vous adresser à la réception.',
+    step2Title:    'Carte-clé',
+    step2Sub:      'Laissez-la dans la chambre ou remettez-la à la réception.',
+    step3Title:    'Confirmer le départ',
+    step3Sub:      'Un clic — vous recevrez un e-mail de confirmation.',
+    btnLabel:      'Partir maintenant',
+    hintLabel:     'Vous recevrez une confirmation par e-mail.',
+    btnCallLabel:  'Appeler la réception',
+    callHint:      'Le départ autonome sera disponible après règlement.',
+    doneTitle:     'Départ confirmé.',
+    doneSub:       'Bon voyage — à bientôt !',
+    notYetTitle:   'Départ pas encore disponible.',
+    notYetSub:     `Votre date de départ est le ${checkoutDateLabel}.`,
+    back:          '← retour',
   },
   es: {
-    eyebrow: `Salida · ${checkoutDateLabel} · ${checkoutTime}`,
-    title: `Hasta pronto${guestName ? `, ${guestName}` : ''}`,
-    titleFallback: 'Hasta pronto',
-    sub: 'Gracias por tu estancia — esperamos verte pronto.',
-    step1Title: 'Revisar la factura',
-    step1Sub: 'Todo registrado automáticamente. ¿Preguntas? Llama a recepción.',
-    step2Title: 'Devolver las llaves',
-    step2Sub: 'Deposítalas en la caja de recepción — sin esperar.',
-    step3Title: 'Confirmar la salida',
-    step3Sub: 'Un clic — recibirás un correo de confirmación.',
-    btnLabel: 'Salir ahora',
-    hintLabel: 'Recibirás una confirmación breve por e-mail.',
-    doneTitle: 'Salida confirmada.',
-    doneSub: '¡Buen viaje — esperamos verte pronto!',
-    notYetTitle: 'Salida aún no disponible.',
-    notYetSub: `Tu fecha de salida es el ${checkoutDateLabel}.`,
-    back: '← volver',
+    eyebrow:       `Salida · ${checkoutDateLabel} · ${checkoutTime}`,
+    title:         `Hasta pronto${guestName ? `, ${guestName}` : ''}`,
+    titleOpen:     `Ya casi${guestName ? `, ${guestName}` : ''}`,
+    sub:           'Gracias por tu estancia — esperamos verte pronto.',
+    subOpen:       'Hay un saldo pendiente por liquidar antes de la salida.',
+    step1BillTitle: 'Factura',
+    billPaidLabel:  'Pagada',
+    billOpenLabel:  'Pendiente',
+    billTotal:      'Total',
+    billOpenTotal:  'Importe pendiente',
+    billNote:       'Tu recibo oficial se enviará por correo electrónico.',
+    billNoteOpen:   'Tu recibo oficial está disponible en recepción o por correo electrónico.',
+    attnLabel:      'Pendiente',
+    attnMsg:        'El auto-checkout solo está disponible cuando el saldo esté liquidado. Por favor dirígete a recepción.',
+    step2Title:    'Tarjeta-llave',
+    step2Sub:      'Déjala en la habitación o entrégala en recepción.',
+    step3Title:    'Confirmar la salida',
+    step3Sub:      'Un clic — recibirás un correo de confirmación.',
+    btnLabel:      'Salir ahora',
+    hintLabel:     'Recibirás una confirmación breve por e-mail.',
+    btnCallLabel:  'Llamar a recepción',
+    callHint:      'El auto-checkout estará disponible tras el pago.',
+    doneTitle:     'Salida confirmada.',
+    doneSub:       '¡Buen viaje — esperamos verte pronto!',
+    notYetTitle:   'Salida aún no disponible.',
+    notYetSub:     `Tu fecha de salida es el ${checkoutDateLabel}.`,
+    back:          '← volver',
   },
 };
 
-const L = labels[lang];
+const L = (labels as Record<Lang, LabelSet>)[lang] ?? (labels as Record<Lang, LabelSet>)['de'];
+const effectiveTitle = isBalanceOpen ? L.titleOpen : L.title;
+const effectiveSub   = isBalanceOpen ? L.subOpen   : L.sub;
 ---
 
 <!DOCTYPE html>
@@ -208,10 +285,50 @@ const L = labels[lang];
         margin-top: 1px;
       }
       .step--highlight .step__num { background: var(--guest-accent); color: #fff; }
-      .step--done .step__num { background: var(--guest-accent); color: #fff; }
-      .step__title { font-size: 15px; font-weight: 600; color: #0A0A0A; line-height: 1.2; margin-bottom: 4px; }
-      .step__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; line-height: 1.4; }
+      .step--done .step__num      { background: var(--guest-accent); color: #fff; }
+      .step__body { flex: 1; min-width: 0; }
+      .step__title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+      .step__title { font-size: 15px; font-weight: 600; color: #0A0A0A; line-height: 1.2; }
+      .step__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; line-height: 1.4; margin-top: 4px; }
       .step__check { margin-left: auto; flex-shrink: 0; color: var(--guest-accent); margin-top: 4px; }
+
+      /* Bill chips */
+      .bill-chip {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+        text-transform: uppercase; font-weight: 600; padding: 3px 8px; border-radius: 7px;
+        white-space: nowrap; flex-shrink: 0;
+      }
+      .bill-chip--paid { background: var(--guest-accent); color: #fff; }
+      .bill-chip--open { background: #0A0A0A; color: #FFE600; }
+
+      /* Billing breakdown */
+      .bill { margin-top: 11px; padding-top: 11px; border-top: 1px solid #E0DDD8; }
+      .bill__li { display: flex; justify-content: space-between; font-size: 13px; color: #555; padding: 3px 0; }
+      .bill__lbl { color: #666; }
+      .bill__total {
+        display: flex; justify-content: space-between;
+        font-size: 15px; font-weight: 600; color: #0A0A0A;
+        margin-top: 8px; padding-top: 8px; border-top: 1px solid #E0DDD8;
+      }
+      .bill__note {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: #AAA; margin-top: 9px; line-height: 1.4;
+      }
+
+      /* Attention card (open balance) — warmer Gelb-Tint, kein Rot */
+      .attn {
+        background: #FFFBEA; border: 1px solid #F0E2A8; border-radius: 14px;
+        padding: 18px; margin-bottom: 0;
+      }
+      .attn__label {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: #8A7A3A;
+      }
+      .attn__amount {
+        font-size: 30px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
+        margin-top: 4px; color: #0A0A0A;
+      }
+      .attn__msg { font-size: 13px; color: #5B5536; margin-top: 10px; line-height: 1.5; }
 
       /* CTA */
       .cta-area { display: flex; flex-direction: column; gap: 10px; align-items: center; }
@@ -222,11 +339,12 @@ const L = labels[lang];
         font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
         transition: background 150ms, color 150ms;
         display: flex; align-items: center; justify-content: center; gap: 8px;
+        text-decoration: none;
       }
       .cta-btn:hover { background: #FFE600; color: #0A0A0A; }
-      .cta-btn:hover .btn-chk { stroke: #0A0A0A; }
+      .cta-btn:hover .btn-icon { stroke: #0A0A0A; }
       .cta-btn:disabled { opacity: 0.5; cursor: wait; }
-      .btn-chk { flex-shrink: 0; stroke: #FAFAF8; fill: none; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
+      .btn-icon { flex-shrink: 0; stroke: #FAFAF8; fill: none; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
       .cta-hint {
         font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA;
         text-align: center; margin: 0; letter-spacing: 0.04em;
@@ -252,7 +370,7 @@ const L = labels[lang];
 
       /* Flash */
       .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
-      .flash--ok { background: #EDF7ED; color: #2D6B2D; border: 1px solid #B5D9B5; }
+      .flash--ok  { background: #EDF7ED; color: #2D6B2D; border: 1px solid #B5D9B5; }
       .flash--err { background: #FEF2F2; color: #8C2128; border: 1px solid #F5C6C6; }
       .flash[hidden] { display: none; }
 
@@ -271,44 +389,116 @@ const L = labels[lang];
 
       <div class="hero">
         <span class="hero__eyebrow">{L.eyebrow}</span>
-        <h1 class="hero__title">{L.title}<span class="dot">.</span></h1>
-        <p class="hero__sub">{L.sub}</p>
+        <h1 class="hero__title">{effectiveTitle}<span class="dot">.</span></h1>
+        <p class="hero__sub">{effectiveSub}</p>
       </div>
 
       {alreadyCheckedOut ? (
-        <!-- Schon ausgecheckt -->
         <div class="done-state">
           <div class="done-state__icon">✓</div>
           <h2 class="done-state__title">{L.doneTitle}</h2>
           <p class="done-state__sub">{L.doneSub}</p>
         </div>
       ) : !isCheckoutDay && !alreadyPast ? (
-        <!-- Noch nicht Abreise-Tag -->
         <div class="notyet-state">
           <h2 class="notyet-state__title">{L.notYetTitle}</h2>
           <p class="notyet-state__sub">{L.notYetSub}</p>
         </div>
+      ) : isBalanceOpen ? (
+        /* ── Zustand B: offener Saldo ── */
+        <>
+          <div class="attn">
+            <div class="attn__label">{L.attnLabel}</div>
+            <div class="attn__amount">{fmtMoney(balanceCents)}</div>
+            <p class="attn__msg">{L.attnMsg}</p>
+          </div>
+
+          <div class="steps" style="margin-top: 14px;">
+            <div class="step">
+              <div class="step__num" style="font-style:italic;font-family:'Space Grotesk',sans-serif;font-size:13px;">i</div>
+              <div class="step__body">
+                <div class="step__title-row">
+                  <span class="step__title">{L.step1BillTitle}</span>
+                  <span class="bill-chip bill-chip--open">{L.billOpenLabel}</span>
+                </div>
+                {billItems.length > 0 && (
+                  <div class="bill">
+                    {billItems.map((item: SimItem) => (
+                      <div class="bill__li">
+                        <span class="bill__lbl">{item.label}</span>
+                        <span>{fmtMoney(item.amount_cents)}</span>
+                      </div>
+                    ))}
+                    <div class="bill__total">
+                      <span>{L.billOpenTotal}</span>
+                      <span>{fmtMoney(balanceCents)}</span>
+                    </div>
+                    <div class="bill__note">{L.billNoteOpen}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="cta-area">
+            {hotelPhone ? (
+              <a href={`tel:${hotelPhone}`} class="cta-btn">
+                {L.btnCallLabel}
+                <svg class="btn-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" stroke-linejoin="round">
+                  <path d="M5 4h3l2 5-2 1.5a11 11 0 005 5L20 13l1 3v3a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/>
+                </svg>
+              </a>
+            ) : (
+              <div class="cta-btn" style="cursor:default;">
+                {L.btnCallLabel}
+                <svg class="btn-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" stroke-linejoin="round">
+                  <path d="M5 4h3l2 5-2 1.5a11 11 0 005 5L20 13l1 3v3a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/>
+                </svg>
+              </div>
+            )}
+            <p class="cta-hint">{L.callHint}</p>
+          </div>
+        </>
       ) : (
-        <!-- Checkout-Flow -->
+        /* ── Zustand A: beglichen → Self-Checkout ── */
         <>
           <div id="flash-ok" class="flash flash--ok" hidden></div>
           <div id="flash-err" class="flash flash--err" hidden></div>
 
           <div class="steps">
+            {/* Step 1: Rechnung — done */}
             <div class="step step--done">
               <div class="step__num">1</div>
-              <div>
-                <div class="step__title">{L.step1Title}</div>
-                <div class="step__sub">{L.step1Sub}</div>
+              <div class="step__body">
+                <div class="step__title-row">
+                  <span class="step__title">{L.step1BillTitle}</span>
+                  <span class="bill-chip bill-chip--paid">{L.billPaidLabel}</span>
+                </div>
+                {billItems.length > 0 && (
+                  <div class="bill">
+                    {billItems.map((item: SimItem) => (
+                      <div class="bill__li">
+                        <span class="bill__lbl">{item.label}</span>
+                        <span>{fmtMoney(item.amount_cents)}</span>
+                      </div>
+                    ))}
+                    <div class="bill__total">
+                      <span>{L.billTotal}</span>
+                      <span>{fmtMoney(totalCents)}</span>
+                    </div>
+                    <div class="bill__note">{L.billNote}</div>
+                  </div>
+                )}
               </div>
               <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" width="16" height="16" aria-hidden="true">
                 <path d="M4 12.5 L10 18 L20 6"/>
               </svg>
             </div>
 
+            {/* Step 2: Schlüsselkarte — done */}
             <div class="step step--done">
               <div class="step__num">2</div>
-              <div>
+              <div class="step__body">
                 <div class="step__title">{L.step2Title}</div>
                 <div class="step__sub">{L.step2Sub}</div>
               </div>
@@ -317,9 +507,10 @@ const L = labels[lang];
               </svg>
             </div>
 
+            {/* Step 3: Auschecken bestätigen — active */}
             <div class="step step--highlight">
               <div class="step__num">3</div>
-              <div>
+              <div class="step__body">
                 <div class="step__title">{L.step3Title}</div>
                 <div class="step__sub">{L.step3Sub}</div>
               </div>
@@ -329,7 +520,7 @@ const L = labels[lang];
           <div class="cta-area">
             <button class="cta-btn" id="checkout-btn" type="button">
               {L.btnLabel}
-              <svg class="btn-chk" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path d="M4 12.5 L10 18 L20 6"/>
               </svg>
             </button>
@@ -345,37 +536,28 @@ const L = labels[lang];
 
     <script is:inline define:vars={{ token, doneTitle: L.doneTitle, doneSub: L.doneSub }}>
       const btn = document.getElementById('checkout-btn');
-      const flashOk = document.getElementById('flash-ok');
+      const flashOk  = document.getElementById('flash-ok');
       const flashErr = document.getElementById('flash-err');
       if (btn) {
         btn.addEventListener('click', async () => {
           btn.disabled = true;
-          flashOk && (flashOk.hidden = true);
-          flashErr && (flashErr.hidden = true);
+          if (flashOk)  flashOk.hidden  = true;
+          if (flashErr) flashErr.hidden = true;
           try {
-            const res = await fetch('/api/checkout/complete', {
-              method: 'POST',
-              credentials: 'include',
+            const res  = await fetch('/api/checkout/complete', {
+              method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ stay_token: token }),
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-              if (flashOk) {
-                flashOk.textContent = '✓ ' + doneTitle;
-                flashOk.hidden = false;
-              }
-              setTimeout(() => {
-                window.location.href = '/g/' + token;
-              }, 1800);
+              if (flashOk) { flashOk.textContent = '✓ ' + doneTitle; flashOk.hidden = false; }
+              setTimeout(() => { window.location.href = '/g/' + token; }, 1800);
             } else {
               throw new Error(data.error || 'checkout failed');
             }
           } catch (err) {
-            if (flashErr) {
-              flashErr.textContent = 'Fehler: ' + (err.message || 'Bitte nochmal versuchen.');
-              flashErr.hidden = false;
-            }
+            if (flashErr) { flashErr.textContent = 'Fehler: ' + (err.message || 'Bitte nochmal versuchen.'); flashErr.hidden = false; }
             btn.disabled = false;
           }
         });
