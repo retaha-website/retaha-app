@@ -85,7 +85,7 @@ const labels: Record<Lang, LabelSet> = {
     step2Sub: 'Briefkasten am Empfang — kein Warten an der Rezeption nötig.',
     step3Title: 'Auschecken bestätigen',
     step3Sub: 'Ein Klick — du erhältst eine Bestätigungs-Email.',
-    btnLabel: 'Jetzt auschecken ✓',
+    btnLabel: 'Jetzt auschecken',
     hintLabel: 'Du erhältst eine kurze Bestätigung per E-Mail.',
     doneTitle: 'Erfolgreich ausgecheckt.',
     doneSub: 'Gute Reise — wir hoffen, dich bald wieder begrüßen zu dürfen.',
@@ -104,7 +104,7 @@ const labels: Record<Lang, LabelSet> = {
     step2Sub: 'Drop them in the box at reception — no waiting required.',
     step3Title: 'Confirm check-out',
     step3Sub: "One click — you'll receive a confirmation email.",
-    btnLabel: 'Check out now ✓',
+    btnLabel: 'Check out now',
     hintLabel: "You'll receive a short confirmation by email.",
     doneTitle: 'Successfully checked out.',
     doneSub: 'Safe travels — we hope to welcome you back soon.',
@@ -123,7 +123,7 @@ const labels: Record<Lang, LabelSet> = {
     step2Sub: 'Glissez-les dans la boîte à la réception — sans attente.',
     step3Title: 'Confirmer le départ',
     step3Sub: "Un clic — vous recevrez un e-mail de confirmation.",
-    btnLabel: 'Partir maintenant ✓',
+    btnLabel: 'Partir maintenant',
     hintLabel: "Vous recevrez une confirmation par e-mail.",
     doneTitle: 'Départ confirmé.',
     doneSub: 'Bon voyage — à bientôt!',
@@ -142,7 +142,7 @@ const labels: Record<Lang, LabelSet> = {
     step2Sub: 'Deposítalas en la caja de recepción — sin esperar.',
     step3Title: 'Confirmar la salida',
     step3Sub: 'Un clic — recibirás un correo de confirmación.',
-    btnLabel: 'Salir ahora ✓',
+    btnLabel: 'Salir ahora',
     hintLabel: 'Recibirás una confirmación breve por e-mail.',
     doneTitle: 'Salida confirmada.',
     doneSub: '¡Buen viaje — esperamos verte pronto!',
@@ -193,37 +193,40 @@ const L = labels[lang];
       .hero__sub { font-size: 15px; color: #666; line-height: 1.5; margin: 0; }
 
       /* Steps */
-      .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+      .steps { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
       .step {
         display: flex; align-items: flex-start; gap: 14px;
-        padding: 14px 16px;
-        background: #fff; border: 1px solid #E0DDD8; border-radius: 10px;
+        padding: 16px;
+        background: #fff; border: 1px solid #E0DDD8; border-radius: 14px;
       }
-      .step--highlight { border-color: #0A0A0A; }
-      .step--done { opacity: 0.45; }
+      .step--highlight { border: 1.5px solid var(--guest-accent); }
       .step__num {
-        width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+        width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
         background: #E0DDD8; color: #555;
         display: flex; align-items: center; justify-content: center;
-        font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+        font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
         margin-top: 1px;
       }
-      .step--highlight .step__num { background: #0A0A0A; color: #FAFAF8; }
-      .step__title { font-size: 14px; font-weight: 500; color: #0A0A0A; line-height: 1.2; margin-bottom: 3px; }
+      .step--highlight .step__num { background: var(--guest-accent); color: #fff; }
+      .step--done .step__num { background: var(--guest-accent); color: #fff; }
+      .step__title { font-size: 15px; font-weight: 600; color: #0A0A0A; line-height: 1.2; margin-bottom: 4px; }
       .step__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; line-height: 1.4; }
-      .step__check { margin-left: auto; flex-shrink: 0; color: #5C9070; margin-top: 4px; }
+      .step__check { margin-left: auto; flex-shrink: 0; color: var(--guest-accent); margin-top: 4px; }
 
       /* CTA */
       .cta-area { display: flex; flex-direction: column; gap: 10px; align-items: center; }
       .cta-btn {
         width: 100%; padding: 16px;
         background: #0A0A0A; color: #FAFAF8;
-        border: none; border-radius: 10px;
-        font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit;
-        transition: background 150ms;
+        border: none; border-radius: 14px;
+        font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+        transition: background 150ms, color 150ms;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
       }
-      .cta-btn:hover { background: var(--guest-accent); }
+      .cta-btn:hover { background: #FFE600; color: #0A0A0A; }
+      .cta-btn:hover .btn-chk { stroke: #0A0A0A; }
       .cta-btn:disabled { opacity: 0.5; cursor: wait; }
+      .btn-chk { flex-shrink: 0; stroke: #FAFAF8; fill: none; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
       .cta-hint {
         font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA;
         text-align: center; margin: 0; letter-spacing: 0.04em;
@@ -298,8 +301,8 @@ const L = labels[lang];
                 <div class="step__title">{L.step1Title}</div>
                 <div class="step__sub">{L.step1Sub}</div>
               </div>
-              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-                <path d="M5 12 L10 17 L19 7"/>
+              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" width="16" height="16" aria-hidden="true">
+                <path d="M4 12.5 L10 18 L20 6"/>
               </svg>
             </div>
 
@@ -309,8 +312,8 @@ const L = labels[lang];
                 <div class="step__title">{L.step2Title}</div>
                 <div class="step__sub">{L.step2Sub}</div>
               </div>
-              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-                <path d="M5 12 L10 17 L19 7"/>
+              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" width="16" height="16" aria-hidden="true">
+                <path d="M4 12.5 L10 18 L20 6"/>
               </svg>
             </div>
 
@@ -326,6 +329,9 @@ const L = labels[lang];
           <div class="cta-area">
             <button class="cta-btn" id="checkout-btn" type="button">
               {L.btnLabel}
+              <svg class="btn-chk" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M4 12.5 L10 18 L20 6"/>
+              </svg>
             </button>
             <p class="cta-hint">{L.hintLabel}</p>
           </div>
