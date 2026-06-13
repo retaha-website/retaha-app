@@ -1,10 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels } from '@retaha/auth';
-import { t } from '../i18n/helpers';
 import { calculateTrialStatus } from '../lib/trial-status';
-import type { AdminLocale } from '../i18n/types';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -13,59 +10,467 @@ const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
-const userLocale: AdminLocale = (Astro.locals.locale ?? 'de') as AdminLocale;
-
+const currentPlan: string = (hotel as any).plan ?? 'lite';
+const currentAddons: string[] = (hotel as any).addons ?? [];
 const trial = calculateTrialStatus(hotel);
-const trialEndFormatted = trial.endsAt?.toLocaleDateString(userLocale === 'en' ? 'en-US' : 'de-DE', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
+const trialEndFormatted = trial.endsAt?.toLocaleDateString('de-DE', {
+  day: 'numeric', month: 'long', year: 'numeric',
 });
+
+const TIER_RANK: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
+
+const PLANS = [
+  {
+    key: 'lite',
+    label: 'Lite',
+    tagline: 'Gäste-Basis',
+    popular: false,
+    price: '49',
+    priceYear: '470,40',
+    modules: [
+      'Willkommens-Hub', 'WLAN-Info (QR)', 'Frühstück-Buchung',
+      'Service-Anfragen', 'Post-Stay Feedback', 'Action-Cards (5 Kacheln)',
+    ],
+  },
+  {
+    key: 'pro',
+    label: 'Pro',
+    tagline: 'Smart & Reichweite',
+    popular: false,
+    price: '249',
+    priceYear: '2.390,40',
+    modules: [
+      'Alles in Lite',
+      'Empfehlungen (Google Places)', '10 Sprachen automatisch',
+      'NFC-Tag Management', 'Pre-Stay Messaging', '9 Stay-Push-Trigger',
+    ],
+  },
+  {
+    key: 'premium',
+    label: 'Premium',
+    tagline: 'Volle Suite mit KI',
+    price: '549',
+    priceYear: '5.270,40',
+    popular: true,
+    modules: [
+      'Alles in Pro',
+      'Eve KI-Concierge (inklusive)', 'Wallet-Pass + CRM',
+      'Marketing (Drips + Kampagnen)', 'Loyalty-Program',
+      'Referral-Program', 'Best-Price-Guarantee', 'Microsite-Builder',
+    ],
+  },
+  {
+    key: 'enterprise',
+    label: 'Enterprise',
+    tagline: 'Auf Anfrage',
+    popular: false,
+    price: null,
+    priceYear: null,
+    modules: [
+      'Alles in Premium',
+      'Multi-Property Management', 'White-Label App',
+      'API-Zugang (direkt)', 'Custom Email-Domain',
+      'Dedizierter Account Manager',
+    ],
+  },
+];
+
+const PLAN_LABEL: Record<string, string> = {
+  lite: 'Lite', pro: 'Pro', premium: 'Premium', enterprise: 'Enterprise',
+};
+
+const showEveAddon = currentPlan === 'lite' || currentPlan === 'pro';
+const hasEveAddon  = currentAddons.includes('eve');
 ---
 
-<Layout title={t('subscription.page_title', userLocale)} activeTab="backoffice">
-  <EditorialPageHeader
-    sectionNumber={t('subscription.section_number', userLocale)}
-    sectionLabel={t('subscription.section_label', userLocale)}
-    headlineLight={t('subscription.headline_light', userLocale)}
-    headlineBold={t('subscription.headline_bold', userLocale)}
-    subtitle={t('subscription.subtitle', userLocale)}
-  />
+<Layout
+  title="Plan & Pakete"
+  activeTab="backoffice"
+  hotelName={hotel.name}
+  hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
+>
+  <div class="sub-page">
 
-  <!-- Aktives Modul-Paket -->
-  <section class="border-t border-b border-anthrazit/[0.12] py-8 mb-10">
-    <p class="eyebrow text-pink-shock mb-3">
-      — {t('subscription.current_eyebrow', userLocale)} —
-    </p>
-    <div class="flex items-baseline justify-between gap-6 flex-wrap">
-      <h2 class="text-2xl font-light text-anthrazit m-0">
-        {t('subscription.current_module', userLocale)}
-      </h2>
-      <p class="text-2xl font-medium text-anthrazit m-0">
-        {t('subscription.current_price', userLocale)}
+    <!-- Breadcrumb -->
+    <nav class="sub-breadcrumb">
+      <a href="/uebersicht" class="sub-breadcrumb__crumb">Übersicht</a>
+      <span class="sub-breadcrumb__sep">/</span>
+      <span class="sub-breadcrumb__crumb sub-breadcrumb__crumb--current">Plan & Pakete</span>
+    </nav>
+
+    <!-- Hero -->
+    <section class="sub-hero">
+      <div class="sub-hero__eyebrow-row">
+        <span class="sub-hero__eyebrow">Plan & Pakete</span>
+        <span class={`sub-hero__current-badge sub-hero__current-badge--${currentPlan}`}>
+          Aktuell: {PLAN_LABEL[currentPlan] ?? currentPlan}
+        </span>
+      </div>
+      <h1 class="sub-hero__title">Wähle das richtige Paket<span class="sub-hero__dot">.</span></h1>
+      <p class="sub-hero__sub">
+        {trial.isInTrial
+          ? `Du bist im Trial${trialEndFormatted ? ` — endet am ${trialEndFormatted}` : ''}. Alle Pakete enthalten monatliche Kündigung.`
+          : 'Alle Pakete monatlich kündbar. Jahresabo spart 20 %.'}
       </p>
+    </section>
+
+    <!-- Plan Cards -->
+    <div class="plans-grid">
+      {PLANS.map(plan => {
+        const rank = TIER_RANK[plan.key] ?? 0;
+        const curRank = TIER_RANK[currentPlan] ?? 0;
+        const isCurrent  = plan.key === currentPlan;
+        const isUpgrade  = rank > curRank;
+        const isDowngrade = rank < curRank;
+
+        return (
+          <div class={[
+            'plan-card',
+            isCurrent  ? 'plan-card--current'  : '',
+            isUpgrade  ? 'plan-card--upgrade'   : '',
+            isDowngrade ? 'plan-card--downgrade' : '',
+            plan.popular && !isCurrent ? 'plan-card--popular' : '',
+          ].filter(Boolean).join(' ')}>
+
+            {plan.popular && !isCurrent && (
+              <div class="plan-card__popular-bar">Empfohlen</div>
+            )}
+            {isCurrent && (
+              <div class="plan-card__current-bar">Dein aktueller Plan</div>
+            )}
+
+            <div class="plan-card__head">
+              <span class={`plan-card__tier plan-card__tier--${plan.key}`}>{plan.label}</span>
+              <span class="plan-card__tagline">{plan.tagline}</span>
+            </div>
+
+            <div class="plan-card__price">
+              {plan.price !== null ? (
+                <>
+                  <span class="plan-card__price-num">{plan.price} €</span>
+                  <span class="plan-card__price-per">/Monat</span>
+                  <div class="plan-card__price-year">
+                    oder {plan.priceYear} €/Jahr <span class="plan-card__price-discount">−20 %</span>
+                  </div>
+                </>
+              ) : (
+                <span class="plan-card__price-custom">Individuell</span>
+              )}
+            </div>
+
+            <ul class="plan-card__modules">
+              {plan.modules.map(m => (
+                <li class="plan-card__module-item">
+                  <span class="plan-card__module-check" aria-hidden="true">✓</span>
+                  {m}
+                </li>
+              ))}
+            </ul>
+
+            <div class="plan-card__cta">
+              {isCurrent ? (
+                <button type="button" class="plan-btn plan-btn--current" disabled>
+                  Aktueller Plan
+                </button>
+              ) : plan.key === 'enterprise' ? (
+                <button type="button" class="plan-btn plan-btn--contact" disabled>
+                  Kontakt aufnehmen
+                </button>
+              ) : isUpgrade ? (
+                <button type="button" class="plan-btn plan-btn--upgrade" disabled title="Stripe-Integration kommt bald">
+                  Upgrade auf {plan.label} — kommt bald
+                </button>
+              ) : (
+                <button type="button" class="plan-btn plan-btn--downgrade" disabled>
+                  Downgrade auf {plan.label}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
-    {trialEndFormatted && (
-      <p class="text-sm italic text-anthrazit/60 mt-4 m-0">
-        {t('onboarding.setup.done_trial_text', userLocale)} {trialEndFormatted}.
-      </p>
+
+    <!-- Eve Add-on (nur für Lite & Pro) -->
+    {showEveAddon && (
+      <section class="addon-section">
+        <div class="addon-card">
+          <div class="addon-card__left">
+            <div class="addon-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="addon-card__label">Eve KI-Concierge — Add-on</p>
+              <p class="addon-card__desc">
+                KI-Assistent für Gäste: Fragen, Buchungen, Empfehlungen — 24/7.
+                {hasEveAddon
+                  ? ' Bereits gebucht — Danke!'
+                  : ' Für Lite und Pro als monatliches Add-on buchbar.'}
+              </p>
+            </div>
+          </div>
+          <div class="addon-card__right">
+            <span class="addon-card__price">89 € <span class="addon-card__price-per">/Monat</span></span>
+            {hasEveAddon ? (
+              <span class="addon-badge addon-badge--active">Aktiv</span>
+            ) : (
+              <button type="button" class="plan-btn plan-btn--addon" disabled title="Stripe-Integration kommt bald">
+                Hinzufügen — kommt bald
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
     )}
-  </section>
 
-  <!-- Soon: Stripe -->
-  <section class="py-8 mb-10">
-    <p class="eyebrow text-anthrazit/55 mb-3">
-      — {t('subscription.soon_eyebrow', userLocale)} —
-    </p>
-    <p class="text-sm text-anthrazit/70 max-w-2xl mb-6 leading-relaxed">
-      {t('subscription.soon_note', userLocale)}
-    </p>
-    <button type="button" class="bauhaus-button" disabled aria-disabled="true">
-      {t('subscription.cta_disabled', userLocale)}
-    </button>
-  </section>
+    <!-- Footer-Notiz -->
+    <div class="sub-footer">
+      <p class="sub-footer__note">
+        Stripe-Integration wird in Kürze freigeschaltet — Buttons werden aktiv.
+        Fragen? <a href="mailto:hallo@retaha.de" class="sub-footer__link">hallo@retaha.de</a>
+      </p>
+      <a href="/uebersicht" class="sub-footer__back">← Zurück zur Übersicht</a>
+    </div>
 
-  <a href="/uebersicht" class="inline-block text-sm text-anthrazit/60 hover:text-anthrazit">
-    {t('subscription.cta_back', userLocale)}
-  </a>
+  </div>
 </Layout>
+
+<style>
+  .sub-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+  @media (max-width: 768px) { .sub-page { padding: 0 20px 64px; } }
+
+  /* Breadcrumb */
+  .sub-breadcrumb {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #888;
+  }
+  .sub-breadcrumb__sep { color: #ccc; }
+  .sub-breadcrumb__crumb { color: #888; text-decoration: none; transition: color 150ms; }
+  .sub-breadcrumb__crumb:hover { color: #1a1a1a; }
+  .sub-breadcrumb__crumb--current { color: #1a1a1a; font-weight: 500; }
+
+  /* Hero */
+  .sub-hero {
+    padding: 40px 0 36px;
+    border-bottom: 1px solid #e5e5e5;
+    margin-bottom: 40px;
+  }
+  .sub-hero__eyebrow-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .sub-hero__eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; font-weight: 500;
+    color: #0A0A0A; background: #F5DF4D;
+    padding: 5px 10px; display: inline-block; border-radius: 4px;
+  }
+  .sub-hero__current-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em; font-weight: 500;
+    padding: 4px 10px; border-radius: 99px;
+    text-transform: uppercase;
+  }
+  .sub-hero__current-badge--lite       { background: #f5f5f5; color: #1a1a1a; border: 1px solid #d0d0d0; }
+  .sub-hero__current-badge--pro        { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
+  .sub-hero__current-badge--premium    { background: #f4f0fb; color: #6d28d9; border: 1px solid #c4b5f5; }
+  .sub-hero__current-badge--enterprise { background: #1a1a1a; color: #fff;    border: 1px solid #1a1a1a; }
+
+  .sub-hero__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(28px, 4vw, 48px); font-weight: 400;
+    line-height: 1.05; letter-spacing: -0.025em;
+    margin-bottom: 12px; color: #1a1a1a;
+  }
+  .sub-hero__dot { color: #e0184d; }
+  .sub-hero__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: #777; letter-spacing: 0.03em; line-height: 1.6;
+  }
+
+  /* Plans Grid */
+  .plans-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  @media (max-width: 1000px) { .plans-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .plans-grid { grid-template-columns: 1fr; } }
+
+  /* Plan Card */
+  .plan-card {
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    background: #fff;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 0;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 150ms;
+  }
+  .plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+  .plan-card--current  { border-color: #1a1a1a; border-width: 2px; }
+  .plan-card--popular  { border-color: #7c3aed; }
+  .plan-card--downgrade { opacity: 0.65; }
+
+  .plan-card__popular-bar,
+  .plan-card__current-bar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+    text-align: center;
+    padding: 4px;
+    margin: -20px -20px 16px;
+  }
+  .plan-card__popular-bar { background: #7c3aed; color: #fff; }
+  .plan-card__current-bar { background: #1a1a1a; color: #fff; }
+
+  .plan-card__head { margin-bottom: 14px; }
+  .plan-card__tier {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 99px; border: 1px solid;
+    display: inline-block; margin-bottom: 6px;
+  }
+  .plan-card__tier--lite       { background: transparent;  color: #555; border-color: #ccc; }
+  .plan-card__tier--pro        { background: #edf7f0;     color: #2e7d4f; border-color: #a8d5b8; }
+  .plan-card__tier--premium    { background: #f4f0fb;     color: #6d28d9; border-color: #c4b5f5; }
+  .plan-card__tier--enterprise { background: #1a1a1a;     color: #fff;    border-color: #1a1a1a; }
+
+  .plan-card__tagline {
+    display: block;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; color: #888; font-weight: 400;
+  }
+
+  .plan-card__price { margin-bottom: 18px; border-bottom: 1px solid #eee; padding-bottom: 16px; }
+  .plan-card__price-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px; font-weight: 300; color: #1a1a1a;
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .plan-card__price-per {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #999; margin-left: 2px;
+  }
+  .plan-card__price-year {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #999; margin-top: 4px;
+  }
+  .plan-card__price-discount {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
+    color: #2e7d4f; background: #edf7f0;
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .plan-card__price-custom {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px; font-weight: 300; color: #1a1a1a;
+  }
+
+  .plan-card__modules {
+    list-style: none; padding: 0; margin: 0 0 20px;
+    display: flex; flex-direction: column; gap: 6px;
+    flex: 1;
+  }
+  .plan-card__module-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #555; letter-spacing: 0.02em;
+    display: flex; align-items: flex-start; gap: 7px;
+    line-height: 1.4;
+  }
+  .plan-card__module-check {
+    color: #2e7d4f; flex-shrink: 0; font-size: 10px; margin-top: 1px;
+  }
+
+  .plan-card__cta { margin-top: auto; }
+
+  /* Buttons */
+  .plan-btn {
+    width: 100%; padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    border-radius: 8px; cursor: pointer; border: 1px solid;
+    transition: all 150ms; white-space: nowrap;
+  }
+  .plan-btn:disabled { cursor: not-allowed; }
+
+  .plan-btn--current  { background: #f5f5f5; color: #888; border-color: #ddd; }
+  .plan-btn--upgrade  { background: #1a1a1a; color: #fff; border-color: #1a1a1a; opacity: 0.7; }
+  .plan-btn--downgrade { background: transparent; color: #ccc; border-color: #eee; }
+  .plan-btn--contact  { background: transparent; color: #888; border-color: #ddd; }
+  .plan-btn--addon    { background: #1a1a1a; color: #fff; border-color: #1a1a1a; opacity: 0.7; }
+  .plan-btn--addon:not(:disabled):hover { background: #F5DF4D; color: #1a1a1a; border-color: #F5DF4D; }
+
+  /* Eve Add-on */
+  .addon-section { margin-bottom: 40px; }
+  .addon-card {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+    flex-wrap: wrap;
+    padding: 20px 24px;
+    border: 1px solid #e5e5e5; border-radius: 12px;
+    background: #fafafa;
+  }
+  .addon-card__left { display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 0; }
+  .addon-card__icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: #f0f0f0; display: flex; align-items: center; justify-content: center;
+    color: #555; flex-shrink: 0;
+  }
+  .addon-card__label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px; font-weight: 500; color: #1a1a1a; margin: 0 0 4px;
+  }
+  .addon-card__desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #777; line-height: 1.5; margin: 0; letter-spacing: 0.02em;
+  }
+  .addon-card__right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0;
+  }
+  .addon-card__price {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px; font-weight: 300; color: #1a1a1a; line-height: 1;
+  }
+  .addon-card__price-per {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #999;
+  }
+  .addon-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px;
+  }
+  .addon-badge--active { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
+
+  /* Footer */
+  .sub-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px 20px;
+    border: 1px solid #e5e5e5; border-radius: 10px;
+    background: #fafafa;
+  }
+  .sub-footer__note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: #888; letter-spacing: 0.02em; margin: 0;
+  }
+  .sub-footer__link { color: #1a1a1a; text-decoration: underline; text-underline-offset: 2px; }
+  .sub-footer__back {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #888; text-decoration: none; white-space: nowrap;
+    transition: color 150ms;
+  }
+  .sub-footer__back:hover { color: #1a1a1a; }
+</style>
