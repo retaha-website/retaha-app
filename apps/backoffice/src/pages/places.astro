@@ -328,88 +328,97 @@ if (savedParam === 'pick_added' && !message) {
           {activePicks.length === 0 && (
             <p class="places-empty">Noch keine Picks in dieser Kategorie. Suche oben nach einem Ort.</p>
           )}
+          {activePicks.length > 0 && (
+            <p class="s-hint">Ziehen zum Sortieren — die oberste Empfehlung zeigt Eve dem Gast zuerst.</p>
+          )}
 
           <div class="picks-list" x-data="picksSort()">
-            {activePicks.map((pick: any) => {
+            {activePicks.map((pick: any, idx: number) => {
               const cd = (pick.cached_data ?? {}) as any;
-              const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 200) : null;
+              const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 400) : null;
               const currentNote = pick.hotel_note_i18n?.[hotelDefaultLang]?.value ?? pick.hotel_note ?? '';
+              const openNow: boolean | null = (cd.opening_hours != null && cd.opening_hours.openNow != null)
+                ? Boolean(cd.opening_hours.openNow) : null;
               return (
-                <article
-                  class="pick-card"
+                <div
+                  class="pc"
                   data-pick-id={pick.id}
                   x-data={`pickCardRefresh('${pick.id}')`}
-                  :class={`{'is-drag-over': dragTarget === '${pick.id}', 'is-dragging': dragItem === '${pick.id}'}`}
+                  :class={`{'pc-drag-over': dragTarget === '${pick.id}', 'pc-dragging': dragItem === '${pick.id}'}`}
                 >
-                  <div x-show="!editing" class="pick-card__view">
-                    <span
-                      class="pick-drag-handle"
-                      @click.stop
-                      @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
-                      aria-label="Reihenfolge ändern"
+                  <!-- VIEW -->
+                  <div x-show="!editing">
+                    <div
+                      class="pc-photo"
+                      role="img"
+                      aria-label={cd.name ?? ''}
+                      style={photoUrl ? `background-image:url(${photoUrl})` : undefined}
                     >
-                      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
-                        <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
-                        <circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/>
-                        <circle cx="5" cy="12" r="1.5"/><circle cx="11" cy="12" r="1.5"/>
-                      </svg>
-                    </span>
-                    {photoUrl && (
-                      <img src={photoUrl} alt={cd.name ?? ''} class="pick-card__photo" loading="lazy" />
-                    )}
-                    <div class="pick-card__info">
-                      <div class="pick-card__top">
-                        <h3 class="pick-card__name">{cd.name ?? '(Name fehlt)'}</h3>
-                        <div class="pick-card__actions">
-                          <button
-                            type="button"
-                            x-on:click="editing = true"
-                            class="pick-action-btn"
-                            title="Notiz bearbeiten"
-                            aria-label="Notiz bearbeiten"
-                          >
-                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                              <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            class="pick-action-btn"
-                            :disabled="refreshing"
-                            x-on:click="refresh()"
-                            :title="refreshing ? '…' : 'Google-Daten aktualisieren'"
-                            aria-label="Google-Daten aktualisieren"
-                          >
-                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                              <path d="M13 2.5A6 6 0 0 1 8 14 6 6 0 0 1 2 8a6 6 0 0 1 9.43-4.93"/>
-                              <polyline points="10 2 13 2 13 5"/>
-                            </svg>
-                          </button>
-                          <form method="POST" class="pick-action-form" x-on:submit.prevent="if(confirm('Diesen Pick wirklich entfernen?')) $el.submit()">
-                            <input type="hidden" name="_action" value="pick_delete" />
-                            <input type="hidden" name="id" value={pick.id} />
-                            <button type="submit" class="pick-action-btn pick-action-btn--danger" title="Pick entfernen" aria-label="Pick entfernen">
-                              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <polyline points="3 4 4 4 13 4"/>
-                                <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
-                                <path d="M12 4l-.867 8.657A1 1 0 0 1 10.138 13H5.862a1 1 0 0 1-.995-.9L4 4"/>
-                              </svg>
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                      <p class="pick-card__meta">
-                        {cd.rating && <span><span class="s-star" aria-hidden="true">★</span> {cd.rating} ({cd.user_ratings_total ?? 0})</span>}
-                        {cd.price_level && <span> · {cd.price_level.replace('PRICE_LEVEL_', '').toLowerCase()}</span>}
-                      </p>
-                      <p class="pick-card__address">{cd.formatted_address ?? ''}</p>
-                      {currentNote && (
-                        <p class="pick-card__note">„{currentNote}"</p>
+                      <span class="pc-rank" data-rank-badge>#{idx + 1}</span>
+                      <span
+                        class="pc-drag"
+                        @click.stop
+                        @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
+                        aria-label="Reihenfolge ändern"
+                      >
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+                          <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
+                          <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
+                          <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
+                        </svg>
+                      </span>
+                      {cd.rating != null && (
+                        <span class="pc-rating">
+                          <span class="pc-star" aria-hidden="true">★</span>
+                          {cd.rating} · {cd.user_ratings_total ?? 0}
+                        </span>
                       )}
+                      {openNow !== null && (
+                        <span class={openNow ? 'pc-status pc-status--open' : 'pc-status pc-status--closed'}>
+                          {openNow ? 'GEÖFFNET' : 'GESCHLOSSEN'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div class="pc-body">
+                      <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
+                      <div class="pc-addr">{cd.formatted_address ?? ''}</div>
+
+                      {currentNote ? (
+                        <div class="pc-note">
+                          <span class="pc-note__label">Deine Notiz</span>
+                          {currentNote}
+                        </div>
+                      ) : (
+                        <div class="pc-note-empty" x-on:click="editing = true">+ Notiz hinzufügen</div>
+                      )}
+
+                      <div class="pc-foot">
+                        <button type="button" class="pc-btn" x-on:click="editing = true" title="Notiz bearbeiten" aria-label="Notiz bearbeiten">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
+                          </svg>
+                        </button>
+                        <button type="button" class="pc-btn" :disabled="refreshing" x-on:click="refresh()" :title="refreshing ? '…' : 'Daten aktualisieren'" aria-label="Google-Daten aktualisieren">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>
+                          </svg>
+                        </button>
+                        <form method="POST" class="pc-btn-form" x-on:submit.prevent="if(confirm('Pick wirklich entfernen?')) $el.submit()">
+                          <input type="hidden" name="_action" value="pick_delete" />
+                          <input type="hidden" name="id" value={pick.id} />
+                          <button type="submit" class="pc-btn pc-btn--del" title="Entfernen" aria-label="Pick entfernen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>
+                            </svg>
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   </div>
 
-                  <form x-show="editing" x-cloak method="POST" class="pick-card__edit">
+                  <!-- EDIT -->
+                  <form x-show="editing" x-cloak method="POST" class="pc-edit">
                     <input type="hidden" name="_action" value="pick_update" />
                     <input type="hidden" name="id" value={pick.id} />
                     <div class="s-field">
@@ -418,7 +427,7 @@ if (savedParam === 'pick_added' && !message) {
                       </label>
                       <textarea
                         name="hotel_note_default"
-                        rows={2}
+                        rows={3}
                         placeholder='z.B. „Unser Lieblings-Italiener für Geschäftsessen — bitte Risotto probieren!"'
                         class="s-textarea"
                       >{currentNote}</textarea>
@@ -431,7 +440,7 @@ if (savedParam === 'pick_added' && !message) {
                       <button type="button" x-on:click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
                     </div>
                   </form>
-                </article>
+                </div>
               );
             })}
           </div>
@@ -672,8 +681,14 @@ if (savedParam === 'pick_added' && !message) {
 
           if (fromIdx < toIdx) { toEl.after(fromEl); } else { toEl.before(fromEl); }
 
-          var newOrder = Array.from(list.querySelectorAll('[data-pick-id]'))
-            .map(function (el) { return el.dataset.pickId; });
+          var reordered = Array.from(list.querySelectorAll('[data-pick-id]'));
+          var newOrder = reordered.map(function (el) { return el.dataset.pickId; });
+
+          // Update visible rank badges (#1, #2 …)
+          reordered.forEach(function (el, i) {
+            var badge = el.querySelector('[data-rank-badge]');
+            if (badge) badge.textContent = '#' + (i + 1);
+          });
 
           this.dragItem = null;
           this.dragTarget = null;
@@ -748,46 +763,87 @@ if (savedParam === 'pick_added' && !message) {
     letter-spacing: 0.04em;
   }
 
-  .picks-list { display: flex; flex-direction: column; gap: 12px; }
-  .pick-card {
-    border: 1px solid var(--border); border-radius: var(--r);
-    background: var(--surface); overflow: hidden;
-    transition: box-shadow 120ms, opacity 120ms;
-  }
-  .pick-card.is-drag-over { box-shadow: inset 0 2px 0 var(--te-yellow, #FFE600); background: var(--te-yellow-soft, #FFFBEC); }
-  .pick-card.is-dragging { opacity: 0.4; }
-  .pick-card__view { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 16px 0; }
-  .pick-drag-handle {
-    display: flex; align-items: center; justify-content: center;
-    width: 36px; min-height: 88px; flex-shrink: 0;
-    cursor: grab; color: var(--ink-faint); touch-action: none; user-select: none;
-    padding: 0 4px;
-  }
-  .pick-drag-handle:hover { color: var(--ink-muted); }
-  .pick-drag-handle:active { cursor: grabbing; }
-  .pick-drag-handle svg { pointer-events: none; }
-  .pick-card__photo { width: 88px; height: 88px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
-  .pick-card__info { flex: 1; min-width: 0; padding-top: 2px; }
-  .pick-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-  .pick-card__name { font-size: 14px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pick-card__actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-  .pick-card__meta { font-size: 11px; color: var(--ink-muted); margin-bottom: 2px; }
-  .pick-card__address { font-size: 11px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pick-card__note { font-size: 12px; color: var(--ink-muted); font-style: italic; margin-top: 6px; }
+  /* ── Picks-Grid (Variante B "Kassette") ─────────────────────────────────── */
+  #picks-list .s-card__body { gap: 12px; }
+  .picks-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .picks-list { grid-template-columns: 1fr; } }
 
-  .pick-action-form { display: inline-flex; }
-  .pick-action-btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px;
-    background: none; border: 1px solid transparent; border-radius: var(--r-sm, 4px);
-    cursor: pointer; color: var(--ink-faint);
-    transition: color 150ms, border-color 150ms, background 150ms;
+  .pc {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease, opacity .12s ease;
   }
-  .pick-action-btn:hover { color: var(--ink); border-color: var(--border); background: var(--bg-deep, #EDECEA); }
-  .pick-action-btn--danger:hover { color: #c0392b; border-color: #c0392b; background: transparent; }
-  .pick-action-btn:disabled { opacity: 0.35; cursor: wait; }
+  .pc:hover { border-color: #D8D3C8; box-shadow: 0 3px 14px rgba(10,10,10,.05); }
+  .pc.pc-drag-over { box-shadow: 0 0 0 2px #FFE600; }
+  .pc.pc-dragging { opacity: 0.4; }
 
-  .pick-card__edit { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pc-photo {
+    position: relative; aspect-ratio: 1/1; width: 100%;
+    background: #4a3f33 center/cover no-repeat;
+  }
+  .pc-rank {
+    position: absolute; top: 11px; left: 11px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px;
+    color: var(--ink); background: #FFE600; padding: 3px 8px; border-radius: 6px; letter-spacing: .04em;
+  }
+  .pc-drag {
+    position: absolute; top: 11px; right: 11px; width: 30px; height: 30px;
+    border-radius: 8px; background: rgba(10,10,10,.5); backdrop-filter: blur(5px);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: grab; touch-action: none; user-select: none;
+  }
+  .pc-drag:active { cursor: grabbing; }
+  .pc-drag svg { pointer-events: none; }
+  .pc-rating {
+    position: absolute; bottom: 11px; left: 11px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    color: #fff; background: rgba(10,10,10,.62); backdrop-filter: blur(5px);
+    padding: 4px 9px; border-radius: 6px; display: flex; align-items: center; gap: 5px;
+  }
+  .pc-star { color: #FFE600; }
+  .pc-status {
+    position: absolute; bottom: 11px; right: 11px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: .08em;
+    padding: 4px 8px; border-radius: 6px; backdrop-filter: blur(5px);
+  }
+  .pc-status--open   { color: #fff; background: rgba(92,144,112,.85); }
+  .pc-status--closed { color: #fff; background: rgba(140,33,40,.82); }
+
+  .pc-body { padding: 13px 14px 0; }
+  .pc-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.22; }
+  .pc-addr { font-size: 11.5px; color: var(--ink-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-note {
+    font-size: 12px; color: var(--ink); background: #FAF8F3;
+    border-left: 2px solid #FF4A82; border-radius: 0 7px 7px 0;
+    padding: 7px 10px; margin-top: 10px;
+  }
+  .pc-note__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: .13em;
+    color: var(--ink-muted); display: block; text-transform: uppercase; margin-bottom: 2px;
+  }
+  .pc-note-empty {
+    font-size: 11.5px; color: var(--ink-muted); font-style: italic; margin-top: 10px; cursor: pointer;
+    transition: color 120ms ease;
+  }
+  .pc-note-empty:hover { color: var(--ink); }
+
+  .pc-foot {
+    display: flex; border-top: 1px solid var(--border); margin-top: 12px;
+  }
+  .pc-btn {
+    flex: 1; border: none; background: none; padding: 10px 0; cursor: pointer;
+    color: var(--ink-muted); display: flex; align-items: center; justify-content: center;
+    border-right: 1px solid var(--border);
+    transition: color .12s ease, background .12s ease;
+  }
+  .pc-btn svg { width: 15px; height: 15px; pointer-events: none; }
+  .pc-btn-form { flex: 1; display: flex; }
+  .pc-btn-form .pc-btn { flex: 1; border-right: none; }
+  .pc-btn:last-child { border-right: none; }
+  .pc-btn:hover { background: #FFE600; color: var(--ink); }
+  .pc-btn--del:hover { background: #8C2128 !important; color: #fff !important; }
+  .pc-btn:disabled { opacity: 0.35; cursor: wait; }
+  .pc-edit { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  /* ── /Picks-Grid ─────────────────────────────────────────────────────────── */
 
   .places-nearby-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
   .places-refresh-icon-btn {
