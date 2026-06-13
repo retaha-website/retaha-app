@@ -62,6 +62,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     .update({
       checked_out_at: checkedOutAt,
       is_active: false,
+      state: 'Processed',
     })
     .eq('id', session.stay_id);
 
