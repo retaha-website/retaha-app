@@ -276,21 +276,9 @@ async function getActiveBookings(ctx: EveExecutionContext) {
   };
 }
 
-async function getConferenceRooms(ctx: EveExecutionContext) {
-  const { data } = await sb()
-    .from('hotel_settings')
-    .select('conference_rooms, conference_start_time, conference_end_time, conference_slot_minutes')
-    .eq('hotel_id', ctx.hotel_id)
-    .maybeSingle();
-  const rooms = (data?.conference_rooms as any[]) ?? [];
-  return {
-    rooms,
-    booking_window: {
-      start: data?.conference_start_time,
-      end: data?.conference_end_time,
-      slot_minutes: data?.conference_slot_minutes,
-    },
-  };
+async function getConferenceRooms(_ctx: EveExecutionContext) {
+  // Conference-Modul ist deaktiviert (Legacy-Drop). Immer leere Liste zurückgeben.
+  return { rooms: [], booking_window: { start: null, end: null, slot_minutes: null } };
 }
 
 async function getHotelInfo(ctx: EveExecutionContext) {
@@ -303,8 +291,7 @@ async function getHotelInfo(ctx: EveExecutionContext) {
     .from('hotel_settings')
     .select(`
       wifi_ssid, wifi_password, wifi_speed_mbits,
-      breakfast_start_time, breakfast_end_time, breakfast_location_de,
-      conference_start_time, conference_end_time
+      breakfast_start_time, breakfast_end_time, breakfast_location_de
     `)
     .eq('hotel_id', ctx.hotel_id)
     .maybeSingle();
@@ -318,7 +305,6 @@ async function getHotelInfo(ctx: EveExecutionContext) {
       end: s.breakfast_end_time,
       location: s.breakfast_location_de,
     } : null,
-    conference: s?.conference_start_time ? { start: s.conference_start_time, end: s.conference_end_time } : null,
   };
 }
 

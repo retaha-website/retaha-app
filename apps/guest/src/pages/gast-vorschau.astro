@@ -23,7 +23,7 @@ const [
   { data: hotelLang, error: hotelLangError },
   { data: hotelSettings },
 ] = await Promise.all([
-  sb.from('hotels').select('default_language, enabled_languages').eq('id', hotel.id).maybeSingle(),
+  sb.from('hotels').select('default_language, enabled_languages, plan, addons').eq('id', hotel.id).maybeSingle(),
   sb.from('hotel_settings')
     .select('welcome_message_i18n, welcome_message_de, hotel_eyebrow_i18n, hotel_eyebrow_de, guest_address_form, features')
     .eq('hotel_id', hotel.id)
@@ -47,6 +47,8 @@ const welcomeText = pickSettingsText(hotelSettings?.welcome_message_i18n, hotelS
 const eyebrowText = pickSettingsText(hotelSettings?.hotel_eyebrow_i18n,   hotelSettings?.hotel_eyebrow_de,   hotelDefaultLang);
 const formality   = ((hotelSettings?.guest_address_form ?? 'du') === 'sie' ? 'sie' : 'du') as 'du' | 'sie';
 const featuresRaw = (hotelSettings?.features ?? {}) as Record<string, unknown>;
+const hotelPlan: string    = (hotelLang as any)?.plan   ?? 'lite';
+const hotelAddons: string[] = (hotelLang as any)?.addons ?? [];
 ---
 
 <HotelierLayout
@@ -99,7 +101,7 @@ const featuresRaw = (hotelSettings?.features ?? {}) as Record<string, unknown>;
   <script>
     // ─── iframe-basierter Demo-Modus ──────────────────────────────────────
 
-    const DEMO_MODULES = ['eve', 'breakfast', 'conference', 'service', 'recommendations', 'self_checkout'];
+    const DEMO_MODULES = ['eve', 'breakfast', 'service', 'recommendations', 'wallet', 'action_cards'];
 
     const iframe        = document.getElementById('guestPreview') as HTMLIFrameElement | null;
     const phonePreview  = document.getElementById('phonePreview');
@@ -206,6 +208,8 @@ const featuresRaw = (hotelSettings?.features ?? {}) as Record<string, unknown>;
         eyebrowText={eyebrowText}
         formality={formality}
         modulesFeatures={featuresRaw}
+        modulesHotelPlan={hotelPlan}
+        modulesHotelAddons={hotelAddons}
       />
       <DemoQrCard demoUrl={demoUrl} />
     </div>

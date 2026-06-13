@@ -50,10 +50,6 @@ export type StayContext = {
     breakfast_slot_minutes: number | null;
     breakfast_location_i18n: Record<string, any> | null;
     breakfast_included_i18n: Record<string, any> | null;
-    conference_rooms: any[];
-    conference_start_time: string | null;
-    conference_end_time: string | null;
-    conference_slot_minutes: number | null;
     service_items: any[];
     service_start_time: string | null;
     service_end_time: string | null;
@@ -78,7 +74,7 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       id, check_in, check_out, is_active,
       guest:guests(id, first_name, last_name, language, visit_count),
       room:rooms(id, room_number, room_name),
-      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, brand_primary, currency)
+      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, brand_primary, currency, plan, addons)
     `)
     .eq('access_token', token)
     .eq('is_active', true)
@@ -103,7 +99,6 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
       breakfast_hours,
       breakfast_location_i18n, breakfast_included_i18n,
-      conference_rooms, conference_start_time, conference_end_time, conference_slot_minutes,
       service_items, service_start_time, service_end_time
     `)
     .eq('hotel_id', (stay.hotel as any).id)

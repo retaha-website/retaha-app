@@ -1,43 +1,56 @@
 ---
+import { isModuleAvailable } from '../../../lib/plan-modules';
+
 interface Props {
   features?: Record<string, unknown>;
+  hotelPlan?: string;
+  hotelAddons?: string[];
 }
-const { features = {} } = Astro.props;
+const { features = {}, hotelPlan = 'lite', hotelAddons = [] } = Astro.props;
 
-// Same logic as guest Startseite: key !== false → on (undefined/null/true → on)
 function isOn(key: string): boolean {
   return features[key] !== false;
 }
 
-const groups = [
+function avail(key: string): boolean {
+  return isModuleAvailable({ plan: hotelPlan, addons: hotelAddons }, key);
+}
+
+const ALL_GROUPS = [
   {
     label: 'Gäste-Services',
     modules: [
-      { key: 'eve',          label: 'Eve Concierge',   sub: 'KI-Chat für Gäste' },
-      { key: 'recommendations', label: 'Empfehlungen',     sub: 'Google Places, Tipps' },
-      { key: 'service',      label: 'Service-Anfragen', sub: 'Zimmerwünsche, Buchungen' },
+      { key: 'eve',             label: 'Eve Concierge',   sub: 'KI-Chat für Gäste' },
+      { key: 'recommendations', label: 'Empfehlungen',    sub: 'Google Places, Tipps' },
+      { key: 'service',         label: 'Service-Anfragen', sub: 'Zimmerwünsche, Buchungen' },
     ],
   },
   {
-    label: 'Kulinarik & Buchung',
+    label: 'Kulinarik',
     modules: [
-      { key: 'breakfast',   label: 'Frühstück',   sub: 'Slot-Buchung, Zeiten' },
+      { key: 'breakfast', label: 'Frühstück', sub: 'Slot-Buchung, Zeiten' },
     ],
   },
   {
-    label: 'Abreise & Wallet',
+    label: 'Wallet & CRM',
     modules: [
-      { key: 'self_checkout', label: 'Self-Checkout', sub: 'Digitale Abreise' },
-      { key: 'wallet',        label: 'Wallet-Pass',   sub: 'Apple & Google Wallet' },
+      { key: 'wallet',    label: 'Wallet-Pass',       sub: 'Apple & Google Wallet' },
+      { key: 'marketing', label: 'Marketing',          sub: 'Drips + Kampagnen' },
+      { key: 'loyalty',   label: 'Loyalty-Program',   sub: 'Punkte, Stufen, Belohnungen' },
     ],
   },
   {
     label: 'Inhalte',
     modules: [
-      { key: 'action_cards', label: 'Hero-Slider', sub: 'Swipeable Karten-Feed' },
+      { key: 'action_cards', label: 'Action-Cards', sub: 'Hero-Kacheln' },
     ],
   },
 ];
+
+// Nur Gruppen/Module zeigen die im Plan verfügbar sind
+const groups = ALL_GROUPS
+  .map(g => ({ ...g, modules: g.modules.filter(m => avail(m.key)) }))
+  .filter(g => g.modules.length > 0);
 ---
 
 <section class="settings-section">
@@ -45,6 +58,10 @@ const groups = [
     <span class="settings-section__title">— Module —</span>
     <span class="settings-section__hint">live toggle</span>
   </div>
+
+  {groups.length === 0 && (
+    <p class="mod-empty">Keine Module in deinem Paket verfügbar.</p>
+  )}
 
   {groups.map(group => (
     <div class="module-group">
@@ -81,6 +98,12 @@ const groups = [
   .settings-section__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .settings-section__title { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: var(--ink); font-weight: 500; text-transform: uppercase; }
   .settings-section__hint { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted); }
+
+  .mod-empty {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--ink-muted); letter-spacing: 0.04em; text-align: center;
+    padding: 16px 0;
+  }
 
   .module-group { margin-bottom: 16px; }
   .module-group:last-child { margin-bottom: 0; }
@@ -143,8 +166,6 @@ const groups = [
     if (state === 'saved') statusTimer = setTimeout(() => setStatus('', ''), 2500);
   }
 
-  // Sync preview state from SSR-rendered DOM — initialState has all-true hardcoded,
-  // reading DOM gives us the real DB values the server rendered.
   const domModules: Partial<ReturnType<typeof getState>['modules']> = {};
   document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
     const k = btn.dataset.moduleKey as ModuleKey | undefined;
@@ -157,11 +178,9 @@ const groups = [
       const key = btn.dataset.moduleKey as ModuleKey | undefined;
       if (!key || btn.dataset.loading) return;
 
-      // Read current state from DOM (not from initialState which hardcodes all-true)
       const wasOn = btn.classList.contains('is-on');
       const newVal = !wasOn;
 
-      // Optimistic update
       btn.classList.toggle('is-on', newVal);
       btn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
       updateState({ modules: { ...getState().modules, [key]: newVal } });
@@ -178,7 +197,6 @@ const groups = [
         if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
         setStatus('saved', '✓ Gespeichert');
       } catch {
-        // Rollback visual + state on failure
         btn.classList.toggle('is-on', wasOn);
         btn.setAttribute('aria-pressed', wasOn ? 'true' : 'false');
         updateState({ modules: { ...getState().modules, [key]: wasOn } });

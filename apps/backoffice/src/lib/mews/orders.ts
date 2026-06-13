@@ -134,7 +134,7 @@ async function loadHotelSettings(hotelId: string) {
   const supabase = createSupabaseServiceRoleInstance();
   const { data } = await supabase
     .from('hotel_settings')
-    .select('conference_rooms, service_items, breakfast_price_cents')
+    .select('service_items, breakfast_price_cents')
     .eq('hotel_id', hotelId)
     .maybeSingle();
   return data;

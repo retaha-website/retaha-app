@@ -103,7 +103,6 @@ async function loadEveWelcomeContext(sb: any, hotelId: string, stayId: string, r
       wifi_ssid, wifi_password, wifi_speed_mbits,
       breakfast_start_time, breakfast_end_time,
       breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es,
-      conference_rooms, conference_start_time, conference_end_time
     `).eq('hotel_id', hotelId).maybeSingle(),
     sb.from('eve_knowledge')
       .select('category, question, answer')

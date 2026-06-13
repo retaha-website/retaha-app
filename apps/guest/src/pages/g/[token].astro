@@ -3,8 +3,8 @@ import { loadStayByToken, loadBookingsForStay } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import ConferenceSheet from '../../components/sheets/ConferenceSheet.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
+import { isModuleAvailable } from '../../lib/plan-modules';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
 import ConsentModule from '@retaha/ui-guest/ConsentModule';
@@ -57,7 +57,7 @@ if (token && isShowcaseToken(token)) {
     // Pseudo-Context aus Demo-Daten + Hotel + Hotel-Settings
     const sbSrInit = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary, plan, addons').eq('id', showcaseSession.hotel_id).single(),
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -144,9 +144,6 @@ if (!existingSession || existingSession.stay_id !== stay.id || !!existingSession
     is_showcase: isShowcase,
   });
 }
-
-const existingConferenceBookings = await loadBookingsForStay(stay.id, 'conference');
-const activeConferenceBooking = existingConferenceBookings[0] || null;
 
 const existingServiceBookings = await loadBookingsForStay(stay.id, 'service');
 const activeServiceBooking = existingServiceBookings[0] || null;
@@ -318,6 +315,8 @@ const recs = (actionCardsRows ?? []).map((card: any) => ({
 // (weather placeholder removed — replaced by fetchWeather above)
 
 const f = (settings as any).features ?? {};
+const _hotelForModules = { plan: (hotel as any).plan ?? 'lite', addons: (hotel as any).addons ?? [] };
+const avail = (key: string) => isModuleAvailable(_hotelForModules, key);
 const wifiSsid: string | null = settings.wifi_ssid || (isShowcase ? 'Demo-Hotel-WLAN' : null);
 const wifiPassword: string = settings.wifi_password || (isShowcase ? 'gast2026' : '');
 const wifiConfigured = !!wifiSsid;
@@ -336,7 +335,7 @@ const eveSuggestions = getEveSmartChips(
   localHour,
   lang,
   (_topFaqs ?? []).map((r: any) => ({ id: r.id, question: r.question as string, question_i18n: r.question_i18n })),
-  { wifi: wifiConfigured, breakfast: f.breakfast !== false },
+  { wifi: wifiConfigured, breakfast: avail('breakfast') && f.breakfast !== false },
 );
 
 const switchUrl = (l: string) => `/g/${token}?lang=${l}`;
@@ -372,7 +371,7 @@ const brandStyle = (() => {
 // Sheet wirklich aufpoppt — Render-Aufwand sparen wir trotzdem schon hier.
 // Sprint Wallet Phase 5 — Add-to-Wallet nur anzeigen wenn Wallet konfiguriert
 // UND der Gast eine Email hat (Pass braucht guest_email).
-const walletAvailable = isWalletConfigured() && !!guest?.email;
+const walletAvailable = avail('wallet') && isWalletConfigured() && !!guest?.email;
 
 const stayEnded = Date.parse(stay.check_out) < Date.now();
 let hasStayFeedback = false;
@@ -515,7 +514,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       </div>
 
       <!-- RECOMMENDATION SLIDER -->
-      {f.action_cards !== false && recs.length > 0 && (
+      {avail('action_cards') && f.action_cards !== false && recs.length > 0 && (
         <section class="rec-slider-section">
           <div class="rec-slider-eyebrow themed-eyebrow-flank">{t('rec.eyebrow', lang)}</div>
           <div class="rec-slider"
@@ -599,7 +598,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </a>
           )}
 
-          {f.eve !== false && (
+          {avail('eve') && f.eve !== false && (
             <button class="gate-tile" data-tile="eve" type="button" @click="eveOpen = true; eveSeenBefore = true; try { localStorage.setItem('retaha_eve_seen', '1') } catch(_) {}; eveMaybeWelcome()">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="10" r="2"/><circle cx="15" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -609,27 +608,18 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </button>
           )}
 
-          <a class="gate-tile" data-tile="breakfast" href={`/g/${token}/breakfast?persona=${stayPersona}`} data-astro-reload style="text-decoration:none;color:inherit">
-            <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
-            <span class="gate-tile-icon">
-              <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
-            </span>
-            <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
-            <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
-          </a>
-
-          {f.conference !== false && settings.conference_rooms && settings.conference_rooms.length > 0 && (
-            <button class="gate-tile" data-tile="conference" type="button" @click="openSheet('conference')">
-              <span class="gate-tile-badge">{t('tile.conference.badge', lang)}</span>
+          {avail('breakfast') && f.breakfast !== false && (
+            <a class="gate-tile" data-tile="breakfast" href={`/g/${token}/breakfast?persona=${stayPersona}`} data-astro-reload style="text-decoration:none;color:inherit">
+              <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
               <span class="gate-tile-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="12"/></svg>
+                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,5 19,18 5,18"/></svg>
               </span>
-              <span class="gate-tile-label">{t('tile.conference', lang)}</span>
-              <span class="gate-tile-sub">{t('tile.conference.sub', lang)}</span>
-            </button>
+              <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
+            </a>
           )}
 
-          {f.service !== false && settings.service_items && settings.service_items.length > 0 && (
+          {avail('service') && f.service !== false && settings.service_items && settings.service_items.length > 0 && (
             <button class="gate-tile" data-tile="service" type="button" @click="openSheet('service')">
               <span class="gate-tile-badge orange">{t('tile.service.badge', lang)}</span>
               <span class="gate-tile-icon">
@@ -640,7 +630,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </button>
           )}
 
-          {f.recommendations !== false && (
+          {avail('recommendations') && f.recommendations !== false && (
             <a class="gate-tile" data-tile="recommendations" href={`/g/${token}/recommendations?persona=${stayPersona}`} data-astro-reload style="text-decoration:none;color:inherit">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L18 12 L12 21 L6 12 Z"/></svg>
@@ -650,7 +640,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </a>
           )}
 
-          {f.self_checkout !== false && (
+          {avail('self_checkout') && f.self_checkout !== false && (
             <button class="gate-tile tile-checkout" data-tile="self_checkout" type="button" onclick={`window.location='/g/${token}/checkout'`}>
               <div class="checkout-left">
                 <span class="check-icon">
@@ -665,7 +655,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </button>
           )}
 
-          {f.loyalty !== false && (
+          {avail('loyalty') && f.loyalty !== false && (
             <button class="gate-tile" type="button" onclick={`window.location='/g/${token}/loyalty'`}>
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -696,23 +686,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       )}
 
       <!-- SHEETS (rendered as overlays, alle Themes) -->
-      {f.conference !== false && settings.conference_rooms && settings.conference_rooms.length > 0 && (
-        <ConferenceSheet
-          lang={lang}
-          rooms={settings.conference_rooms}
-          startTime={settings.conference_start_time || '08:00'}
-          endTime={settings.conference_end_time || '20:00'}
-          slotMinutes={settings.conference_slot_minutes || 60}
-          accessToken={token!}
-          existingBooking={activeConferenceBooking}
-          conciergeName={settings.eve_name || 'das Team'}
-          checkIn={stay.check_in}
-          checkOut={stay.check_out}
-        />
-      )}
-
-
-      {f.service !== false && settings.service_items && settings.service_items.length > 0 && (
+      {avail('service') && f.service !== false && settings.service_items && settings.service_items.length > 0 && (
         <ServiceSheet
           lang={lang}
           items={settings.service_items}
@@ -726,7 +700,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         />
       )}
 
-      {f.eve !== false && (
+      {avail('eve') && f.eve !== false && (
         <>
           <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang, guestName: guest?.first_name ?? null, eveName: settings.eve_name || 'Eve' })};window.__RETAHA_META__ = ${JSON.stringify({ isShowcase })};`} />
           <EveChatSheet
@@ -1208,7 +1182,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                 window.location.href = `/g/${_tok}/${_dest}?persona=${_pers}`;
                 return;
               }
-              const KNOWN_SHEETS = new Set(['conference', 'service']);
+              const KNOWN_SHEETS = new Set(['service']);
               if (KNOWN_SHEETS.has(sheetId)) {
                 this.openSheet(sheetId);
               } else {

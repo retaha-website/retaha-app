@@ -4,8 +4,12 @@ import type { APIRoute } from 'astro';
 import { getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 
 const ALLOWED_KEYS = new Set([
-  'eve', 'recommendations', 'service', 'breakfast',
-  'conference', 'self_checkout', 'wallet', 'action_cards',
+  // Lite
+  'breakfast', 'service', 'feedback', 'action_cards',
+  // Pro
+  'recommendations', 'multi_language', 'nfc_tags', 'pre_stay', 'stay_pushes',
+  // Premium
+  'eve', 'wallet', 'marketing', 'loyalty',
 ]);
 
 function json(data: unknown, status = 200) {
