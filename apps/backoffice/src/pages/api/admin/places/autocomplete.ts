@@ -13,6 +13,20 @@ export const GET: APIRoute = async ({ cookies, request, url }) => {
   const q = url.searchParams.get('q')?.trim() ?? '';
   if (q.length < 2) return json({ ok: true, suggestions: [] }, 200);
 
+  const category = url.searchParams.get('category')?.trim() ?? '';
+
+  // Mapping Kategorie → Google Primary Types — schränkt Suche auf Betriebe ein,
+  // nicht auf Städte/administrative Regionen.
+  const CATEGORY_PRIMARY_TYPES: Record<string, string[]> = {
+    restaurant: ['restaurant'],
+    cafe:       ['cafe', 'coffee_shop'],
+    bar:        ['bar', 'wine_bar', 'pub'],
+    sight:      ['tourist_attraction', 'museum', 'art_gallery', 'historical_landmark'],
+    activity:   ['tourist_attraction', 'park', 'amusement_park', 'hiking_area'],
+    explore:    ['tourist_attraction', 'museum', 'art_gallery', 'historical_landmark', 'park', 'amusement_park'],
+  };
+  const includedPrimaryTypes = CATEGORY_PRIMARY_TYPES[category];
+
   const sb = createSupabaseServerInstance(cookies, request);
   const { data: hotelRow } = await sb
     .from('hotels')
@@ -28,6 +42,7 @@ export const GET: APIRoute = async ({ cookies, request, url }) => {
       lat, lng,
       radius: 5000,
       languageCode: 'de',
+      ...(includedPrimaryTypes ? { includedPrimaryTypes } : {}),
     });
     return json({ ok: true, suggestions }, 200);
   } catch (err) {

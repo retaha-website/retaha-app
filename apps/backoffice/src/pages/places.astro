@@ -208,7 +208,7 @@ if (savedParam === 'pick_added' && !message) {
   message = { type: 'success', text: 'Pick hinzugefügt — bitte Notiz pflegen.' };
 }
 
-const totalPicks = (allPicks ?? []).length;
+
 ---
 
 <Layout title="Empfehlungen" activeTab="backoffice">
@@ -329,14 +329,31 @@ const totalPicks = (allPicks ?? []).length;
             <p class="places-empty">Noch keine Picks in dieser Kategorie. Suche oben nach einem Ort.</p>
           )}
 
-          <div class="picks-list">
-            {activePicks.map((pick: any, idx: number) => {
+          <div class="picks-list" x-data="picksSort()">
+            {activePicks.map((pick: any) => {
               const cd = (pick.cached_data ?? {}) as any;
               const photoUrl = pick.photo_references?.[0] ? buildPhotoUrl(pick.photo_references[0], 200) : null;
               const currentNote = pick.hotel_note_i18n?.[hotelDefaultLang]?.value ?? pick.hotel_note ?? '';
               return (
-                <article class="pick-card" x-data={`pickCardRefresh('${pick.id}')`}>
+                <article
+                  class="pick-card"
+                  data-pick-id={pick.id}
+                  x-data={`pickCardRefresh('${pick.id}')`}
+                  :class={`{'is-drag-over': dragTarget === '${pick.id}', 'is-dragging': dragItem === '${pick.id}'}`}
+                >
                   <div x-show="!editing" class="pick-card__view">
+                    <span
+                      class="pick-drag-handle"
+                      @click.stop
+                      @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
+                      aria-label="Reihenfolge ändern"
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                        <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
+                        <circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/>
+                        <circle cx="5" cy="12" r="1.5"/><circle cx="11" cy="12" r="1.5"/>
+                      </svg>
+                    </span>
                     {photoUrl && (
                       <img src={photoUrl} alt={cd.name ?? ''} class="pick-card__photo" loading="lazy" />
                     )}
@@ -344,35 +361,40 @@ const totalPicks = (allPicks ?? []).length;
                       <div class="pick-card__top">
                         <h3 class="pick-card__name">{cd.name ?? '(Name fehlt)'}</h3>
                         <div class="pick-card__actions">
-                          {idx > 0 && (
-                            <form method="POST" class="pick-action-form">
-                              <input type="hidden" name="_action" value="pick_move" />
-                              <input type="hidden" name="id" value={pick.id} />
-                              <input type="hidden" name="direction" value="up" />
-                              <button type="submit" class="pick-action-btn" aria-label="Nach oben">↑</button>
-                            </form>
-                          )}
-                          {idx < activePicks.length - 1 && (
-                            <form method="POST" class="pick-action-form">
-                              <input type="hidden" name="_action" value="pick_move" />
-                              <input type="hidden" name="id" value={pick.id} />
-                              <input type="hidden" name="direction" value="down" />
-                              <button type="submit" class="pick-action-btn" aria-label="Nach unten">↓</button>
-                            </form>
-                          )}
-                          <button type="button" x-on:click="editing = true" class="pick-action-btn">Notiz</button>
+                          <button
+                            type="button"
+                            x-on:click="editing = true"
+                            class="pick-action-btn"
+                            title="Notiz bearbeiten"
+                            aria-label="Notiz bearbeiten"
+                          >
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
+                            </svg>
+                          </button>
                           <button
                             type="button"
                             class="pick-action-btn"
                             :disabled="refreshing"
                             x-on:click="refresh()"
                             :title="refreshing ? '…' : 'Google-Daten aktualisieren'"
-                            aria-label="Aktualisieren"
-                          >↻</button>
+                            aria-label="Google-Daten aktualisieren"
+                          >
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M13 2.5A6 6 0 0 1 8 14 6 6 0 0 1 2 8a6 6 0 0 1 9.43-4.93"/>
+                              <polyline points="10 2 13 2 13 5"/>
+                            </svg>
+                          </button>
                           <form method="POST" class="pick-action-form" x-on:submit.prevent="if(confirm('Diesen Pick wirklich entfernen?')) $el.submit()">
                             <input type="hidden" name="_action" value="pick_delete" />
                             <input type="hidden" name="id" value={pick.id} />
-                            <button type="submit" class="pick-action-btn pick-action-btn--danger">×</button>
+                            <button type="submit" class="pick-action-btn pick-action-btn--danger" title="Pick entfernen" aria-label="Pick entfernen">
+                              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="3 4 4 4 13 4"/>
+                                <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
+                                <path d="M12 4l-.867 8.657A1 1 0 0 1 10.138 13H5.862a1 1 0 0 1-.995-.9L4 4"/>
+                              </svg>
+                            </button>
                           </form>
                         </div>
                       </div>
@@ -431,12 +453,17 @@ const totalPicks = (allPicks ?? []).length;
             <p class="s-hint">Automatische Vorschläge aus Google Places in deiner Umgebung.</p>
             <button
               type="button"
-              class="v9-btn v9-btn--ghost"
+              class="places-refresh-icon-btn"
               :disabled="refreshing"
               x-on:click="refreshNearby()"
+              title="Empfehlungen aktualisieren"
+              aria-label="Empfehlungen aktualisieren"
             >
-              <span x-show="!refreshing">↻ Aktualisieren</span>
-              <span x-show="refreshing" x-cloak>… aktualisiere</span>
+              <svg x-show="!refreshing" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M13 2.5A6 6 0 0 1 8 14 6 6 0 0 1 2 8a6 6 0 0 1 9.43-4.93"/>
+                <polyline points="10 2 13 2 13 5"/>
+              </svg>
+              <span x-show="refreshing" x-cloak aria-hidden="true">…</span>
             </button>
           </div>
 
@@ -582,6 +609,89 @@ const totalPicks = (allPicks ?? []).length;
         },
       };
     });
+
+    // Drag & Drop — exakt wie breakfast.astro (Pointer Events auf window, kein setPointerCapture wegen iOS)
+    A.data('picksSort', function () {
+      return {
+        dragItem: null,
+        dragTarget: null,
+        _ptrItem: null,
+        _ptrMoveHandler: null,
+        _ptrUpHandler: null,
+
+        dndPtrDown: function (e, pickId) {
+          e.preventDefault();
+          this._ptrItem = pickId;
+          this.dragItem = pickId;
+          var pid = e.pointerId;
+          var self = this;
+
+          self._ptrMoveHandler = function (ev) {
+            if (ev.pointerId !== pid) return;
+            ev.preventDefault();
+            var el = document.elementFromPoint(ev.clientX, ev.clientY);
+            var row = el && el.closest('[data-pick-id]');
+            if (row) {
+              var targetId = row.dataset.pickId;
+              if (targetId && targetId !== self._ptrItem) {
+                self.dragTarget = targetId;
+              }
+            }
+          };
+          self._ptrUpHandler = function (ev) {
+            if (ev.pointerId !== pid) return;
+            window.removeEventListener('pointermove', self._ptrMoveHandler);
+            window.removeEventListener('pointerup', self._ptrUpHandler);
+            window.removeEventListener('pointercancel', self._ptrUpHandler);
+            if (self._ptrItem && self.dragTarget) {
+              self._dndPerform(self.dragTarget);
+            } else {
+              self.dragItem = null;
+              self.dragTarget = null;
+            }
+            self._ptrItem = null;
+            self._ptrMoveHandler = null;
+            self._ptrUpHandler = null;
+          };
+          window.addEventListener('pointermove', self._ptrMoveHandler, { passive: false });
+          window.addEventListener('pointerup', self._ptrUpHandler);
+          window.addEventListener('pointercancel', self._ptrUpHandler);
+        },
+
+        _dndPerform: async function (targetId) {
+          var list = this.$el;
+          var items = Array.from(list.querySelectorAll('[data-pick-id]'));
+          var fromEl = items.find(function (el) { return el.dataset.pickId === this.dragItem; }, this);
+          var toEl   = items.find(function (el) { return el.dataset.pickId === targetId; });
+
+          if (!fromEl || !toEl || fromEl === toEl) {
+            this.dragItem = null; this.dragTarget = null; return;
+          }
+          var fromIdx = items.indexOf(fromEl);
+          var toIdx   = items.indexOf(toEl);
+
+          if (fromIdx < toIdx) { toEl.after(fromEl); } else { toEl.before(fromEl); }
+
+          var newOrder = Array.from(list.querySelectorAll('[data-pick-id]'))
+            .map(function (el) { return el.dataset.pickId; });
+
+          this.dragItem = null;
+          this.dragTarget = null;
+
+          try {
+            var res = await fetch('/api/admin/places/reorder', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: newOrder }),
+            });
+            var body = await res.json();
+            if (!body.ok) console.warn('[picks reorder]', body.error);
+          } catch (err) {
+            console.warn('[picks reorder] network', err);
+          }
+        },
+      };
+    });
   });
 </script>
 
@@ -642,31 +752,53 @@ const totalPicks = (allPicks ?? []).length;
   .pick-card {
     border: 1px solid var(--border); border-radius: var(--r);
     background: var(--surface); overflow: hidden;
+    transition: box-shadow 120ms, opacity 120ms;
   }
-  .pick-card__view { display: flex; gap: 16px; padding: 16px; }
+  .pick-card.is-drag-over { box-shadow: inset 0 2px 0 var(--te-yellow, #FFE600); background: var(--te-yellow-soft, #FFFBEC); }
+  .pick-card.is-dragging { opacity: 0.4; }
+  .pick-card__view { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 16px 0; }
+  .pick-drag-handle {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; min-height: 88px; flex-shrink: 0;
+    cursor: grab; color: var(--ink-faint); touch-action: none; user-select: none;
+    padding: 0 4px;
+  }
+  .pick-drag-handle:hover { color: var(--ink-muted); }
+  .pick-drag-handle:active { cursor: grabbing; }
+  .pick-drag-handle svg { pointer-events: none; }
   .pick-card__photo { width: 88px; height: 88px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
-  .pick-card__info { flex: 1; min-width: 0; }
+  .pick-card__info { flex: 1; min-width: 0; padding-top: 2px; }
   .pick-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
   .pick-card__name { font-size: 14px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pick-card__actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .pick-card__actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .pick-card__meta { font-size: 11px; color: var(--ink-muted); margin-bottom: 2px; }
   .pick-card__address { font-size: 11px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pick-card__note { font-size: 12px; color: var(--ink-muted); font-style: italic; margin-top: 6px; }
 
-  .pick-action-form { display: inline; }
+  .pick-action-form { display: inline-flex; }
   .pick-action-btn {
-    padding: 4px 8px; font-size: 12px; color: var(--ink-faint);
-    background: none; border: 1px solid transparent; border-radius: 4px;
-    cursor: pointer; transition: color 150ms, border-color 150ms, background 150ms;
-    line-height: 1.4;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm, 4px);
+    cursor: pointer; color: var(--ink-faint);
+    transition: color 150ms, border-color 150ms, background 150ms;
   }
-  .pick-action-btn:hover { color: var(--ink); border-color: var(--border); }
-  .pick-action-btn--danger:hover { color: #c0392b; border-color: #c0392b; }
-  .pick-action-btn:disabled { opacity: 0.4; cursor: wait; }
+  .pick-action-btn:hover { color: var(--ink); border-color: var(--border); background: var(--bg-deep, #EDECEA); }
+  .pick-action-btn--danger:hover { color: #c0392b; border-color: #c0392b; background: transparent; }
+  .pick-action-btn:disabled { opacity: 0.35; cursor: wait; }
 
   .pick-card__edit { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 
   .places-nearby-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+  .places-refresh-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; flex-shrink: 0;
+    background: none; border: 1px solid var(--border-medium, #D0CCC5);
+    border-radius: var(--r-sm, 4px); cursor: pointer; color: var(--ink);
+    transition: background 150ms, color 150ms;
+  }
+  .places-refresh-icon-btn:hover:not(:disabled) { background: var(--bg-deep, #EDECEA); }
+  .places-refresh-icon-btn:disabled { opacity: 0.35; cursor: wait; }
   .nearby-list { display: flex; flex-direction: column; gap: 8px; }
   .nearby-item {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;

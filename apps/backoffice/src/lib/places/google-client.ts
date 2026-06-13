@@ -111,6 +111,9 @@ export interface AutocompleteOptions {
   radius?: number;
   /** Sprach-Code z.B. 'de', 'en'. */
   languageCode?: string;
+  /** Google Primary Types Filter — schränkt Ergebnisse auf bestimmte Betriebstypen ein.
+   *  Ohne Filter liefert Google auch Städte/Regionen. */
+  includedPrimaryTypes?: string[];
 }
 
 export async function placesAutocomplete(
@@ -132,6 +135,11 @@ export async function placesAutocomplete(
         radius: Math.max(1, Math.min(50000, options.radius ?? 50000)),
       },
     };
+  }
+
+  // Typ-Filter: schränkt auf Establishments ein — verhindert Städte/Regionen in Ergebnissen
+  if (options.includedPrimaryTypes && options.includedPrimaryTypes.length > 0) {
+    body.includedPrimaryTypes = options.includedPrimaryTypes;
   }
 
   // SKU: Autocomplete (Per Session) — gratis bis 5000 Sessions/Monat
