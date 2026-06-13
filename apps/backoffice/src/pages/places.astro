@@ -353,7 +353,7 @@ if (savedParam === 'pick_added' && !message) {
                   x-data={`pickCardRefresh('${pick.id}', ${JSON.stringify(currentNote)})`}
                   :class={`{'pc-drag-over': dragTarget === '${pick.id}', 'pc-dragging': dragItem === '${pick.id}'}`}
                 >
-                  <!-- Photo (cinematic) -->
+                  <!-- Photo (cinematic, overflow:hidden für border-radius Clipping) -->
                   <div
                     class:list={['pc-photo', !photoUrl && 'pc-photo--nophoto']}
                     role="img"
@@ -361,18 +361,24 @@ if (savedParam === 'pick_added' && !message) {
                     style={photoUrl ? `background-image:url(${photoUrl})` : undefined}
                   >
                     <span class="pc-rank" data-rank-badge>#{idx + 1}</span>
-                    <span
-                      class="pc-drag"
-                      @click.stop
-                      @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
-                      aria-label="Reihenfolge ändern"
+                    <!-- Notiz-Chip unten links, über der Caption -->
+                    <button
+                      type="button"
+                      class="pc-note-chip"
+                      :class="{ 'pc-note-chip--empty': !savedNote }"
+                      @click="openEditor()"
+                      aria-label="Notiz bearbeiten"
                     >
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
-                        <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
-                        <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
-                        <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
-                      </svg>
-                    </span>
+                      <svg x-cloak x-show="savedNote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><path d="M4 5h16v11H7l-3 3z"/></svg>
+                      <svg x-cloak x-show="!savedNote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13" aria-hidden="true"><path d="M12 5V19"/><path d="M5 12H19"/></svg>
+                      <span>Notiz</span>
+                    </button>
+                    <!-- Name + Adresse Caption -->
+                    <div class="pc-cap">
+                      <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
+                      <div class="pc-addr">{cd.formatted_address ?? ''}</div>
+                    </div>
+                    <!-- Rating-Chip unten rechts -->
                     {cd.rating != null && (
                       <span class="pc-rating">
                         <span class="pc-rating-star" aria-hidden="true">
@@ -381,64 +387,57 @@ if (savedParam === 'pick_added' && !message) {
                         {cd.rating} · {cd.user_ratings_total ?? 0}
                       </span>
                     )}
-                    <div class="pc-cap">
-                      <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
-                      <div class="pc-addr">{cd.formatted_address ?? ''}</div>
+                  </div>
+
+                  <!-- Toolbar: Drag-Handle + Kebab — auf .pc, nicht .pc-photo, damit Menü-Dropdown nicht abgeschnitten wird -->
+                  <div class="pc-toolbar">
+                    <span
+                      class="pc-drag"
+                      @click.stop
+                      @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
+                      aria-label="Reihenfolge ändern"
+                      role="button"
+                      tabindex="0"
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                        <circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
+                        <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
+                        <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/>
+                      </svg>
+                    </span>
+                    <div class="pc-kebab-wrap">
+                      <button
+                        type="button"
+                        class="pc-kebab"
+                        @click="menuOpen = !menuOpen"
+                        aria-label="Aktionen"
+                        aria-haspopup="true"
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
+                        </svg>
+                      </button>
+                      <div class="pc-menu" x-show="menuOpen" x-cloak @click.outside="menuOpen = false">
+                        <button type="button" class="pc-menu-btn" @click="menuOpen=false; openEditor()">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                          <span x-text="savedNote ? 'Notiz bearbeiten' : 'Notiz hinzufügen'">Notiz</span>
+                        </button>
+                        <button type="button" class="pc-menu-btn" :disabled="refreshing" @click="menuOpen=false; refresh()">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                          Aktualisieren
+                        </button>
+                        <div class="pc-menu-sep"></div>
+                        <button type="button" class="pc-menu-btn" @click="menuOpen=false; removePick()">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                          Aus Picks entfernen
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- Body -->
-                  <div class="pc-body">
-                    <div class="pc-toprow">
-                      <div class="pc-kebab-wrap">
-                        <button
-                          type="button"
-                          class="pc-kebab"
-                          @click="menuOpen = !menuOpen"
-                          aria-label="Aktionen"
-                          aria-haspopup="true"
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
-                          </svg>
-                        </button>
-                        <div class="pc-menu" x-show="menuOpen" x-cloak @click.outside="menuOpen = false">
-                          <button type="button" class="pc-menu-btn" @click="menuOpen=false; openEditor()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-                            <span x-text="savedNote ? 'Notiz bearbeiten' : 'Notiz hinzufügen'">Notiz</span>
-                          </button>
-                          <button type="button" class="pc-menu-btn" :disabled="refreshing" @click="menuOpen=false; refresh()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-                            Aktualisieren
-                          </button>
-                          <div class="pc-menu-sep"></div>
-                          <button type="button" class="pc-menu-btn" @click="menuOpen=false; removePick()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-                            Aus Picks entfernen
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Note display (reactive after save) -->
-                    <div
-                      class="pc-note-display"
-                      x-show="savedNote && !noteEditing"
-                      x-cloak
-                      @click="openEditor()"
-                    >
-                      <span class="pc-note-lbl">DEINE NOTIZ</span>
-                      <span x-text="savedNote"></span>
-                    </div>
-                    <div
-                      class="pc-addnote"
-                      x-show="!savedNote && !noteEditing"
-                      x-cloak
-                      @click="openEditor()"
-                    >+ Notiz hinzufügen</div>
-
-                    <!-- Inline note editor -->
-                    <div class="pc-note-edit" x-show="noteEditing" x-cloak>
+                  <!-- Notiz-Editor: nur sichtbar wenn noteEditing=true → kein Whitespace sonst -->
+                  <div class="pc-body" x-show="noteEditing" x-cloak>
+                    <div class="pc-note-edit">
                       <textarea
                         class="pc-note-ta"
                         placeholder="Deine Empfehlung für den Gast …"
@@ -452,7 +451,6 @@ if (savedParam === 'pick_added' && !message) {
                         <button type="button" class="pc-note-cancel" @click="cancelEdit()">Abbrechen</button>
                       </div>
                     </div>
-
                     <!-- Hidden delete form (submitted by removePick()) -->
                     <form method="POST" class="pc-delete-form">
                       <input type="hidden" name="_action" value="pick_delete" />
@@ -874,8 +872,8 @@ if (savedParam === 'pick_added' && !message) {
   @media (max-width: 600px) { .picks-list { grid-template-columns: 1fr; } }
 
   .pc {
+    position: relative;
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    /* overflow: hidden removed — dropdown-Menü muss aus der Karte herausragen */
     transition: border-color .15s ease, box-shadow .15s ease, opacity .12s ease;
   }
   .pc:hover { border-color: #D8D3C8; box-shadow: 0 2px 12px rgba(10,10,10,.05); }
@@ -883,7 +881,7 @@ if (savedParam === 'pick_added' && !message) {
   .pc.pc-dragging { opacity: 0.4; }
 
   .pc-photo {
-    position: relative; height: 210px; width: 100%;
+    position: relative; height: 232px; width: 100%;
     background: #1a1a1a center/cover no-repeat;
     border-radius: 11px 11px 0 0; overflow: hidden;
   }
@@ -895,28 +893,27 @@ if (savedParam === 'pick_added' && !message) {
     background: radial-gradient(120% 120% at 80% 0%, #2a3344 0%, #0A0A0A 60%);
   }
   .pc-photo--nophoto::after { display: none; }
+
   .pc-rank {
-    position: absolute; top: 9px; left: 9px;
-    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px;
-    color: var(--ink); background: #FFE600; padding: 2px 7px; border-radius: 5px; letter-spacing: .04em;
+    position: absolute; top: 14px; left: 14px; z-index: 3;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px;
+    color: #0A0A0A; background: #FFE600; padding: 5px 11px; border-radius: 9px;
   }
-  .pc-drag {
-    position: absolute; top: 9px; right: 9px; width: 26px; height: 26px;
-    border-radius: 7px; background: rgba(10,10,10,.5); backdrop-filter: blur(5px);
-    color: #fff; display: flex; align-items: center; justify-content: center;
-    cursor: grab; touch-action: none; user-select: none;
+
+  /* Notiz-Chip: Glasmorphism-Pill unten links auf dem Foto */
+  .pc-note-chip {
+    position: absolute; left: 14px; bottom: 52px; z-index: 3;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    background: rgba(8,8,8,.55); backdrop-filter: blur(4px); color: #fff;
+    padding: 5px 10px; border-radius: 8px; border: none; cursor: pointer;
+    transition: background .12s;
   }
-  .pc-drag:active { cursor: grabbing; }
-  .pc-drag svg { pointer-events: none; }
-  .pc-rating {
-    position: absolute; bottom: 9px; right: 9px;
-    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600;
-    color: #fff; background: rgba(10,10,10,.6); backdrop-filter: blur(5px);
-    padding: 2px 7px; border-radius: 5px; display: flex; align-items: center; gap: 4px; line-height: 1;
-  }
-  .pc-rating-star { color: #FFE600; display: flex; align-items: center; }
-  .pc-rating-star svg { width: 11px; height: 11px; display: block; }
-  .pc-cap { position: absolute; left: 9px; right: 76px; bottom: 9px; z-index: 3; }
+  .pc-note-chip:hover { background: rgba(8,8,8,.78); }
+  .pc-note-chip--empty svg { stroke: #ccc; }
+  .pc-note-chip:not(.pc-note-chip--empty) svg { stroke: #FFE600; }
+
+  .pc-cap { position: absolute; left: 14px; right: 118px; bottom: 14px; z-index: 3; }
   .pc-name {
     font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px;
     line-height: 1.15; color: #fff; text-shadow: 0 1px 10px rgba(0,0,0,.55);
@@ -927,20 +924,39 @@ if (savedParam === 'pick_added' && !message) {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  .pc-body { padding: 11px 12px 12px; }
-  .pc-toprow { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
-
-  /* Kebab menu */
-  .pc-kebab-wrap { position: relative; flex: 0 0 auto; }
-  .pc-kebab {
-    width: 28px; height: 28px; border-radius: 7px; border: none; background: none;
-    color: var(--ink-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: background .12s, color .12s;
+  .pc-rating {
+    position: absolute; bottom: 14px; right: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600;
+    color: #fff; background: rgba(10,10,10,.6); backdrop-filter: blur(5px);
+    padding: 2px 7px; border-radius: 5px; display: flex; align-items: center; gap: 4px; line-height: 1;
   }
-  .pc-kebab:hover { background: #F4F1EA; color: var(--ink); }
+  .pc-rating-star { color: #FFE600; display: flex; align-items: center; }
+  .pc-rating-star svg { width: 11px; height: 11px; display: block; }
+
+  /* Toolbar: positioniert auf .pc (kein overflow:hidden) damit Menü-Dropdown nicht clippt */
+  .pc-toolbar {
+    position: absolute; top: 14px; right: 14px; z-index: 5;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .pc-drag {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: rgba(8,8,8,.55); backdrop-filter: blur(4px);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: grab; touch-action: none; user-select: none; flex-shrink: 0;
+  }
+  .pc-drag:active { cursor: grabbing; }
+  .pc-drag svg { pointer-events: none; }
+  .pc-kebab-wrap { position: relative; }
+  .pc-kebab {
+    width: 34px; height: 34px; border-radius: 9px; border: none;
+    background: rgba(8,8,8,.55); backdrop-filter: blur(4px);
+    color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .12s;
+  }
+  .pc-kebab:hover { background: rgba(8,8,8,.78); }
   .pc-kebab svg { width: 16px; height: 16px; pointer-events: none; }
   .pc-menu {
-    position: absolute; top: 32px; right: 0; z-index: 10;
+    position: absolute; top: 40px; right: 0; z-index: 10;
     min-width: 190px; background: #fff; border: 1px solid var(--border);
     border-radius: 10px; box-shadow: 0 6px 22px rgba(10,10,10,.10); padding: 5px;
   }
@@ -955,19 +971,9 @@ if (savedParam === 'pick_added' && !message) {
   .pc-menu-btn:disabled { opacity: 0.4; cursor: wait; }
   .pc-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 
-  /* Note section */
-  .pc-note-display { font-size: 11.5px; color: var(--ink); margin-top: 10px; cursor: text; }
-  .pc-note-lbl {
-    font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: .12em;
-    color: var(--ink-muted); display: block; text-transform: uppercase; margin-bottom: 2px;
-  }
-  .pc-addnote {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .04em;
-    color: var(--ink-muted); margin-top: 10px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 5px; transition: color .12s;
-  }
-  .pc-addnote:hover { color: var(--ink); }
-  .pc-note-edit { margin-top: 10px; }
+  /* Notiz-Editor: nur wenn noteEditing=true (x-show), sonst kein Whitespace */
+  .pc-body { padding: 11px 12px 12px; }
+  .pc-note-edit { }
   .pc-note-ta {
     width: 100%; border: 1px solid var(--border); border-radius: 8px;
     padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 12px;
