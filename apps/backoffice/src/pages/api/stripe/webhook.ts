@@ -7,6 +7,11 @@ import {
   isAddonEntry,
 } from '../../../lib/stripe/config';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+import {
+  computeLostModules,
+  computeGainedModules,
+  scheduleModuleDeletions,
+} from '../../../lib/stripe/module-deletions';
 
 // ── Idempotenz ─────────────────────────────────────────────────────────────────
 // Alle DB-Writes sind SET-Operationen (kein APPEND/INCREMENT).
@@ -36,10 +41,26 @@ function derivePlan(
   }
 
   if (plan === null) {
-    // Kein bekannter Plan gefunden → kein Update, Fehler nach oben melden
     return null;
   }
   return { plan, addons };
+}
+
+// ── Aktuellen Plan des Hotels aus DB lesen ────────────────────────────────────
+async function readCurrentHotelPlan(
+  hotelId: string,
+): Promise<{ plan: string; addons: string[] } | null> {
+  const { data } = await createSupabaseServiceRoleInstance()
+    .from('hotels')
+    .select('plan, addons')
+    .eq('id', hotelId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return {
+    plan: (data as any).plan ?? 'lite',
+    addons: (data as any).addons ?? [],
+  };
 }
 
 // ── checkout.session.completed ─────────────────────────────────────────────────
@@ -74,22 +95,37 @@ async function handleCheckoutCompleted(
     );
     return;
   }
-  const { plan, addons } = planData;
+  const { plan: newPlan, addons: newAddons } = planData;
+
+  // Phase 6: Lösch-Fahrplan bei Downgrade / Reaktivierung
+  const current = await readCurrentHotelPlan(hotelId);
+  if (current) {
+    const lost   = computeLostModules(current.plan, current.addons, newPlan, newAddons);
+    const gained = computeGainedModules(current.plan, current.addons, newPlan, newAddons);
+    if (lost.length > 0 || gained.length > 0) {
+      await scheduleModuleDeletions({
+        hotelId, lost, gained,
+        trigger: 'checkout.session.completed',
+        oldPlan: current.plan,
+        newPlan,
+      });
+    }
+  }
 
   const { error } = await createSupabaseServiceRoleInstance()
     .from('hotels')
     .update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
-      plan,
-      addons,
+      plan: newPlan,
+      addons: newAddons,
       subscription_status: subscription.status,
     })
     .eq('id', hotelId);
 
   if (error) throw new Error(`hotel update fehlgeschlagen (${hotelId}): ${error.message}`);
   console.log(
-    `[stripe/webhook] checkout.completed → hotel=${hotelId} plan=${plan} addons=[${addons}] status=${subscription.status}`,
+    `[stripe/webhook] checkout.completed → hotel=${hotelId} plan=${newPlan} addons=[${newAddons}] status=${subscription.status}`,
   );
 }
 
@@ -112,13 +148,30 @@ async function handleSubscriptionUpdated(
     );
     return;
   }
-  const { plan, addons } = planData;
+  const { plan: newPlan, addons: newAddons } = planData;
+
+  // Phase 6: alten Plan VOR dem Update lesen → Downgrade/Upgrade erkennen
+  const current = await readCurrentHotelPlan(hotelId);
+  const oldPlan   = current?.plan   ?? 'lite';
+  const oldAddons = current?.addons ?? [];
+
+  const lost   = computeLostModules(oldPlan, oldAddons, newPlan, newAddons);
+  const gained = computeGainedModules(oldPlan, oldAddons, newPlan, newAddons);
+
+  if (lost.length > 0 || gained.length > 0) {
+    await scheduleModuleDeletions({
+      hotelId, lost, gained,
+      trigger: 'subscription.updated',
+      oldPlan,
+      newPlan,
+    });
+  }
 
   const { error } = await createSupabaseServiceRoleInstance()
     .from('hotels')
     .update({
-      plan,
-      addons,
+      plan: newPlan,
+      addons: newAddons,
       subscription_status: subscription.status,
       stripe_subscription_id: subscription.id,
     })
@@ -126,13 +179,13 @@ async function handleSubscriptionUpdated(
 
   if (error) throw new Error(`hotel update fehlgeschlagen (${hotelId}): ${error.message}`);
   console.log(
-    `[stripe/webhook] subscription.updated → hotel=${hotelId} plan=${plan} status=${subscription.status}`,
+    `[stripe/webhook] subscription.updated → hotel=${hotelId} plan=${newPlan} status=${subscription.status}`,
   );
 }
 
 // ── customer.subscription.deleted ─────────────────────────────────────────────
-// Phase 6 übernimmt den vollständigen Downgrade-Pfad + DSGVO Grace Period.
-// Hier: nur status=canceled setzen, damit die UI entsprechend reagiert.
+// Phase 6: Plan sofort auf 'lite' setzen (blockiert Modul-Zugriff via isModuleAvailable),
+// alle betroffenen Module in den 30-Tage-Lösch-Fahrplan.
 async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription,
 ): Promise<void> {
@@ -142,13 +195,36 @@ async function handleSubscriptionDeleted(
     return;
   }
 
+  const current = await readCurrentHotelPlan(hotelId);
+  const oldPlan   = current?.plan   ?? 'lite';
+  const oldAddons = current?.addons ?? [];
+
+  // Alle Module, die bei altem Plan verfügbar, bei 'lite' ohne Addons nicht mehr
+  const lost = computeLostModules(oldPlan, oldAddons, 'lite', []);
+
+  if (lost.length > 0) {
+    await scheduleModuleDeletions({
+      hotelId, lost, gained: [],
+      trigger: 'subscription.deleted',
+      oldPlan,
+      newPlan: 'lite',
+    });
+  }
+
+  // Plan sofort auf 'lite' — blockiert Modul-Zugriff, Daten bleiben noch 30d
   const { error } = await createSupabaseServiceRoleInstance()
     .from('hotels')
-    .update({ subscription_status: 'canceled' })
+    .update({
+      plan: 'lite',
+      addons: [],
+      subscription_status: 'canceled',
+    })
     .eq('id', hotelId);
 
   if (error) throw new Error(`hotel update fehlgeschlagen (${hotelId}): ${error.message}`);
-  console.log(`[stripe/webhook] subscription.deleted → hotel=${hotelId} status=canceled`);
+  console.log(
+    `[stripe/webhook] subscription.deleted → hotel=${hotelId} plan=lite status=canceled lost=[${lost}]`,
+  );
 }
 
 // ── invoice.payment_failed ─────────────────────────────────────────────────────
@@ -165,7 +241,6 @@ async function handlePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
     return;
   }
 
-  // Lookup via stripe_subscription_id — wurde von checkout.session.completed gesetzt
   const { error } = await createSupabaseServiceRoleInstance()
     .from('hotels')
     .update({ subscription_status: 'past_due' })
@@ -209,9 +284,6 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response('Invalid signature', { status: 400 });
   }
 
-  // Nach erfolgreicher Signaturprüfung: immer 200 zurückgeben.
-  // Verarbeitungsfehler werden geloggt, aber kein Retry getriggert —
-  // Updates sind idempotent, manuelle Re-Trigger über Stripe Dashboard möglich.
   try {
     switch (event.type) {
       case 'checkout.session.completed':
