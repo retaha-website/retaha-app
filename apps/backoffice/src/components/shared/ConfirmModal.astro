@@ -1,0 +1,81 @@
+---
+// Shared confirm dialog driven by Alpine.store('confirm').
+// Usage: this.$store.confirm.ask('Text?', callback, 'Bestätigen')
+---
+
+<div
+  x-data
+  x-show="$store.confirm.open"
+  x-cloak
+  class="cm-backdrop"
+  @click.self="$store.confirm.no()"
+  @keydown.escape.window="$store.confirm.no()"
+>
+  <div class="cm-box" role="dialog" aria-modal="true">
+    <p class="cm-text" x-text="$store.confirm.text"></p>
+    <div class="cm-foot">
+      <button type="button" class="v9-btn v9-btn--ghost cm-btn" @click="$store.confirm.no()">
+        Abbrechen
+      </button>
+      <button type="button" class="v9-btn cm-btn" @click="$store.confirm.yes()" x-text="$store.confirm.confirmLabel">
+        Bestätigen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('alpine:init', function () {
+    window.Alpine.store('confirm', {
+      open: false,
+      text: '',
+      confirmLabel: 'Bestätigen',
+      _cb: null,
+      ask: function (text, cb, confirmLabel) {
+        this.text = text;
+        this._cb = cb || null;
+        this.confirmLabel = confirmLabel || 'Bestätigen';
+        this.open = true;
+      },
+      yes: function () {
+        this.open = false;
+        if (this._cb) { this._cb(); }
+        this._cb = null;
+      },
+      no: function () {
+        this.open = false;
+        this._cb = null;
+      },
+    });
+  });
+</script>
+
+<style>
+  .cm-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(10, 10, 10, .45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500;
+    padding: 24px;
+  }
+  .cm-box {
+    background: var(--bg, #FFFFFF);
+    border: 1px solid var(--border, #E7E4DD);
+    border-radius: 14px;
+    padding: 28px 24px 22px;
+    max-width: 340px; width: 100%;
+    box-shadow: 0 12px 48px rgba(10, 10, 10, .18);
+  }
+  .cm-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 600;
+    color: var(--ink, #0A0A0A);
+    margin: 0 0 22px; line-height: 1.35;
+  }
+  .cm-foot {
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+  .cm-btn {
+    font-size: 11px;
+  }
+</style>
