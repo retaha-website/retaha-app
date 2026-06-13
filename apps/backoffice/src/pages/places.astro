@@ -485,94 +485,103 @@ const totalPicks = (allPicks ?? []).length;
   </div><!-- .settings-page -->
 </Layout>
 
-<script>
-  document.addEventListener('alpine:init', () => {
-    // @ts-expect-error Alpine global
-    Alpine.data('placesAutocomplete', (category: string, hasAddress: boolean) => ({
-      category,
-      hasAddress,
-      query: '',
-      suggestions: [] as Array<{ placeId: string; mainText: string; secondaryText: string }>,
-      pending: false,
+<script is:inline>
+  // is:inline runs synchronously during HTML parsing, BEFORE the Layout's deferred module script
+  // calls Alpine.start(). This ensures our alpine:init listener is registered before that event fires.
+  document.addEventListener('alpine:init', function () {
+    var A = window.Alpine;
+    if (!A) return;
 
-      async search() {
-        const q = this.query.trim();
-        if (q.length < 2) { this.suggestions = []; return; }
-        this.pending = true;
-        try {
-          const res = await fetch(`/api/admin/places/autocomplete?q=${encodeURIComponent(q)}&category=${this.category}`);
-          const body = await res.json();
-          this.suggestions = body.ok ? (body.suggestions ?? []) : [];
-        } catch {
-          this.suggestions = [];
-        } finally {
-          this.pending = false;
-        }
-      },
-    }));
+    A.data('placesAutocomplete', function (category, hasAddress) {
+      return {
+        category: category,
+        hasAddress: hasAddress,
+        query: '',
+        suggestions: [],
+        pending: false,
 
-    // @ts-expect-error Alpine global
-    Alpine.data('placesRefresh', (category: string) => ({
-      category,
-      refreshing: false,
-      refreshMessage: '' as string,
-      refreshOk: true,
+        search: async function () {
+          var q = this.query.trim();
+          if (q.length < 2) { this.suggestions = []; return; }
+          this.pending = true;
+          try {
+            var res = await fetch('/api/admin/places/autocomplete?q=' + encodeURIComponent(q) + '&category=' + this.category);
+            var body = await res.json();
+            this.suggestions = body.ok ? (body.suggestions || []) : [];
+          } catch (_) {
+            this.suggestions = [];
+          } finally {
+            this.pending = false;
+          }
+        },
+      };
+    });
 
-      async refreshNearby() {
-        this.refreshing = true;
-        this.refreshMessage = '';
-        try {
-          // 'explore' tab maps to DB categories sight + activity — refresh both
-          const cats: string[] = this.category === 'explore' ? ['sight', 'activity'] : [this.category];
-          let total = 0;
-          for (const cat of cats) {
-            const res = await fetch('/api/admin/places/refresh-nearby', {
+    A.data('placesRefresh', function (category) {
+      return {
+        category: category,
+        refreshing: false,
+        refreshMessage: '',
+        refreshOk: true,
+
+        refreshNearby: async function () {
+          this.refreshing = true;
+          this.refreshMessage = '';
+          try {
+            // 'explore' tab maps to DB categories sight + activity — refresh both
+            var cats = this.category === 'explore' ? ['sight', 'activity'] : [this.category];
+            var total = 0;
+            for (var i = 0; i < cats.length; i++) {
+              var cat = cats[i];
+              var res = await fetch('/api/admin/places/refresh-nearby', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category: cat }),
+              });
+              var body = await res.json();
+              if (!body.ok) {
+                this.refreshOk = false;
+                this.refreshMessage = 'Fehler: ' + (body.error || 'unbekannt');
+                return;
+              }
+              total += body.total_places_cached || 0;
+            }
+            this.refreshOk = true;
+            this.refreshMessage = 'Aktualisiert — ' + total + ' Places gefunden. (Seite neu laden für Anzeige.)';
+          } catch (err) {
+            this.refreshOk = false;
+            this.refreshMessage = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+          } finally {
+            this.refreshing = false;
+          }
+        },
+      };
+    });
+
+    A.data('pickCardRefresh', function (pickId) {
+      return {
+        pickId: pickId,
+        editing: false,
+        refreshing: false,
+
+        refresh: async function () {
+          this.refreshing = true;
+          try {
+            var res = await fetch('/api/admin/places/refresh-pick', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ category: cat }),
+              body: JSON.stringify({ id: this.pickId }),
             });
-            const body = await res.json();
-            if (!body.ok) {
-              this.refreshOk = false;
-              this.refreshMessage = `Fehler: ${body.error ?? 'unbekannt'}`;
-              return;
-            }
-            total += body.total_places_cached ?? 0;
+            var body = await res.json();
+            if (!body.ok) console.warn('[pick refresh]', body.error);
+          } catch (err) {
+            console.warn('[pick refresh] network', err);
+          } finally {
+            this.refreshing = false;
           }
-          this.refreshOk = true;
-          this.refreshMessage = `Aktualisiert — ${total} Places gefunden. (Seite neu laden für Anzeige.)`;
-        } catch (err) {
-          this.refreshOk = false;
-          this.refreshMessage = `Netzwerk-Fehler: ${(err as Error).message}`;
-        } finally {
-          this.refreshing = false;
-        }
-      },
-    }));
-
-    // @ts-expect-error Alpine global
-    Alpine.data('pickCardRefresh', (pickId: string) => ({
-      pickId,
-      editing: false,
-      refreshing: false,
-
-      async refresh() {
-        this.refreshing = true;
-        try {
-          const res = await fetch('/api/admin/places/refresh-pick', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: this.pickId }),
-          });
-          const body = await res.json();
-          if (!body.ok) console.warn('[pick refresh]', body.error);
-        } catch (err) {
-          console.warn('[pick refresh] network', err);
-        } finally {
-          this.refreshing = false;
-        }
-      },
-    }));
+        },
+      };
+    });
   });
 </script>
 
