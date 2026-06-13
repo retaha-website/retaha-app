@@ -22,6 +22,7 @@ import { getSessionToken, buildLoginRedirect } from '@retaha/auth';
 
 const PUBLIC_PATTERNS = [
   /^\/api\/webhooks\//,
+  /^\/api\/stripe\//,
   /^\/api\/health$/,
   /^\/api\/cron\//,
   /^\/admin\/login$/,
