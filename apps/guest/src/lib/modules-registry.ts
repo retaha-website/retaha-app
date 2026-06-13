@@ -71,6 +71,14 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
 
   // ── PRO — inkludiert ──────────────────────────────────────────────────────
   {
+    key: 'self_checkout',
+    label: 'Self-Checkout',
+    desc: 'Gäste checken aus ohne Empfangs-Schlange — digital, schnell.',
+    tier: 'pro',
+    linkedRoute: '/checkout',
+    icon: `<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>`,
+  },
+  {
     key: 'recommendations',
     label: 'Empfehlungen',
     desc: 'Kuratierte Restaurants, Cafés, Bars — mit Google-Places-Daten.',
@@ -241,16 +249,6 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     icon: `<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>`,
   },
 
-  // ── Halbfertig — vorerst ausgeschlossen (comingSoon = nicht buchbar) ──────
-  {
-    key: 'self_checkout',
-    label: 'Self-Checkout',
-    desc: 'Gäste checken aus ohne Empfangs-Schlange — digital, schnell.',
-    tier: 'pro',
-    comingSoon: true,
-    backofficeRoute: '/admin/self-checkout',
-    icon: `<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>`,
-  },
 ];
 
 export const TIER_LABELS: Record<ModuleTier, string> = {

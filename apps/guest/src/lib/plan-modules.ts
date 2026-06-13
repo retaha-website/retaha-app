@@ -19,7 +19,7 @@ const TIER_RANK: Record<PlanTier, number> = {
 
 // Systembasis: immer aktiv in jedem Paket (kein Verkaufsargument)
 // Lite: breakfast, service, feedback, action_cards
-// Pro: recommendations, multi_language, nfc_tags, pre_stay, stay_pushes
+// Pro: recommendations, multi_language, nfc_tags, pre_stay, stay_pushes, self_checkout
 // Premium: eve (inkl.), wallet, marketing, loyalty, referrals, best_price, microsite
 // Enterprise: multi_property, white_label, api_access, custom_email_domain
 // Intern (kein Plan-Gate): showcase
@@ -37,6 +37,7 @@ export const PLAN_MODULES: Record<string, PlanModuleEntry> = {
   nfc_tags:        { minTier: 'pro' },
   pre_stay:        { minTier: 'pro' },
   stay_pushes:     { minTier: 'pro' },
+  self_checkout:   { minTier: 'pro' },
   // Premium (Eve inkl.; als Add-on für Lite + Pro buchbar)
   eve:        { minTier: 'premium', addonForTiers: ['lite', 'pro'] },
   wallet:     { minTier: 'premium' },
