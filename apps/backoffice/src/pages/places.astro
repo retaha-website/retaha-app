@@ -520,35 +520,38 @@ if (savedParam === 'pick_added' && !message) {
 
           <div class="nearby-grid">
             {autoSuggestions.map((s: any) => {
-              const nbThumbUrl = s.photoNames?.[0] ? buildPhotoUrl(s.photoNames[0], 200) : null;
+              const nbPhotoUrl = s.photoNames?.[0] ? buildPhotoUrl(s.photoNames[0], 400) : null;
               return (
-                <div class="nb-cell">
+                <div class="nb-card">
                   <div
-                    class="nb-thumb"
+                    class="nb-photo"
                     role="img"
                     aria-label={s.name ?? ''}
-                    style={nbThumbUrl ? `background-image:url(${nbThumbUrl})` : undefined}
-                  ></div>
-                  <div class="nb-info">
-                    <div class="nb-name">{s.name ?? '(kein Name)'}</div>
+                    style={nbPhotoUrl ? `background-image:url(${nbPhotoUrl})` : undefined}
+                  >
                     {s.rating != null && (
-                      <div class="nb-meta">
+                      <span class="nb-rating">
                         <span class="nb-star" aria-hidden="true">
                           <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M12 2l2.9 6.3 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.6 1.5-6.7L2.4 9.4l6.8-.6z"/></svg>
                         </span>
-                        <b>{s.rating}</b>
-                        <span>· {s.userRatingCount ?? 0}</span>
-                      </div>
+                        {s.rating} · {s.userRatingCount ?? 0}
+                      </span>
                     )}
                   </div>
-                  <form method="POST">
-                    <input type="hidden" name="_action" value="pick_add" />
-                    <input type="hidden" name="category" value={activeDbCategory} />
-                    <input type="hidden" name="place_id" value={s.placeId ?? s.place_id} />
-                    <button type="submit" class="nb-add" title={`${s.name ?? ''} zu Picks`} aria-label={`${s.name ?? ''} zu Picks`}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-                    </button>
-                  </form>
+                  <div class="nb-body">
+                    <div class="nb-info">
+                      <div class="nb-name">{s.name ?? '(kein Name)'}</div>
+                      <div class="nb-addr">{s.formattedAddress ?? ''}</div>
+                    </div>
+                    <form method="POST">
+                      <input type="hidden" name="_action" value="pick_add" />
+                      <input type="hidden" name="category" value={activeDbCategory} />
+                      <input type="hidden" name="place_id" value={s.placeId ?? s.place_id} />
+                      <button type="submit" class="nb-add" title={`${s.name ?? ''} zu Picks`} aria-label={`${s.name ?? ''} zu Picks`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                      </button>
+                    </form>
+                  </div>
                 </div>
               );
             })}
@@ -990,43 +993,50 @@ if (savedParam === 'pick_added' && !message) {
   .places-nearby-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
   .places-refresh-icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px; flex-shrink: 0;
-    background: none; border: 1px solid var(--border-medium, #D0CCC5);
-    border-radius: var(--r-sm, 4px); cursor: pointer; color: var(--ink);
-    transition: background 150ms, color 150ms;
+    width: 32px; height: 32px; flex-shrink: 0;
+    background: #fff; border: 1px solid var(--border, #E7E4DD);
+    border-radius: 9px; cursor: pointer; color: var(--ink);
+    transition: background 120ms ease, border-color 120ms ease;
   }
-  .places-refresh-icon-btn:hover:not(:disabled) { background: var(--te-yellow, #FFE600); border-color: var(--te-yellow, #FFE600); color: var(--ink); }
+  .places-refresh-icon-btn:hover:not(:disabled) { background: #FFE600; border-color: #FFE600; }
   .places-refresh-icon-btn:disabled { opacity: 0.35; cursor: wait; }
 
-  /* ── Nearby Grid (Variante 4: Zwei-Spalten kompakt) ── */
-  .nearby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* ── Nearby Grid (Richtung A kompakt, nearby-final.html) ── */
+  .nearby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
   @media (max-width: 480px) { .nearby-grid { grid-template-columns: 1fr; } }
-  .nb-cell {
-    display: flex; align-items: center; gap: 11px;
-    padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px;
+  .nb-card {
+    border: 1px solid var(--border, #E7E4DD); border-radius: 11px;
+    overflow: hidden; background: #fff;
+    transition: border-color .12s ease, box-shadow .12s ease;
   }
-  .nb-thumb {
-    width: 40px; height: 40px; flex: 0 0 auto;
-    border-radius: 8px; background: var(--bg-deep, #EDECEA) center/cover no-repeat;
+  .nb-card:hover { border-color: #D8D3C8; box-shadow: 0 2px 10px rgba(10,10,10,.04); }
+  .nb-photo {
+    aspect-ratio: 21 / 9; width: 100%; position: relative;
+    background: var(--bg-deep, #EDECEA) center / cover no-repeat;
   }
+  .nb-rating {
+    position: absolute; bottom: 7px; left: 7px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600;
+    color: #fff; background: rgba(10,10,10,.6); backdrop-filter: blur(5px);
+    padding: 2px 7px; border-radius: 5px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .nb-star { color: #FFE600; display: inline-flex; align-items: center; }
+  .nb-body { display: flex; align-items: center; gap: 9px; padding: 9px 10px; }
   .nb-info { flex: 1 1 auto; min-width: 0; }
   .nb-name {
     font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink);
+  }
+  .nb-addr {
+    font-size: 10.5px; color: var(--ink-faint, #A5A29A); margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    color: var(--ink);
   }
-  .nb-meta {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: var(--ink-faint, #8A877F); margin-top: 2px;
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .nb-meta b { color: var(--ink); }
-  .nb-star { color: #FFE600; display: inline-flex; align-items: center; }
   .nb-add {
-    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
-    border: 1px solid var(--ink); background: #fff; color: var(--ink);
+    flex: 0 0 auto; width: 31px; height: 31px; border-radius: 8px;
+    border: 1px solid var(--ink); background: var(--ink); color: #fff;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: background 120ms ease, color 120ms ease;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
   }
-  .nb-add:hover { background: var(--ink); color: #fff; }
+  .nb-add:hover { background: #FFE600; color: var(--ink); border-color: #FFE600; }
 </style>
