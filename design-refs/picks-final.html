@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>retaha · Picks-Karte final</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --ink:#0A0A0A; --offwhite:#FBFAF7; --paper:#FFFFFF;
+    --border:#E7E4DD; --border-soft:#EFECE4; --muted:#8A877F; --muted2:#A5A29A;
+    --yellow:#FFE600; --pink:#FF4A82; --sage:#5C9070;
+    --ease:cubic-bezier(.32,.72,0,1);
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--offwhite); color:var(--ink); font-family:'Inter',sans-serif; padding:38px 22px 80px; display:flex; flex-direction:column; align-items:center; }
+  .head{ text-align:center; margin-bottom:22px; }
+  .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.22em; color:var(--muted); text-transform:uppercase; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:23px; margin:6px 0 0; }
+  h1 .dot{ color:var(--pink); }
+  .wrap{ width:100%; max-width:660px; }
+  .sect-head{ display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid var(--border-soft); padding-bottom:13px; margin-bottom:5px; }
+  .sect-title{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:19px; }
+  .sect-num{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted2); letter-spacing:.1em; }
+  .sect-hint{ font-size:12.5px; color:var(--muted); margin:0 0 18px; }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+  .card{ background:var(--paper); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .15s var(--ease), box-shadow .15s var(--ease); }
+  .card:hover{ border-color:#D8D3C8; box-shadow:0 2px 12px rgba(10,10,10,.05); }
+
+  .photowrap{ position:relative; }
+  .ph{ aspect-ratio:16/10; width:100%; display:block; background:#6b5844 center/cover no-repeat; }
+  .ph.a{ background-image:linear-gradient(135deg,#5a4a38,#8a7355 55%,#3a2f24); }
+  .ph.b{ background-image:linear-gradient(135deg,#26262b,#494953); }
+
+  .rank{ position:absolute; top:9px; left:9px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; color:var(--ink); background:var(--yellow); padding:2px 7px; border-radius:5px; }
+  .drag{ position:absolute; top:9px; right:9px; width:26px; height:26px; border-radius:7px; background:rgba(10,10,10,.5); backdrop-filter:blur(5px); color:#fff; display:flex; align-items:center; justify-content:center; cursor:grab; touch-action:none; }
+  .drag svg{ width:12px; height:12px; }
+  .rating{ position:absolute; bottom:9px; left:9px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; color:#fff; background:rgba(10,10,10,.6); backdrop-filter:blur(5px); padding:3px 8px; border-radius:5px; display:flex; align-items:center; gap:5px; line-height:1; }
+  .rating .star{ color:var(--yellow); font-size:14px; line-height:1; display:flex; align-items:center; }
+  .rating .star svg{ width:13px; height:13px; display:block; }
+  .status{ position:absolute; bottom:9px; right:9px; font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:600; letter-spacing:.06em; padding:3px 7px; border-radius:5px; color:#fff; backdrop-filter:blur(5px); }
+  .status.open{ background:rgba(92,144,112,.85); }
+  .status.closed{ background:rgba(10,10,10,.55); }
+
+  .body{ padding:11px 12px 12px; }
+  .toprow{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; line-height:1.2; }
+  .addr{ font-size:11px; color:var(--muted2); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Kebab + Menü */
+  .kebab-wrap{ position:relative; flex:0 0 auto; }
+  .kebab{ width:28px; height:28px; border-radius:7px; border:none; background:none; color:var(--muted2); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .12s, color .12s; }
+  .kebab:hover{ background:#F4F1EA; color:var(--ink); }
+  .kebab svg{ width:16px; height:16px; }
+  .menu{ position:absolute; top:32px; right:0; z-index:10; min-width:148px; background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 22px rgba(10,10,10,.10); padding:5px; display:none; }
+  .menu.open{ display:block; }
+  .menu button{ width:100%; text-align:left; border:none; background:none; padding:8px 10px; border-radius:7px; cursor:pointer; font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); display:flex; align-items:center; gap:9px; }
+  .menu button svg{ width:14px; height:14px; color:var(--muted); }
+  .menu button:hover{ background:var(--yellow); }
+  .menu button:hover svg{ color:var(--ink); }
+  .menu .sep{ height:1px; background:var(--border-soft); margin:4px 2px; }
+
+  /* Notiz inline */
+  .note-display{ font-size:11.5px; color:var(--ink); padding-left:0; margin-top:10px; cursor:text; }
+  .note-display .lbl{ font-family:'JetBrains Mono',monospace; font-size:8px; letter-spacing:.12em; color:var(--muted); display:block; text-transform:uppercase; margin-bottom:2px; }
+  .addnote{ font-size:11.5px; color:var(--muted2); margin-top:10px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace; letter-spacing:.04em; }
+  .addnote:hover{ color:var(--ink); }
+
+  .note-edit{ margin-top:10px; display:none; }
+  .note-edit.open{ display:block; }
+  .note-edit textarea{ width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:12px; color:var(--ink); resize:vertical; min-height:54px; outline:none; transition:border-color .12s; background:#FAF8F3; }
+  .note-edit textarea:focus{ border-color:var(--ink); }
+  .note-edit .erow{ display:flex; gap:8px; margin-top:7px; align-items:center; }
+  .note-save{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em; padding:6px 13px; border-radius:7px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; transition:background .12s, color .12s; }
+  .note-save:hover{ background:var(--yellow); color:var(--ink); border-color:var(--yellow); }
+  .note-cancel{ font-size:11px; color:var(--muted); background:none; border:none; cursor:pointer; }
+  .note-cancel:hover{ color:var(--ink); }
+
+  .cap{ font-size:11px; color:var(--muted2); line-height:1.6; margin-top:16px; }
+  code{ font-family:'JetBrains Mono',monospace; font-size:11px; background:#F0EEE9; padding:1px 5px; border-radius:5px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="eyebrow">RETAHA · BACKOFFICE · PICKS</div>
+    <h1>Picks-Karte — final<span class="dot">.</span></h1>
+  </div>
+
+  <div class="wrap">
+    <div class="sect-head"><div class="sect-title">Deine Picks</div><div class="sect-num">03</div></div>
+    <div class="sect-hint">Ziehen zum Sortieren — die oberste Empfehlung zeigt Eve dem Gast zuerst. Tippe "Notiz", um direkt zu schreiben.</div>
+
+    <div class="grid">
+      <!-- Karte 1: hat Notiz -->
+      <div class="card">
+        <div class="photowrap">
+          <div class="ph a"></div>
+          <span class="rank">#1</span>
+          <span class="drag"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>
+          <span class="rating"><span class="star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.6 1.5-6.7L2.4 9.4l6.8-.6z"/></svg></span> 4,1 · 46</span>
+          <span class="status open">GEÖFFNET</span>
+        </div>
+        <div class="body">
+          <div class="toprow">
+            <div style="min-width:0"><div class="name">Jäger's Landhaus Rössle</div><div class="addr">Hauptstraße 12, Niedernhall</div></div>
+            <div class="kebab-wrap">
+              <button class="kebab" onclick="toggleMenu(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>
+              <div class="menu">
+                <button onclick="editNote(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Notiz bearbeiten</button>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Aktualisieren</button>
+                <div class="sep"></div>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>Aus Picks entfernen</button>
+              </div>
+            </div>
+          </div>
+          <div class="note-display" onclick="editNoteFromDisplay(this)"><span class="lbl">DEINE NOTIZ</span>Bestes Wild der Region — frag nach dem Tagesgericht.</div>
+          <div class="note-edit">
+            <textarea placeholder="Deine Empfehlung für den Gast …">Bestes Wild der Region — frag nach dem Tagesgericht.</textarea>
+            <div class="erow"><button class="note-save" onclick="saveNote(this)">SPEICHERN</button><button class="note-cancel" onclick="cancelNote(this)">Abbrechen</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Karte 2: keine Notiz -->
+      <div class="card">
+        <div class="photowrap">
+          <div class="ph b"></div>
+          <span class="rank">#2</span>
+          <span class="drag"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>
+          <span class="rating"><span class="star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.6 1.5-6.7L2.4 9.4l6.8-.6z"/></svg></span> 4,6 · 271</span>
+          <span class="status closed">GESCHLOSSEN</span>
+        </div>
+        <div class="body">
+          <div class="toprow">
+            <div style="min-width:0"><div class="name">DOTHENTIC Wok &amp; Sushi</div><div class="addr">Criesbacher Str. 40, Niedernhall</div></div>
+            <div class="kebab-wrap">
+              <button class="kebab" onclick="toggleMenu(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>
+              <div class="menu">
+                <button onclick="editNote(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Notiz hinzufügen</button>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Aktualisieren</button>
+                <div class="sep"></div>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>Aus Picks entfernen</button>
+              </div>
+            </div>
+          </div>
+          <div class="addnote" onclick="editNoteFromDisplay(this)">+ Notiz hinzufügen</div>
+          <div class="note-edit">
+            <textarea placeholder="Deine Empfehlung für den Gast …"></textarea>
+            <div class="erow"><button class="note-save" onclick="saveNote(this)">SPEICHERN</button><button class="note-cancel" onclick="cancelNote(this)">Abbrechen</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="cap">
+      Kebab (⋮) = Notiz bearbeiten / Aktualisieren / Entfernen. Notiz aber auch DIREKT: Klick auf "+ Notiz hinzufügen" bzw. die bestehende Notiz öffnet sofort das Textfeld mit Fokus — kein Zwischenschritt. Foto <code>16:10</code>, kompakt, kein Burgund. Pink = Notiz-Signatur, Gelb = Rang/Stern/Hover.
+    </p>
+  </div>
+
+<script>
+  function closeAllMenus(){ document.querySelectorAll('.menu.open').forEach(m=>m.classList.remove('open')); }
+  function toggleMenu(btn){
+    const m = btn.nextElementSibling;
+    const wasOpen = m.classList.contains('open');
+    closeAllMenus();
+    if(!wasOpen) m.classList.add('open');
+  }
+  document.addEventListener('click', e=>{ if(!e.target.closest('.kebab-wrap')) closeAllMenus(); });
+
+  function openEditor(body){
+    body.querySelector('.note-display')?.style.setProperty('display','none');
+    body.querySelector('.addnote')?.style.setProperty('display','none');
+    const ed = body.querySelector('.note-edit');
+    ed.classList.add('open');
+    const ta = ed.querySelector('textarea');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+  function editNoteFromDisplay(el){ openEditor(el.closest('.body')); }
+  function editNote(menuBtn){ closeAllMenus(); openEditor(menuBtn.closest('.body')); }
+
+  function saveNote(btn){
+    const body = btn.closest('.body');
+    const ed = body.querySelector('.note-edit');
+    const val = ed.querySelector('textarea').value.trim();
+    ed.classList.remove('open');
+    let disp = body.querySelector('.note-display');
+    const add = body.querySelector('.addnote');
+    if(val){
+      if(disp){ disp.innerHTML = '<span class="lbl">DEINE NOTIZ</span>'+val; disp.style.display=''; }
+      else { add.style.display='none';
+             const d=document.createElement('div'); d.className='note-display'; d.onclick=function(){editNoteFromDisplay(this)};
+             d.innerHTML='<span class="lbl">DEINE NOTIZ</span>'+val; body.insertBefore(d, ed); }
+    } else {
+      if(disp){ disp.style.display='none'; }
+      if(add){ add.style.display=''; }
+    }
+  }
+  function cancelNote(btn){
+    const body = btn.closest('.body');
+    body.querySelector('.note-edit').classList.remove('open');
+    const disp = body.querySelector('.note-display');
+    const add = body.querySelector('.addnote');
+    if(disp && disp.textContent.replace('DEINE NOTIZ','').trim()){ disp.style.display=''; }
+    else if(add){ add.style.display=''; }
+  }
+</script>
+</body>
+</html>
