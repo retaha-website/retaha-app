@@ -164,7 +164,11 @@ for (const p of picks) {
     website: cd.website_uri, googleMapsUri: cd.google_maps_uri,
     openNow: cd.opening_hours?.openNow ?? null,
     weekdayDescriptions: cd.opening_hours?.weekdayDescriptions ?? [],
-    reviews: (cd.reviews ?? []).slice(0, 3),
+    reviews: (cd.reviews ?? []).slice(0, 3).map((r: any) => ({
+      author: r.authorAttribution?.displayName ?? r.author ?? 'Gast',
+      text: r.text?.text ?? (typeof r.text === 'string' ? r.text : '') ?? '',
+      rating: r.rating ?? null,
+    })),
     photoUrls: (p.photo_references ?? []).slice(0, 8).map((n: string) => buildPhotoUrl(n, 1200)),
   };
 }
@@ -419,7 +423,6 @@ function walkLabel(min: number | undefined): string {
       /* ── Place detail overlay ─────────────────────────────────────────── */
       .detail-backdrop {
         position: fixed;
-        /* starts BELOW safe-area so statusbar stays light */
         top: env(safe-area-inset-top, 50px);
         left: 0; right: 0; bottom: 0;
         background: rgba(10,10,10,0.18);
@@ -427,76 +430,129 @@ function walkLabel(min: number | undefined): string {
       }
       .detail-sheet {
         position: fixed; bottom: 0;
-        /* centering without transform so translateY animation is pure */
-        left: 0; right: 0;
-        margin-inline: auto;
+        left: 0; right: 0; margin-inline: auto;
         width: min(100%, 480px);
-        max-height: 88vh; overflow-y: auto;
-        background: var(--bg); border-radius: 16px 16px 0 0;
+        max-height: 92vh; overflow-y: auto; overscroll-behavior: contain;
+        scrollbar-width: none;
+        background: var(--bg); border-radius: 26px 26px 0 0;
         z-index: 41;
         padding-bottom: env(safe-area-inset-bottom, 20px);
-        box-shadow: 0 -4px 24px rgba(10,10,10,0.10);
+        box-shadow: 0 -10px 40px rgba(10,10,10,.18);
+        will-change: transform;
       }
-      .detail-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 18px 18px 14px; border-bottom: 1px solid var(--border);
-        position: sticky; top: 0; background: var(--bg); z-index: 1;
-      }
-      .detail-title { font-size: 17px; font-weight: 600; margin: 0; flex: 1; color: var(--ink); }
-      .detail-close {
-        width: 30px; height: 30px; border-radius: 50%; border: none;
-        background: #EFEDE8; color: var(--ink);
-        display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
-        font-size: 16px; line-height: 1;
-      }
-      .detail-body { padding: 0 18px 20px; }
-      .detail-loading { padding: 32px 18px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+      .detail-sheet::-webkit-scrollbar { display: none; }
+      .detail-loading { padding: 48px 22px; text-align: center; color: var(--ink-muted); font-size: 14px; }
 
-      .detail-photos { width: 100%; aspect-ratio: 4/3; background: #F0EDE6; overflow: hidden; }
-      .detail-photo-frame { width: 100%; height: 100%; position: relative; }
-      .detail-photo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
-      .detail-photo-img.is-active { opacity: 1; }
-      .detail-photo-prev, .detail-photo-next {
-        position: absolute; top: 50%; transform: translateY(-50%);
-        width: 30px; height: 30px; border-radius: 50%; border: none;
-        background: rgba(255,255,255,0.85); cursor: pointer;
-        display: grid; place-items: center; font-size: 16px;
+      /* Hero photo — flush against rounded top of sheet */
+      .detail-hero {
+        height: 190px; position: relative;
+        background: #1a1a1a center/cover no-repeat;
+        border-radius: 26px 26px 0 0; overflow: hidden;
       }
-      .detail-photo-prev { left: 10px; }
-      .detail-photo-next { right: 10px; }
+      .detail-hero::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(to top, rgba(8,8,8,.55), rgba(8,8,8,.04) 62%);
+      }
+      .detail-hero--nophoto {
+        background: radial-gradient(120% 120% at 80% 0%, #2a3344 0%, #0A0A0A 60%);
+      }
+      .detail-hero--nophoto::after { display: none; }
 
-      .detail-meta {
-        display: flex; gap: 14px; flex-wrap: wrap;
-        padding: 14px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+      /* Close button — top right, on the photo */
+      .detail-hero-close {
+        position: absolute; top: 15px; right: 16px; z-index: 3;
+        width: 34px; height: 34px; border-radius: 50%; border: none;
+        background: rgba(255,255,255,.92); color: #333;
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
       }
-      .detail-meta-item { font-size: 13px; color: var(--ink-muted); }
-      .detail-note {
-        padding: 10px 12px; background: var(--accent-soft); border-left: 2px solid var(--accent);
-        font-size: 13px; font-style: italic; color: var(--ink-muted);
-        border-radius: 0 4px 4px 0; margin-bottom: 14px; line-height: 1.45;
+      .detail-hero-close svg { width: 16px; height: 16px; }
+
+      /* Rating chip — bottom right in hero (= kanonisch nb-rating) */
+      .detail-hero-chip {
+        position: absolute; bottom: 14px; right: 14px; z-index: 3;
+        font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+        background: rgba(10,10,10,.6); backdrop-filter: blur(5px);
+        color: #fff; padding: 2px 7px; border-radius: 5px;
+        display: flex; align-items: center; gap: 4px;
       }
-      .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+      .detail-hero-chip-star { color: #FFE600; display: inline-flex; align-items: center; }
+      .detail-hero-chip-star svg { width: 11px; height: 11px; display: block; }
+
+      /* Body */
+      .detail-body { padding: 16px 22px 28px; }
+      .detail-title {
+        font-family: var(--display); font-weight: 700; font-size: 23px;
+        line-height: 1.1; margin: 0; color: var(--ink);
+      }
+
+      /* Status line: ● Geöffnet · €€ · 15 Min. */
+      .detail-status {
+        display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+        margin-top: 10px; font-size: 14px; color: #555;
+      }
+      .detail-status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent); flex-shrink: 0;
+      }
+      .detail-status-open { color: var(--ink); font-weight: 600; }
+
+      /* Action buttons */
+      .detail-actions { display: flex; gap: 8px; flex-wrap: nowrap; margin: 16px 0 4px; }
       .detail-action {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px;
-        background: var(--surface); color: var(--ink); font-size: 13px;
+        flex: 1; min-width: 0;
+        display: flex; align-items: center; justify-content: center; gap: 5px;
+        padding: 10px 6px; border: 1px solid var(--border); border-radius: 11px;
+        background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 500;
         text-decoration: none; transition: border-color 0.12s;
       }
       .detail-action:hover { border-color: var(--border-strong); }
+      .detail-action svg { width: 15px; height: 15px; flex-shrink: 0;
+        fill: none; stroke: currentColor; stroke-width: 1.7;
+        stroke-linecap: round; stroke-linejoin: round; }
 
-      .detail-hours-title, .detail-reviews-title {
-        font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em;
-        text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 8px;
+      .detail-addr { color: var(--ink-muted); font-size: 14px; line-height: 1.5; margin-top: 12px; }
+      .detail-note {
+        padding: 10px 12px; background: var(--accent-soft); border-left: 2px solid var(--accent);
+        font-size: 13px; font-style: italic; color: var(--ink-muted);
+        border-radius: 0 4px 4px 0; margin: 12px 0 0; line-height: 1.45;
       }
-      .detail-hours { list-style: none; margin: 0; padding: 0; }
-      .detail-hours li { font-size: 13px; color: var(--ink-muted); padding: 2px 0; }
-      .detail-review { padding: 10px 0; border-bottom: 1px solid var(--border); }
-      .detail-review:last-child { border-bottom: none; }
-      .detail-review-author { font-size: 13px; font-weight: 500; margin: 0 0 3px; color: var(--ink); }
-      .detail-review-text { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* Section label */
+      .detail-section-lbl {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em;
+        text-transform: uppercase; color: var(--ink-faint); margin: 20px 0 8px;
+      }
+
+      /* Hours: today bold + toggle for rest */
+      .detail-hours-today {
+        font-size: 14px; font-weight: 600; color: var(--ink);
+        padding: 5px 0; border-bottom: 1px solid var(--border);
+      }
+      .detail-hours-row {
+        font-size: 13px; color: var(--ink-muted); padding: 4px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .detail-hours-toggle {
+        background: none; border: none; padding: 8px 0;
+        font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+        text-transform: uppercase; color: var(--accent); cursor: pointer;
+        display: inline-flex; align-items: center; gap: 5px;
+      }
+      .detail-hours-toggle:hover { opacity: 0.75; }
+
+      /* Reviews */
+      .detail-rev { padding: 10px 0; border-top: 1px solid var(--border); }
+      .detail-rev:first-of-type { border-top: none; }
+      .detail-rev-who {
+        display: flex; justify-content: space-between; align-items: center;
+        font-family: var(--mono); font-size: 13px; color: var(--ink-muted);
+      }
+      .detail-rev-rating { display: flex; align-items: center; gap: 4px; color: var(--ink); }
+      .detail-rev-text { font-size: 14px; color: #333; margin: 6px 0 0; line-height: 1.5; }
 
       /* ── Detail slide transitions ─────────────────────────────────────── */
-      .d-enter        { transition: transform 0.32s cubic-bezier(.32,.72,0,1); }
+      /* JANK-FIX: nur transform + opacity animieren, kein layout-prop */
+      .d-enter        { transition: transform 0.44s cubic-bezier(.22,.61,.36,1); }
       .d-enter-start  { transform: translateY(100%); }
       .d-enter-end    { transform: translateY(0); }
       .d-leave        { transition: transform 0.24s ease-in; }
@@ -512,7 +568,7 @@ function walkLabel(min: number | undefined): string {
       @media (prefers-reduced-motion: reduce) {
         .d-enter, .d-leave { transition: none; }
         .tab-btn { transition: none; }
-        .place-card { transition: none; }
+        .place-card, .nearby-card { transition: none; }
       }
     </style>
   </head>
@@ -568,8 +624,8 @@ function walkLabel(min: number | undefined): string {
                 <article
                   class="place-card"
                   tabindex="0"
-                  @click={`openDetail('${p.place_id}')`}
-                  @keydown.enter={`openDetail('${p.place_id}')`}
+                  @click={`openDetail('${p.place_id}', ${p.walkingMin ?? null})`}
+                  @keydown.enter={`openDetail('${p.place_id}', ${p.walkingMin ?? null})`}
                 >
                   {p.photoUrl && (
                     <div class="place-card-photo">
@@ -603,8 +659,8 @@ function walkLabel(min: number | undefined): string {
                     data-photo={a.photoUrl ? 'true' : 'false'}
                     style={a.photoUrl ? `background-image:url('${a.photoUrl}')` : undefined}
                     tabindex="0"
-                    @click={`openDetail('${a.place_id}')`}
-                    @keydown.enter={`openDetail('${a.place_id}')`}
+                    @click={`openDetail('${a.place_id}', ${a.walkingMin ?? null})`}
+                    @keydown.enter={`openDetail('${a.place_id}', ${a.walkingMin ?? null})`}
                   >
                     {a.openNow !== null && a.openNow !== undefined && (
                       <span class={`nearby-ribbon ${a.openNow ? 'nearby-ribbon-open' : 'nearby-ribbon-closed'}`}>
@@ -646,8 +702,8 @@ function walkLabel(min: number | undefined): string {
                     tabindex="0"
                     x-show={`showAllExpanded['${cat}']`}
                     x-cloak
-                    @click={`openDetail('${a.place_id}')`}
-                    @keydown.enter={`openDetail('${a.place_id}')`}
+                    @click={`openDetail('${a.place_id}', ${a.walkingMin ?? null})`}
+                    @keydown.enter={`openDetail('${a.place_id}', ${a.walkingMin ?? null})`}
                   >
                     {a.openNow !== null && a.openNow !== undefined && (
                       <span class={`nearby-ribbon ${a.openNow ? 'nearby-ribbon-open' : 'nearby-ribbon-closed'}`}>
@@ -703,88 +759,111 @@ function walkLabel(min: number | undefined): string {
       x-transition:leave-start="d-leave-start"
       x-transition:leave-end="d-leave-end"
     >
-      <header class="detail-header">
-        <h2 class="detail-title" x-text="data?.name || '…'"></h2>
-        <button type="button" class="detail-close" @click="closeDetail()" aria-label="Schließen">×</button>
-      </header>
-
-      <div x-show="loading && !data" class="detail-loading" x-cloak>
-        <p>…</p>
-      </div>
+      <!-- Loading state -->
+      <div x-show="loading && !data" class="detail-loading" x-cloak><p>…</p></div>
 
       <div x-show="data" x-cloak>
-        <!-- Carousel -->
-        <div class="detail-photos" x-data="{ idx: 0 }" x-show="(data?.photoUrls?.length || 0) > 0">
-          <div class="detail-photo-frame">
-            <template x-for="(u, i) in (data?.photoUrls || [])" :key="u">
-              <img :src="u" :alt="data?.name" class="detail-photo-img" :class="{ 'is-active': i === idx }" loading="lazy" />
-            </template>
-          </div>
-          <button type="button" class="detail-photo-prev" @click="idx = Math.max(0, idx - 1)" :disabled="idx === 0" x-show="(data?.photoUrls?.length || 0) > 1">‹</button>
-          <button type="button" class="detail-photo-next" @click="idx = Math.min(idx + 1, (data?.photoUrls?.length || 1) - 1)" :disabled="idx >= (data?.photoUrls?.length || 1) - 1" x-show="(data?.photoUrls?.length || 0) > 1">›</button>
+
+        <!-- Hero photo -->
+        <div
+          class="detail-hero"
+          :class="{ 'detail-hero--nophoto': !(data?.photoUrls?.length) }"
+          :style="data?.photoUrls?.length ? `background-image:url('${data.photoUrls[0]}')` : undefined"
+        >
+          <button type="button" class="detail-hero-close" @click="closeDetail()" aria-label="Schließen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <span class="detail-hero-chip" x-show="data?.rating != null">
+            <span class="detail-hero-chip-star" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11">
+                <path d="M12 2l2.9 6.3 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.6 1.5-6.7L2.4 9.4l6.8-.6z"/>
+              </svg>
+            </span>
+            <span x-text="data?.rating"></span>
+            <span x-show="(data?.userRatingCount ?? 0) > 0" style="opacity:.5">·</span>
+            <span x-show="(data?.userRatingCount ?? 0) > 0" x-text="data?.userRatingCount"></span>
+          </span>
         </div>
 
+        <!-- Body -->
         <div class="detail-body">
-          <!-- Meta row -->
-          <div class="detail-meta">
-            <span class="detail-meta-item" x-show="data?.rating" style="display:inline-flex;align-items:center;gap:3px">
-              <span class="star" aria-hidden="true">★</span>
-              <span x-text="data?.rating"></span>
-              <span x-show="data?.userRatingCount">(<span x-text="data?.userRatingCount"></span>)</span>
-            </span>
-            <span class="detail-meta-item" x-show="data?.priceSymbol" x-text="data?.priceSymbol"></span>
-            <span class="detail-meta-item"
-              x-show="data?.openNow !== null && data?.openNow !== undefined"
-              :style="data?.openNow ? 'color:var(--success)' : 'color:var(--ink-muted)'"
-              x-text="data?.openNow ? 'Geöffnet' : 'Geschlossen'">
+          <h2 class="detail-title" x-text="data?.name || '…'"></h2>
+
+          <!-- Status line: ● Geöffnet · €€ · N Min. zu Fuß -->
+          <div class="detail-status" x-show="data?.openNow != null || data?.priceSymbol || walkMin != null">
+            <span class="detail-status-dot" x-show="data?.openNow != null"></span>
+            <strong class="detail-status-open" x-show="data?.openNow != null" x-text="data?.openNow ? 'Geöffnet' : 'Geschlossen'"></strong>
+            <span x-show="data?.priceSymbol || walkMin != null"
+              x-text="(data?.openNow != null ? '· ' : '') + [data?.priceSymbol, walkMin != null ? walkMin + ' Min. zu Fuß' : null].filter(v => v != null).join(' · ')">
             </span>
           </div>
 
-          <!-- Hotel note -->
-          <div x-show="data?.hotelNote" class="detail-note" x-text="data?.hotelNote"></div>
-
-          <!-- Action links -->
+          <!-- Action buttons -->
           <div class="detail-actions">
             <a x-show="data?.googleMapsUri" :href="data?.googleMapsUri" target="_blank" rel="noopener" class="detail-action">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M12 21s-6-5.7-6-10a6 6 0 1112 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
               Maps
             </a>
             <a x-show="data?.phone" :href="`tel:${data?.phone}`" class="detail-action">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.89 8.19a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.8 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M5 4h3l2 5-2 1.5a11 11 0 005 5L20 13l1 3v3a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/></svg>
               Anrufen
             </a>
             <a x-show="data?.website" :href="data?.website" target="_blank" rel="noopener" class="detail-action">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg>
               Website
             </a>
           </div>
 
           <!-- Address -->
-          <p x-show="data?.formattedAddress" class="detail-meta-item" x-text="data?.formattedAddress" style="font-size:13px;color:var(--ink-muted);margin:0 0 4px"></p>
+          <p x-show="data?.formattedAddress" x-text="data?.formattedAddress" class="detail-addr"></p>
 
-          <!-- Hours -->
+          <!-- Hotel note -->
+          <div x-show="data?.hotelNote" class="detail-note" x-text="data?.hotelNote"></div>
+
+          <!-- Hours: today highlighted + expandable rest -->
           <div x-show="(data?.weekdayDescriptions?.length || 0) > 0">
-            <p class="detail-hours-title">Öffnungszeiten</p>
-            <ul class="detail-hours">
-              <template x-for="d in (data?.weekdayDescriptions || [])" :key="d">
-                <li x-text="d"></li>
+            <p class="detail-section-lbl">Öffnungszeiten</p>
+            <div class="detail-hours-today"
+              x-text="(data?.weekdayDescriptions || [])[(new Date().getDay()+6)%7] || ''">
+            </div>
+            <div x-show="(data?.weekdayDescriptions?.length || 0) > 1">
+              <template x-if="hoursOpen">
+                <div>
+                  <template x-for="(h, i) in (data?.weekdayDescriptions || [])" :key="i">
+                    <div class="detail-hours-row"
+                      x-show="i !== (new Date().getDay()+6)%7"
+                      x-text="h">
+                    </div>
+                  </template>
+                </div>
               </template>
-            </ul>
+              <button type="button" class="detail-hours-toggle" @click="hoursOpen = !hoursOpen">
+                <span x-text="hoursOpen ? 'Weniger anzeigen ▴' : 'Alle Zeiten anzeigen ▾'"></span>
+              </button>
+            </div>
           </div>
 
           <!-- Reviews -->
           <div x-show="(data?.reviews?.length || 0) > 0">
-            <p class="detail-reviews-title">Bewertungen</p>
-            <template x-for="r in (data?.reviews || [])" :key="r.author">
-              <div class="detail-review">
-                <p class="detail-review-author">
-                  <span x-text="r.author"></span>
-                  <span class="star" x-show="r.rating" x-text="r.rating ? ' · ' + '★'.repeat(r.rating) : ''" style="font-size:10px;margin-left:4px"></span>
-                </p>
-                <p class="detail-review-text" x-text="r.text"></p>
+            <p class="detail-section-lbl">Bewertungen</p>
+            <template x-for="r in (data?.reviews || [])" :key="(r.author || '') + (r.text || '')">
+              <div class="detail-rev">
+                <div class="detail-rev-who">
+                  <span x-text="r.author || 'Gast'"></span>
+                  <span class="detail-rev-rating" x-show="r.rating != null">
+                    <svg viewBox="0 0 24 24" fill="#FFE600" width="12" height="12">
+                      <path d="M12 2l2.9 6.3 6.8.6-5.1 4.5 1.5 6.7L12 17l-6 3.6 1.5-6.7L2.4 9.4l6.8-.6z"/>
+                    </svg>
+                    <span x-text="r.rating != null ? Number(r.rating).toFixed(1).replace('.', ',') : ''"></span>
+                  </span>
+                </div>
+                <p class="detail-rev-text" x-show="r.text" x-text="r.text"></p>
               </div>
             </template>
           </div>
+
         </div>
       </div>
     </aside>
@@ -799,14 +878,19 @@ function walkLabel(min: number | undefined): string {
           data: null as any,
           loading: false,
           error: null as string | null,
+          walkMin: null as number | null,
+          hoursOpen: false,
 
           init() {
             this.activeTab = (window as any).__PLACE_DETAILS__?.initialTab ?? 'restaurant';
           },
 
-          async openDetail(placeId: string) {
+          async openDetail(placeId: string, walkMin?: number | null) {
             this.error = null;
             this.activeId = placeId;
+            this.walkMin = walkMin ?? null;
+            this.hoursOpen = false;
+            document.body.style.overflow = 'hidden';
 
             const cache = (window as any).__PLACE_DETAILS__?.cache ?? {};
             if (cache[placeId]) {
@@ -833,13 +917,11 @@ function walkLabel(min: number | undefined): string {
                 openNow: d.openingHours?.openNow ?? null,
                 weekdayDescriptions: d.openingHours?.weekdayDescriptions ?? [],
                 reviews: (d.reviews ?? []).slice(0, 3).map((r: any) => ({
-                  author: r.authorAttribution?.displayName ?? 'Gast',
-                  text: r.text?.text ?? '',
-                  rating: r.rating,
+                  author: r.authorAttribution?.displayName ?? r.author ?? 'Gast',
+                  text: r.text?.text ?? (typeof r.text === 'string' ? r.text : '') ?? '',
+                  rating: r.rating ?? null,
                 })),
-                photoUrls: (d.photos ?? []).slice(0, 8).map((ph: any) =>
-                  `/api/places/photo?name=${encodeURIComponent(ph.name ?? ph)}&maxWidth=1200`
-                ),
+                photoUrls: d.photoUrls ?? [],
               };
             } catch (e) {
               this.error = (e as Error).message;
@@ -852,6 +934,9 @@ function walkLabel(min: number | undefined): string {
             this.activeId = null;
             this.data = null;
             this.error = null;
+            this.hoursOpen = false;
+            this.walkMin = null;
+            document.body.style.overflow = '';
           },
         }));
 
