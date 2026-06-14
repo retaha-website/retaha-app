@@ -1,4 +1,7 @@
 ---
+// Pre-Arrival Welcome — "Check-in vorbereiten"
+// Design: welcome-checkin.html (1:1 rebuild), ersetzt altes Gate-Landing.
+// gateState 'skipped' wird auf [token].astro-Ebene abgefangen (App rendern).
 interface Props {
   token: string;
   guestName: string | null;
@@ -6,397 +9,880 @@ interface Props {
   heroImageUrl: string | null;
   logoUrl: string | null;
   brandPrimary: string;
-  gateState: 'default' | 'skipped' | 'completed';
+  gateState: 'default' | 'completed';
   checkInLabel: string;
   lang: string;
 }
 
-const { token, guestName, hotelName, heroImageUrl, logoUrl, brandPrimary, gateState, checkInLabel, lang } = Astro.props;
+const {
+  token, guestName, hotelName, heroImageUrl, logoUrl,
+  brandPrimary, gateState, checkInLabel, lang,
+} = Astro.props;
 
-const firstName = guestName ?? '';
+const fn = guestName ?? '';
 
-type LS = { title: string; sub: string };
-type LG = { default: LS; skipped: LS; completed: LS };
-const allLabels: Record<string, LG> = {
+function hexToRgb(hex: string) {
+  const h = (hex || '#6982cf').replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) || 105;
+  const g = parseInt(h.slice(2, 4), 16) || 130;
+  const b = parseInt(h.slice(4, 6), 16) || 207;
+  return `${r},${g},${b}`;
+}
+const accentRgb = hexToRgb(brandPrimary);
+
+type Lang = 'de'|'en'|'fr'|'es'|'it'|'pt'|'nl'|'ru'|'ar'|'zh';
+const l = (['de','en','fr','es','it','pt','nl','ru','ar','zh'].includes(lang) ? lang : 'de') as Lang;
+
+type Txt = {
+  headline: string; sub: string;
+  slider: string; skip: string;
+  eyebrow: string; mockGreet: string;
+  eveMsg: string; chip1: string; chip2: string; eveInput: string;
+  headlineDone: string; subDone: string;
+};
+
+const LABELS: Record<Lang, Txt> = {
   de: {
-    default:   { title: firstName ? `Willkommen, ${firstName}.` : 'Willkommen.',    sub: 'Schön, dass du kommst. Wir freuen uns auf dich.' },
-    skipped:   { title: firstName ? `Bis bald, ${firstName}.`   : 'Bis bald.',      sub: `Wir freuen uns auf deinen Besuch am ${checkInLabel}.` },
-    completed: { title: firstName ? `Bis bald, ${firstName}!`   : 'Bis bald!',      sub: 'Wir sehen uns beim Check-in.' },
+    headline:     fn ? `Willkommen, ${fn}.` : 'Willkommen.',
+    sub:          'Bereite deinen Check-in vor – dann geht\'s bei der Ankunft ganz schnell.',
+    slider:       'Check-in vorbereiten',
+    skip:         'Später erledigen',
+    eyebrow:      'Dein Aufenthalt',
+    mockGreet:    fn ? `Hallo, ${fn}` : 'Hallo',
+    eveMsg:       'Ich hab Tipps & Empfehlungen für deinen Aufenthalt zusammengestellt.',
+    chip1:        '☕ Frühstück',
+    chip2:        '📍 Anfahrt',
+    eveInput:     'Frag mich alles …',
+    headlineDone: fn ? `Bis bald, ${fn}!` : 'Bis bald!',
+    subDone:      'Deine Anmeldung ist erledigt. Beim Check-in geht\'s direkt los.',
   },
   en: {
-    default:   { title: firstName ? `Welcome, ${firstName}.`    : 'Welcome.',       sub: 'Great to have you coming. We look forward to your visit.' },
-    skipped:   { title: firstName ? `See you soon, ${firstName}.` : 'See you soon.', sub: `We look forward to seeing you on ${checkInLabel}.` },
-    completed: { title: firstName ? `See you soon, ${firstName}!` : 'See you soon!', sub: "We'll see you at check-in." },
+    headline:     fn ? `Welcome, ${fn}.` : 'Welcome.',
+    sub:          'Prepare your check-in now – for a smooth and quick arrival.',
+    slider:       'Prepare Check-in',
+    skip:         'Maybe later',
+    eyebrow:      'Your Stay',
+    mockGreet:    fn ? `Hello, ${fn}` : 'Hello',
+    eveMsg:       'I\'ve put together tips and recommendations for your stay.',
+    chip1:        '☕ Breakfast',
+    chip2:        '📍 Directions',
+    eveInput:     'Ask me anything …',
+    headlineDone: fn ? `See you soon, ${fn}!` : 'See you soon!',
+    subDone:      'All set. Check-in will be quick and easy.',
   },
   fr: {
-    default:   { title: firstName ? `Bienvenue, ${firstName}.`  : 'Bienvenue.',     sub: 'Nous sommes ravis de votre venue.' },
-    skipped:   { title: firstName ? `À bientôt, ${firstName}.`  : 'À bientôt.',     sub: `Nous attendons votre arrivée le ${checkInLabel}.` },
-    completed: { title: firstName ? `À bientôt, ${firstName} !` : 'À bientôt !',    sub: 'Nous vous accueillerons au check-in.' },
+    headline:     fn ? `Bienvenue, ${fn}.` : 'Bienvenue.',
+    sub:          'Préparez votre enregistrement – pour une arrivée rapide et sans attente.',
+    slider:       'Préparer le check-in',
+    skip:         'Plus tard',
+    eyebrow:      'Votre séjour',
+    mockGreet:    fn ? `Bonjour, ${fn}` : 'Bonjour',
+    eveMsg:       'J\'ai préparé des conseils et recommandations pour votre séjour.',
+    chip1:        '☕ Petit-déj.',
+    chip2:        '📍 Itinéraire',
+    eveInput:     'Posez-moi une question …',
+    headlineDone: fn ? `À bientôt, ${fn} !` : 'À bientôt !',
+    subDone:      'Votre enregistrement est terminé. L\'arrivée sera rapide.',
   },
   es: {
-    default:   { title: firstName ? `Bienvenido, ${firstName}.` : 'Bienvenido.',    sub: 'Nos alegra que vengas. Te esperamos con entusiasmo.' },
-    skipped:   { title: firstName ? `Hasta pronto, ${firstName}.` : 'Hasta pronto.', sub: `Esperamos tu visita el ${checkInLabel}.` },
-    completed: { title: firstName ? `¡Hasta pronto, ${firstName}!` : '¡Hasta pronto!', sub: 'Te vemos en el check-in.' },
+    headline:     fn ? `Bienvenido, ${fn}.` : 'Bienvenido.',
+    sub:          'Prepara tu check-in – para una llegada rápida y sin esperas.',
+    slider:       'Preparar el check-in',
+    skip:         'Más tarde',
+    eyebrow:      'Tu estancia',
+    mockGreet:    fn ? `Hola, ${fn}` : 'Hola',
+    eveMsg:       'He preparado consejos y recomendaciones para tu estancia.',
+    chip1:        '☕ Desayuno',
+    chip2:        '📍 Cómo llegar',
+    eveInput:     'Pregúntame …',
+    headlineDone: fn ? `¡Hasta pronto, ${fn}!` : '¡Hasta pronto!',
+    subDone:      'Tu registro está listo. El check-in será rápido.',
+  },
+  it: {
+    headline:     fn ? `Benvenuto, ${fn}.` : 'Benvenuto.',
+    sub:          'Prepara il tuo check-in – per un arrivo rapido e senza attese.',
+    slider:       'Prepara il check-in',
+    skip:         'Più tardi',
+    eyebrow:      'Il tuo soggiorno',
+    mockGreet:    fn ? `Ciao, ${fn}` : 'Ciao',
+    eveMsg:       'Ho preparato consigli e suggerimenti per il tuo soggiorno.',
+    chip1:        '☕ Colazione',
+    chip2:        '📍 Come arrivare',
+    eveInput:     'Chiedimi tutto …',
+    headlineDone: fn ? `A presto, ${fn}!` : 'A presto!',
+    subDone:      'La tua registrazione è completata. Il check-in sarà veloce.',
+  },
+  pt: {
+    headline:     fn ? `Bem-vindo, ${fn}.` : 'Bem-vindo.',
+    sub:          'Prepare o seu check-in – para uma chegada rápida e sem esperas.',
+    slider:       'Preparar check-in',
+    skip:         'Mais tarde',
+    eyebrow:      'A sua estadia',
+    mockGreet:    fn ? `Olá, ${fn}` : 'Olá',
+    eveMsg:       'Preparei dicas e recomendações para a sua estadia.',
+    chip1:        '☕ Pequeno-almoço',
+    chip2:        '📍 Como chegar',
+    eveInput:     'Pergunte-me …',
+    headlineDone: fn ? `Até breve, ${fn}!` : 'Até breve!',
+    subDone:      'O seu registo está concluído. O check-in será rápido.',
+  },
+  nl: {
+    headline:     fn ? `Welkom, ${fn}.` : 'Welkom.',
+    sub:          'Bereid je check-in voor – voor een vlotte aankomst zonder wachten.',
+    slider:       'Check-in voorbereiden',
+    skip:         'Later',
+    eyebrow:      'Jouw verblijf',
+    mockGreet:    fn ? `Hallo, ${fn}` : 'Hallo',
+    eveMsg:       'Ik heb tips en aanbevelingen voor jouw verblijf samengesteld.',
+    chip1:        '☕ Ontbijt',
+    chip2:        '📍 Route',
+    eveInput:     'Stel me een vraag …',
+    headlineDone: fn ? `Tot snel, ${fn}!` : 'Tot snel!',
+    subDone:      'Je aanmelding is klaar. De check-in gaat snel.',
+  },
+  ru: {
+    headline:     fn ? `Добро пожаловать, ${fn}.` : 'Добро пожаловать.',
+    sub:          'Подготовьтесь к заезду – чтобы прибытие прошло быстро.',
+    slider:       'Подготовить заезд',
+    skip:         'Позже',
+    eyebrow:      'Ваше пребывание',
+    mockGreet:    fn ? `Привет, ${fn}` : 'Привет',
+    eveMsg:       'Я подготовила советы и рекомендации для вашего пребывания.',
+    chip1:        '☕ Завтрак',
+    chip2:        '📍 Маршрут',
+    eveInput:     'Спросите меня …',
+    headlineDone: fn ? `До встречи, ${fn}!` : 'До встречи!',
+    subDone:      'Ваша регистрация завершена. Заезд пройдёт быстро.',
+  },
+  ar: {
+    headline:     fn ? `مرحباً، ${fn}.` : 'مرحباً.',
+    sub:          'جهّز تسجيل وصولك – للوصول بسرعة دون انتظار.',
+    slider:       'التحضير للوصول',
+    skip:         'لاحقاً',
+    eyebrow:      'إقامتك',
+    mockGreet:    fn ? `مرحباً، ${fn}` : 'مرحباً',
+    eveMsg:       'لقد أعددت نصائح وتوصيات لإقامتك.',
+    chip1:        '☕ الإفطار',
+    chip2:        '📍 الاتجاهات',
+    eveInput:     'اسألني …',
+    headlineDone: fn ? `إلى اللقاء، ${fn}!` : 'إلى اللقاء!',
+    subDone:      'تم التسجيل. سيكون الوصول سريعاً.',
+  },
+  zh: {
+    headline:     fn ? `欢迎，${fn}。` : '欢迎。',
+    sub:          '提前完成入住登记 – 到达时无需排队，快速入住。',
+    slider:       '准备入住登记',
+    skip:         '稍后',
+    eyebrow:      '您的住宿',
+    mockGreet:    fn ? `你好，${fn}` : '你好',
+    eveMsg:       '我为您的住宿准备了提示和建议。',
+    chip1:        '☕ 早餐',
+    chip2:        '📍 路线',
+    eveInput:     '有什么问题请问我 …',
+    headlineDone: fn ? `再见，${fn}！` : '再见！',
+    subDone:      '登记完成。入住将会很顺畅。',
   },
 };
-const lg = allLabels[lang] ?? allLabels.de;
-const L = lg[gateState];
 
-const heroUrl = heroImageUrl ?? '';
+const txt = LABELS[l];
+const isCompleted = gateState === 'completed';
+const heroSafe = (heroImageUrl ?? '').replace(/'/g, "\\'");
+const preCheckinUrl = `/g/${token}/pre-checkin`;
 ---
 
-<!-- Layer 0: Foto — kein Padding, deckt Statusbar/Notch vollständig -->
 <div
-  class="gate-photo"
-  style={heroUrl ? `background-image:url('${heroUrl.replace(/'/g, "\\'")}')` : undefined}
-  aria-hidden="true"
-></div>
+  class={`wc-screen${isCompleted ? ' wc-completed' : ''}`}
+  style={`--accent:${brandPrimary};--accent-rgb:${accentRgb};`}
+>
 
-<!-- Layer 1: Gradient-Overlay -->
-<div class="gate-overlay" aria-hidden="true"></div>
-
-<!-- Layer 2: Inhalt — NUR hier lebt das Safe-Area-Padding -->
-<div class="gate-content" style={`--accent:${brandPrimary};`}>
-
-  <!-- Logo -->
-  <div class="logo">
+  {/* ── Logo ── */}
+  <div class="wc-brand">
     {logoUrl ? (
-      <img src={logoUrl} alt={hotelName} />
+      <img src={logoUrl} alt={hotelName} class="wc-logo" />
     ) : (
-      <span class="logo-name">{hotelName}</span>
+      <span class="wc-logo-text">{hotelName}</span>
     )}
   </div>
 
-  <!-- Greeting -->
-  <div class="ptitle">{L.title}</div>
-  <div class="psub">{L.sub}</div>
-
-  <!-- Cards: margin-top:auto drückt sie ans Seitenende -->
-  <div class="cards">
-
-    {/* ── Default: Voranmeldung dominant ── */}
-    {gateState === 'default' && (
-      <a class="glasscard primary" href={`/g/${token}/pre-checkin`} data-astro-reload>
-        <span class="gi" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="5" width="18" height="14" rx="2.5"/>
-            <circle cx="8.5" cy="11" r="2"/>
-            <path d="M13.5 9.5h4.5M13.5 12.5h4.5M6.5 15.5h6"/>
+  {isCompleted ? (
+    // ── Bis-bald-State ─────────────────────────────────────────────
+    <div class="wc-done-body">
+      <div class="wc-check-wrap">
+        <div class="wc-check-glow"></div>
+        <div class="wc-check-circle">
+          {/* Eckiger Haus-Haken (nicht Unicode-✓) */}
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <polyline
+              points="10 20 17 27 30 13"
+              stroke="#fff"
+              stroke-width="3"
+              stroke-linecap="square"
+              stroke-linejoin="miter"
+            />
           </svg>
-        </span>
-        <span class="gtxt">
-          <div class="geyebrow">Vor der Anreise</div>
-          <div class="gt">Online voranmelden</div>
-          <div class="gs">Spart Zeit beim Check-in</div>
-        </span>
-        <span class="gchev" aria-hidden="true">›</span>
-      </a>
-    )}
-
-    {/* ── Skipped: Reminder als Primärkarte, column-layout ── */}
-    {gateState === 'skipped' && (
-      <a class="glasscard primary col" href={`/g/${token}/pre-checkin`} data-astro-reload>
-        <div class="geyebrow">Anmeldung noch offen</div>
-        <div class="gt">Jetzt online voranmelden</div>
-        <div class="gs">2 Minuten — schnellerer Check-in, kein Papierkram an der Rezeption.</div>
-      </a>
-    )}
-
-    {/* ── Completed: Kompakte Erledigtkarte ── */}
-    {gateState === 'completed' && (
-      <div class="glasscard done">
-        <span class="done-check" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </span>
-        <span class="gtxt">
-          <div class="gt">Anmeldung erledigt</div>
-          <div class="gs">Check-in am {checkInLabel}</div>
-        </span>
+        </div>
       </div>
-    )}
+      <p class="wc-hotel-tag">{hotelName}</p>
+      <h1 class="wc-headline">{txt.headlineDone}</h1>
+      <p class="wc-sub">{txt.subDone}</p>
+      <div class="wc-checkin-badge">Check-in · {checkInLabel}</div>
+    </div>
+  ) : (
+    // ── Welcome-State ──────────────────────────────────────────────
+    <>
+      {/* Stage: Glows + Device */}
+      <div class="wc-stage">
+        <div class="wc-glow wc-glow-a"></div>
+        <div class="wc-glow wc-glow-b"></div>
 
-    <!-- Anfahrt & Check-in -->
-    <a class="glasscard" href={`/g/${token}/anfahrt`} data-astro-reload>
-      <span class="gi" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"/>
-          <circle cx="12" cy="9" r="2.3"/>
-        </svg>
-      </span>
-      <span class="gtxt">
-        <div class="gt">Anfahrt &amp; Check-in</div>
-        <div class="gs">Route &amp; Zeiten</div>
-      </span>
-      <span class="gchev" aria-hidden="true">›</span>
-    </a>
+        <div class="wc-device">
+          <div class="wc-scr">
+            {/* Dynamic Island */}
+            <div class="wc-island"></div>
 
-    <!-- Frühstück -->
-    <a class="glasscard" href={`/g/${token}/fruehstueck`} data-astro-reload>
-      <span class="gi" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/>
-          <path d="M16 9h2.4a2 2 0 0 1 0 5H16"/>
-          <path d="M7.5 3v2M11 3v2"/>
-        </svg>
-      </span>
-      <span class="gtxt">
-        <div class="gt">Frühstück</div>
-        <div class="gs">Zeiten &amp; Infos</div>
-      </span>
-      <span class="gchev" aria-hidden="true">›</span>
-    </a>
+            {/* Hero-Streifen */}
+            <div
+              class="wc-ph"
+              style={heroSafe ? `--hero:url('${heroSafe}')` : undefined}
+            >
+              <div class="wc-ph-over"></div>
+              <div class="wc-ph-hi">
+                <span class="wc-ph-eyebrow">{txt.eyebrow}</span>
+                <span class="wc-ph-name">{txt.mockGreet}</span>
+              </div>
+            </div>
 
-    <!-- Wünsche vorab -->
-    <a class="glasscard" href={`/g/${token}/requests`} data-astro-reload>
-      <span class="gi" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-      </span>
-      <span class="gtxt">
-        <div class="gt">Wünsche vorab</div>
-        <div class="gs">Präferenzen mitteilen</div>
-      </span>
-      <span class="gchev" aria-hidden="true">›</span>
-    </a>
+            {/* In-App-Teaser */}
+            <div class="wc-in">
+              <div class="wc-eve-row">
+                <div class="wc-ev-av">E</div>
+                <div class="wc-ev-bubble">{txt.eveMsg}</div>
+              </div>
+              <div class="wc-chips">
+                <span class="wc-chip">{txt.chip1}</span>
+                <span class="wc-chip">{txt.chip2}</span>
+              </div>
+              <div class="wc-input-bar">
+                <span class="wc-input-txt">{txt.eveInput}</span>
+                <span class="wc-input-send" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    {/* Soft-skip: Liquid-Glass Pill */}
-    {gateState === 'default' && (
-      <button
-        class="glassbtn"
-        type="button"
-        onclick="fetch('/api/g/gate-skip',{method:'POST',credentials:'same-origin'}).then(()=>location.reload())"
-      >
-        Später erledigen &rarr;
-      </button>
-    )}
-  </div>
+      {/* Copy */}
+      <div class="wc-copy">
+        <h1 class="wc-headline">{txt.headline}</h1>
+        <p class="wc-sub">{txt.sub}</p>
+      </div>
+
+      {/* CTA: Slider + Skip */}
+      <div class="wc-cta">
+        <div
+          id="wc-track"
+          class="wc-track"
+          role="button"
+          tabindex="0"
+          aria-label={txt.slider}
+          data-url={preCheckinUrl}
+        >
+          <div id="wc-fill" class="wc-fill"></div>
+          <div id="wc-knob" class="wc-knob">
+            <div class="wc-arr" aria-hidden="true">
+              {/* Arrow right */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </div>
+          </div>
+          <span class="wc-track-lbl">{txt.slider}</span>
+        </div>
+        <button id="wc-skip" class="wc-skip" type="button">
+          {txt.skip}
+        </button>
+      </div>
+    </>
+  )}
 </div>
 
 <style>
-  /* ── Layer 0: Foto — fixed, kein Padding, Vollbild bis Statusbar/Notch ── */
-  .gate-photo {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    background-color: #16181c;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-  }
-
-  /* ── Layer 1: Gradient-Overlay — fixed, z darüber ── */
-  .gate-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-    /* Oben #16181c → iOS nimmt die bg-color vom fixed-Element für die Statusbar-Tönung;
-       Gradient matcht nahtlos an diese Farbe, fällt dann transparent → Foto sichtbar → dunkel unten */
-    background: linear-gradient(
-      180deg,
-      #16181c                    0%,
-      rgba(22, 24, 28, 0.85)     4%,
-      rgba(22, 24, 28, 0.25)    14%,
-      rgba(22, 24, 28, 0.00)    26%,
-      rgba(8,  10, 14, 0.00)    60%,
-      rgba(8,  10, 14, 0.55)    82%,
-      rgba(8,  10, 14, 0.74)   100%
-    );
-  }
-
-  /* ── Layer 2: Inhalt — NUR hier das Safe-Area-Padding ── */
-  .gate-content {
-    position: relative;
-    z-index: 2;
+  /* ── Root screen ─────────────────────────────────────────────────── */
+  .wc-screen {
+    background: #0a0b0d;
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    padding:
-      max(20px, env(safe-area-inset-top))
-      22px
-      max(20px, env(safe-area-inset-bottom));
-    max-width: 430px;
-    margin: 0 auto;
-    box-sizing: border-box;
     color: #fff;
+    position: relative;
+    overflow: hidden;
   }
 
-  /* ── Logo ── */
-  .logo {
-    margin-bottom: 16px;
+  /* ── Logo / Brand ────────────────────────────────────────────────── */
+  .wc-brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: max(env(safe-area-inset-top, 0px), 20px) 24px 12px;
+    animation: wc-logo-in .7s .15s ease-out both;
   }
-  .logo img {
-    height: 30px;
+  .wc-logo {
+    height: 28px;
     width: auto;
     display: block;
     filter: brightness(0) invert(1);
-    opacity: 0.9;
+    opacity: 0.88;
   }
-  .logo-name {
+  .wc-logo-text {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.65);
-  }
-
-  /* ── Greeting ── */
-  .ptitle {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: clamp(28px, 7.5vw, 32px);
-    letter-spacing: -0.02em;
-    line-height: 1.07;
-    color: #fff;
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.32);
-  }
-  .psub {
-    font-size: 15.5px;
-    line-height: 1.45;
-    color: rgba(255, 255, 255, 0.9);
-    margin-top: 10px;
-    max-width: 300px;
-    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  /* ── Card cluster: pushed to bottom ── */
-  .cards {
-    margin-top: auto;
-    padding-top: 26px;
-  }
-
-  /* ── Base glass card ── */
-  .glasscard {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    background: rgba(26, 28, 34, 0.42);
-    -webkit-backdrop-filter: blur(22px) saturate(135%);
-    backdrop-filter: blur(22px) saturate(135%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 17px;
-    padding: 12px 15px;
-    text-decoration: none;
-    margin-top: 9px;
-    color: #fff;
-    cursor: pointer;
-    transition: opacity 0.13s ease;
-    box-sizing: border-box;
-  }
-  .glasscard:active { opacity: 0.76; }
-
-  /* Icon container */
-  .gi {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.11);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    color: #fff;
-  }
-
-  /* Text block */
-  .gtxt { flex: 1; min-width: 0; }
-
-  .geyebrow {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    font-size: 10px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: color-mix(in srgb, var(--accent) 68%, rgba(255, 255, 255, 0.65));
-    margin-bottom: 4px;
+    color: rgba(255,255,255,.6);
   }
 
-  .gt {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-    font-size: 16px;
-    color: #fff;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
-  }
-
-  .gs {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.66);
-    margin-top: 3px;
-    line-height: 1.35;
-  }
-
-  .gchev {
-    color: rgba(255, 255, 255, 0.52);
-    font-size: 23px;
-    flex: 0 0 auto;
-    line-height: 1;
-  }
-
-  /* ── Primary card ── */
-  .glasscard.primary {
-    border-color: color-mix(in srgb, var(--accent) 60%, rgba(255, 255, 255, 0.15));
-    background: color-mix(in srgb, var(--accent) 17%, rgba(26, 28, 34, 0.52));
-    box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 30%, transparent);
-  }
-  .glasscard.primary .gi {
-    background: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.11));
-    color: color-mix(in srgb, var(--accent) 30%, #fff);
-  }
-
-  /* Column variant for skipped reminder card */
-  .glasscard.col {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 14px 15px;
-  }
-
-  /* ── Completed card ── */
-  .glasscard.done {
-    border-color: rgba(52, 199, 89, 0.35);
-    background: rgba(52, 199, 89, 0.10);
-    cursor: default;
-  }
-  .done-check {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(52, 199, 89, 0.22);
-    border: 1px solid rgba(52, 199, 89, 0.38);
+  /* ── Stage ───────────────────────────────────────────────────────── */
+  .wc-stage {
+    flex: 1;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #34c759;
+    min-height: 0;
+    padding: 8px 0 12px;
   }
 
-  /* ── Liquid-Glass Pill (Skip button) ── */
-  .glassbtn {
-    display: block;
-    width: fit-content;
-    margin: 16px auto 0;
-    background: rgba(26, 28, 34, 0.42);
-    -webkit-backdrop-filter: blur(20px) saturate(130%);
-    backdrop-filter: blur(20px) saturate(130%);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 30px;
-    padding: 12px 24px;
-    color: rgba(255, 255, 255, 0.92);
+  /* Radial glows */
+  .wc-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .wc-glow-a {
+    width: 340px;
+    height: 340px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -48%);
+    background: radial-gradient(
+      circle,
+      rgba(var(--accent-rgb), .32) 0%,
+      rgba(var(--accent-rgb), .14) 36%,
+      rgba(var(--accent-rgb), .04) 62%,
+      transparent 76%
+    );
+  }
+  .wc-glow-b {
+    width: 200px;
+    height: 180px;
+    left: 62%;
+    top: 32%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      circle,
+      rgba(var(--accent-rgb), .18) 0%,
+      transparent 70%
+    );
+  }
+
+  /* ── Device mockup ───────────────────────────────────────────────── */
+  .wc-device {
+    position: relative;
+    z-index: 2;
+    width: min(198px, 52vw);
+    aspect-ratio: 9 / 17;
+    border-radius: min(36px, 9.4vw);
+    background: #0f1014;
+    border: 1.5px solid rgba(255,255,255,.18);
+    box-shadow:
+      0 0 0 3px rgba(0,0,0,.5),
+      0 0 40px rgba(0,0,0,.55),
+      inset 0 1px 0 rgba(255,255,255,.10);
+    overflow: hidden;
+    animation: wc-dev-in .95s .32s cubic-bezier(.2,0,.2,1.1) both, wc-float 6s 1.5s ease-in-out infinite;
+  }
+
+  .wc-scr {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+  /* Dynamic Island */
+  .wc-island {
+    position: absolute;
+    top: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28%;
+    height: 5%;
+    background: #000;
+    border-radius: 20px;
+    z-index: 10;
+  }
+
+  /* Hero photo strip */
+  .wc-ph {
+    position: relative;
+    flex: 0 0 38%;
+    background-color: rgba(var(--accent-rgb), .25);
+    background-image: var(--hero, none);
+    background-size: cover;
+    background-position: center;
+  }
+  .wc-ph-over {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(0,0,0,.28) 0%,
+      rgba(0,0,0,.05) 40%,
+      rgba(0,0,0,.52) 100%
+    );
+  }
+  .wc-ph-hi {
+    position: absolute;
+    bottom: 7%;
+    left: 8%;
+    right: 8%;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .wc-ph-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 5.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.68);
+  }
+  .wc-ph-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    color: #fff;
+    letter-spacing: -.01em;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* In-app teaser */
+  .wc-in {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6%;
+    padding: 8% 6% 6%;
+    background: #141519;
+    overflow: hidden;
+  }
+  .wc-eve-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5%;
+  }
+  .wc-ev-av {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent, #6982cf);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .wc-ev-bubble {
+    background: rgba(255,255,255,.07);
+    border-radius: 0 8px 8px 8px;
+    border: .5px solid rgba(255,255,255,.1);
+    font-size: 6.5px;
+    line-height: 1.45;
+    color: rgba(255,255,255,.82);
+    padding: 4% 6%;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .wc-chips {
+    display: flex;
+    gap: 4%;
+  }
+  .wc-chip {
+    background: rgba(255,255,255,.08);
+    border: .5px solid rgba(255,255,255,.14);
+    border-radius: 20px;
+    font-size: 6px;
+    color: rgba(255,255,255,.76);
+    padding: 2% 6%;
+    font-family: 'Space Grotesk', sans-serif;
+    white-space: nowrap;
+  }
+  .wc-input-bar {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,.06);
+    border: .5px solid rgba(255,255,255,.14);
+    border-radius: 20px;
+    padding: 3% 6%;
+    gap: 4%;
+  }
+  .wc-input-txt {
+    flex: 1;
+    font-size: 6px;
+    color: rgba(255,255,255,.38);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .wc-input-send {
+    color: rgba(255,255,255,.45);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  /* ── Copy ────────────────────────────────────────────────────────── */
+  .wc-copy {
+    text-align: center;
+    padding: 18px 28px 4px;
+    animation: wc-copy-up .7s .9s ease-out both;
+  }
+  .wc-headline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(26px, 7vw, 32px);
+    letter-spacing: -.025em;
+    line-height: 1.1;
+    color: #fff;
+    margin: 0 0 10px;
+  }
+  .wc-sub {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: rgba(255,255,255,.65);
+    margin: 0;
+    max-width: 310px;
+    margin-inline: auto;
+  }
+
+  /* ── CTA: Slide + Skip ───────────────────────────────────────────── */
+  .wc-cta {
+    padding: 20px 24px max(env(safe-area-inset-bottom, 0px), 34px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    animation: wc-cta-fade .6s 1.1s ease-out both;
+  }
+
+  /* Slide track */
+  .wc-track {
+    position: relative;
+    width: 100%;
+    height: 56px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04));
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -6px 14px rgba(0,0,0,.18);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wc-fill {
+    position: absolute;
+    inset: 0;
+    right: auto;
+    width: 0%;
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),.0), rgba(var(--accent-rgb),.28));
+    border-radius: 28px;
+    pointer-events: none;
+  }
+  .wc-knob {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
+    background: var(--accent, #6982cf);
+    box-shadow: 0 0 22px rgba(var(--accent-rgb), .52), 0 2px 8px rgba(0,0,0,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    z-index: 2;
+    will-change: transform;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wc-knob:active { cursor: grabbing; }
+  .wc-track-lbl {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 58px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: rgba(255,255,255,.72);
+    letter-spacing: -.01em;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 16px;
+  }
+
+  /* Skip link */
+  .wc-skip {
+    background: none;
+    border: none;
+    padding: 8px 16px;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
-    font-size: 12px;
-    letter-spacing: 0.05em;
+    font-size: 11.5px;
+    letter-spacing: .06em;
     text-transform: uppercase;
-    text-decoration: none;
+    color: rgba(255,255,255,.42);
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .15s;
   }
-  .glassbtn:hover {
-    background: rgba(40, 44, 52, 0.55);
-    border-color: rgba(255, 255, 255, 0.26);
+  .wc-skip:hover, .wc-skip:active { color: rgba(255,255,255,.66); }
+
+  /* ── Bis-bald-State ──────────────────────────────────────────────── */
+  .wc-done-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px 32px max(env(safe-area-inset-bottom, 0px), 48px);
+    gap: 0;
+  }
+  .wc-check-wrap {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    margin-bottom: 28px;
+  }
+  .wc-check-glow {
+    position: absolute;
+    inset: -22px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(var(--accent-rgb), .28) 0%,
+      rgba(var(--accent-rgb), .10) 50%,
+      transparent 74%
+    );
+    animation: wc-glow-pulse 2.8s 1s ease-in-out infinite;
+  }
+  .wc-check-circle {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    background: var(--accent, #6982cf);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: wc-check-pop .5s .25s ease-out both;
+  }
+  .wc-hotel-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.4);
+    margin-bottom: 18px;
+  }
+  .wc-completed .wc-headline {
+    font-size: clamp(28px, 7.5vw, 34px);
+    margin-bottom: 12px;
+  }
+  .wc-completed .wc-sub {
+    color: rgba(255,255,255,.55);
+  }
+  .wc-checkin-badge {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .06em;
+    color: rgba(255,255,255,.68);
+  }
+
+  /* ── Animations ──────────────────────────────────────────────────── */
+  @keyframes wc-logo-in   { from { opacity:0; transform:translateY(-10px) } to { opacity:1; transform:none } }
+  @keyframes wc-dev-in    { from { opacity:0; transform:translateY(28px) scale(.96) } to { opacity:1; transform:none } }
+  @keyframes wc-copy-up   { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:none } }
+  @keyframes wc-cta-fade  { from { opacity:0; } to { opacity:1 } }
+  @keyframes wc-float     { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-9px) } }
+  @keyframes wc-check-pop { from { opacity:0; transform:scale(.65) } to { opacity:1; transform:scale(1) } }
+  @keyframes wc-glow-pulse { 0%,100% { transform:scale(1); opacity:.8 } 50% { transform:scale(1.14); opacity:.46 } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wc-brand   { animation: none; opacity: 1; }
+    .wc-device  { animation: none; opacity: 1; transform: none; }
+    .wc-copy    { animation: none; opacity: 1; transform: none; }
+    .wc-cta     { animation: none; opacity: 1; }
+    .wc-check-circle { animation: none; opacity: 1; transform: none; }
+    .wc-check-glow   { animation: none; opacity: .5; }
   }
 </style>
+
+{/* Slide + Skip JS — nur für Default-State */}
+{!isCompleted && (
+  <script>
+    (function () {
+      var track = document.getElementById('wc-track');
+      var knob  = document.getElementById('wc-knob');
+      var fill  = document.getElementById('wc-fill');
+      if (!track || !knob || !fill) return;
+
+      var url  = track.dataset.url;
+      var done = false;
+      var currentDx = 0;
+      var dragging  = false;
+      var startX    = 0;
+
+      var CHECK_SVG =
+        '<svg width="20" height="20" viewBox="0 0 40 40" fill="none" aria-hidden="true">' +
+        '<polyline points="10 20 17 27 30 13" stroke="#fff" stroke-width="3"' +
+        ' stroke-linecap="square" stroke-linejoin="miter"/></svg>';
+
+      function trackW() { return track.offsetWidth - knob.offsetWidth - 8; }
+
+      function complete() {
+        if (done) return;
+        done = true;
+        var w = trackW();
+        knob.style.transition = 'transform .24s ease';
+        fill.style.transition = 'width .24s ease';
+        knob.style.transform  = 'translateX(' + w + 'px)';
+        fill.style.width      = '100%';
+        var arr = knob.querySelector('.wc-arr');
+        if (arr) arr.innerHTML = CHECK_SVG;
+        setTimeout(function () { window.location.href = url; }, 350);
+      }
+
+      function snapBack() {
+        knob.style.transition = 'transform .35s cubic-bezier(.5,0,.2,1)';
+        fill.style.transition = 'width .35s cubic-bezier(.5,0,.2,1)';
+        knob.style.transform  = 'translateX(0)';
+        fill.style.width      = '0%';
+        currentDx = 0;
+        setTimeout(function () {
+          knob.style.transition = '';
+          fill.style.transition = '';
+        }, 380);
+      }
+
+      function moveKnob(dx) {
+        var w = trackW();
+        currentDx = Math.min(Math.max(dx, 0), w);
+        knob.style.transform = 'translateX(' + currentDx + 'px)';
+        fill.style.width = (w > 0 ? currentDx / w * 100 : 0) + '%';
+      }
+
+      // Tap on track → complete
+      track.addEventListener('click', function (e) {
+        if (done) return;
+        // Only if the tap didn't start a drag
+        if (currentDx < 4) complete();
+      });
+
+      // ── Touch ──────────────────────────────────────────────────────
+      knob.addEventListener('touchstart', function (e) {
+        if (done) return;
+        startX   = e.touches[0].clientX;
+        dragging = true;
+        knob.style.transition = '';
+        fill.style.transition = '';
+        e.preventDefault();
+        e.stopPropagation();
+      }, { passive: false });
+
+      document.addEventListener('touchmove', function (e) {
+        if (!dragging || done) return;
+        moveKnob(e.touches[0].clientX - startX);
+        e.preventDefault();
+      }, { passive: false });
+
+      document.addEventListener('touchend', function () {
+        if (!dragging || done) return;
+        dragging = false;
+        var w = trackW();
+        if (w > 0 && currentDx / w >= 0.85) { complete(); }
+        else { snapBack(); }
+      });
+
+      // ── Mouse (desktop testing) ────────────────────────────────────
+      knob.addEventListener('mousedown', function (e) {
+        if (done) return;
+        startX   = e.clientX;
+        dragging = true;
+        knob.style.transition = '';
+        fill.style.transition = '';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', function (e) {
+        if (!dragging || done) return;
+        moveKnob(e.clientX - startX);
+      });
+
+      document.addEventListener('mouseup', function () {
+        if (!dragging || done) return;
+        dragging = false;
+        var w = trackW();
+        if (w > 0 && currentDx / w >= 0.85) { complete(); }
+        else { snapBack(); }
+      });
+
+      // ── Keyboard (accessibility) ───────────────────────────────────
+      track.addEventListener('keydown', function (e) {
+        if (done) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); complete(); }
+      });
+
+      // ── Skip button ────────────────────────────────────────────────
+      var skip = document.getElementById('wc-skip');
+      if (skip) {
+        skip.addEventListener('click', function () {
+          fetch('/api/g/gate-skip', { method: 'POST', credentials: 'same-origin' })
+            .then(function () { location.reload(); });
+        });
+      }
+    })();
+  </script>
+)}

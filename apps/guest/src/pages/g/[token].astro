@@ -423,6 +423,10 @@ const gateSkipped = !isShowcase && Astro.cookies.get('gate_skip')?.value === 'tr
 const gateState: 'default' | 'skipped' | 'completed' =
   gatePreCheckinCompleted ? 'completed' : gateSkipped ? 'skipped' : 'default';
 
+// skipped → App zeigen (Soft-Skip: Session-Cookie gesetzt)
+// default/completed → PreArrivalGate (Welcome oder Bis-bald)
+const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipped';
+
 ---
 
 <!DOCTYPE html>
@@ -430,8 +434,8 @@ const gateState: 'default' | 'skipped' | 'completed' =
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content={stayPersona === 'pre_arrival' ? '#16181c' : '#ffffff'} />
-    {stayPersona === 'pre_arrival' && (
+    <meta name="theme-color" content={showPreArrivalGate ? '#0a0b0d' : '#ffffff'} />
+    {showPreArrivalGate && (
       <>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -442,9 +446,9 @@ const gateState: 'default' | 'skipped' | 'completed' =
   </head>
   <body
     class={`gate-guest gate-theme-${activeTheme}`}
-    style={stayPersona === 'pre_arrival' ? 'background:#16181c;' : undefined}
+    style={showPreArrivalGate ? 'background:#0a0b0d;' : undefined}
   >
-    {stayPersona === 'pre_arrival' ? (
+    {showPreArrivalGate ? (
       <PreArrivalGate
         token={token!}
         guestName={guest?.first_name ?? null}
@@ -452,7 +456,7 @@ const gateState: 'default' | 'skipped' | 'completed' =
         heroImageUrl={hotelHeroBg}
         logoUrl={(hotelGeoRow as any)?.logo_primary ?? (hotel as any)?.logo_primary ?? null}
         brandPrimary={brandPrimary ?? '#6982cf'}
-        gateState={gateState}
+        gateState={gateState === 'completed' ? 'completed' : 'default'}
         checkInLabel={checkInLabel}
         lang={lang}
       />
@@ -829,7 +833,7 @@ const gateState: 'default' | 'skipped' | 'completed' =
     </main>
     )} {/* /gate-else: pre_arrival renders PreArrivalGate instead */}
 
-    {stayPersona !== 'pre_arrival' && <ConsentModule stayToken={token} />}
+    {!showPreArrivalGate && <ConsentModule stayToken={token} />}
 
     <script>
       import Alpine from 'alpinejs';
