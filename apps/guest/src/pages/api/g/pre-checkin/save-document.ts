@@ -8,6 +8,7 @@ function json(data: unknown, status = 200) {
 export const POST: APIRoute = async ({ cookies, request }) => {
   const session = await getStaySession(cookies);
   if (!session) return json({ ok: false, error: 'no_stay_session' }, 401);
+  if (session.is_showcase) return json({ ok: true });
 
   let body: {
     nationality?: string;

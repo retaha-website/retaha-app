@@ -1,7 +1,7 @@
 ---
 // Wünsche vorab — Bestätigung
 
-import { loadStayByToken } from '@retaha/db';
+import { loadGuestCtx } from '../../../../lib/showcase/guest-ctx';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
@@ -10,9 +10,9 @@ import '@fontsource/space-grotesk/700.css';
 const { token } = Astro.params;
 if (!token) return new Response(null, { status: 400 });
 
-const ctx = await loadStayByToken(token);
-if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
-
+const ctxResult = await loadGuestCtx(token);
+if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
+const { ctx } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
 const features = (settings as any)?.features ?? {};
 if (features.special_requests === false) return Astro.redirect(`/g/${token}`);

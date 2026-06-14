@@ -10,6 +10,7 @@ const VALID_CHIPS = ['quiet_room','high_floor','extra_pillow','late_arrival','cr
 export const POST: APIRoute = async ({ cookies, request }) => {
   const session = await getStaySession(cookies);
   if (!session) return json({ ok: false, error: 'no_stay_session' }, 401);
+  if (session.is_showcase) return json({ ok: true });
 
   let body: { chips?: string[]; allergies?: string; occasion?: string; note?: string };
   try { body = await request.json(); }

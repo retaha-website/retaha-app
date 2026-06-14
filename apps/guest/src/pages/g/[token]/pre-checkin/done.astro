@@ -2,7 +2,7 @@
 // Pre-Checkin — Erfolgsseite (domestic + foreign)
 // Abschlussfarbe ist bewusst KEIN Hotel-Brand-Akzent (feste Systemfarbe).
 
-import { loadStayByToken } from '@retaha/db';
+import { loadGuestCtx } from '../../../../lib/showcase/guest-ctx';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
@@ -12,19 +12,19 @@ import '@fontsource/jetbrains-mono/400.css';
 const { token } = Astro.params;
 if (!token) return new Response(null, { status: 400 });
 
-const ctx = await loadStayByToken(token);
-if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
-
+const ctxResult = await loadGuestCtx(token);
+if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
+const { ctx, isShowcase } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
 const features = (settings?.features ?? {}) as Record<string, boolean>;
 if (features.pre_checkin === false) return Astro.redirect(`/g/${token}`);
 
 const sbSr = createSupabaseServiceRoleInstance();
-const { data: rec } = await sbSr
-  .from('stay_pre_checkin')
-  .select('path, status')
-  .eq('stay_id', stay.id)
-  .maybeSingle();
+let rec: any = null;
+if (!isShowcase) {
+  const { data } = await sbSr.from('stay_pre_checkin').select('path, status').eq('stay_id', stay.id).maybeSingle();
+  rec = data;
+}
 
 const path = rec?.path ?? 'foreign';
 const lang: Lang = normalizeLang(guest?.language || hotel.default_language);

@@ -1,7 +1,7 @@
 ---
 // Pre-Checkin — Schritt 2 (Foreign): Adresse
 
-import { loadStayByToken } from '@retaha/db';
+import { loadGuestCtx } from '../../../../lib/showcase/guest-ctx';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
@@ -12,9 +12,9 @@ import '@retaha/ui-guest/base';
 const { token } = Astro.params;
 if (!token) return new Response(null, { status: 400 });
 
-const ctx = await loadStayByToken(token);
-if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
-
+const ctxResult = await loadGuestCtx(token);
+if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
+const { ctx, isShowcase } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
 const features = (settings?.features ?? {}) as Record<string, boolean>;
 if (features.pre_checkin === false) return Astro.redirect(`/g/${token}`);
@@ -23,19 +23,18 @@ const session = await getStaySession(Astro.cookies);
 if (!session || session.stay_id !== stay.id) {
   await setStaySessionCookie(Astro.cookies, {
     stay_id: stay.id, hotel_id: (hotel as any).id,
-    check_out_utc: stay.check_out, is_showcase: false,
+    check_out_utc: stay.check_out, is_showcase: isShowcase,
   });
 }
 
 const sbSr = createSupabaseServiceRoleInstance();
-const { data: rec } = await sbSr
-  .from('stay_pre_checkin')
-  .select('path, status, address_street, address_zip, address_city, address_country')
-  .eq('stay_id', stay.id)
-  .maybeSingle();
-
-if (rec?.path !== 'foreign') return Astro.redirect(`/g/${token}/pre-checkin`);
-if (rec?.status === 'completed') return Astro.redirect(`/g/${token}/pre-checkin/done`);
+let rec: any = null;
+if (!isShowcase) {
+  const { data } = await sbSr.from('stay_pre_checkin').select('path, status, address_street, address_zip, address_city, address_country').eq('stay_id', stay.id).maybeSingle();
+  rec = data;
+  if (rec?.path !== 'foreign') return Astro.redirect(`/g/${token}/pre-checkin`);
+  if (rec?.status === 'completed') return Astro.redirect(`/g/${token}/pre-checkin/done`);
+}
 
 const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
 const brandPrimary = (hotel as any).brand_primary ?? '#0A0A0A';
