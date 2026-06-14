@@ -429,26 +429,28 @@ const gateState: 'default' | 'skipped' | 'completed' =
 // default/completed → PreArrivalGate (Welcome oder Bis-bald)
 const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipped';
 
-// Live-iframe für Device-Mockup: Hotel-Showcase in in_house-Persona
-// Nur für echte Gäste (nicht wenn self = showcase), nur wenn Gate sichtbar ist.
+// Live-iframe für Device-Mockup: zeigt die App in in_house-Persona
+// Showcase: selbes Token mit ?persona=in_house (kein Rekursionsrisiko — in_house zeigt kein Gate)
+// Echter Gast: Hotel-Showcase-Token aus DB (falls vorhanden)
+// Immer same-origin via Astro.url.origin
 let gatePreviewUrl: string | null = null;
-if (showPreArrivalGate && !isShowcase) {
-  const { data: existingShowcase } = await sbSr
-    .from('showcase_sessions')
-    .select('token')
-    .eq('hotel_id', hotel.id)
-    .eq('is_active', true)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existingShowcase?.token) {
-    const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
-    const slug = (hotel as any).slug ?? null;
-    const base = slug
-      ? `https://${slug}.${domain}/g/${existingShowcase.token}`
-      : `https://app.${domain}/g/${existingShowcase.token}`;
-    gatePreviewUrl = `${base}?persona=in_house&_preview=1`;
+if (showPreArrivalGate) {
+  const origin = Astro.url.origin;
+  if (isShowcase && token) {
+    gatePreviewUrl = `${origin}/g/${token}?persona=in_house&_preview=1`;
+  } else {
+    const { data: existingShowcase } = await sbSr
+      .from('showcase_sessions')
+      .select('token')
+      .eq('hotel_id', hotel.id)
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingShowcase?.token) {
+      gatePreviewUrl = `${origin}/g/${existingShowcase.token}?persona=in_house&_preview=1`;
+    }
   }
 }
 

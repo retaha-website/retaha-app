@@ -818,10 +818,13 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     setScale();
     window.addEventListener('resize', setScale, { passive: true });
 
+    function showIframe() { iframeEl.style.opacity = '1'; }
     if (reduced) {
-      iframeEl.style.opacity = '1';
+      showIframe();
     } else {
-      iframeEl.addEventListener('load', function () { iframeEl.style.opacity = '1'; });
+      iframeEl.addEventListener('load', showIframe);
+      // Fallback: nach 2.5s anzeigen auch wenn load-Event nicht feuert
+      setTimeout(showIframe, 2500);
     }
   })();
 </script>
