@@ -70,7 +70,9 @@ export const UI_STRINGS_EXTRA = {
     'places.show_more': 'Mostra di più',
     'places.distance_minutes': '{n} min a piedi',
     'tile.precheckin': 'Pre-registrazione',
-    'tile.precheckin.sub': "2 min · prima dell'arrivo"
+    'tile.precheckin.sub': "2 min · prima dell'arrivo",
+    'tile.requests': 'Richieste anticipate',
+    'tile.requests.sub': 'Preferenze & allergie'
   },
   pt: {
     'hero.kicker': 'Bem-vindo novamente',
@@ -139,7 +141,9 @@ export const UI_STRINGS_EXTRA = {
     'places.tab.sight': 'Atrações',
     'places.our_favorites': 'NOSSOS FAVORITOS',
     'tile.precheckin': 'Pré-registo',
-    'tile.precheckin.sub': '2 min · antes da chegada'
+    'tile.precheckin.sub': '2 min · antes da chegada',
+    'tile.requests': 'Pedidos antecipados',
+    'tile.requests.sub': 'Preferências & alergias'
   },
   nl: {
     'hero.kicker': 'Welkom terug',
@@ -208,7 +212,9 @@ export const UI_STRINGS_EXTRA = {
     'places.more_nearby': 'MEER ONTDEKKEN IN DE BUURT',
     'places.no_nearby': 'Auto-aanbevelingen worden momenteel opgebouwd.',
     'tile.precheckin': 'Pre-registratie',
-    'tile.precheckin.sub': '2 min · voor aankomst'
+    'tile.precheckin.sub': '2 min · voor aankomst',
+    'tile.requests': 'Wensen vooraf',
+    'tile.requests.sub': 'Kamervoorkeur & allergieën'
   },
   ru: {
     'hero.kicker': 'Добро пожаловать назад',
@@ -277,7 +283,9 @@ export const UI_STRINGS_EXTRA = {
     'places.no_picks': 'В этой категории избранного пока нет.',
     'places.no_nearby': 'Рекомендации загружаются.',
     'tile.precheckin': 'Предрегистрация',
-    'tile.precheckin.sub': '2 мин · до приезда'
+    'tile.precheckin.sub': '2 мин · до приезда',
+    'tile.requests': 'Пожелания заранее',
+    'tile.requests.sub': 'Предпочтения и аллергии'
   },
   ar: {
     'hero.greeting': 'مرحبا',
@@ -346,7 +354,9 @@ export const UI_STRINGS_EXTRA = {
     'places.our_favorites': 'المفضلة لدينا',
     'places.no_nearby': 'جاري إعداد التوصيات التلقائية.',
     'tile.precheckin': 'التسجيل المسبق',
-    'tile.precheckin.sub': 'دقيقتان · قبل الوصول'
+    'tile.precheckin.sub': 'دقيقتان · قبل الوصول',
+    'tile.requests': 'الطلبات المسبقة',
+    'tile.requests.sub': 'تفضيلات وحساسية'
   },
   zh: {
     'hero.kicker': '欢迎回来',
@@ -415,6 +425,8 @@ export const UI_STRINGS_EXTRA = {
     'places.our_favorites': '我们的最爱',
     'places.more_nearby': '在附近探索更多',
     'tile.precheckin': '预登记',
-    'tile.precheckin.sub': '2分钟 · 入住前'
+    'tile.precheckin.sub': '2分钟 · 入住前',
+    'tile.requests': '提前预约',
+    'tile.requests.sub': '房间偏好和过敏信息'
   }
 } as const;

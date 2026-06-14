@@ -1,0 +1,346 @@
+---
+// Wünsche vorab — Gast teilt Präferenzen vor Ankunft
+
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@retaha/ui-guest/base';
+
+const { token } = Astro.params;
+if (!token) return new Response(null, { status: 400 });
+
+const ctx = await loadStayByToken(token);
+if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
+
+const { stay, guest, hotel, settings } = ctx;
+const features = (settings as any)?.features ?? {};
+if (features.special_requests === false) return Astro.redirect(`/g/${token}`);
+
+const session = await getStaySession(Astro.cookies);
+if (!session || session.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id, hotel_id: (hotel as any).id,
+    check_out_utc: stay.check_out, is_showcase: false,
+  });
+}
+
+// Wenn bereits gesendet → done
+const sbSr = createSupabaseServiceRoleInstance();
+const { data: existing } = await sbSr
+  .from('stay_requests')
+  .select('id')
+  .eq('stay_id', stay.id)
+  .maybeSingle();
+if (existing) return Astro.redirect(`/g/${token}/requests/done`);
+
+const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
+const brandPrimary = (hotel as any).brand_primary ?? '#0A0A0A';
+const brandPalette = computeBrandPalette(brandPrimary);
+const guestName = guest?.first_name ?? null;
+
+type Labels = {
+  title: string; sub: string;
+  chips: Record<string, string>;
+  allergyLabel: string; allergyPlaceholder: string;
+  occasionLabel: string; occasionOptions: { slug: string; label: string }[];
+  noteLabel: string; notePlaceholder: string;
+  cta: string; ctaSubmitting: string;
+};
+
+const labels: Record<Lang, Labels> = {
+  de: {
+    title: 'Wünsche vorab', sub: 'Was macht deinen Aufenthalt schöner? Wir versuchen, es möglich zu machen.',
+    chips: { quiet_room: 'Ruhiges Zimmer', high_floor: 'Hohe Etage', extra_pillow: 'Extra Kissen', late_arrival: 'Späte Anreise', crib: 'Babybett', accessible: 'Barrierefrei', vegetarian: 'Vegetarisch', occasion: 'Anlass', allergies: 'Allergien' },
+    allergyLabel: 'Allergien & Unverträglichkeiten', allergyPlaceholder: 'z. B. Nüsse, Laktose …',
+    occasionLabel: 'Welcher Anlass?', occasionOptions: [{ slug: 'Geburtstag', label: 'Geburtstag' }, { slug: 'Jahrestag', label: 'Jahrestag' }, { slug: 'Honeymoon', label: 'Honeymoon' }],
+    noteLabel: 'Sonst noch etwas?', notePlaceholder: 'Freier Text …',
+    cta: 'Wünsche senden', ctaSubmitting: 'Wird gespeichert …',
+  },
+  en: {
+    title: 'Requests in advance', sub: 'What makes your stay better? We\'ll do our best to make it happen.',
+    chips: { quiet_room: 'Quiet room', high_floor: 'High floor', extra_pillow: 'Extra pillow', late_arrival: 'Late arrival', crib: 'Baby cot', accessible: 'Accessible', vegetarian: 'Vegetarian', occasion: 'Special occasion', allergies: 'Allergies' },
+    allergyLabel: 'Allergies & intolerances', allergyPlaceholder: 'e.g. nuts, lactose …',
+    occasionLabel: 'What\'s the occasion?', occasionOptions: [{ slug: 'Birthday', label: 'Birthday' }, { slug: 'Anniversary', label: 'Anniversary' }, { slug: 'Honeymoon', label: 'Honeymoon' }],
+    noteLabel: 'Anything else?', notePlaceholder: 'Free text …',
+    cta: 'Send requests', ctaSubmitting: 'Saving …',
+  },
+  fr: {
+    title: 'Souhaits à l\'avance', sub: 'Qu\'est-ce qui rend votre séjour meilleur ? Nous ferons de notre mieux.',
+    chips: { quiet_room: 'Chambre calme', high_floor: 'Étage élevé', extra_pillow: 'Oreiller supplémentaire', late_arrival: 'Arrivée tardive', crib: 'Lit bébé', accessible: 'Accessible', vegetarian: 'Végétarien', occasion: 'Occasion spéciale', allergies: 'Allergies' },
+    allergyLabel: 'Allergies et intolérances', allergyPlaceholder: 'ex. noix, lactose …',
+    occasionLabel: 'Quelle occasion ?', occasionOptions: [{ slug: 'Anniversaire', label: 'Anniversaire' }, { slug: 'Mariage', label: 'Anniversaire de mariage' }, { slug: 'Lune de miel', label: 'Lune de miel' }],
+    noteLabel: 'Autre chose ?', notePlaceholder: 'Texte libre …',
+    cta: 'Envoyer mes souhaits', ctaSubmitting: 'Enregistrement …',
+  },
+  es: {
+    title: 'Peticiones previas', sub: '¿Qué hace mejor tu estancia? Haremos lo posible.',
+    chips: { quiet_room: 'Habitación tranquila', high_floor: 'Piso alto', extra_pillow: 'Almohada extra', late_arrival: 'Llegada tardía', crib: 'Cuna', accessible: 'Accesible', vegetarian: 'Vegetariano', occasion: 'Ocasión especial', allergies: 'Alergias' },
+    allergyLabel: 'Alergias e intolerancias', allergyPlaceholder: 'p. ej. frutos secos, lactosa …',
+    occasionLabel: '¿Cuál es la ocasión?', occasionOptions: [{ slug: 'Cumpleaños', label: 'Cumpleaños' }, { slug: 'Aniversario', label: 'Aniversario' }, { slug: 'Luna de miel', label: 'Luna de miel' }],
+    noteLabel: '¿Algo más?', notePlaceholder: 'Texto libre …',
+    cta: 'Enviar peticiones', ctaSubmitting: 'Guardando …',
+  },
+  it: {
+    title: 'Richieste anticipate', sub: 'Cosa rende migliore il tuo soggiorno? Faremo del nostro meglio.',
+    chips: { quiet_room: 'Camera silenziosa', high_floor: 'Piano alto', extra_pillow: 'Cuscino extra', late_arrival: 'Arrivo tardivo', crib: 'Lettino bambino', accessible: 'Accessibile', vegetarian: 'Vegetariano', occasion: 'Occasione speciale', allergies: 'Allergie' },
+    allergyLabel: 'Allergie e intolleranze', allergyPlaceholder: 'es. noci, lattosio …',
+    occasionLabel: 'Qual è l\'occasione?', occasionOptions: [{ slug: 'Compleanno', label: 'Compleanno' }, { slug: 'Anniversario', label: 'Anniversario' }, { slug: 'Luna di miele', label: 'Luna di miele' }],
+    noteLabel: 'Altro?', notePlaceholder: 'Testo libero …',
+    cta: 'Invia richieste', ctaSubmitting: 'Salvataggio …',
+  },
+  pt: {
+    title: 'Pedidos antecipados', sub: 'O que torna a tua estadia melhor? Faremos o nosso melhor.',
+    chips: { quiet_room: 'Quarto tranquilo', high_floor: 'Andar alto', extra_pillow: 'Almofada extra', late_arrival: 'Chegada tardia', crib: 'Berço', accessible: 'Acessível', vegetarian: 'Vegetariano', occasion: 'Ocasião especial', allergies: 'Alergias' },
+    allergyLabel: 'Alergias e intolerâncias', allergyPlaceholder: 'ex. nozes, lactose …',
+    occasionLabel: 'Qual é a ocasião?', occasionOptions: [{ slug: 'Aniversário', label: 'Aniversário' }, { slug: 'Casamento', label: 'Aniversário de casamento' }, { slug: 'Lua de mel', label: 'Lua de mel' }],
+    noteLabel: 'Mais alguma coisa?', notePlaceholder: 'Texto livre …',
+    cta: 'Enviar pedidos', ctaSubmitting: 'A guardar …',
+  },
+  nl: {
+    title: 'Wensen vooraf', sub: 'Wat maakt uw verblijf beter? We doen ons best.',
+    chips: { quiet_room: 'Rustige kamer', high_floor: 'Hoge verdieping', extra_pillow: 'Extra kussen', late_arrival: 'Late aankomst', crib: 'Babybedje', accessible: 'Toegankelijk', vegetarian: 'Vegetarisch', occasion: 'Speciale gelegenheid', allergies: 'Allergieën' },
+    allergyLabel: 'Allergieën & intoleranties', allergyPlaceholder: 'bijv. noten, lactose …',
+    occasionLabel: 'Wat is de gelegenheid?', occasionOptions: [{ slug: 'Verjaardag', label: 'Verjaardag' }, { slug: 'Jubileum', label: 'Jubileum' }, { slug: 'Huwelijksreis', label: 'Huwelijksreis' }],
+    noteLabel: 'Nog iets?', notePlaceholder: 'Vrije tekst …',
+    cta: 'Wensen versturen', ctaSubmitting: 'Opslaan …',
+  },
+  ru: {
+    title: 'Пожелания заранее', sub: 'Что сделает ваше пребывание лучше? Мы постараемся.',
+    chips: { quiet_room: 'Тихий номер', high_floor: 'Высокий этаж', extra_pillow: 'Дополнительная подушка', late_arrival: 'Поздний заезд', crib: 'Детская кроватка', accessible: 'Без барьеров', vegetarian: 'Вегетарианское', occasion: 'Особый случай', allergies: 'Аллергии' },
+    allergyLabel: 'Аллергии и непереносимости', allergyPlaceholder: 'напр. орехи, лактоза …',
+    occasionLabel: 'Какой повод?', occasionOptions: [{ slug: 'День рождения', label: 'День рождения' }, { slug: 'Годовщина', label: 'Годовщина' }, { slug: 'Медовый месяц', label: 'Медовый месяц' }],
+    noteLabel: 'Что-то ещё?', notePlaceholder: 'Свободный текст …',
+    cta: 'Отправить пожелания', ctaSubmitting: 'Сохранение …',
+  },
+  ar: {
+    title: 'الطلبات المسبقة', sub: 'ما الذي يجعل إقامتك أفضل؟ سنبذل قصارى جهدنا.',
+    chips: { quiet_room: 'غرفة هادئة', high_floor: 'طابق مرتفع', extra_pillow: 'وسادة إضافية', late_arrival: 'وصول متأخر', crib: 'سرير أطفال', accessible: 'إمكانية الوصول', vegetarian: 'نباتي', occasion: 'مناسبة خاصة', allergies: 'حساسية' },
+    allergyLabel: 'الحساسية وعدم التحمل', allergyPlaceholder: 'مثلاً المكسرات، اللاكتوز …',
+    occasionLabel: 'ما هي المناسبة؟', occasionOptions: [{ slug: 'عيد ميلاد', label: 'عيد ميلاد' }, { slug: 'ذكرى سنوية', label: 'ذكرى سنوية' }, { slug: 'شهر العسل', label: 'شهر العسل' }],
+    noteLabel: 'شيء آخر؟', notePlaceholder: 'نص حر …',
+    cta: 'إرسال الطلبات', ctaSubmitting: 'جارٍ الحفظ …',
+  },
+  zh: {
+    title: '提前预约', sub: '什么让您的住宿更美好？我们会尽力满足您的需求。',
+    chips: { quiet_room: '安静的房间', high_floor: '高楼层', extra_pillow: '额外枕头', late_arrival: '晚到', crib: '婴儿床', accessible: '无障碍', vegetarian: '素食', occasion: '特殊场合', allergies: '过敏' },
+    allergyLabel: '过敏和不耐受', allergyPlaceholder: '例如坚果、乳糖 …',
+    occasionLabel: '是什么场合？', occasionOptions: [{ slug: '生日', label: '生日' }, { slug: '周年纪念日', label: '周年纪念日' }, { slug: '蜜月', label: '蜜月' }],
+    noteLabel: '还有什么吗？', notePlaceholder: '自由文本 …',
+    cta: '发送请求', ctaSubmitting: '保存中 …',
+  },
+};
+
+const CHIPS_ORDER = ['quiet_room','high_floor','extra_pillow','late_arrival','crib','accessible','vegetarian','occasion','allergies'];
+const L = labels[lang];
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={`--accent:${brandPrimary};--accent-soft:${brandPalette.soft};--accent-on:${brandPalette.onAccent};`}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>{L.title}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { font-family: 'Space Grotesk', sans-serif; }
+    body { background: #F8F7F4; min-height: 100dvh; padding-bottom: 120px; }
+
+    .wiz-header {
+      display: flex; align-items: center;
+      padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px;
+    }
+    .wiz-back {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #EDEBE7; border: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #3A3A36; cursor: pointer; text-decoration: none; flex-shrink: 0;
+    }
+
+    .wiz-body { padding: 8px 20px 0; }
+    .wiz-title { font-size: 30px; font-weight: 700; color: #0F0F0D; line-height: 1.2; margin-bottom: 10px; }
+    .wiz-sub { font-size: 15px; color: #6B6B63; line-height: 1.5; margin-bottom: 28px; }
+
+    .chip-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 16px; border-radius: 50px;
+      border: 1.5px solid #E0DDD6; background: #fff;
+      font-size: 15px; font-weight: 500; color: #0F0F0D;
+      cursor: pointer; user-select: none; transition: all 0.15s;
+    }
+    .chip.active {
+      background: var(--accent-soft, #EEF0FF);
+      border-color: var(--accent, #7B83D0);
+      color: var(--accent, #7B83D0);
+    }
+    .chip-check {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent, #7B83D0);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .chip.active .chip-check { opacity: 1; }
+
+    .expand-section { margin-bottom: 20px; }
+    .expand-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.12em; color: #888;
+      text-transform: uppercase; margin-bottom: 8px; display: block;
+    }
+    .expand-textarea {
+      width: 100%; padding: 14px 16px;
+      border: 1.5px solid #E0DDD6; border-radius: 12px;
+      background: #fff; font-size: 15px; color: #0F0F0D;
+      font-family: 'Space Grotesk', sans-serif;
+      resize: vertical; min-height: 80px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .expand-textarea:focus {
+      border-color: var(--accent, #0A0A0A);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0A0A0A) 10%, transparent);
+    }
+    .occasion-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .occasion-chip {
+      padding: 8px 14px; border-radius: 50px;
+      border: 1.5px solid #E0DDD6; background: #fff;
+      font-size: 14px; font-weight: 500; color: #0F0F0D;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .occasion-chip.active {
+      background: var(--accent-soft, #EEF0FF);
+      border-color: var(--accent, #7B83D0);
+      color: var(--accent, #7B83D0);
+    }
+
+    .note-section { margin-bottom: 12px; }
+
+    .wiz-footer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+      background: linear-gradient(to bottom, transparent 0%, #F8F7F4 30%);
+    }
+    .btn-wiz {
+      width: 100%; border: 0; padding: 16px;
+      border-radius: 14px; font-size: 16px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: opacity 0.15s;
+    }
+    .btn-dark { background: #0F0F0D; color: #fff; }
+    .btn-dark:disabled { opacity: 0.35; cursor: default; }
+  </style>
+</head>
+<body>
+  <div x-data="wizRequests()">
+    <header class="wiz-header">
+      <a class="wiz-back" href={`/g/${token}`} data-astro-reload aria-label="Zurück">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </a>
+    </header>
+
+    <div class="wiz-body">
+      <h1 class="wiz-title">{L.title}</h1>
+      <p class="wiz-sub">{L.sub}</p>
+
+      <div class="chip-grid">
+        {CHIPS_ORDER.map(slug => (
+          <button
+            type="button"
+            class="chip"
+            :class={`{ active: chips.includes('${slug}') }`}
+            @click={`toggleChip('${slug}')`}
+          >
+            <span class="chip-check">
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                <polyline points="1.5 5 4 7.5 8.5 2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            {(L.chips as any)[slug]}
+          </button>
+        ))}
+      </div>
+
+      <div class="expand-section" x-show="chips.includes('allergies')" x-transition>
+        <label class="expand-label">{L.allergyLabel}</label>
+        <textarea class="expand-textarea" x-model="allergies" placeholder={L.allergyPlaceholder} rows="2"></textarea>
+      </div>
+
+      <div class="expand-section" x-show="chips.includes('occasion')" x-transition>
+        <label class="expand-label">{L.occasionLabel}</label>
+        <div class="occasion-chips">
+          {L.occasionOptions.map(opt => (
+            <button
+              type="button"
+              class="occasion-chip"
+              :class={`{ active: occasion === '${opt.slug}' }`}
+              @click={`occasion = occasion === '${opt.slug}' ? '' : '${opt.slug}'`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div class="note-section">
+        <label class="expand-label">{L.noteLabel}</label>
+        <textarea class="expand-textarea" x-model="note" placeholder={L.notePlaceholder} rows="3"></textarea>
+      </div>
+    </div>
+
+    <footer class="wiz-footer">
+      <button
+        class="btn-wiz btn-dark"
+        :disabled="submitting"
+        @click="submit()"
+        x-text={`submitting ? '${L.ctaSubmitting}' : '${L.cta}'`}
+      >{L.cta}</button>
+    </footer>
+  </div>
+
+  <script is:inline define:vars={{ token }}>
+    document.addEventListener('alpine:init', () => {
+      const Alpine = window['Alpine'];
+      Alpine.data('wizRequests', () => ({
+        chips: [],
+        allergies: '',
+        occasion: '',
+        note: '',
+        submitting: false,
+        toggleChip(slug) {
+          const i = this.chips.indexOf(slug);
+          if (i === -1) {
+            this.chips.push(slug);
+          } else {
+            this.chips.splice(i, 1);
+            if (slug === 'allergies') this.allergies = '';
+            if (slug === 'occasion') this.occasion = '';
+          }
+        },
+        async submit() {
+          if (this.submitting) return;
+          this.submitting = true;
+          try {
+            const res = await fetch('/api/g/requests/save', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chips: this.chips,
+                allergies: this.allergies || null,
+                occasion: this.occasion || null,
+                note: this.note || null,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!data.ok) { this.submitting = false; return; }
+            window.location.href = `/g/${token}/requests/done`;
+          } catch { this.submitting = false; }
+        },
+      }));
+    });
+  </script>
+</body>
+</html>
