@@ -316,6 +316,7 @@ const recs = (actionCardsRows ?? []).map((card: any) => ({
 
 const f = (settings as any).features ?? {};
 const _hotelForModules = { plan: (hotel as any).plan ?? 'lite', addons: (hotel as any).addons ?? [] };
+const hasBreakfastInfo = !!((settings as any).breakfast_start_time || (settings as any).breakfast_hours || (settings as any).breakfast_location_de || f.breakfast_type);
 const avail = (key: string) => isModuleAvailable(_hotelForModules, key);
 const wifiSsid: string | null = settings.wifi_ssid || (isShowcase ? 'Demo-Hotel-WLAN' : null);
 const wifiPassword: string = settings.wifi_password || (isShowcase ? 'gast2026' : '');
@@ -618,6 +619,31 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </a>
           )}
 
+          {stayPersona === 'pre_arrival' && (
+            <a class="gate-tile" href={`/g/${token}/anfahrt`} data-astro-reload style="text-decoration:none;color:inherit">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+                </svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.anfahrt', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.anfahrt.sub', lang)}</span>
+            </a>
+          )}
+
+          {stayPersona === 'pre_arrival' && hasBreakfastInfo && (
+            <a class="gate-tile" href={`/g/${token}/fruehstueck`} data-astro-reload style="text-decoration:none;color:inherit">
+              <span class="gate-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                  <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                  <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                </svg>
+              </span>
+              <span class="gate-tile-label">{t('tile.breakfast', lang)}</span>
+              <span class="gate-tile-sub">{t('tile.breakfast.sub', lang)}</span>
+            </a>
+          )}
+
           {wifiConfigured && (
             <a class="gate-tile" href={`/g/${token}/wifi?persona=${stayPersona}${langParam ? `&lang=${langParam}` : ''}`} data-astro-reload style="text-decoration:none;color:inherit">
               <span class="gate-tile-icon">
@@ -640,7 +666,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             </button>
           )}
 
-          {avail('breakfast') && f.breakfast !== false && (
+          {stayPersona !== 'pre_arrival' && avail('breakfast') && f.breakfast !== false && (
             <a class="gate-tile" data-tile="breakfast" href={`/g/${token}/breakfast?persona=${stayPersona}`} data-astro-reload style="text-decoration:none;color:inherit">
               <span class="gate-tile-badge green">{t('tile.breakfast.badge', lang)}</span>
               <span class="gate-tile-icon">

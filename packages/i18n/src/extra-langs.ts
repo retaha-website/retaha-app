@@ -72,7 +72,9 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': 'Pre-registrazione',
     'tile.precheckin.sub': "2 min · prima dell'arrivo",
     'tile.requests': 'Richieste anticipate',
-    'tile.requests.sub': 'Preferenze & allergie'
+    'tile.requests.sub': 'Preferenze & allergie',
+    'tile.anfahrt': 'Indicazioni & Check-in',
+    'tile.anfahrt.sub': 'Pianifica il percorso'
   },
   pt: {
     'hero.kicker': 'Bem-vindo novamente',
@@ -143,7 +145,9 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': 'Pré-registo',
     'tile.precheckin.sub': '2 min · antes da chegada',
     'tile.requests': 'Pedidos antecipados',
-    'tile.requests.sub': 'Preferências & alergias'
+    'tile.requests.sub': 'Preferências & alergias',
+    'tile.anfahrt': 'Como chegar & Check-in',
+    'tile.anfahrt.sub': 'Abrir rota'
   },
   nl: {
     'hero.kicker': 'Welkom terug',
@@ -214,7 +218,9 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': 'Pre-registratie',
     'tile.precheckin.sub': '2 min · voor aankomst',
     'tile.requests': 'Wensen vooraf',
-    'tile.requests.sub': 'Kamervoorkeur & allergieën'
+    'tile.requests.sub': 'Kamervoorkeur & allergieën',
+    'tile.anfahrt': 'Route & Check-in',
+    'tile.anfahrt.sub': 'Route openen'
   },
   ru: {
     'hero.kicker': 'Добро пожаловать назад',
@@ -285,7 +291,9 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': 'Предрегистрация',
     'tile.precheckin.sub': '2 мин · до приезда',
     'tile.requests': 'Пожелания заранее',
-    'tile.requests.sub': 'Предпочтения и аллергии'
+    'tile.requests.sub': 'Предпочтения и аллергии',
+    'tile.anfahrt': 'Маршрут & Check-in',
+    'tile.anfahrt.sub': 'Открыть маршрут'
   },
   ar: {
     'hero.greeting': 'مرحبا',
@@ -356,7 +364,9 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': 'التسجيل المسبق',
     'tile.precheckin.sub': 'دقيقتان · قبل الوصول',
     'tile.requests': 'الطلبات المسبقة',
-    'tile.requests.sub': 'تفضيلات وحساسية'
+    'tile.requests.sub': 'تفضيلات وحساسية',
+    'tile.anfahrt': 'الاتجاهات & تسجيل الوصول',
+    'tile.anfahrt.sub': 'فتح المسار'
   },
   zh: {
     'hero.kicker': '欢迎回来',
@@ -427,6 +437,8 @@ export const UI_STRINGS_EXTRA = {
     'tile.precheckin': '预登记',
     'tile.precheckin.sub': '2分钟 · 入住前',
     'tile.requests': '提前预约',
-    'tile.requests.sub': '房间偏好和过敏信息'
+    'tile.requests.sub': '房间偏好和过敏信息',
+    'tile.anfahrt': '路线 & 入住',
+    'tile.anfahrt.sub': '打开路线'
   }
 } as const;

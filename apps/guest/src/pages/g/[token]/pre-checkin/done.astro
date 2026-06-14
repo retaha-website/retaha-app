@@ -4,7 +4,7 @@
 
 import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
-import { getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -28,44 +28,30 @@ const { data: rec } = await sbSr
 
 const path = rec?.path ?? 'foreign';
 const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
-const brandPrimary = (hotel as any).brand_primary ?? '#0A0A0A';
-const brandPalette = computeBrandPalette(brandPrimary);
+const brandPrimary: string = (hotel as any).brand_primary ?? '#0A0A0A';
 const guestName = guest?.first_name ?? null;
 const hotelName = (hotel as any).name ?? 'Hotel';
 
 type Labels = { title: string; subDomestic: string; subForeign: string; cta: string };
+const n = guestName;
 const labels: Record<Lang, Labels> = {
-  de: {
-    title: guestName ? `Alles erledigt, ${guestName}.` : 'Alles erledigt.',
-    subDomestic: 'Wir freuen uns auf dich! Beim Check-in geht alles schnell.',
-    subForeign: 'Beim Check-in zeigst du nur noch kurz deinen Ausweis. Wir freuen uns auf dich!',
-    cta: 'Fertig',
-  },
-  en: {
-    title: guestName ? `All done, ${guestName}.` : 'All done.',
-    subDomestic: 'We look forward to your arrival! Check-in will be quick.',
-    subForeign: 'Just show your ID at check-in. We look forward to welcoming you!',
-    cta: 'Done',
-  },
-  fr: {
-    title: guestName ? `C'est fait, ${guestName}.` : 'C\'est fait.',
-    subDomestic: 'Nous avons hâte de vous accueillir ! L\'enregistrement sera rapide.',
-    subForeign: 'Il vous suffira de présenter votre pièce d\'identité à l\'enregistrement.',
-    cta: 'Terminer',
-  },
-  es: {
-    title: guestName ? `Todo listo, ${guestName}.` : 'Todo listo.',
-    subDomestic: '¡Esperamos tu llegada! El check-in será muy rápido.',
-    subForeign: 'Solo muestra tu documento de identidad al llegar. ¡Te esperamos!',
-    cta: 'Finalizar',
-  },
+  de: { title: n ? `Alles erledigt, ${n}.` : 'Alles erledigt.', subDomestic: 'Wir freuen uns auf dich! Beim Check-in geht alles schnell.', subForeign: 'Beim Check-in zeigst du nur noch kurz deinen Ausweis. Wir freuen uns auf dich!', cta: 'Fertig' },
+  en: { title: n ? `All done, ${n}.` : 'All done.', subDomestic: 'We look forward to your arrival! Check-in will be quick.', subForeign: 'Just show your ID at check-in. We look forward to welcoming you!', cta: 'Done' },
+  fr: { title: n ? `C'est fait, ${n}.` : "C'est fait.", subDomestic: "Nous avons hâte de vous accueillir ! L'enregistrement sera rapide.", subForeign: "Il vous suffira de présenter votre pièce d'identité à l'enregistrement.", cta: 'Terminer' },
+  es: { title: n ? `Todo listo, ${n}.` : 'Todo listo.', subDomestic: '¡Esperamos tu llegada! El check-in será muy rápido.', subForeign: 'Solo muestra tu documento de identidad al llegar. ¡Te esperamos!', cta: 'Finalizar' },
+  it: { title: n ? `Tutto fatto, ${n}.` : 'Tutto fatto.', subDomestic: "Non vediamo l'ora di accoglierti! Il check-in sarà rapido.", subForeign: "Al check-in mostra solo il documento d'identità. Non vediamo l'ora di vederti!", cta: 'Chiudi' },
+  pt: { title: n ? `Tudo feito, ${n}.` : 'Tudo feito.', subDomestic: 'Estamos ansiosos pela tua chegada! O check-in será rápido.', subForeign: 'No check-in só tens de mostrar o teu documento. Até breve!', cta: 'Fechar' },
+  nl: { title: n ? `Alles geregeld, ${n}.` : 'Alles geregeld.', subDomestic: 'We kijken uit naar uw komst! De check-in gaat snel.', subForeign: 'Bij de check-in hoeft u alleen uw identiteitsbewijs te tonen. Tot ziens!', cta: 'Sluiten' },
+  ru: { title: n ? `Готово, ${n}.` : 'Готово.', subDomestic: 'С нетерпением ждём вас! Заезд будет быстрым.', subForeign: 'При заезде покажите только удостоверение личности. Ждём вас!', cta: 'Закрыть' },
+  ar: { title: n ? `تم كل شيء، ${n}.` : 'تم كل شيء.', subDomestic: 'نتطلع إلى وصولك! تسجيل الوصول سيكون سريعاً.', subForeign: 'عند تسجيل الوصول فقط أظهر وثيقتك. نتطلع إلى استقبالك!', cta: 'إغلاق' },
+  zh: { title: n ? `完成了，${n}。` : '完成了。', subDomestic: '期待您的到来！入住手续将很快完成。', subForeign: '入住时只需出示您的证件。期待欢迎您的到来！', cta: '关闭' },
 };
 const L = labels[lang];
 const subtitle = path === 'domestic' ? L.subDomestic : L.subForeign;
 ---
 
 <!DOCTYPE html>
-<html lang={lang} style={`--accent:${brandPalette.accent};--accent-soft:${brandPalette.soft};--accent-on:${brandPalette.on};`}>
+<html lang={lang} style={`--accent:${brandPrimary};`}>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -101,7 +87,10 @@ const subtitle = path === 'domestic' ? L.subDomestic : L.subForeign;
     .check-glow {
       position: absolute; inset: -20px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(123,131,208,0.22) 0%, rgba(123,131,208,0.06) 60%, transparent 80%);
+      background: radial-gradient(circle,
+        color-mix(in srgb, var(--accent, #7B83D0) 22%, transparent) 0%,
+        color-mix(in srgb, var(--accent, #7B83D0) 6%, transparent) 60%,
+        transparent 80%);
       animation: pulse-glow 2.4s ease-in-out infinite;
     }
     @keyframes pulse-glow {
@@ -110,7 +99,7 @@ const subtitle = path === 'domestic' ? L.subDomestic : L.subForeign;
     }
     .check-circle {
       position: relative; width: 96px; height: 96px; border-radius: 50%;
-      background: #7B83D0;
+      background: var(--accent, #7B83D0);
       display: flex; align-items: center; justify-content: center;
     }
 

@@ -59,15 +59,19 @@ create policy "hotel_team_select_pre_checkin"
   on public.stay_pre_checkin
   for select
   to authenticated
-  using (hotel_id = any(user_hotel_ids()));
+  using (hotel_id = any(array(select user_hotel_ids())));
 
 -- Gäste-App: alle Schreib-Ops via service_role (bypasses RLS).
 -- Kein direkter anon-Zugriff.
 
 -- updated_at automatisch setzen
+create or replace function public.set_stay_pre_checkin_updated_at()
+  returns trigger language plpgsql
+as $$ begin new.updated_at = now(); return new; end; $$;
+
 create trigger set_stay_pre_checkin_updated_at
   before update on public.stay_pre_checkin
-  for each row execute function public.set_updated_at();
+  for each row execute function public.set_stay_pre_checkin_updated_at();
 
 -- Performance-Index für Admin-Liste (nach Hotel + Anreise-Datum geordnet)
 create index stay_pre_checkin_hotel_id_idx on public.stay_pre_checkin(hotel_id);

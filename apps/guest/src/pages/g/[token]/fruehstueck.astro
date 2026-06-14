@@ -1,0 +1,252 @@
+---
+// Frühstück Info — Anreise-Phase (Info-Karte, kein Buchungsflow)
+
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { pickI18n } from '@retaha/i18n';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const { token } = Astro.params;
+if (!token) return new Response(null, { status: 400 });
+
+const ctx = await loadStayByToken(token);
+if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
+
+const { stay, guest, hotel, settings } = ctx;
+
+const session = await getStaySession(Astro.cookies);
+if (!session || session.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id, hotel_id: (hotel as any).id,
+    check_out_utc: stay.check_out, is_showcase: false,
+  });
+}
+
+const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
+const hotelDefaultLang: Lang = normalizeLang(hotel.default_language);
+
+// --- Frühstück-Daten aus Settings ---
+const bf = (settings as any).breakfast_hours ?? {};
+const f  = (settings as any).features ?? {};
+
+function rangeFor(days: string[]): string | null {
+  const times = days.map(d => (bf as any)[d]).filter(d => d && !d.closed);
+  if (!times.length) return null;
+  const starts = [...new Set(times.map((t: any) => t.start))];
+  const ends   = [...new Set(times.map((t: any) => t.end))];
+  if (starts.length === 1 && ends.length === 1) return `${starts[0]} – ${ends[0]}`;
+  return null;
+}
+
+const weekdayRange = rangeFor(['mon','tue','wed','thu','fri']);
+const weekendRange = rangeFor(['sat','sun']);
+
+// Fallback: global Zeiten
+const globalRange = (settings.breakfast_start_time && settings.breakfast_end_time)
+  ? `${settings.breakfast_start_time} – ${settings.breakfast_end_time}`
+  : null;
+
+const hasAnyTime = weekdayRange || weekendRange || globalRange;
+
+// Standort aus i18n-Spalten oder features
+const location = pickI18n((settings as any).breakfast_location_i18n, hotelDefaultLang as any, lang as any)
+  || (settings as any).breakfast_location_de || null;
+
+// "Enthalten" — bool aus features oder Text-Check
+const includedBool: boolean = f.breakfast_included === true
+  || (typeof (settings as any).breakfast_included_de === 'string'
+      && (settings as any).breakfast_included_de.toLowerCase().includes('enthalten'));
+
+// Typ & Hinweis aus features
+const bfType = (f.breakfast_type as string | null) ?? null;
+const bfNote = (f.breakfast_note as string | null) ?? null;
+
+type Labels = {
+  title: string; sub: string;
+  included: string;
+  weekday: string; weekend: string; allDays: string;
+  rowOrt: string; rowArt: string; rowHinweis: string;
+};
+const labels: Record<Lang, Labels> = {
+  de: { title: 'Frühstück', sub: 'Der beste Start in den Tag.', included: 'Im Übernachtungspreis enthalten', weekday: 'Mo – Fr', weekend: 'Sa, So & Feiertage', allDays: 'Täglich', rowOrt: 'Ort', rowArt: 'Art', rowHinweis: 'Hinweis' },
+  en: { title: 'Breakfast', sub: 'The best start to the day.', included: 'Included in the room rate', weekday: 'Mon – Fri', weekend: 'Sat, Sun & Holidays', allDays: 'Daily', rowOrt: 'Location', rowArt: 'Style', rowHinweis: 'Note' },
+  fr: { title: 'Petit-déjeuner', sub: 'Le meilleur début de journée.', included: 'Inclus dans le prix de la chambre', weekday: 'Lun – Ven', weekend: 'Sam, Dim & Jours fériés', allDays: 'Tous les jours', rowOrt: 'Lieu', rowArt: 'Type', rowHinweis: 'Remarque' },
+  es: { title: 'Desayuno', sub: 'El mejor comienzo del día.', included: 'Incluido en el precio de la habitación', weekday: 'Lun – Vie', weekend: 'Sáb, Dom & Festivos', allDays: 'Diariamente', rowOrt: 'Lugar', rowArt: 'Tipo', rowHinweis: 'Nota' },
+  it: { title: 'Colazione', sub: 'Il miglior inizio della giornata.', included: 'Incluso nel prezzo della camera', weekday: 'Lun – Ven', weekend: 'Sab, Dom & Festivi', allDays: 'Ogni giorno', rowOrt: 'Luogo', rowArt: 'Tipo', rowHinweis: 'Nota' },
+  pt: { title: 'Pequeno-almoço', sub: 'O melhor início do dia.', included: 'Incluído no preço do quarto', weekday: 'Seg – Sex', weekend: 'Sáb, Dom & Feriados', allDays: 'Diariamente', rowOrt: 'Local', rowArt: 'Tipo', rowHinweis: 'Nota' },
+  nl: { title: 'Ontbijt', sub: 'De beste start van de dag.', included: 'Inbegrepen in de overnachtingsprijs', weekday: 'Ma – Vr', weekend: 'Za, Zo & Feestdagen', allDays: 'Dagelijks', rowOrt: 'Locatie', rowArt: 'Type', rowHinweis: 'Opmerking' },
+  ru: { title: 'Завтрак', sub: 'Лучшее начало дня.', included: 'Включено в стоимость номера', weekday: 'Пн – Пт', weekend: 'Сб, Вс & Праздники', allDays: 'Ежедневно', rowOrt: 'Место', rowArt: 'Тип', rowHinweis: 'Примечание' },
+  ar: { title: 'الإفطار', sub: 'أفضل بداية لليوم.', included: 'مشمول في سعر الغرفة', weekday: 'الاثنين – الجمعة', weekend: 'السبت، الأحد & العطل', allDays: 'يومياً', rowOrt: 'المكان', rowArt: 'النوع', rowHinweis: 'ملاحظة' },
+  zh: { title: '早餐', sub: '一天最好的开始。', included: '含在房费中', weekday: '周一 – 周五', weekend: '周六、周日和节假日', allDays: '每天', rowOrt: '地点', rowArt: '类型', rowHinweis: '备注' },
+};
+const L = labels[lang];
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>{L.title}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { font-family: 'Space Grotesk', sans-serif; }
+    body { background: #F8F7F4; min-height: 100dvh; padding-bottom: 40px; }
+
+    .page-header {
+      display: flex; align-items: center;
+      padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px;
+    }
+    .back-btn {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #EDEBE7; border: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #3A3A36; cursor: pointer; text-decoration: none; flex-shrink: 0;
+    }
+
+    .page-body { padding: 8px 20px 0; }
+    .page-title { font-size: 30px; font-weight: 700; color: #0F0F0D; line-height: 1.2; margin-bottom: 8px; }
+    .page-sub   { font-size: 15px; color: #6B6B63; line-height: 1.5; margin-bottom: 24px; }
+
+    /* Zeiten-Card */
+    .times-card {
+      background: #fff; border-radius: 16px;
+      border: 1px solid #EAEAE4; padding: 20px 20px;
+      margin-bottom: 14px;
+    }
+    .chip-included {
+      display: inline-block;
+      padding: 5px 12px; border-radius: 50px;
+      border: 1.5px solid #5C9070;
+      color: #5C9070;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.12em;
+      text-transform: uppercase; margin-bottom: 18px;
+    }
+    .time-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 12px; padding: 12px 0;
+      border-top: 1px solid #F0EDE8;
+    }
+    .time-row:first-of-type { border-top: 0; padding-top: 0; }
+    .time-label { font-size: 14px; color: #8A8880; }
+    .time-value { font-size: 18px; font-weight: 700; color: #0F0F0D; letter-spacing: -0.01em; }
+
+    /* Info rows */
+    .info-card {
+      background: #fff; border-radius: 16px;
+      border: 1px solid #EAEAE4; overflow: hidden;
+    }
+    .info-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px; border-bottom: 1px solid #F0EDE8;
+    }
+    .info-row:last-child { border-bottom: 0; }
+    .info-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: #F0EDE8; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #6B6B63;
+    }
+    .info-text { flex: 1; min-width: 0; }
+    .info-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.12em; color: #AEACA6;
+      text-transform: uppercase; margin-bottom: 3px;
+    }
+    .info-value { font-size: 15px; font-weight: 500; color: #0F0F0D; line-height: 1.3; }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <a class="back-btn" href={`/g/${token}`} data-astro-reload aria-label="Zurück">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </a>
+  </header>
+
+  <div class="page-body">
+    <h1 class="page-title">{L.title}</h1>
+    <p class="page-sub">{L.sub}</p>
+
+    {hasAnyTime && (
+      <div class="times-card">
+        {includedBool && (
+          <div class="chip-included">{L.included}</div>
+        )}
+
+        {weekdayRange ? (
+          <>
+            <div class="time-row">
+              <span class="time-label">{L.weekday}</span>
+              <span class="time-value">{weekdayRange}</span>
+            </div>
+            {weekendRange && (
+              <div class="time-row">
+                <span class="time-label">{L.weekend}</span>
+                <span class="time-value">{weekendRange}</span>
+              </div>
+            )}
+          </>
+        ) : globalRange ? (
+          <div class="time-row">
+            <span class="time-label">{L.allDays}</span>
+            <span class="time-value">{globalRange}</span>
+          </div>
+        ) : null}
+      </div>
+    )}
+
+    {(location || bfType || bfNote) && (
+      <div class="info-card">
+        {location && (
+          <div class="info-row">
+            <div class="info-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+              </svg>
+            </div>
+            <div class="info-text">
+              <div class="info-label">{L.rowOrt}</div>
+              <div class="info-value">{location}</div>
+            </div>
+          </div>
+        )}
+
+        {bfType && (
+          <div class="info-row">
+            <div class="info-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+              </svg>
+            </div>
+            <div class="info-text">
+              <div class="info-label">{L.rowArt}</div>
+              <div class="info-value">{bfType}</div>
+            </div>
+          </div>
+        )}
+
+        {bfNote && (
+          <div class="info-row">
+            <div class="info-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+              </svg>
+            </div>
+            <div class="info-text">
+              <div class="info-label">{L.rowHinweis}</div>
+              <div class="info-value">{bfNote}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</body>
+</html>

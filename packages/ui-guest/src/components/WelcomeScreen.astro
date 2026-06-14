@@ -33,12 +33,12 @@ const {
   heroCards = [], weather, persona = 'in_house',
 } = Astro.props;
 
-type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet';
+type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt';
 type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
 
 // Module-Reihenfolge und Sichtbarkeit pro Mode
 const MODULE_ORDER: Record<StayMode, ModuleKey[]> = {
-  pre_arrival:  ['wifi', 'breakfast', 'eve', 'places', 'wallet'],
+  pre_arrival:  ['anfahrt', 'breakfast', 'wifi', 'eve', 'places', 'wallet'],
   in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'checkout', 'wallet'],
   checking_out: ['checkout', 'eve', 'wallet', 'breakfast', 'places'],
 };
@@ -88,13 +88,22 @@ const ACTION_POOL: ActionItem[] = [
     visible: wifiConfigured,
   } as any,
   {
+    key: 'anfahrt',
+    num: '01',
+    icon: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+    label: 'Anfahrt',
+    sub: 'Route planen',
+    handler: '',
+    href: `/g/${token}/anfahrt`,
+  } as any,
+  {
     key: 'breakfast',
     num: '02',
     icon: '<path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>',
     label: 'Frühstück',
-    sub: 'Slot buchen',
+    sub: persona === 'pre_arrival' ? 'Zeiten & Infos' : 'Slot buchen',
     handler: '',
-    href: `/g/${token}/breakfast?persona=${persona}`,
+    href: persona === 'pre_arrival' ? `/g/${token}/fruehstueck` : `/g/${token}/breakfast?persona=${persona}`,
   } as any,
   {
     key: 'eve',
