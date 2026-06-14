@@ -1,21 +1,23 @@
 ---
-// Self-Checkout-Sheet
-// Feature-Gate: features.self_checkout
+// Self-Checkout-Sheet  ·  3 Eingangs-Zustände
 //
-// Billing-Logik:
-//   Test (jetzt): stays.raw_mews_data._retaha_sim  →  { currency, balance_cents, total_cents, items }
-//   TODO Mews live: Saldo + Posten aus Mews-API lesen; _retaha_sim-Block entfernen/ignorieren.
+// Gate (Hotel-TZ):
+//   today < checkout-date  →  A · Noch nicht
+//   today = checkout-date  →  Saldo lesen  →  B · Beglichen / C · Offen
+//   today > checkout-date  →  vorerst wie C (Overstay-Zustand folgt separat)
 //
-// Pfade:
-//   balance_cents === 0  →  Zustand A: Self-Checkout erlaubt
-//   balance_cents  > 0  →  Zustand B: gesperrt, Rezeption aufsuchen
+// Billing:
+//   Test: stays.raw_mews_data._retaha_sim  →  { currency, balance_cents, total_cents, items }
+//   TODO Mews live: Saldo + Posten aus Mews-API lesen; _retaha_sim-Block entfernen.
 
 import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
-import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
-import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@retaha/ui-guest/base';
 
 const { token } = Astro.params;
 if (!token) return new Response('Token fehlt', { status: 400 });
@@ -27,504 +29,662 @@ const { stay, guest, hotel, settings } = ctx;
 
 // Feature-Gate
 const features = (settings?.features ?? {}) as Record<string, boolean>;
-if (features.self_checkout === false) {
-  return Astro.redirect(`/g/${token}`);
-}
+if (features.self_checkout === false) return Astro.redirect(`/g/${token}`);
 
-const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
-
-// Stay-Session sicherstellen
+// Session
 const existingSession = await getStaySession(Astro.cookies);
 if (!existingSession || existingSession.stay_id !== stay.id) {
   await setStaySessionCookie(Astro.cookies, {
-    stay_id: stay.id,
-    hotel_id: hotel.id,
-    check_out_utc: stay.check_out,
-    is_showcase: false,
+    stay_id: stay.id, hotel_id: hotel.id,
+    check_out_utc: stay.check_out, is_showcase: false,
   });
 }
 
-// Checkout-Datum formatieren
-const localeMap = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as Record<Lang, string>;
-const checkoutDate = new Date(stay.check_out);
-const checkoutDateLabel = checkoutDate.toLocaleDateString(localeMap[lang], {
-  weekday: 'long', day: '2-digit', month: 'long',
+// Lang
+type LK = 'de' | 'en' | 'fr' | 'es';
+const langRaw = normalizeLang(guest?.language || (hotel as any).default_language);
+const lk: LK = (['de','en','fr','es'].includes(langRaw) ? langRaw : 'de') as LK;
+const localeMap: Record<LK, string> = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' };
+const locale = localeMap[lk];
+
+// Hotel-TZ — alle Datumsvergleiche in Hotel-Zeitzone
+const hotelTz: string = (hotel as any).timezone ?? 'Europe/Berlin';
+
+// Datum-Gate (YYYY-MM-DD Strings in Hotel-TZ — direkt vergleichbar)
+const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: hotelTz });
+const checkoutStr = new Date(stay.check_out).toLocaleDateString('en-CA', { timeZone: hotelTz });
+
+type GateState = 'not_yet' | 'checkout_day' | 'overstay';
+const gateState: GateState =
+  todayStr < checkoutStr ? 'not_yet'      :
+  todayStr === checkoutStr ? 'checkout_day' : 'overstay';
+
+// Checkout-Uhrzeit + Datumsformate
+const checkoutTime = new Date(stay.check_out).toLocaleTimeString(locale, {
+  hour: '2-digit', minute: '2-digit', timeZone: hotelTz,
 });
-const checkoutTime = checkoutDate.toLocaleTimeString(localeMap[lang], {
-  hour: '2-digit', minute: '2-digit',
+const checkoutDateFull = new Date(stay.check_out).toLocaleDateString(locale, {
+  weekday: 'long', day: '2-digit', month: 'long', timeZone: hotelTz,
+});
+const checkoutDateShort = new Date(stay.check_out).toLocaleDateString(locale, {
+  day: '2-digit', month: 'long', timeZone: hotelTz,
 });
 
-const guestName = guest?.first_name ?? null;
-const isCheckoutDay = new Date().toDateString() === checkoutDate.toDateString();
-const alreadyPast = Date.parse(stay.check_out) < Date.now();
+// Nächte bis Abreise (nur für State A relevant)
+const nightsRemaining = gateState === 'not_yet'
+  ? Math.round((new Date(checkoutStr).getTime() - new Date(todayStr).getTime()) / 86400000)
+  : 0;
 
-// Stay-Daten + Billing in einem Query
-const sbSr = createSupabaseServiceRoleInstance();
-const { data: stayRow } = await sbSr
-  .from('stays')
-  .select('checked_out_at, raw_mews_data')
-  .eq('id', stay.id)
-  .maybeSingle();
+// Gäste-Vorname
+const guestName: string | null = (guest as any)?.first_name ?? null;
 
-const alreadyCheckedOut = !!(stayRow as any)?.checked_out_at;
-
-// --- Billing ---------------------------------------------------------------
-// TODO: Mews live-Anbindung hier — dann _retaha_sim-Block ersetzen.
+// Billing (nur am Abreisetag oder Overstay)
 interface SimItem    { label: string; amount_cents: number; }
-interface SimBilling { currency: string; balance_cents: number; total_cents: number; items: SimItem[]; }
 
-const simBilling: SimBilling | null = (stayRow as any)?.raw_mews_data?._retaha_sim ?? null;
-const balanceCents  = simBilling?.balance_cents ?? 0;
-const totalCents    = simBilling?.total_cents   ?? 0;
-const billItems     = simBilling?.items         ?? [];
-const billCurrency  = simBilling?.currency      ?? (hotel as any).currency ?? 'EUR';
-const isBalanceOpen = balanceCents > 0;
+let balanceCents  = 0;
+let totalCents    = 0;
+let billItems: SimItem[] = [];
+let billCurrency: string = (hotel as any).currency ?? 'EUR';
+let billingError  = false;
+let alreadyCheckedOut = false;
 
+if (gateState !== 'not_yet') {
+  const sbSr = createSupabaseServiceRoleInstance();
+  const { data: stayRow, error: stayRowErr } = await sbSr
+    .from('stays')
+    .select('checked_out_at, raw_mews_data')
+    .eq('id', stay.id)
+    .maybeSingle();
+
+  if (stayRowErr || !stayRow) {
+    billingError = true;
+  } else {
+    alreadyCheckedOut = !!(stayRow as any).checked_out_at;
+    // TODO Mews live: Saldo aus Mews-API; _retaha_sim dann entfernen
+    const sim: any = (stayRow as any)?.raw_mews_data?._retaha_sim ?? null;
+    balanceCents = sim?.balance_cents ?? 0;
+    totalCents   = sim?.total_cents   ?? 0;
+    billItems    = sim?.items         ?? [];
+    billCurrency = sim?.currency      ?? billCurrency;
+  }
+}
+
+// Overstay → vorerst wie C (geblockt)
+const isBalanceOpen = (gateState === 'checkout_day' && balanceCents > 0) || gateState === 'overstay';
+const isBalancePaid = gateState === 'checkout_day' && balanceCents === 0 && !billingError;
+
+// Hotel-Telefon (für tel:-Link in State C)
+const hotelPhone: string | null = (hotel as any).phone ?? null;
+
+// Brand-Palette → --accent = Hotelfarbe
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandStyle = brandPrimary
+  ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
+  : undefined;
+
+// Zurück-Link
+const backHref = `/g/${token}`;
+
+// Geld-Formatierung
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat('de-DE', {
     style: 'currency', currency: billCurrency, minimumFractionDigits: 2,
   }).format(cents / 100);
 }
-// ---------------------------------------------------------------------------
 
-const hotelPhone: string | null = (hotel as any).phone ?? null;
-const backHref = `/g/${token}`;
+// Nächte-Label (Singular/Plural)
+function nightsLabel(n: number): string {
+  if (lk === 'de') return n === 1 ? '1 Nacht'  : `${n} Nächte`;
+  if (lk === 'en') return n === 1 ? '1 night'  : `${n} nights`;
+  if (lk === 'fr') return n === 1 ? '1 nuit'   : `${n} nuits`;
+  if (lk === 'es') return n === 1 ? '1 noche'  : `${n} noches`;
+  return `${n}`;
+}
 
+// i18n
 type LabelSet = {
+  pageTitle: string;
   eyebrow: string;
-  title: string; titleOpen: string;
-  sub: string; subOpen: string;
-  step1BillTitle: string;
-  billPaidLabel: string; billOpenLabel: string;
-  billTotal: string; billOpenTotal: string;
-  billNote: string; billNoteOpen: string;
-  attnLabel: string; attnMsg: string;
-  step2Title: string; step2Sub: string;
-  step3Title: string; step3Sub: string;
-  btnLabel: string; hintLabel: string;
-  btnCallLabel: string; callHint: string;
+  // A
+  titleA: string; titleAccentA: string; subA: string;
+  piktoLabelA: string; piktoValueA: string; piktoHintA: string;
+  backBtn: string;
+  // B
+  titleB: string; titleAccentB: string; subB: string;
+  piktoLabelB: string; piktoValueB: string;
+  billTitle: string; chipPaid: string; billTotal: string; billNote: string;
+  keyTile: string; keyTileSub: string;
+  btnCheckout: string; hintCheckout: string;
+  // C
+  titleC: string; titleAccentC: string; subC: string;
+  piktoLabelC: string;
+  chipOpen: string; billOpenTotal: string; billNoteOpen: string;
+  btnCall: string; hintCall: string; noPhoneHint: string;
+  // already done
   doneTitle: string; doneSub: string;
-  notYetTitle: string; notYetSub: string;
-  back: string;
+  // billing error
+  errorHint: string;
 };
 
-const labels = {
+const labels: Record<LK, LabelSet> = {
   de: {
-    eyebrow:       `Abreise · ${checkoutDateLabel} · ${checkoutTime} Uhr`,
-    title:         `Auf Wiedersehen${guestName ? `, ${guestName}` : ''}`,
-    titleOpen:     `Fast geschafft${guestName ? `, ${guestName}` : ''}`,
-    sub:           'Danke für deinen Aufenthalt — wir hoffen, es hat dir gefallen.',
-    subOpen:       'Vor der Abreise ist noch ein offener Betrag zu begleichen.',
-    step1BillTitle: 'Rechnung',
-    billPaidLabel:  'Beglichen',
-    billOpenLabel:  'Offen',
-    billTotal:      'Gesamt',
-    billOpenTotal:  'Offener Betrag',
-    billNote:       'Die offizielle Rechnung erhältst du per E-Mail.',
-    billNoteOpen:   'Die offizielle Rechnung erhältst du an der Rezeption oder per E-Mail.',
-    attnLabel:      'Noch offen',
-    attnMsg:        'Self-Checkout ist erst möglich, wenn die Rechnung beglichen ist. Bitte checke an der Rezeption aus — unser Team hilft dir gern.',
-    step2Title:    'Schlüsselkarte',
-    step2Sub:      'Einfach im Zimmer lassen oder an der Rezeption abgeben.',
-    step3Title:    'Auschecken bestätigen',
-    step3Sub:      'Ein Klick — du erhältst eine Bestätigungs-E-Mail.',
-    btnLabel:      'Jetzt auschecken',
-    hintLabel:     'Du erhältst eine kurze Bestätigung per E-Mail.',
-    btnCallLabel:  'Rezeption anrufen',
-    callHint:      'Self-Checkout wird nach Begleichung wieder freigeschaltet.',
-    doneTitle:     'Erfolgreich ausgecheckt.',
-    doneSub:       'Gute Reise — wir hoffen, dich bald wieder begrüßen zu dürfen.',
-    notYetTitle:   'Checkout noch nicht möglich.',
-    notYetSub:     `Dein Abreise-Tag ist ${checkoutDateLabel}. Bis dahin — genieß deinen Aufenthalt!`,
-    back:          '← zurück',
+    pageTitle: `${hotel.name} · Auschecken`,
+    eyebrow: '— Abreise —',
+    // A
+    titleA: 'Noch', titleAccentA: `${nightsLabel(nightsRemaining)}, ${guestName ?? 'lieber Gast'}.`,
+    subA: `Abreise: ${checkoutDateFull}`,
+    piktoLabelA: 'DEINE ABREISE',
+    piktoValueA: checkoutDateShort,
+    piktoHintA: `Self-Checkout öffnet am Abreisetag, bis ${checkoutTime} Uhr.`,
+    backBtn: 'Zurück zur Übersicht',
+    // B
+    titleB: 'Auf', titleAccentB: `Wiedersehen, ${guestName ?? 'lieber Gast'}.`,
+    subB: `Check-out bis ${checkoutTime} Uhr.`,
+    piktoLabelB: 'ALLES BEGLICHEN',
+    piktoValueB: fmtMoney(totalCents),
+    billTitle: 'RECHNUNG', chipPaid: 'Beglichen', billTotal: 'Gesamt', billNote: 'Rechnung kommt per E-Mail.',
+    keyTile: 'Schlüsselkarte', keyTileSub: 'Einfach im Zimmer lassen.',
+    btnCheckout: 'Jetzt auschecken', hintCheckout: 'Du erhältst eine Bestätigung per E-Mail.',
+    // C
+    titleC: 'Fast', titleAccentC: `geschafft, ${guestName ?? 'lieber Gast'}.`,
+    subC: 'Es gibt noch einen offenen Betrag.',
+    piktoLabelC: 'NOCH OFFEN',
+    chipOpen: 'Offen', billOpenTotal: 'Offener Betrag', billNoteOpen: 'Rechnung erhältst du an der Rezeption.',
+    btnCall: 'Rezeption anrufen', hintCall: 'Self-Checkout öffnet nach Begleichung.',
+    noPhoneHint: 'Bitte an der Rezeption vorbeikommen.',
+    // done
+    doneTitle: 'Ausgecheckt.', doneSub: 'Gute Reise — wir hoffen, dich bald wiederzusehen.',
+    // error
+    errorHint: 'Rechnung konnte nicht geladen werden. Bitte an der Rezeption auschecken.',
   },
   en: {
-    eyebrow:       `Check-out · ${checkoutDateLabel} · ${checkoutTime}`,
-    title:         `Goodbye${guestName ? `, ${guestName}` : ''}`,
-    titleOpen:     `Almost there${guestName ? `, ${guestName}` : ''}`,
-    sub:           'Thank you for your stay — we hope you enjoyed it.',
-    subOpen:       'There is an outstanding balance to settle before departure.',
-    step1BillTitle: 'Invoice',
-    billPaidLabel:  'Settled',
-    billOpenLabel:  'Open',
-    billTotal:      'Total',
-    billOpenTotal:  'Outstanding',
-    billNote:       'Your official receipt will be sent by e-mail.',
-    billNoteOpen:   'Your official receipt is available at reception or by e-mail.',
-    attnLabel:      'Outstanding',
-    attnMsg:        'Self-checkout is only available once the balance is settled. Please check out at reception — our team is happy to help.',
-    step2Title:    'Key card',
-    step2Sub:      'Leave it in the room or hand it to reception.',
-    step3Title:    'Confirm check-out',
-    step3Sub:      "One click — you'll receive a confirmation email.",
-    btnLabel:      'Check out now',
-    hintLabel:     "You'll receive a short confirmation by email.",
-    btnCallLabel:  'Call reception',
-    callHint:      'Self-checkout will be available once the balance is settled.',
-    doneTitle:     'Successfully checked out.',
-    doneSub:       'Safe travels — we hope to welcome you back soon.',
-    notYetTitle:   'Check-out not yet available.',
-    notYetSub:     `Your check-out date is ${checkoutDateLabel}. Until then — enjoy your stay!`,
-    back:          '← back',
+    pageTitle: `${hotel.name} · Check-out`,
+    eyebrow: '— Departure —',
+    titleA: 'Still', titleAccentA: `${nightsLabel(nightsRemaining)}, ${guestName ?? 'dear guest'}.`,
+    subA: `Departure: ${checkoutDateFull}`,
+    piktoLabelA: 'YOUR DEPARTURE',
+    piktoValueA: checkoutDateShort,
+    piktoHintA: `Self-checkout opens on departure day, until ${checkoutTime}.`,
+    backBtn: 'Back to overview',
+    titleB: 'Goodbye,', titleAccentB: `${guestName ?? 'dear guest'}.`,
+    subB: `Check-out by ${checkoutTime}.`,
+    piktoLabelB: 'ALL SETTLED',
+    piktoValueB: fmtMoney(totalCents),
+    billTitle: 'INVOICE', chipPaid: 'Settled', billTotal: 'Total', billNote: 'Receipt will be sent by e-mail.',
+    keyTile: 'Key card', keyTileSub: 'Just leave it in the room.',
+    btnCheckout: 'Check out now', hintCheckout: "You'll receive a confirmation by e-mail.",
+    titleC: 'Almost', titleAccentC: `there, ${guestName ?? 'dear guest'}.`,
+    subC: 'There is an outstanding balance.',
+    piktoLabelC: 'OUTSTANDING',
+    chipOpen: 'Open', billOpenTotal: 'Outstanding', billNoteOpen: 'Receipt available at reception.',
+    btnCall: 'Call reception', hintCall: 'Self-checkout opens once settled.',
+    noPhoneHint: 'Please visit reception to check out.',
+    doneTitle: 'Checked out.', doneSub: 'Safe travels — we hope to see you again soon.',
+    errorHint: 'Invoice could not be loaded. Please check out at reception.',
   },
   fr: {
-    eyebrow:       `Départ · ${checkoutDateLabel} · ${checkoutTime}`,
-    title:         `Au revoir${guestName ? `, ${guestName}` : ''}`,
-    titleOpen:     `Presque là${guestName ? `, ${guestName}` : ''}`,
-    sub:           'Merci pour votre séjour — nous espérons vous revoir bientôt.',
-    subOpen:       'Un solde est encore à régler avant votre départ.',
-    step1BillTitle: 'Facture',
-    billPaidLabel:  'Réglée',
-    billOpenLabel:  'Ouverte',
-    billTotal:      'Total',
-    billOpenTotal:  'Solde dû',
-    billNote:       'Votre reçu officiel vous sera envoyé par e-mail.',
-    billNoteOpen:   'Votre reçu officiel est disponible à la réception ou par e-mail.',
-    attnLabel:      'Solde dû',
-    attnMsg:        'Le départ autonome est disponible une fois le solde réglé. Veuillez vous adresser à la réception.',
-    step2Title:    'Carte-clé',
-    step2Sub:      'Laissez-la dans la chambre ou remettez-la à la réception.',
-    step3Title:    'Confirmer le départ',
-    step3Sub:      'Un clic — vous recevrez un e-mail de confirmation.',
-    btnLabel:      'Partir maintenant',
-    hintLabel:     'Vous recevrez une confirmation par e-mail.',
-    btnCallLabel:  'Appeler la réception',
-    callHint:      'Le départ autonome sera disponible après règlement.',
-    doneTitle:     'Départ confirmé.',
-    doneSub:       'Bon voyage — à bientôt !',
-    notYetTitle:   'Départ pas encore disponible.',
-    notYetSub:     `Votre date de départ est le ${checkoutDateLabel}.`,
-    back:          '← retour',
+    pageTitle: `${hotel.name} · Départ`,
+    eyebrow: '— Départ —',
+    titleA: 'Encore', titleAccentA: `${nightsLabel(nightsRemaining)}, ${guestName ?? 'cher hôte'}.`,
+    subA: `Départ : ${checkoutDateFull}`,
+    piktoLabelA: 'VOTRE DÉPART',
+    piktoValueA: checkoutDateShort,
+    piktoHintA: `Le départ autonome ouvre le jour du départ, jusqu'à ${checkoutTime}.`,
+    backBtn: "Retour à l'accueil",
+    titleB: 'Au revoir,', titleAccentB: `${guestName ?? 'cher hôte'}.`,
+    subB: `Départ avant ${checkoutTime}.`,
+    piktoLabelB: 'TOUT RÉGLÉ',
+    piktoValueB: fmtMoney(totalCents),
+    billTitle: 'FACTURE', chipPaid: 'Réglée', billTotal: 'Total', billNote: 'Reçu envoyé par e-mail.',
+    keyTile: 'Carte-clé', keyTileSub: 'Laissez-la simplement dans la chambre.',
+    btnCheckout: 'Partir maintenant', hintCheckout: 'Vous recevrez une confirmation par e-mail.',
+    titleC: 'Presque', titleAccentC: `là, ${guestName ?? 'cher hôte'}.`,
+    subC: 'Il reste un solde à régler.',
+    piktoLabelC: 'SOLDE DÛ',
+    chipOpen: 'Ouverte', billOpenTotal: 'Solde dû', billNoteOpen: 'Reçu disponible à la réception.',
+    btnCall: 'Appeler la réception', hintCall: 'Le départ autonome ouvre après règlement.',
+    noPhoneHint: 'Veuillez vous présenter à la réception.',
+    doneTitle: 'Départ confirmé.', doneSub: 'Bon voyage — à bientôt !',
+    errorHint: "La facture n'a pas pu être chargée. Veuillez passer à la réception.",
   },
   es: {
-    eyebrow:       `Salida · ${checkoutDateLabel} · ${checkoutTime}`,
-    title:         `Hasta pronto${guestName ? `, ${guestName}` : ''}`,
-    titleOpen:     `Ya casi${guestName ? `, ${guestName}` : ''}`,
-    sub:           'Gracias por tu estancia — esperamos verte pronto.',
-    subOpen:       'Hay un saldo pendiente por liquidar antes de la salida.',
-    step1BillTitle: 'Factura',
-    billPaidLabel:  'Pagada',
-    billOpenLabel:  'Pendiente',
-    billTotal:      'Total',
-    billOpenTotal:  'Importe pendiente',
-    billNote:       'Tu recibo oficial se enviará por correo electrónico.',
-    billNoteOpen:   'Tu recibo oficial está disponible en recepción o por correo electrónico.',
-    attnLabel:      'Pendiente',
-    attnMsg:        'El auto-checkout solo está disponible cuando el saldo esté liquidado. Por favor dirígete a recepción.',
-    step2Title:    'Tarjeta-llave',
-    step2Sub:      'Déjala en la habitación o entrégala en recepción.',
-    step3Title:    'Confirmar la salida',
-    step3Sub:      'Un clic — recibirás un correo de confirmación.',
-    btnLabel:      'Salir ahora',
-    hintLabel:     'Recibirás una confirmación breve por e-mail.',
-    btnCallLabel:  'Llamar a recepción',
-    callHint:      'El auto-checkout estará disponible tras el pago.',
-    doneTitle:     'Salida confirmada.',
-    doneSub:       '¡Buen viaje — esperamos verte pronto!',
-    notYetTitle:   'Salida aún no disponible.',
-    notYetSub:     `Tu fecha de salida es el ${checkoutDateLabel}.`,
-    back:          '← volver',
+    pageTitle: `${hotel.name} · Salida`,
+    eyebrow: '— Salida —',
+    titleA: 'Todavía', titleAccentA: `${nightsLabel(nightsRemaining)}, ${guestName ?? 'estimado huésped'}.`,
+    subA: `Salida: ${checkoutDateFull}`,
+    piktoLabelA: 'TU SALIDA',
+    piktoValueA: checkoutDateShort,
+    piktoHintA: `El auto-checkout abre el día de salida, hasta las ${checkoutTime}.`,
+    backBtn: 'Volver al inicio',
+    titleB: 'Hasta pronto,', titleAccentB: `${guestName ?? 'estimado huésped'}.`,
+    subB: `Salida antes de las ${checkoutTime}.`,
+    piktoLabelB: 'TODO PAGADO',
+    piktoValueB: fmtMoney(totalCents),
+    billTitle: 'FACTURA', chipPaid: 'Pagada', billTotal: 'Total', billNote: 'Recibo enviado por correo electrónico.',
+    keyTile: 'Tarjeta-llave', keyTileSub: 'Déjala simplemente en la habitación.',
+    btnCheckout: 'Salir ahora', hintCheckout: 'Recibirás una confirmación por e-mail.',
+    titleC: 'Ya casi,', titleAccentC: `${guestName ?? 'estimado huésped'}.`,
+    subC: 'Hay un importe pendiente.',
+    piktoLabelC: 'PENDIENTE',
+    chipOpen: 'Pendiente', billOpenTotal: 'Importe pendiente', billNoteOpen: 'Recibo disponible en recepción.',
+    btnCall: 'Llamar a recepción', hintCall: 'El auto-checkout abre tras el pago.',
+    noPhoneHint: 'Pase por recepción para realizar el check-out.',
+    doneTitle: 'Salida confirmada.', doneSub: '¡Buen viaje — esperamos verte pronto!',
+    errorHint: 'La factura no pudo cargarse. Realice el check-out en recepción.',
   },
 };
-
-const L = (labels as Record<Lang, LabelSet>)[lang] ?? (labels as Record<Lang, LabelSet>)['de'];
-const effectiveTitle = isBalanceOpen ? L.titleOpen : L.title;
-const effectiveSub   = isBalanceOpen ? L.subOpen   : L.sub;
+const L = labels[lk];
 ---
 
 <!DOCTYPE html>
-<html lang={lang}>
+<html lang={lk} style={brandStyle}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0A0A0A" />
-    <title>{hotel.name} · {lang === 'de' ? 'Auschecken' : 'Check-out'}</title>
+    <meta name="theme-color" content="#FBFAF7" />
+    <title>{L.pageTitle}</title>
     <style>
+      [x-cloak] { display: none !important; }
       *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --accent:        #0A0A0A;
+        --accent-soft:   rgba(10,10,10,0.08);
+        --ink:           #0F0F0D;
+        --ink-muted:     #6B6B63;
+        --ink-faint:     #A8A8A0;
+        --border:        #E7E4DD;
+        --border-strong: #C8C4BB;
+        --bg:            #FBFAF7;
+        --surface:       #FFFFFF;
+        --success:       #3D8C5C;
+        --success-soft:  rgba(61,140,92,0.10);
+        --radius:        12px;
+        --mono:   'JetBrains Mono', 'Courier New', monospace;
+        --display:'Space Grotesk', system-ui, sans-serif;
+      }
+
       body {
         margin: 0; padding: 0;
-        background: #FAFAF8; color: #0A0A0A;
-        font-family: 'Space Grotesk', system-ui, sans-serif; min-height: 100vh;
-      }
-      .page { max-width: 520px; margin: 0 auto; padding: 0 20px 60px; }
-
-      .back-link {
-        display: inline-block; padding: 16px 0 0;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-        color: #888; text-decoration: none;
-      }
-      .back-link:hover { color: #0A0A0A; }
-
-      .hero { padding: 32px 0 28px; border-bottom: 1px solid #E0DDD8; margin-bottom: 28px; }
-      .hero__eyebrow {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px; letter-spacing: 0.14em; font-weight: 500;
-        color: #888; display: block; margin-bottom: 12px;
-      }
-      .hero__title {
-        font-size: clamp(26px, 6vw, 42px); font-weight: 400; letter-spacing: -0.025em;
-        line-height: 1.05; margin: 0 0 10px; color: #0A0A0A;
-      }
-      .hero__title .dot { color: var(--guest-accent); }
-      .hero__sub { font-size: 15px; color: #666; line-height: 1.5; margin: 0; }
-
-      /* Steps */
-      .steps { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
-      .step {
-        display: flex; align-items: flex-start; gap: 14px;
-        padding: 16px;
-        background: #fff; border: 1px solid #E0DDD8; border-radius: 14px;
-      }
-      .step--highlight { border: 1.5px solid var(--guest-accent); }
-      .step__num {
-        width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
-        background: #E0DDD8; color: #555;
-        display: flex; align-items: center; justify-content: center;
-        font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
-        margin-top: 1px;
-      }
-      .step--highlight .step__num { background: var(--guest-accent); color: #fff; }
-      .step--done .step__num      { background: var(--guest-accent); color: #fff; }
-      .step__body { flex: 1; min-width: 0; }
-      .step__title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-      .step__title { font-size: 15px; font-weight: 600; color: #0A0A0A; line-height: 1.2; }
-      .step__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; line-height: 1.4; margin-top: 4px; }
-      .step__check { margin-left: auto; flex-shrink: 0; color: var(--guest-accent); margin-top: 4px; }
-
-      /* Bill chips */
-      .bill-chip {
-        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
-        text-transform: uppercase; font-weight: 600; padding: 3px 8px; border-radius: 7px;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .bill-chip--paid { background: var(--guest-accent); color: #fff; }
-      .bill-chip--open { background: #0A0A0A; color: #FFE600; }
-
-      /* Billing breakdown */
-      .bill { margin-top: 11px; padding-top: 11px; border-top: 1px solid #E0DDD8; }
-      .bill__li { display: flex; justify-content: space-between; font-size: 13px; color: #555; padding: 3px 0; }
-      .bill__lbl { color: #666; }
-      .bill__total {
-        display: flex; justify-content: space-between;
-        font-size: 15px; font-weight: 600; color: #0A0A0A;
-        margin-top: 8px; padding-top: 8px; border-top: 1px solid #E0DDD8;
-      }
-      .bill__note {
-        font-family: 'JetBrains Mono', monospace; font-size: 10px;
-        color: #AAA; margin-top: 9px; line-height: 1.4;
+        background: var(--bg); color: var(--ink);
+        font-family: var(--display); min-height: 100dvh;
+        -webkit-font-smoothing: antialiased; position: relative;
       }
 
-      /* Attention card (open balance) — warmer Gelb-Tint, kein Rot */
-      .attn {
-        background: #FFFBEA; border: 1px solid #F0E2A8; border-radius: 14px;
-        padding: 18px; margin-bottom: 0;
+      .page {
+        max-width: 480px; margin: 0 auto;
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
+        animation: page-in 280ms cubic-bezier(0.22,1,0.36,1) both;
       }
-      .attn__label {
-        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
-        text-transform: uppercase; color: #8A7A3A;
+      @keyframes page-in {
+        from { transform: translateY(-12px); opacity: 0; }
+        to   { transform: translateY(0);     opacity: 1; }
       }
-      .attn__amount {
-        font-size: 30px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
-        margin-top: 4px; color: #0A0A0A;
-      }
-      .attn__msg { font-size: 13px; color: #5B5536; margin-top: 10px; line-height: 1.5; }
+      @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
 
-      /* CTA */
-      .cta-area { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-      .cta-btn {
-        width: 100%; padding: 16px;
-        background: #0A0A0A; color: #FAFAF8;
-        border: none; border-radius: 14px;
-        font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
-        transition: background 150ms, color 150ms;
-        display: flex; align-items: center; justify-content: center; gap: 8px;
-        text-decoration: none;
+      /* ── Close button ── */
+      .close-btn {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 16px); right: 20px;
+        width: 36px; height: 36px; border-radius: 50%;
+        background: #EFEDE8; display: grid; place-items: center;
+        text-decoration: none; color: var(--ink); flex-shrink: 0;
+        transition: background 0.14s ease; z-index: 10;
       }
-      .cta-btn:hover { background: #FFE600; color: #0A0A0A; }
-      .cta-btn:hover .btn-icon { stroke: #0A0A0A; }
-      .cta-btn:disabled { opacity: 0.5; cursor: wait; }
-      .btn-icon { flex-shrink: 0; stroke: #FAFAF8; fill: none; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
+      .close-btn:hover  { background: #E0DDD7; }
+      .close-btn:active { transform: none !important; }
+      .close-btn svg { width: 16px; height: 16px; }
+
+      /* ── Hero ── */
+      .hero { padding: 28px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; font-weight: 500;
+        color: var(--accent); margin: 0 0 14px; display: block;
+      }
+      .title {
+        font-size: clamp(28px, 7vw, 38px); font-weight: 700;
+        letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 8px; color: var(--ink);
+      }
+      .title .accent { color: var(--accent); }
+      .subtitle { font-size: 14px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Visual block (Pikto + Value) ── */
+      .vis { text-align: center; padding: 24px 0 32px; }
+      .vis-pikto {
+        width: 56px; height: 56px; border-radius: 50%;
+        background: var(--accent); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+      .vis-pikto--sage    { background: var(--success); }
+      .vis-pikto svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .vis-label {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; font-weight: 500;
+        color: var(--ink-faint); text-transform: uppercase; margin: 0 0 8px;
+      }
+      .vis-value {
+        font-size: clamp(24px, 6vw, 34px); font-weight: 700; letter-spacing: -0.025em;
+        color: var(--accent); margin: 0 0 10px; font-family: var(--display); line-height: 1.1;
+      }
+      .vis-value--sage { color: var(--success); }
+      .vis-hint { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Card ── */
+      .card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); overflow: hidden; margin-bottom: 12px;
+      }
+      .row {
+        display: flex; align-items: flex-start; gap: 12px;
+        padding: 16px 18px; border-bottom: 1px solid var(--border);
+      }
+      .row:last-child { border-bottom: none; }
+      .row-body { flex: 1; min-width: 0; }
+      .row-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+        text-transform: uppercase; font-weight: 500; color: var(--ink-faint);
+        margin-bottom: 3px;
+      }
+      .row-value {
+        font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--ink);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+
+      /* ── Chip ── */
+      .chip {
+        display: inline-flex; align-items: center;
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+        text-transform: uppercase; font-weight: 500;
+        padding: 3px 9px; border-radius: 100px; white-space: nowrap; flex-shrink: 0;
+      }
+      .chip--paid { background: var(--success-soft); color: var(--success); }
+      .chip--open { background: var(--accent-soft);  color: var(--accent);  }
+
+      /* ── Bill ── */
+      .bill { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+      .bill-row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; }
+      .bill-row__lbl  { font-size: 13px; color: var(--ink-muted); }
+      .bill-row__amt  { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+      .bill-total {
+        display: flex; justify-content: space-between; align-items: baseline;
+        margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+        font-size: 15px; font-weight: 600;
+      }
+      .bill-total__amt { font-family: var(--mono); }
+      .bill-note {
+        font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+        margin-top: 10px; line-height: 1.5; margin-bottom: 0;
+      }
+
+      /* ── Tile (Schlüsselkarte etc.) ── */
+      .tile {
+        display: flex; align-items: center; gap: 14px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px;
+      }
+      .tile-icon {
+        width: 38px; height: 38px; border-radius: 10px;
+        background: var(--accent-soft); color: var(--accent);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      .tile-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .tile-label { font-size: 14px; font-weight: 500; margin: 0 0 2px; }
+      .tile-sub   { font-family: var(--mono); font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em; margin: 0; }
+
+      /* ── CTA ── */
+      .cta { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+      .btn-primary {
+        width: 100%; padding: 15px 20px;
+        background: var(--ink); color: #FBFAF7;
+        border: none; border-radius: var(--radius);
+        font-size: 15px; font-weight: 600; font-family: var(--display);
+        cursor: pointer; text-decoration: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        transition: background 140ms ease, color 140ms ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .btn-primary:hover    { background: #2A2A2A; }
+      .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+      .btn-primary svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+      .btn-secondary {
+        width: 100%; padding: 13px 20px;
+        background: transparent; border: 1.5px solid var(--border-strong);
+        color: var(--ink); border-radius: var(--radius);
+        font-size: 14px; font-weight: 500; font-family: var(--display);
+        cursor: pointer; text-decoration: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        transition: border-color 140ms ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .btn-secondary:hover { border-color: var(--ink); }
+      .btn-secondary svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
       .cta-hint {
-        font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA;
-        text-align: center; margin: 0; letter-spacing: 0.04em;
+        font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+        text-align: center; margin: 0; letter-spacing: 0.04em; line-height: 1.5;
       }
 
-      /* Done state */
-      .done-state {
-        background: #0A0A0A; color: #FAFAF8;
-        border-radius: 12px; padding: 28px 24px; text-align: center;
-        margin-bottom: 20px;
-      }
-      .done-state__icon { font-size: 36px; margin-bottom: 16px; }
-      .done-state__title { font-size: 20px; font-weight: 400; margin: 0 0 8px; }
-      .done-state__sub { font-size: 13px; opacity: 0.65; line-height: 1.4; margin: 0; }
-
-      /* Not-yet state */
-      .notyet-state {
-        background: #F5F5F3; border: 1px solid #E0DDD8;
-        border-radius: 12px; padding: 24px; text-align: center;
-      }
-      .notyet-state__title { font-size: 18px; font-weight: 400; margin: 0 0 8px; }
-      .notyet-state__sub { font-size: 13px; color: #666; line-height: 1.4; margin: 0; }
-
-      /* Flash */
-      .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
-      .flash--ok  { background: #EDF7ED; color: #2D6B2D; border: 1px solid #B5D9B5; }
-      .flash--err { background: #FEF2F2; color: #8C2128; border: 1px solid #F5C6C6; }
+      /* ── Flash ── */
+      .flash { padding: 11px 15px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+      .flash--err { background: #FFF0F0; border: 1px solid #F5C6C6; color: #8C2128; }
       .flash[hidden] { display: none; }
 
+      /* ── Footer ── */
       .made-by {
-        margin-top: 48px; padding-top: 20px;
-        border-top: 1px solid #E0DDD8;
-        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+        font-family: var(--mono); font-size: 10px;
         color: #BBB; text-align: center; letter-spacing: 0.06em;
       }
       .made-by a { color: #888; text-decoration: none; }
     </style>
   </head>
-  <body>
-    <div class="page">
-      <a href={backHref} class="back-link">{L.back}</a>
 
-      <div class="hero">
-        <span class="hero__eyebrow">{L.eyebrow}</span>
-        <h1 class="hero__title">{effectiveTitle}<span class="dot">.</span></h1>
-        <p class="hero__sub">{effectiveSub}</p>
-      </div>
+  <body>
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </a>
+
+    <div class="page">
 
       {alreadyCheckedOut ? (
-        <div class="done-state">
-          <div class="done-state__icon">✓</div>
-          <h2 class="done-state__title">{L.doneTitle}</h2>
-          <p class="done-state__sub">{L.doneSub}</p>
-        </div>
-      ) : !isCheckoutDay && !alreadyPast ? (
-        <div class="notyet-state">
-          <h2 class="notyet-state__title">{L.notYetTitle}</h2>
-          <p class="notyet-state__sub">{L.notYetSub}</p>
-        </div>
-      ) : isBalanceOpen ? (
-        /* ── Zustand B: offener Saldo ── */
+        /* ── Bereits ausgecheckt ── */
         <>
-          <div class="attn">
-            <div class="attn__label">{L.attnLabel}</div>
-            <div class="attn__amount">{fmtMoney(balanceCents)}</div>
-            <p class="attn__msg">{L.attnMsg}</p>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">{L.doneTitle}</h1>
+            <p class="subtitle">{L.doneSub}</p>
+          </div>
+          <div class="vis">
+            <div class="vis-pikto vis-pikto--sage">
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+        </>
+      ) : gateState === 'not_yet' ? (
+        /* ══ ZUSTAND A — Noch nicht ══════════════════════════════ */
+        <>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">{L.titleA} <span class="accent">{L.titleAccentA}</span></h1>
+            <p class="subtitle">{L.subA}</p>
           </div>
 
-          <div class="steps" style="margin-top: 14px;">
-            <div class="step">
-              <div class="step__num" style="font-style:italic;font-family:'Space Grotesk',sans-serif;font-size:13px;">i</div>
-              <div class="step__body">
-                <div class="step__title-row">
-                  <span class="step__title">{L.step1BillTitle}</span>
-                  <span class="bill-chip bill-chip--open">{L.billOpenLabel}</span>
+          <div class="vis">
+            <div class="vis-pikto">
+              {/* Kalender-Icon */}
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8"  y1="2" x2="8"  y2="6"/>
+                <line x1="3"  y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div class="vis-label">{L.piktoLabelA}</div>
+            <div class="vis-value">{L.piktoValueA}</div>
+            <p class="vis-hint">{L.piktoHintA}</p>
+          </div>
+
+          <div class="cta">
+            <a href={backHref} class="btn-secondary" data-astro-reload>
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              {L.backBtn}
+            </a>
+          </div>
+        </>
+      ) : billingError ? (
+        /* ── Billing-Fehler (kein Crash) ── */
+        <>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">{L.titleC} <span class="accent">{L.titleAccentC}</span></h1>
+          </div>
+          <p class="cta-hint" style="margin-top:24px;">{L.errorHint}</p>
+        </>
+      ) : isBalancePaid ? (
+        /* ══ ZUSTAND B — Beglichen ═══════════════════════════════ */
+        <>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">{L.titleB} <span class="accent">{L.titleAccentB}</span></h1>
+            <p class="subtitle">{L.subB}</p>
+          </div>
+
+          <div class="vis">
+            <div class="vis-pikto vis-pikto--sage">
+              {/* Haken-Icon */}
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="vis-label">{L.piktoLabelB}</div>
+            <div class="vis-value vis-value--sage">{L.piktoValueB}</div>
+          </div>
+
+          <div id="flash-err" class="flash flash--err" hidden></div>
+
+          {/* Rechnung-Card */}
+          <div class="card">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-label">{L.billTitle}</span>
+                  <span class="chip chip--paid">{L.chipPaid}</span>
                 </div>
                 {billItems.length > 0 && (
                   <div class="bill">
                     {billItems.map((item: SimItem) => (
-                      <div class="bill__li">
-                        <span class="bill__lbl">{item.label}</span>
-                        <span>{fmtMoney(item.amount_cents)}</span>
+                      <div class="bill-row">
+                        <span class="bill-row__lbl">{item.label}</span>
+                        <span class="bill-row__amt">{fmtMoney(item.amount_cents)}</span>
                       </div>
                     ))}
-                    <div class="bill__total">
-                      <span>{L.billOpenTotal}</span>
-                      <span>{fmtMoney(balanceCents)}</span>
+                    <div class="bill-total">
+                      <span>{L.billTotal}</span>
+                      <span class="bill-total__amt">{fmtMoney(totalCents)}</span>
                     </div>
-                    <div class="bill__note">{L.billNoteOpen}</div>
                   </div>
                 )}
+                <p class="bill-note">{L.billNote}</p>
               </div>
             </div>
           </div>
 
-          <div class="cta-area">
-            {hotelPhone ? (
-              <a href={`tel:${hotelPhone}`} class="cta-btn">
-                {L.btnCallLabel}
-                <svg class="btn-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" stroke-linejoin="round">
-                  <path d="M5 4h3l2 5-2 1.5a11 11 0 005 5L20 13l1 3v3a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/>
-                </svg>
-              </a>
-            ) : (
-              <div class="cta-btn" style="cursor:default;">
-                {L.btnCallLabel}
-                <svg class="btn-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" stroke-linejoin="round">
-                  <path d="M5 4h3l2 5-2 1.5a11 11 0 005 5L20 13l1 3v3a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/>
-                </svg>
-              </div>
-            )}
-            <p class="cta-hint">{L.callHint}</p>
+          {/* Schlüsselkarte-Tile */}
+          <div class="tile">
+            <div class="tile-icon">
+              {/* Schlüssel-Icon */}
+              <svg viewBox="0 0 24 24">
+                <circle cx="7.5" cy="15.5" r="5.5"/>
+                <path d="M21 2 11 12"/>
+                <path d="M16 7 l3 3"/>
+              </svg>
+            </div>
+            <div>
+              <div class="tile-label">{L.keyTile}</div>
+              <p class="tile-sub">{L.keyTileSub}</p>
+            </div>
+          </div>
+
+          <div class="cta">
+            <button class="btn-primary" id="checkout-btn" type="button">
+              {/* Log-out-Icon */}
+              <svg viewBox="0 0 24 24">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              {L.btnCheckout}
+            </button>
+            <p class="cta-hint">{L.hintCheckout}</p>
           </div>
         </>
       ) : (
-        /* ── Zustand A: beglichen → Self-Checkout ── */
+        /* ══ ZUSTAND C — Offen (inkl. Overstay) ════════════════ */
         <>
-          <div id="flash-ok" class="flash flash--ok" hidden></div>
-          <div id="flash-err" class="flash flash--err" hidden></div>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">{L.titleC} <span class="accent">{L.titleAccentC}</span></h1>
+            <p class="subtitle">{L.subC}</p>
+          </div>
 
-          <div class="steps">
-            {/* Step 1: Rechnung — done */}
-            <div class="step step--done">
-              <div class="step__num">1</div>
-              <div class="step__body">
-                <div class="step__title-row">
-                  <span class="step__title">{L.step1BillTitle}</span>
-                  <span class="bill-chip bill-chip--paid">{L.billPaidLabel}</span>
+          <div class="vis">
+            <div class="vis-pikto">
+              {/* Wallet-/Karte-Icon */}
+              <svg viewBox="0 0 24 24">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </div>
+            <div class="vis-label">{L.piktoLabelC}</div>
+            <div class="vis-value">{fmtMoney(balanceCents)}</div>
+            <p class="vis-hint">{
+              lk === 'de' ? `An der Rezeption begleichen — dann ist Self-Checkout frei.`  :
+              lk === 'en' ? 'Settle at reception — then self-checkout is available.'       :
+              lk === 'fr' ? "Réglez à la réception — le départ autonome sera disponible." :
+                            'Liquide en recepción — luego el auto-checkout estará libre.'
+            }</p>
+          </div>
+
+          {/* Rechnung-Card */}
+          <div class="card">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-label">{L.billTitle}</span>
+                  <span class="chip chip--open">{L.chipOpen}</span>
                 </div>
                 {billItems.length > 0 && (
                   <div class="bill">
                     {billItems.map((item: SimItem) => (
-                      <div class="bill__li">
-                        <span class="bill__lbl">{item.label}</span>
-                        <span>{fmtMoney(item.amount_cents)}</span>
+                      <div class="bill-row">
+                        <span class="bill-row__lbl">{item.label}</span>
+                        <span class="bill-row__amt">{fmtMoney(item.amount_cents)}</span>
                       </div>
                     ))}
-                    <div class="bill__total">
-                      <span>{L.billTotal}</span>
-                      <span>{fmtMoney(totalCents)}</span>
+                    <div class="bill-total">
+                      <span>{L.billOpenTotal}</span>
+                      <span class="bill-total__amt">{fmtMoney(balanceCents)}</span>
                     </div>
-                    <div class="bill__note">{L.billNote}</div>
                   </div>
                 )}
-              </div>
-              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" width="16" height="16" aria-hidden="true">
-                <path d="M4 12.5 L10 18 L20 6"/>
-              </svg>
-            </div>
-
-            {/* Step 2: Schlüsselkarte — done */}
-            <div class="step step--done">
-              <div class="step__num">2</div>
-              <div class="step__body">
-                <div class="step__title">{L.step2Title}</div>
-                <div class="step__sub">{L.step2Sub}</div>
-              </div>
-              <svg class="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" width="16" height="16" aria-hidden="true">
-                <path d="M4 12.5 L10 18 L20 6"/>
-              </svg>
-            </div>
-
-            {/* Step 3: Auschecken bestätigen — active */}
-            <div class="step step--highlight">
-              <div class="step__num">3</div>
-              <div class="step__body">
-                <div class="step__title">{L.step3Title}</div>
-                <div class="step__sub">{L.step3Sub}</div>
+                <p class="bill-note">{L.billNoteOpen}</p>
               </div>
             </div>
           </div>
 
-          <div class="cta-area">
-            <button class="cta-btn" id="checkout-btn" type="button">
-              {L.btnLabel}
-              <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path d="M4 12.5 L10 18 L20 6"/>
-              </svg>
-            </button>
-            <p class="cta-hint">{L.hintLabel}</p>
+          <div class="cta">
+            {hotelPhone ? (
+              <a href={`tel:${hotelPhone}`} class="btn-primary">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 4a2 2 0 012-2z"/>
+                </svg>
+                {L.btnCall}
+              </a>
+            ) : (
+              <p class="cta-hint">{L.noPhoneHint}</p>
+            )}
+            <p class="cta-hint">{L.hintCall}</p>
           </div>
         </>
       )}
@@ -534,14 +694,12 @@ const effectiveSub   = isBalanceOpen ? L.subOpen   : L.sub;
       </div>
     </div>
 
-    <script is:inline define:vars={{ token, doneTitle: L.doneTitle, doneSub: L.doneSub }}>
+    <script is:inline define:vars={{ token }}>
       const btn = document.getElementById('checkout-btn');
-      const flashOk  = document.getElementById('flash-ok');
       const flashErr = document.getElementById('flash-err');
       if (btn) {
         btn.addEventListener('click', async () => {
           btn.disabled = true;
-          if (flashOk)  flashOk.hidden  = true;
           if (flashErr) flashErr.hidden = true;
           try {
             const res  = await fetch('/api/checkout/complete', {
@@ -551,13 +709,16 @@ const effectiveSub   = isBalanceOpen ? L.subOpen   : L.sub;
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-              if (flashOk) { flashOk.textContent = '✓ ' + doneTitle; flashOk.hidden = false; }
-              setTimeout(() => { window.location.href = '/g/' + token; }, 1800);
+              // Reload so server renders alreadyCheckedOut state
+              window.location.reload();
             } else {
               throw new Error(data.error || 'checkout failed');
             }
           } catch (err) {
-            if (flashErr) { flashErr.textContent = 'Fehler: ' + (err.message || 'Bitte nochmal versuchen.'); flashErr.hidden = false; }
+            if (flashErr) {
+              flashErr.textContent = err instanceof Error ? err.message : 'Fehler — bitte nochmal versuchen.';
+              flashErr.hidden = false;
+            }
             btn.disabled = false;
           }
         });
