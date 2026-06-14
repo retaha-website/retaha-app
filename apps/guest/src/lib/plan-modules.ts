@@ -36,6 +36,7 @@ export const PLAN_MODULES: Record<string, PlanModuleEntry> = {
   multi_language:  { minTier: 'pro' },
   nfc_tags:        { minTier: 'pro' },
   pre_stay:        { minTier: 'pro' },
+  pre_checkin:     { minTier: 'pro' },
   stay_pushes:     { minTier: 'pro' },
   self_checkout:   { minTier: 'pro' },
   // Premium (Eve inkl.; als Add-on für Lite + Pro buchbar)

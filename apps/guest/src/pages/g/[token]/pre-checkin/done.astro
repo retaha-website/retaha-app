@@ -1,0 +1,171 @@
+---
+// Pre-Checkin — Erfolgsseite (domestic + foreign)
+// Abschlussfarbe ist bewusst KEIN Hotel-Brand-Akzent (feste Systemfarbe).
+
+import { loadStayByToken } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+const { token } = Astro.params;
+if (!token) return new Response(null, { status: 400 });
+
+const ctx = await loadStayByToken(token);
+if (!ctx) return Astro.redirect(`/g/${token ?? ''}`);
+
+const { stay, guest, hotel, settings } = ctx;
+const features = (settings?.features ?? {}) as Record<string, boolean>;
+if (features.pre_checkin === false) return Astro.redirect(`/g/${token}`);
+
+const sbSr = createSupabaseServiceRoleInstance();
+const { data: rec } = await sbSr
+  .from('stay_pre_checkin')
+  .select('path, status')
+  .eq('stay_id', stay.id)
+  .maybeSingle();
+
+const path = rec?.path ?? 'foreign';
+const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
+const brandPrimary = (hotel as any).brand_primary ?? '#0A0A0A';
+const brandPalette = computeBrandPalette(brandPrimary);
+const guestName = guest?.first_name ?? null;
+const hotelName = (hotel as any).name ?? 'Hotel';
+
+type Labels = { title: string; subDomestic: string; subForeign: string; cta: string };
+const labels: Record<Lang, Labels> = {
+  de: {
+    title: guestName ? `Alles erledigt, ${guestName}.` : 'Alles erledigt.',
+    subDomestic: 'Wir freuen uns auf dich! Beim Check-in geht alles schnell.',
+    subForeign: 'Beim Check-in zeigst du nur noch kurz deinen Ausweis. Wir freuen uns auf dich!',
+    cta: 'Fertig',
+  },
+  en: {
+    title: guestName ? `All done, ${guestName}.` : 'All done.',
+    subDomestic: 'We look forward to your arrival! Check-in will be quick.',
+    subForeign: 'Just show your ID at check-in. We look forward to welcoming you!',
+    cta: 'Done',
+  },
+  fr: {
+    title: guestName ? `C'est fait, ${guestName}.` : 'C\'est fait.',
+    subDomestic: 'Nous avons hâte de vous accueillir ! L\'enregistrement sera rapide.',
+    subForeign: 'Il vous suffira de présenter votre pièce d\'identité à l\'enregistrement.',
+    cta: 'Terminer',
+  },
+  es: {
+    title: guestName ? `Todo listo, ${guestName}.` : 'Todo listo.',
+    subDomestic: '¡Esperamos tu llegada! El check-in será muy rápido.',
+    subForeign: 'Solo muestra tu documento de identidad al llegar. ¡Te esperamos!',
+    cta: 'Finalizar',
+  },
+};
+const L = labels[lang];
+const subtitle = path === 'domestic' ? L.subDomestic : L.subForeign;
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={`--accent:${brandPalette.accent};--accent-soft:${brandPalette.soft};--accent-on:${brandPalette.on};`}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Voranmeldung abgeschlossen</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { font-family: 'Space Grotesk', sans-serif; }
+    body { background: #F8F7F4; min-height: 100dvh; display: flex; flex-direction: column; }
+
+    .done-header {
+      display: flex; justify-content: flex-end;
+      padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 0;
+    }
+    .done-close {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #EDEBE7; border: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #3A3A36; cursor: pointer; text-decoration: none;
+    }
+
+    .done-body {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 32px;
+      text-align: center;
+    }
+
+    .check-wrap {
+      position: relative; width: 96px; height: 96px;
+      margin-bottom: 36px;
+    }
+    .check-glow {
+      position: absolute; inset: -20px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(123,131,208,0.22) 0%, rgba(123,131,208,0.06) 60%, transparent 80%);
+      animation: pulse-glow 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.7; }
+    }
+    .check-circle {
+      position: relative; width: 96px; height: 96px; border-radius: 50%;
+      background: #7B83D0;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .done-title {
+      font-size: 26px; font-weight: 700; color: #0F0F0D;
+      line-height: 1.2; margin-bottom: 12px;
+    }
+    .done-sub {
+      font-size: 15px; color: #6B6B63; line-height: 1.6;
+      max-width: 280px;
+    }
+    .done-hotel {
+      margin-top: 28px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.12em; color: #AEACA6;
+      text-transform: uppercase;
+    }
+
+    .done-footer {
+      padding: 24px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    }
+    .btn-done {
+      width: 100%; border: 0; padding: 16px;
+      border-radius: 14px; font-size: 16px; font-weight: 600;
+      background: #0F0F0D; color: #fff;
+      cursor: pointer; font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <header class="done-header">
+    <a class="done-close" href={`/g/${token}`} data-astro-reload aria-label="Schließen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </a>
+  </header>
+
+  <div class="done-body">
+    <div class="check-wrap">
+      <div class="check-glow"></div>
+      <div class="check-circle">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <polyline points="9 20 17 28 31 12" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1 class="done-title">{L.title}</h1>
+    <p class="done-sub">{subtitle}</p>
+    <p class="done-hotel">{hotelName}</p>
+  </div>
+
+  <footer class="done-footer">
+    <a class="btn-done" href={`/g/${token}`} data-astro-reload style="text-decoration:none;display:block;text-align:center">{L.cta}</a>
+  </footer>
+</body>
+</html>
