@@ -75,6 +75,11 @@ const nightsRemaining = gateState === 'not_yet'
   ? Math.round((new Date(checkoutStr).getTime() - new Date(todayStr).getTime()) / 86400000)
   : 0;
 
+// Kalenderblatt-Teile (State A)
+const calWeekday = new Date(stay.check_out).toLocaleDateString(locale, { weekday: 'long',   timeZone: hotelTz });
+const calDay     = new Date(stay.check_out).toLocaleString('en-US',   { day:     'numeric', timeZone: hotelTz });
+const calMonth   = new Date(stay.check_out).toLocaleDateString(locale, { month:   'long',   timeZone: hotelTz });
+
 // Gäste-Vorname
 const guestName: string | null = (guest as any)?.first_name ?? null;
 
@@ -367,7 +372,38 @@ const L = labels[lk];
         color: var(--accent); margin: 0 0 10px; font-family: var(--display); line-height: 1.1;
       }
       .vis-value--sage { color: var(--success); }
-      .vis-hint { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+      .vis-hint { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; text-align: center; }
+
+      /* ── Kalenderblatt (State A) ── */
+      .cal-section { padding: 8px 0 32px; text-align: center; }
+      .cal-wrap { position: relative; width: 150px; margin: 0 auto 20px; }
+      .cal-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 18px; overflow: hidden;
+        box-shadow: 0 2px 14px rgba(0,0,0,0.07);
+      }
+      .cal-band { background: var(--accent); padding: 11px 16px 10px; text-align: center; }
+      .cal-weekday {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+        text-transform: uppercase; font-weight: 500; color: #fff;
+      }
+      .cal-body { padding: 14px 16px 18px; text-align: center; }
+      .cal-day {
+        font-family: var(--display); font-size: 64px; font-weight: 700;
+        line-height: 0.95; color: var(--ink); margin-bottom: 8px;
+      }
+      .cal-month {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+        text-transform: uppercase; color: var(--ink-muted);
+      }
+      .cal-moon {
+        position: absolute; top: -13px; right: -13px;
+        width: 38px; height: 38px; border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 3px var(--bg), 0 3px 8px rgba(0,0,0,0.15);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .cal-moon svg { width: 19px; height: 19px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
       /* ── Card ── */
       .card {
@@ -469,13 +505,8 @@ const L = labels[lk];
       .flash--err { background: #FFF0F0; border: 1px solid #F5C6C6; color: #8C2128; }
       .flash[hidden] { display: none; }
 
-      /* ── Footer ── */
-      .made-by {
-        margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
-        font-family: var(--mono); font-size: 10px;
-        color: #BBB; text-align: center; letter-spacing: 0.06em;
-      }
-      .made-by a { color: #888; text-decoration: none; }
+      /* ── Bottom border ── */
+      .page-end { margin-top: 48px; border-top: 1px solid var(--border); }
     </style>
   </head>
 
@@ -508,28 +539,38 @@ const L = labels[lk];
         <>
           <div class="hero g-hero-dot">
             <span class="eyebrow">{L.eyebrow}</span>
-            <h1 class="title">{L.titleA} <span class="accent">{L.titleAccentA}</span></h1>
+            <h1 class="title">
+              {L.titleA} <span class="accent">{nightsLabel(nightsRemaining)}</span>{guestName ? `, ${guestName}.` : '.'}
+            </h1>
             <p class="subtitle">{L.subA}</p>
           </div>
 
-          <div class="vis">
-            <div class="vis-pikto">
-              {/* Kalender-Icon */}
-              <svg viewBox="0 0 24 24">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8"  y1="2" x2="8"  y2="6"/>
-                <line x1="3"  y1="10" x2="21" y2="10"/>
-              </svg>
+          <div class="cal-section">
+            <div class="cal-wrap">
+              <div class="cal-card">
+                <div class="cal-band">
+                  <span class="cal-weekday">{calWeekday}</span>
+                </div>
+                <div class="cal-body">
+                  <div class="cal-day">{calDay}</div>
+                  <div class="cal-month">{calMonth}</div>
+                </div>
+              </div>
+              <div class="cal-moon">
+                <svg viewBox="0 0 24 24">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              </div>
             </div>
-            <div class="vis-label">{L.piktoLabelA}</div>
-            <div class="vis-value">{L.piktoValueA}</div>
-            <p class="vis-hint">{L.piktoHintA}</p>
+            <p class="vis-hint" style="padding: 0 12px;">{L.piktoHintA}</p>
           </div>
 
           <div class="cta">
-            <a href={backHref} class="btn-secondary" data-astro-reload>
-              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            <a href={backHref} class="btn-primary" data-astro-reload>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
               {L.backBtn}
             </a>
           </div>
@@ -689,9 +730,7 @@ const L = labels[lk];
         </>
       )}
 
-      <div class="made-by">
-        powered by <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a>
-      </div>
+      <div class="page-end"></div>
     </div>
 
     <script is:inline define:vars={{ token }}>
