@@ -3,6 +3,7 @@ import { loadStayByToken, loadBookingsForStay } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
+import PreArrivalGate from '../../components/PreArrivalGate.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import { isModuleAvailable } from '../../lib/plan-modules';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
@@ -408,6 +409,20 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   new Date(stay.check_out).toDateString() === new Date().toDateString() ? 'checking_out' :
   'in_house';
 
+// Gate-Strecke: Pre-Checkin Status + Soft-Skip Cookie
+let gatePreCheckinCompleted = false;
+if (stayPersona === 'pre_arrival' && !isShowcase) {
+  const { data: _pcRow } = await sbSr
+    .from('stay_pre_checkin')
+    .select('status')
+    .eq('stay_id', stay.id)
+    .maybeSingle();
+  gatePreCheckinCompleted = (_pcRow as any)?.status === 'completed';
+}
+const gateSkipped = !isShowcase && Astro.cookies.get('gate_skip')?.value === 'true';
+const gateState: 'default' | 'skipped' | 'completed' =
+  gatePreCheckinCompleted ? 'completed' : gateSkipped ? 'skipped' : 'default';
+
 ---
 
 <!DOCTYPE html>
@@ -419,6 +434,19 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
     <title>{hotel.name} · {greetingName}</title>
   </head>
   <body class={`gate-guest gate-theme-${activeTheme}`}>
+    {stayPersona === 'pre_arrival' ? (
+      <PreArrivalGate
+        token={token!}
+        guestName={guest?.first_name ?? null}
+        hotelName={(hotel as any)?.name ?? ''}
+        heroImageUrl={hotelHeroBg}
+        logoUrl={(hotelGeoRow as any)?.logo_primary ?? (hotel as any)?.logo_primary ?? null}
+        brandPrimary={brandPrimary ?? '#6982cf'}
+        gateState={gateState}
+        checkInLabel={checkInLabel}
+        lang={lang}
+      />
+    ) : (
     <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
@@ -789,8 +817,9 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         <WalletAddSheet lang={lang} hotelName={hotel.name} />
       )}
     </main>
+    )} {/* /gate-else: pre_arrival renders PreArrivalGate instead */}
 
-    <ConsentModule stayToken={token} />
+    {stayPersona !== 'pre_arrival' && <ConsentModule stayToken={token} />}
 
     <script>
       import Alpine from 'alpinejs';
