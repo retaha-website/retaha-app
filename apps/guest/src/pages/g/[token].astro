@@ -147,7 +147,9 @@ const { stay, guest, room, hotel, settings } = ctx;
 // Pattern (/api/pair?token=...). Eve-Chat (/api/eve/chat) braucht den Cookie.
 const existingSession = await getStaySession(Astro.cookies);
 const isShowcase = !!showcaseSession;
-if (!existingSession || existingSession.stay_id !== stay.id || !!existingSession.is_showcase !== isShowcase) {
+// ?_preview=1 → eingebettete Gate-Vorschau im Live-Iframe: kein Cookie-Override
+const isPreviewEmbed = Astro.url.searchParams.get('_preview') === '1';
+if (!isPreviewEmbed && (!existingSession || existingSession.stay_id !== stay.id || !!existingSession.is_showcase !== isShowcase)) {
   await setStaySessionCookie(Astro.cookies, {
     stay_id: stay.id,
     hotel_id: hotel.id,
@@ -427,6 +429,29 @@ const gateState: 'default' | 'skipped' | 'completed' =
 // default/completed → PreArrivalGate (Welcome oder Bis-bald)
 const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipped';
 
+// Live-iframe für Device-Mockup: Hotel-Showcase in in_house-Persona
+// Nur für echte Gäste (nicht wenn self = showcase), nur wenn Gate sichtbar ist.
+let gatePreviewUrl: string | null = null;
+if (showPreArrivalGate && !isShowcase) {
+  const { data: existingShowcase } = await sbSr
+    .from('showcase_sessions')
+    .select('token')
+    .eq('hotel_id', hotel.id)
+    .eq('is_active', true)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existingShowcase?.token) {
+    const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
+    const slug = (hotel as any).slug ?? null;
+    const base = slug
+      ? `https://${slug}.${domain}/g/${existingShowcase.token}`
+      : `https://app.${domain}/g/${existingShowcase.token}`;
+    gatePreviewUrl = `${base}?persona=in_house&_preview=1`;
+  }
+}
+
 ---
 
 <!DOCTYPE html>
@@ -459,6 +484,7 @@ const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipp
         gateState={gateState === 'completed' ? 'completed' : 'default'}
         checkInLabel={checkInLabel}
         lang={lang}
+        previewUrl={gatePreviewUrl}
       />
     ) : (
     <main x-data="guestPage" x-cloak>

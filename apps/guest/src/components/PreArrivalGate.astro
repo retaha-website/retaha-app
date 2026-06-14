@@ -12,11 +12,12 @@ interface Props {
   gateState: 'default' | 'completed';
   checkInLabel: string;
   lang: string;
+  previewUrl: string | null;
 }
 
 const {
   token, guestName, hotelName, heroImageUrl, logoUrl,
-  brandPrimary, gateState, checkInLabel, lang,
+  brandPrimary, gateState, checkInLabel, lang, previewUrl,
 } = Astro.props;
 
 const fn = guestName ?? '';
@@ -236,42 +237,54 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
         <div class="wc-glow wc-glow-b"></div>
 
         <div class="wc-device">
-          <div class="wc-scr">
-            {/* Dynamic Island */}
+          <div class="wc-scr" id="wc-scr">
+            {/* Dynamic Island always on top */}
             <div class="wc-island"></div>
 
-            {/* Hero-Streifen */}
-            <div
-              class="wc-ph"
-              style={heroSafe ? `--hero:url('${heroSafe}')` : undefined}
-            >
-              <div class="wc-ph-over"></div>
-              <div class="wc-ph-hi">
-                <span class="wc-ph-eyebrow">{txt.eyebrow}</span>
-                <span class="wc-ph-name">{txt.mockGreet}</span>
+            {previewUrl ? (
+              <div class="wc-if-wrap" aria-hidden="true">
+                <iframe
+                  id="wc-if"
+                  src={previewUrl}
+                  class="wc-if"
+                  title=""
+                  tabindex="-1"
+                  loading="lazy"
+                ></iframe>
               </div>
-            </div>
-
-            {/* In-App-Teaser */}
-            <div class="wc-in">
-              <div class="wc-eve-row">
-                <div class="wc-ev-av">E</div>
-                <div class="wc-ev-bubble">{txt.eveMsg}</div>
+            ) : (
+              <div class="wc-static">
+                <div
+                  class="wc-ph"
+                  style={heroSafe ? `--hero:url('${heroSafe}')` : undefined}
+                >
+                  <div class="wc-ph-over"></div>
+                  <div class="wc-ph-hi">
+                    <span class="wc-ph-eyebrow">{txt.eyebrow}</span>
+                    <span class="wc-ph-name">{txt.mockGreet}</span>
+                  </div>
+                </div>
+                <div class="wc-in">
+                  <div class="wc-eve-row">
+                    <div class="wc-ev-av">E</div>
+                    <div class="wc-ev-bubble">{txt.eveMsg}</div>
+                  </div>
+                  <div class="wc-chips">
+                    <span class="wc-chip">{txt.chip1}</span>
+                    <span class="wc-chip">{txt.chip2}</span>
+                  </div>
+                  <div class="wc-input-bar">
+                    <span class="wc-input-txt">{txt.eveInput}</span>
+                    <span class="wc-input-send" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                      </svg>
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div class="wc-chips">
-                <span class="wc-chip">{txt.chip1}</span>
-                <span class="wc-chip">{txt.chip2}</span>
-              </div>
-              <div class="wc-input-bar">
-                <span class="wc-input-txt">{txt.eveInput}</span>
-                <span class="wc-input-send" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"/>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                  </svg>
-                </span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -409,12 +422,41 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
   }
 
   .wc-scr {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: inherit;
+    background: #0f1014;
+  }
+
+  /* Live-iframe (PhoneFrame-Muster) */
+  .wc-if-wrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+  .wc-if {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 390px;
+    height: 844px;
+    border: none;
+    pointer-events: none;
+    transform-origin: top left;
+    transform: scale(0.508);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  /* Statischer Fallback-Teaser */
+  .wc-static {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    border-radius: inherit;
   }
 
   /* Dynamic Island */
@@ -757,8 +799,32 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     .wc-cta     { animation: none; opacity: 1; }
     .wc-check-circle { animation: none; opacity: 1; transform: none; }
     .wc-check-glow   { animation: none; opacity: .5; }
+    .wc-if { transition: none; }
   }
 </style>
+
+{/* Iframe-Scale + Fade-in: responsive scale auf Geräte-Breite */}
+<script>
+  (function () {
+    var scr = document.getElementById('wc-scr');
+    var iframeEl = document.getElementById('wc-if');
+    if (!scr || !iframeEl) return;
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function setScale() {
+      iframeEl.style.transform = 'scale(' + (scr.offsetWidth / 390) + ')';
+    }
+    setScale();
+    window.addEventListener('resize', setScale, { passive: true });
+
+    if (reduced) {
+      iframeEl.style.opacity = '1';
+    } else {
+      iframeEl.addEventListener('load', function () { iframeEl.style.opacity = '1'; });
+    }
+  })();
+</script>
 
 {/* Slide + Skip JS — nur für Default-State */}
 {!isCompleted && (
