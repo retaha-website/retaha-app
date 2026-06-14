@@ -385,6 +385,12 @@ if (stayEnded) {
 }
 const showPostStay = stayEnded && !hasStayFeedback;
 
+// Pre-Checkin Tile: sichtbar bis physischer Check-in durch Rezeption (checked_in_at IS NULL)
+const { data: _stayMeta } = !isShowcase
+  ? await sbSr.from('stays').select('checked_in_at').eq('id', stay.id).maybeSingle()
+  : { data: null };
+const stayCheckedInAt: string | null = (_stayMeta as any)?.checked_in_at ?? null;
+
 // Stay-Persona für Welcome-Screen (pre_arrival / in_house / checking_out)
 const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   Date.parse(stay.check_in) > Date.now() ? 'pre_arrival' :
@@ -586,7 +592,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         </div>
 
         <div class="gate-grid">
-          {Date.parse(stay.check_in) > Date.now() && avail('pre_checkin') && f.pre_checkin !== false && (
+          {!stayCheckedInAt && avail('pre_checkin') && f.pre_checkin !== false && (
             <a class="gate-tile" href={`/g/${token}/pre-checkin`} data-astro-reload style="text-decoration:none;color:inherit">
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">

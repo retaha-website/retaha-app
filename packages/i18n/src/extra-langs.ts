@@ -68,7 +68,9 @@ export const UI_STRINGS_EXTRA = {
     'places.more_nearby': 'SCOPRI DI PIÙ IN ZONA',
     'places.no_nearby': 'Le raccomandazioni automatiche sono in fase di configurazione.',
     'places.show_more': 'Mostra di più',
-    'places.distance_minutes': '{n} min a piedi'
+    'places.distance_minutes': '{n} min a piedi',
+    'tile.precheckin': 'Pre-registrazione',
+    'tile.precheckin.sub': "2 min · prima dell'arrivo"
   },
   pt: {
     'hero.kicker': 'Bem-vindo novamente',
@@ -135,7 +137,9 @@ export const UI_STRINGS_EXTRA = {
     'places.tab.bar': 'Bares',
     'places.tab.activity': 'Atividades',
     'places.tab.sight': 'Atrações',
-    'places.our_favorites': 'NOSSOS FAVORITOS'
+    'places.our_favorites': 'NOSSOS FAVORITOS',
+    'tile.precheckin': 'Pré-registo',
+    'tile.precheckin.sub': '2 min · antes da chegada'
   },
   nl: {
     'hero.kicker': 'Welkom terug',
@@ -202,7 +206,9 @@ export const UI_STRINGS_EXTRA = {
     'places.our_favorites': 'ONZE FAVORIETEN',
     'places.no_picks': 'Nog geen favorieten in deze categorie.',
     'places.more_nearby': 'MEER ONTDEKKEN IN DE BUURT',
-    'places.no_nearby': 'Auto-aanbevelingen worden momenteel opgebouwd.'
+    'places.no_nearby': 'Auto-aanbevelingen worden momenteel opgebouwd.',
+    'tile.precheckin': 'Pre-registratie',
+    'tile.precheckin.sub': '2 min · voor aankomst'
   },
   ru: {
     'hero.kicker': 'Добро пожаловать назад',
@@ -269,7 +275,9 @@ export const UI_STRINGS_EXTRA = {
     'places.tab.activity': 'Мероприятия',
     'places.our_favorites': 'НАШИ ФАВОРИТЫ',
     'places.no_picks': 'В этой категории избранного пока нет.',
-    'places.no_nearby': 'Рекомендации загружаются.'
+    'places.no_nearby': 'Рекомендации загружаются.',
+    'tile.precheckin': 'Предрегистрация',
+    'tile.precheckin.sub': '2 мин · до приезда'
   },
   ar: {
     'hero.greeting': 'مرحبا',
@@ -336,7 +344,9 @@ export const UI_STRINGS_EXTRA = {
     'places.tab.bar': 'الحانات',
     'places.tab.activity': 'الأنشطة',
     'places.our_favorites': 'المفضلة لدينا',
-    'places.no_nearby': 'جاري إعداد التوصيات التلقائية.'
+    'places.no_nearby': 'جاري إعداد التوصيات التلقائية.',
+    'tile.precheckin': 'التسجيل المسبق',
+    'tile.precheckin.sub': 'دقيقتان · قبل الوصول'
   },
   zh: {
     'hero.kicker': '欢迎回来',
@@ -403,6 +413,8 @@ export const UI_STRINGS_EXTRA = {
     'places.tab.activity': '活动',
     'places.tab.sight': '景点',
     'places.our_favorites': '我们的最爱',
-    'places.more_nearby': '在附近探索更多'
+    'places.more_nearby': '在附近探索更多',
+    'tile.precheckin': '预登记',
+    'tile.precheckin.sub': '2分钟 · 入住前'
   }
 } as const;
