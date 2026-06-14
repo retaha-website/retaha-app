@@ -42,199 +42,181 @@ const allLabels: Record<string, LG> = {
 const lg = allLabels[lang] ?? allLabels.de;
 const L = lg[gateState];
 
-const heroStyle = heroImageUrl
-  ? `url('${heroImageUrl.replace(/'/g, "\\'")}')`
-  : 'none';
+const heroUrl = heroImageUrl ?? '';
 ---
 
-{/* Update theme-color so status bar blends into the dark photo */}
-<script is:inline>
-  (function() {
-    var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', '#16181c');
-  })();
-</script>
-
+<!-- Layer 0: Foto — kein Padding, deckt Statusbar/Notch vollständig -->
 <div
-  class="screen"
-  style={`--accent:${brandPrimary};--hero:${heroStyle};`}
->
-  <!-- Inner layout: flex-col, fills full viewport height -->
-  <div class="inner">
+  class="gate-photo"
+  style={heroUrl ? `background-image:url('${heroUrl.replace(/'/g, "\\'")}')` : undefined}
+  aria-hidden="true"
+></div>
 
-    <!-- Logo -->
-    <div class="logo">
-      {logoUrl ? (
-        <img src={logoUrl} alt={hotelName} />
-      ) : (
-        <span class="logo-name">{hotelName}</span>
-      )}
-    </div>
+<!-- Layer 1: Gradient-Overlay -->
+<div class="gate-overlay" aria-hidden="true"></div>
 
-    <!-- Greeting -->
-    <div class="ptitle">{L.title}</div>
-    <div class="psub">{L.sub}</div>
+<!-- Layer 2: Inhalt — NUR hier lebt das Safe-Area-Padding -->
+<div class="gate-content" style={`--accent:${brandPrimary};`}>
 
-    <!-- Cards pushed to bottom via margin-top:auto on .cards -->
-    <div class="cards">
+  <!-- Logo -->
+  <div class="logo">
+    {logoUrl ? (
+      <img src={logoUrl} alt={hotelName} />
+    ) : (
+      <span class="logo-name">{hotelName}</span>
+    )}
+  </div>
 
-      {/* ── Default: Voranmeldung dominant ── */}
-      {gateState === 'default' && (
-        <a class="glasscard primary" href={`/g/${token}/pre-checkin`} data-astro-reload>
-          <span class="gi" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2.5"/>
-              <circle cx="8.5" cy="11" r="2"/>
-              <path d="M13.5 9.5h4.5M13.5 12.5h4.5M6.5 15.5h6"/>
-            </svg>
-          </span>
-          <span class="gtxt">
-            <div class="geyebrow">Vor der Anreise</div>
-            <div class="gt">Online voranmelden</div>
-            <div class="gs">Spart Zeit beim Check-in</div>
-          </span>
-          <span class="gchev" aria-hidden="true">›</span>
-        </a>
-      )}
+  <!-- Greeting -->
+  <div class="ptitle">{L.title}</div>
+  <div class="psub">{L.sub}</div>
 
-      {/* ── Skipped: Reminder als Primärkarte, column-layout ── */}
-      {gateState === 'skipped' && (
-        <a class="glasscard primary col" href={`/g/${token}/pre-checkin`} data-astro-reload>
-          <div class="geyebrow">Anmeldung noch offen</div>
-          <div class="gt">Jetzt online voranmelden</div>
-          <div class="gs">2 Minuten — schnellerer Check-in, kein Papierkram an der Rezeption.</div>
-        </a>
-      )}
+  <!-- Cards: margin-top:auto drückt sie ans Seitenende -->
+  <div class="cards">
 
-      {/* ── Completed: Kompakte Erledigtkarte ── */}
-      {gateState === 'completed' && (
-        <div class="glasscard done">
-          <span class="done-check" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </span>
-          <span class="gtxt">
-            <div class="gt">Anmeldung erledigt</div>
-            <div class="gs">Check-in am {checkInLabel}</div>
-          </span>
-        </div>
-      )}
-
-      <!-- Anfahrt & Check-in -->
-      <a class="glasscard" href={`/g/${token}/anfahrt`} data-astro-reload>
+    {/* ── Default: Voranmeldung dominant ── */}
+    {gateState === 'default' && (
+      <a class="glasscard primary" href={`/g/${token}/pre-checkin`} data-astro-reload>
         <span class="gi" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"/>
-            <circle cx="12" cy="9" r="2.3"/>
+            <rect x="3" y="5" width="18" height="14" rx="2.5"/>
+            <circle cx="8.5" cy="11" r="2"/>
+            <path d="M13.5 9.5h4.5M13.5 12.5h4.5M6.5 15.5h6"/>
           </svg>
         </span>
         <span class="gtxt">
-          <div class="gt">Anfahrt &amp; Check-in</div>
-          <div class="gs">Route &amp; Zeiten</div>
+          <div class="geyebrow">Vor der Anreise</div>
+          <div class="gt">Online voranmelden</div>
+          <div class="gs">Spart Zeit beim Check-in</div>
         </span>
         <span class="gchev" aria-hidden="true">›</span>
       </a>
+    )}
 
-      <!-- Frühstück -->
-      <a class="glasscard" href={`/g/${token}/fruehstueck`} data-astro-reload>
-        <span class="gi" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/>
-            <path d="M16 9h2.4a2 2 0 0 1 0 5H16"/>
-            <path d="M7.5 3v2M11 3v2"/>
+    {/* ── Skipped: Reminder als Primärkarte, column-layout ── */}
+    {gateState === 'skipped' && (
+      <a class="glasscard primary col" href={`/g/${token}/pre-checkin`} data-astro-reload>
+        <div class="geyebrow">Anmeldung noch offen</div>
+        <div class="gt">Jetzt online voranmelden</div>
+        <div class="gs">2 Minuten — schnellerer Check-in, kein Papierkram an der Rezeption.</div>
+      </a>
+    )}
+
+    {/* ── Completed: Kompakte Erledigtkarte ── */}
+    {gateState === 'completed' && (
+      <div class="glasscard done">
+        <span class="done-check" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
           </svg>
         </span>
         <span class="gtxt">
-          <div class="gt">Frühstück</div>
-          <div class="gs">Zeiten &amp; Infos</div>
+          <div class="gt">Anmeldung erledigt</div>
+          <div class="gs">Check-in am {checkInLabel}</div>
         </span>
-        <span class="gchev" aria-hidden="true">›</span>
-      </a>
+      </div>
+    )}
 
-      <!-- Wünsche vorab -->
-      <a class="glasscard" href={`/g/${token}/requests`} data-astro-reload>
-        <span class="gi" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-          </svg>
-        </span>
-        <span class="gtxt">
-          <div class="gt">Wünsche vorab</div>
-          <div class="gs">Präferenzen mitteilen</div>
-        </span>
-        <span class="gchev" aria-hidden="true">›</span>
-      </a>
+    <!-- Anfahrt & Check-in -->
+    <a class="glasscard" href={`/g/${token}/anfahrt`} data-astro-reload>
+      <span class="gi" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"/>
+          <circle cx="12" cy="9" r="2.3"/>
+        </svg>
+      </span>
+      <span class="gtxt">
+        <div class="gt">Anfahrt &amp; Check-in</div>
+        <div class="gs">Route &amp; Zeiten</div>
+      </span>
+      <span class="gchev" aria-hidden="true">›</span>
+    </a>
 
-      {/* Soft-skip: Liquid-Glass Pill */}
-      {gateState === 'default' && (
-        <button
-          class="glassbtn"
-          type="button"
-          onclick="fetch('/api/g/gate-skip',{method:'POST',credentials:'same-origin'}).then(()=>location.reload())"
-        >
-          Später erledigen &rarr;
-        </button>
-      )}
-    </div>
+    <!-- Frühstück -->
+    <a class="glasscard" href={`/g/${token}/fruehstueck`} data-astro-reload>
+      <span class="gi" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/>
+          <path d="M16 9h2.4a2 2 0 0 1 0 5H16"/>
+          <path d="M7.5 3v2M11 3v2"/>
+        </svg>
+      </span>
+      <span class="gtxt">
+        <div class="gt">Frühstück</div>
+        <div class="gs">Zeiten &amp; Infos</div>
+      </span>
+      <span class="gchev" aria-hidden="true">›</span>
+    </a>
+
+    <!-- Wünsche vorab -->
+    <a class="glasscard" href={`/g/${token}/requests`} data-astro-reload>
+      <span class="gi" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+      </span>
+      <span class="gtxt">
+        <div class="gt">Wünsche vorab</div>
+        <div class="gs">Präferenzen mitteilen</div>
+      </span>
+      <span class="gchev" aria-hidden="true">›</span>
+    </a>
+
+    {/* Soft-skip: Liquid-Glass Pill */}
+    {gateState === 'default' && (
+      <button
+        class="glassbtn"
+        type="button"
+        onclick="fetch('/api/g/gate-skip',{method:'POST',credentials:'same-origin'}).then(()=>location.reload())"
+      >
+        Später erledigen &rarr;
+      </button>
+    )}
   </div>
 </div>
 
 <style>
-  /* ── Full-bleed photo screen ── */
-  .screen {
+  /* ── Layer 0: Foto — fixed, kein Padding, Vollbild bis Statusbar/Notch ── */
+  .gate-photo {
     position: fixed;
     inset: 0;
-    z-index: 50;
-    overflow-y: auto;
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
-    background: #16181c;
-    color: #fff;
-  }
-
-  /* Photo layer */
-  .screen::before {
-    content: '';
-    position: fixed;
-    inset: 0;
+    z-index: 0;
     background-color: #16181c;
-    background-image: var(--hero);
     background-size: cover;
     background-position: center;
-    z-index: 0;
+    background-repeat: no-repeat;
   }
 
-  /* Gradient overlay — bright middle so the photo shows, dark top+bottom for text */
-  .screen::after {
-    content: '';
+  /* ── Layer 1: Gradient-Overlay — fixed, z darüber ── */
+  .gate-overlay {
     position: fixed;
     inset: 0;
     z-index: 1;
     background: linear-gradient(
       180deg,
-      rgba(8, 10, 14, 0.46) 0%,
+      rgba(8, 10, 14, 0.42) 0%,
       rgba(8, 10, 14, 0.10) 22%,
       rgba(8, 10, 14, 0.00) 42%,
-      rgba(8, 10, 14, 0.52) 72%,
-      rgba(8, 10, 14, 0.78) 100%
+      rgba(8, 10, 14, 0.55) 72%,
+      rgba(8, 10, 14, 0.74) 100%
     );
   }
 
-  /* Content container */
-  .inner {
+  /* ── Layer 2: Inhalt — NUR hier das Safe-Area-Padding ── */
+  .gate-content {
     position: relative;
     z-index: 2;
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
     padding:
-      max(54px, calc(env(safe-area-inset-top, 0px) + 16px))
+      max(20px, env(safe-area-inset-top))
       22px
-      calc(env(safe-area-inset-bottom, 0px) + 28px);
+      max(20px, env(safe-area-inset-bottom));
     max-width: 430px;
     margin: 0 auto;
     box-sizing: border-box;
+    color: #fff;
   }
 
   /* ── Logo ── */
@@ -350,7 +332,7 @@ const heroStyle = heroImageUrl
     line-height: 1;
   }
 
-  /* ── Primary card (Voranmeldung / Reminder) ── */
+  /* ── Primary card ── */
   .glasscard.primary {
     border-color: color-mix(in srgb, var(--accent) 60%, rgba(255, 255, 255, 0.15));
     background: color-mix(in srgb, var(--accent) 17%, rgba(26, 28, 34, 0.52));
