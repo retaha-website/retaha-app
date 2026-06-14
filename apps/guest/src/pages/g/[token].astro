@@ -62,7 +62,10 @@ if (token && isShowcaseToken(token)) {
     ]);
     if (hotelRow) {
       // Persona-aware demo dates (nur für showcase_ tokens)
-      const _persona = new URL(Astro.request.url).searchParams.get('persona') ?? 'in_house';
+      // URL-Param hat Vorrang; Cookie als Fallback für Back-Navigation innerhalb der App
+      const _urlPersona = new URL(Astro.request.url).searchParams.get('persona');
+      const _cookiePersona = Astro.cookies.get('showcase_persona')?.value ?? null;
+      const _persona = _urlPersona ?? _cookiePersona ?? 'in_house';
       const now = new Date();
       let _checkIn: Date, _checkOut: Date;
       if (_persona === 'arrival') {
@@ -97,6 +100,13 @@ if (token && isShowcaseToken(token)) {
         hotel: hotelRow,
         settings: settingsRow ?? {},
       };
+      // Persist persona in cookie so back-navigation within the app keeps the right phase
+      Astro.cookies.set('showcase_persona', _persona, {
+        path: '/',
+        maxAge: 3600,
+        sameSite: 'lax',
+        httpOnly: true,
+      });
     }
   }
 } else {
@@ -434,6 +444,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           roomLabel={t('hero.stay.room', lang as Lang)}
           weather={weather}
           persona={stayPersona}
+          preCheckinAvailable={!stayCheckedInAt && avail('pre_checkin') && f.pre_checkin !== false}
         />
       )}
 
