@@ -44,12 +44,15 @@ function rangeFor(days: string[]): string | null {
 const weekdayRange = rangeFor(['mon','tue','wed','thu','fri']);
 const weekendRange = rangeFor(['sat','sun']);
 
-// Fallback: global Zeiten
+// Wenn alle 7 Tage identische Zeiten → eine "Täglich"-Zeile statt zwei identischer
+const allDaysRange = rangeFor(['mon','tue','wed','thu','fri','sat','sun']);
+
+// Fallback: global Zeiten aus Spalten
 const globalRange = (settings.breakfast_start_time && settings.breakfast_end_time)
-  ? `${settings.breakfast_start_time} – ${settings.breakfast_end_time}`
+  ? `${settings.breakfast_start_time.slice(0, 5)} – ${settings.breakfast_end_time.slice(0, 5)}`
   : null;
 
-const hasAnyTime = weekdayRange || weekendRange || globalRange;
+const hasAnyTime = allDaysRange || weekdayRange || weekendRange || globalRange;
 
 // Standort aus i18n-Spalten oder features
 const location = pickI18n((settings as any).breakfast_location_i18n, hotelDefaultLang as any, lang as any)
@@ -180,7 +183,12 @@ const L = labels[lang];
           <div class="chip-included">{L.included}</div>
         )}
 
-        {weekdayRange ? (
+        {allDaysRange ? (
+          <div class="time-row">
+            <span class="time-label">{L.allDays}</span>
+            <span class="time-value">{allDaysRange}</span>
+          </div>
+        ) : weekdayRange ? (
           <>
             <div class="time-row">
               <span class="time-label">{L.weekday}</span>
