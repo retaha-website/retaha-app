@@ -18,18 +18,56 @@ import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import '@retaha/ui-guest/base';
+import QRCode from 'qrcode';
+import { isWalletConfigured } from '@retaha/wallet';
+import { isModuleAvailable } from '../../../lib/plan-modules';
+import { buildGuestStayUrl } from '../../../lib/qr/base-url';
+import PostStaySheet from '../../../components/sheets/PostStaySheet.astro';
 
 const { token } = Astro.params;
 if (!token) return new Response('Token fehlt', { status: 400 });
 
-const ctx = await loadStayByToken(token);
-if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+let ctx: any = await loadStayByToken(token);
+let isCompletedStay = false;
+let completedCheckedOutAt: string | null = null;
+
+if (!ctx) {
+  // Ausgecheckter Stay: is_active=false, aber checked_out_at gesetzt — Success-Screen zeigen
+  const sbSrInit = createSupabaseServiceRoleInstance();
+  const { data: cRow } = await sbSrInit
+    .from('stays')
+    .select(`
+      id, check_in, check_out, is_active, checked_out_at,
+      guest:guests(id, first_name, last_name, language, visit_count),
+      room:rooms(id, room_number, room_name),
+      hotel:hotels(id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, brand_primary, currency, plan, addons, phone, timezone)
+    `)
+    .eq('access_token', token)
+    .not('checked_out_at', 'is', null)
+    .maybeSingle();
+
+  if (cRow?.hotel) {
+    const { data: cSettings } = await sbSrInit
+      .from('hotel_settings').select('features').eq('hotel_id', (cRow.hotel as any).id).maybeSingle();
+    isCompletedStay = true;
+    completedCheckedOutAt = cRow.checked_out_at;
+    ctx = {
+      stay:     { id: cRow.id, check_in: cRow.check_in, check_out: cRow.check_out, is_active: false },
+      guest:    cRow.guest,
+      room:     cRow.room,
+      hotel:    cRow.hotel,
+      settings: cSettings ?? { features: {} },
+    };
+  } else {
+    return new Response('Aufenthalt nicht gefunden', { status: 404 });
+  }
+}
 
 const { stay, guest, hotel, settings } = ctx;
 
-// Feature-Gate
+// Feature-Gate — ausgecheckte Stays dürfen den Success-Screen immer sehen
 const features = (settings?.features ?? {}) as Record<string, boolean>;
-if (features.self_checkout === false) return Astro.redirect(`/g/${token}`);
+if (!isCompletedStay && features.self_checkout === false) return Astro.redirect(`/g/${token}`);
 
 // Session
 const existingSession = await getStaySession(Astro.cookies);
@@ -92,8 +130,9 @@ let billItems: SimItem[] = [];
 let billCurrency: string = (hotel as any).currency ?? 'EUR';
 let billingError  = false;
 let alreadyCheckedOut = false;
+let checkedOutAtBilling: string | null = null;
 
-if (gateState !== 'not_yet') {
+if (gateState !== 'not_yet' && !isCompletedStay) {
   const sbSr = createSupabaseServiceRoleInstance();
   const { data: stayRow, error: stayRowErr } = await sbSr
     .from('stays')
@@ -105,6 +144,7 @@ if (gateState !== 'not_yet') {
     billingError = true;
   } else {
     alreadyCheckedOut = !!(stayRow as any).checked_out_at;
+    checkedOutAtBilling = (stayRow as any).checked_out_at ?? null;
     // TODO Mews live: Saldo aus Mews-API; _retaha_sim dann entfernen
     const sim: any = (stayRow as any)?.raw_mews_data?._retaha_sim ?? null;
     balanceCents = sim?.balance_cents ?? 0;
@@ -279,6 +319,70 @@ const labels: Record<LK, LabelSet> = {
   },
 };
 const L = labels[lk];
+
+// ── Zustand D — Success-Screen ───────────────────────────────────────────────
+const showSuccessScreen = isCompletedStay || alreadyCheckedOut;
+
+// Wallet-Verfügbarkeit
+const _hotelMeta = { plan: (hotel as any).plan ?? 'lite', addons: (hotel as any).addons ?? [] };
+const walletAvailable = isModuleAvailable(_hotelMeta, 'wallet')
+  && features.wallet !== false
+  && isWalletConfigured()
+  && !!(guest as any)?.email;
+
+// Checkout-Timestamp für Untertitel
+const _coAt = completedCheckedOutAt ?? checkedOutAtBilling;
+const successSubTitle = _coAt
+  ? (() => {
+      const d = new Date(_coAt);
+      const datePart = d.toLocaleDateString(locale, { day: '2-digit', month: 'long', timeZone: hotelTz });
+      const timePart = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: hotelTz });
+      const prefix = lk === 'de' ? 'Ausgecheckt' : lk === 'en' ? 'Checked out' : lk === 'fr' ? 'Départ' : 'Salida';
+      const suffix = lk === 'de' ? ' Uhr' : '';
+      return `${prefix} · ${datePart}, ${timePart}${suffix}`;
+    })()
+  : (lk === 'de' ? 'Gute Reise — wir freuen uns, dich bald wiederzusehen.'
+   : lk === 'en' ? 'Safe travels — we look forward to seeing you again.'
+   : lk === 'fr' ? 'Bon voyage — au plaisir de vous revoir bientôt.'
+   : '¡Buen viaje — esperamos verte de nuevo pronto!');
+
+// Success-Titel (prefix / accentWord)
+const successTitle = lk === 'de' ? { prefix: 'Gute',   accent: 'Heimreise' }
+                   : lk === 'en' ? { prefix: 'Safe',   accent: 'travels' }
+                   : lk === 'fr' ? { prefix: 'Bon',    accent: 'voyage' }
+                   :               { prefix: 'Buen',   accent: 'viaje' };
+
+// Wallet-Karte Texte
+const walletGuestLabel   = lk === 'de' ? 'GAST'     : lk === 'en' ? 'GUEST'   : lk === 'fr' ? 'HÔTE'    : 'HUÉSPED';
+const walletBenefitLabel = lk === 'de' ? 'VORTEIL'  : lk === 'en' ? 'BENEFIT' : lk === 'fr' ? 'AVANTAGE': 'VENTAJA';
+const walletBenefitValue = lk === 'de' ? 'Schneller einchecken'
+                         : lk === 'en' ? 'Faster check-in'
+                         : lk === 'fr' ? 'Check-in rapide'
+                         :               'Check-in rápido';
+const guestFullName = [(guest as any)?.first_name, (guest as any)?.last_name].filter(Boolean).join(' ') || '—';
+const hotelLogo: string | null = (hotel as any).logo_primary ?? null;
+const hotelInitial = ((hotel as any).name ?? '?').charAt(0).toUpperCase();
+
+// QR-Code für Wallet-Karte
+const walletQrUrl = buildGuestStayUrl(token, Astro.request.url);
+const walletQrDataUrl: string | null = showSuccessScreen
+  ? await QRCode.toDataURL(walletQrUrl, { errorCorrectionLevel: 'M', margin: 1, width: 160,
+      color: { dark: '#1A1A1A', light: '#FFFFFF' } }).catch(() => null)
+  : null;
+
+// CTA-Labels
+const walletBtnLabel = lk === 'de' ? 'Zu Wallet hinzufügen'
+                     : lk === 'en' ? 'Add to Wallet'
+                     : lk === 'fr' ? 'Ajouter au Wallet'
+                     :               'Añadir al Wallet';
+const reviewBtnLabel = lk === 'de' ? 'Aufenthalt bewerten'
+                     : lk === 'en' ? 'Rate your stay'
+                     : lk === 'fr' ? 'Évaluer le séjour'
+                     :               'Valorar estancia';
+const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammgast-Vorteile beim nächsten Mal.'
+                : lk === 'en' ? 'Take us with you — faster check-in & returning guest perks next time.'
+                : lk === 'fr' ? 'Emportez-nous — check-in rapide & avantages fidélité au prochain séjour.'
+                :               'Llévanos contigo — check-in rápido y ventajas para clientes habituales.';
 ---
 
 <!DOCTYPE html>
@@ -507,6 +611,56 @@ const L = labels[lk];
 
       /* ── Bottom border ── */
       .page-end { margin-top: 48px; border-top: 1px solid var(--border); }
+
+      /* ── Wallet-Karte (Zustand D) ── */
+      .wallet-float {
+        padding: 32px 0 20px; display: flex; justify-content: center; align-items: flex-start;
+      }
+      .wallet-card {
+        width: 248px;
+        background: var(--accent);
+        border-radius: 20px; padding: 18px 18px 14px;
+        box-shadow: 0 16px 48px rgba(0,0,0,0.22), 0 4px 14px rgba(0,0,0,0.12);
+        transform: rotate(-8deg);
+        color: #fff;
+      }
+      .wallet-hd { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+      .wallet-logo {
+        width: 30px; height: 30px; border-radius: 7px;
+        background: rgba(255,255,255,0.22);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        overflow: hidden;
+      }
+      .wallet-logo-img  { width: 100%; height: 100%; object-fit: contain; }
+      .wallet-logo-init { font-size: 14px; font-weight: 700; color: #fff; font-family: var(--display); }
+      .wallet-gaestepass {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
+        text-transform: uppercase; color: rgba(255,255,255,0.72); font-weight: 500;
+      }
+      .wallet-hotel {
+        font-family: var(--display); font-size: 18px; font-weight: 700; line-height: 1.15;
+        margin-bottom: 14px; color: #fff;
+      }
+      .wallet-fields { display: flex; gap: 14px; margin-bottom: 14px; }
+      .wallet-field  { flex: 1; min-width: 0; }
+      .wallet-field__label {
+        font-family: var(--mono); font-size: 7px; letter-spacing: 0.14em;
+        text-transform: uppercase; color: rgba(255,255,255,0.58); margin-bottom: 3px;
+      }
+      .wallet-field__value {
+        font-size: 12px; font-weight: 500; color: #fff; line-height: 1.2;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .wallet-qr { background: #fff; border-radius: 10px; padding: 7px; margin-bottom: 10px; }
+      .wallet-qr img { display: block; width: 100%; height: auto; }
+      .wallet-poweredby {
+        font-family: var(--mono); font-size: 8px; letter-spacing: 0.10em;
+        color: rgba(255,255,255,0.42); text-align: center;
+      }
+      .wallet-pitch {
+        font-size: 14px; color: var(--ink-muted); text-align: center; line-height: 1.5;
+        margin: 24px 0 0; padding: 0 8px;
+      }
     </style>
   </head>
 
@@ -520,20 +674,69 @@ const L = labels[lk];
 
     <div class="page">
 
-      {alreadyCheckedOut ? (
-        /* ── Bereits ausgecheckt ── */
-        <>
+      {showSuccessScreen ? (
+        /* ══ ZUSTAND D — Ausgecheckt (Success-Screen) ══════════════════════ */
+        <div x-data="checkoutSuccess">
           <div class="hero g-hero-dot">
             <span class="eyebrow">{L.eyebrow}</span>
-            <h1 class="title">{L.doneTitle}</h1>
-            <p class="subtitle">{L.doneSub}</p>
+            <h1 class="title">
+              {successTitle.prefix} <span class="accent">{successTitle.accent}</span>{guestName ? `, ${guestName}.` : '.'}
+            </h1>
+            <p class="subtitle">{successSubTitle}</p>
           </div>
-          <div class="vis">
-            <div class="vis-pikto vis-pikto--sage">
-              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+
+          <div class="wallet-float">
+            <div class="wallet-card">
+              <div class="wallet-hd">
+                <div class="wallet-logo">
+                  {hotelLogo
+                    ? <img src={hotelLogo} alt={(hotel as any).name} class="wallet-logo-img" />
+                    : <span class="wallet-logo-init">{hotelInitial}</span>
+                  }
+                </div>
+                <span class="wallet-gaestepass">GÄSTEPASS</span>
+              </div>
+              <div class="wallet-hotel">{(hotel as any).name}</div>
+              <div class="wallet-fields">
+                <div class="wallet-field">
+                  <div class="wallet-field__label">{walletGuestLabel}</div>
+                  <div class="wallet-field__value">{guestFullName}</div>
+                </div>
+                <div class="wallet-field">
+                  <div class="wallet-field__label">{walletBenefitLabel}</div>
+                  <div class="wallet-field__value">{walletBenefitValue}</div>
+                </div>
+              </div>
+              {walletQrDataUrl && (
+                <div class="wallet-qr">
+                  <img src={walletQrDataUrl} alt="QR" />
+                </div>
+              )}
+              <div class="wallet-poweredby">powered by retaha</div>
             </div>
           </div>
-        </>
+
+          <p class="wallet-pitch">{pitchText}</p>
+
+          <div class="cta">
+            {walletAvailable && (
+              <button class="btn-primary" id="wallet-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                </svg>
+                {walletBtnLabel}
+              </button>
+            )}
+            <button class="btn-secondary" id="review-btn" type="button" @click="postStayOpen = true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#EAB308" stroke="#EAB308" stroke-width="1">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              {reviewBtnLabel}
+            </button>
+          </div>
+
+          <PostStaySheet lang={lk} stayId={stay.id} hotelName={(hotel as any).name} />
+        </div>
       ) : gateState === 'not_yet' ? (
         /* ══ ZUSTAND A — Noch nicht ══════════════════════════════ */
         <>
@@ -733,6 +936,7 @@ const L = labels[lk];
     </div>
 
     <script is:inline define:vars={{ token }}>
+      // ── Checkout-Button (Zustand B) ────────────────────────────────────────
       const btn = document.getElementById('checkout-btn');
       const flashErr = document.getElementById('flash-err');
       if (btn) {
@@ -747,7 +951,6 @@ const L = labels[lk];
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-              // Reload so server renders alreadyCheckedOut state
               window.location.reload();
             } else {
               throw new Error(data.error || 'checkout failed');
@@ -761,6 +964,64 @@ const L = labels[lk];
           }
         });
       }
+
+      // ── Wallet-Button (Zustand D) ──────────────────────────────────────────
+      const walletBtn = document.getElementById('wallet-btn');
+      if (walletBtn) {
+        walletBtn.addEventListener('click', async () => {
+          walletBtn.disabled = true;
+          try {
+            const res  = await fetch('/api/g/wallet/create', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data.ok && data.save_link_url) {
+              window.location.href = data.save_link_url;
+            } else {
+              walletBtn.disabled = false;
+            }
+          } catch {
+            walletBtn.disabled = false;
+          }
+        });
+      }
+
+      // ── Alpine-Daten für PostStaySheet (Zustand D) ────────────────────────
+      document.addEventListener('alpine:init', () => {
+        Alpine.data('checkoutSuccess', () => ({
+          postStayOpen:       false,
+          postStayRating:     0,
+          postStayHover:      0,
+          postStayComment:    '',
+          postStaySubmitting: false,
+          postStayDone:       false,
+          postStayError:      '',
+          postStayDismiss() { this.postStayOpen = false; },
+          async postStaySubmit() {
+            if (!this.postStayRating || this.postStaySubmitting) return;
+            this.postStaySubmitting = true;
+            this.postStayError = '';
+            try {
+              const res  = await fetch('/api/g/stay-feedback', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  rating:  this.postStayRating,
+                  comment: this.postStayComment.trim() || undefined,
+                }),
+              });
+              const data = await res.json();
+              if (!data.ok) { this.postStayError = data.error || 'unknown'; return; }
+              this.postStayDone = true;
+            } catch (err) {
+              this.postStayError = err instanceof Error ? err.message : 'network';
+            } finally {
+              this.postStaySubmitting = false;
+            }
+          },
+        }));
+      });
     </script>
   </body>
 </html>
