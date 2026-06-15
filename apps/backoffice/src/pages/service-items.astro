@@ -12,17 +12,24 @@ if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const supabase = createSupabaseServiceRoleInstance();
 
-const { data: settings } = await supabase
-  .from('hotel_settings')
-  .select('features, service_items, service_hours, service_start_time, service_end_time')
-  .eq('hotel_id', hotel.id)
-  .maybeSingle();
+const [{ data: settings }, { data: hotelRow }] = await Promise.all([
+  supabase
+    .from('hotel_settings')
+    .select('features, service_items, service_hours, service_start_time, service_end_time')
+    .eq('hotel_id', hotel.id)
+    .maybeSingle(),
+  supabase
+    .from('hotels')
+    .select('default_language')
+    .eq('id', hotel.id)
+    .maybeSingle(),
+]);
 
 const s = settings || ({} as Record<string, any>);
-const features   = ((s.features as Record<string, unknown>) ?? {});
-const serviceOn  = features.service !== false;
-const startTime  = ((s.service_start_time as string | undefined) || '08:00').substring(0, 5);
-const endTime    = ((s.service_end_time   as string | undefined) || '22:00').substring(0, 5);
+const features  = ((s.features as Record<string, unknown>) ?? {});
+const serviceOn = features.service !== false;
+const startTime = ((s.service_start_time as string | undefined) || '08:00').substring(0, 5);
+const endTime   = ((s.service_end_time   as string | undefined) || '22:00').substring(0, 5);
 
 const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const rawServiceHours = (s.service_hours as Record<string, any> | null | undefined) ?? null;
@@ -36,23 +43,32 @@ for (const day of WEEK_DAYS) {
   };
 }
 
-const items = ((s.service_items as any[]) ?? []);
+const defaultLang = (hotelRow?.default_language as string | undefined) || 'de';
+const LANG_LABELS: Record<string, string> = { de: 'Deutsch', en: 'Englisch', fr: 'Français', es: 'Español' };
+const langLabel = LANG_LABELS[defaultLang] ?? 'Deutsch';
+
+const rawItems = ((s.service_items as any[]) ?? []);
+// Extract source-lang value for display; preserve DB id as _orig_id for delta translation
+const itemsDisplay = rawItems.map((item: any) => ({
+  _orig_id:    item.id || '',
+  name:        item[`name_${defaultLang}`] || item.name_de || '',
+  description: item[`description_${defaultLang}`] || item.description_de || '',
+  icon:        item.icon || 'bell',
+}));
 
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 ---
 
 <Layout title="Service-Items" activeTab="backoffice" hotelName={hotel.name}>
 
-<script is:inline define:vars={{ _siInit: { hours: initialHours, items, serviceOn } }}>
+<script is:inline define:vars={{ _siInit: { hours: initialHours, items: itemsDisplay, serviceOn, defaultLang, langLabel } }}>
   window._siInit = _siInit;
 </script>
 
 <style is:global>
 [x-cloak] { display: none !important; }
-textarea.s-input { resize: none; min-height: 72px; }
 .settings-page .toggle-row { min-height: 44px; }
 
-/* suppress browser autofill yellow */
 input:-webkit-autofill,
 input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 1000px var(--bg, #FAFAF8) inset !important;
@@ -60,7 +76,6 @@ input:-webkit-autofill:focus {
   transition: background-color 9999s ease;
 }
 
-/* hours grid — same as .bp-hours-* from breakfast */
 .sp-hours-grid { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; margin-bottom: 16px; }
 .sp-hours-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); min-height: 52px; }
 .sp-hours-row:last-child { border-bottom: none; }
@@ -75,26 +90,32 @@ input:-webkit-autofill:focus {
   .sp-hours-row { grid-template-columns: 36px 1fr auto; gap: 8px; padding: 8px 10px; }
 }
 
-/* items list */
 .sp-row { border: 1px solid var(--border); padding: 20px; margin-bottom: 12px; }
 .sp-row:last-child { margin-bottom: 0; }
 .sp-row__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.sp-row__num {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
-  letter-spacing: 0.12em; color: var(--ink-muted); background: var(--bg-deep); padding: 3px 8px;
-}
-.sp-grid { display: grid; gap: 12px; margin-bottom: 12px; }
-.sp-grid--2 { grid-template-columns: 1fr 1fr; }
-@media (max-width: 600px) { .sp-grid--2 { grid-template-columns: 1fr; } }
-.sp-field { display: flex; flex-direction: column; gap: 5px; }
+.sp-row__num { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--ink-muted); background: var(--bg-deep); padding: 3px 8px; }
+.sp-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.sp-field:last-child { margin-bottom: 0; }
 .sp-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
-.sp-label--mono { font-family: 'JetBrains Mono', monospace; }
-.sp-mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.sp-label-hint { font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 10px; opacity: 0.7; }
 .sp-textarea { min-height: 62px; resize: vertical; }
 .sp-empty { font-size: 13px; color: var(--ink-muted); padding: 48px 32px; text-align: center; font-style: italic; }
-.sp-footer { display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; }
 
-/* toast — same as breakfast bp-toast */
+.sp-icon-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-icon-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 6px; min-width: 52px;
+  border: 1px solid var(--border); border-radius: var(--r-sm, 4px);
+  background: transparent; cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.sp-icon-btn:hover { border-color: var(--ink-muted); }
+.sp-icon-btn.is-active { border-color: var(--accent, #C06A3C); background: color-mix(in srgb, var(--accent, #C06A3C) 8%, transparent); }
+.sp-icon-btn svg { color: var(--ink-muted); }
+.sp-icon-btn.is-active svg { color: var(--accent, #C06A3C); }
+.sp-icon-name { font-size: 9px; color: var(--ink-muted); text-align: center; line-height: 1.2; white-space: nowrap; }
+.sp-icon-btn.is-active .sp-icon-name { color: var(--accent, #C06A3C); }
+
 .bp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14); white-space: nowrap; pointer-events: none; }
 .bp-toast--ok  { background: #0A0A0A; color: white; }
 .bp-toast--err { background: #8C2128; color: white; }
@@ -199,7 +220,9 @@ input:-webkit-autofill:focus {
     </div>
 
     <div class="s-card__body">
-      <p class="field__hint" style="margin-bottom:16px">Jedes Item erscheint als Kachel in der Service-Anfrage der Gäste-App (nur für In-House-Gäste sichtbar).</p>
+      <p class="field__hint" style="margin-bottom:16px">
+        Name und Beschreibung auf <strong x-text="langLabel"></strong> eingeben — das Backend übersetzt automatisch in alle Gastsprachen.
+      </p>
 
       <template x-if="items.length === 0">
         <div class="sp-empty">
@@ -217,46 +240,43 @@ input:-webkit-autofill:focus {
                 <button type="button" @click="removeItem(idx)"
                   class="v9-btn v9-btn--ghost" style="font-size:11px">Entfernen</button>
               </div>
-              <div class="sp-grid sp-grid--2">
-                <label class="sp-field">
-                  <span class="sp-label sp-label--mono">Slug (id)</span>
-                  <input type="text" x-model.lazy="item.id"
-                    placeholder="z.B. extra-towels" autocomplete="off"
-                    class="s-input sp-mono" />
-                </label>
-                <label class="sp-field">
-                  <span class="sp-label sp-label--mono">Icon-Key</span>
-                  <input type="text" x-model.lazy="item.icon"
-                    placeholder="towels" autocomplete="off"
-                    class="s-input sp-mono" />
-                </label>
+
+              <label class="sp-field">
+                <span class="sp-label">
+                  Name
+                  <span class="sp-label-hint" x-text="'(' + langLabel + ')'"></span>
+                </span>
+                <input type="text" x-model.lazy="item.name"
+                  autocomplete="off" class="s-input" />
+              </label>
+
+              <label class="sp-field">
+                <span class="sp-label">
+                  Beschreibung
+                  <span class="sp-label-hint">(optional)</span>
+                </span>
+                <textarea x-model.lazy="item.description"
+                  rows="2" autocomplete="off"
+                  class="s-input sp-textarea"></textarea>
+              </label>
+
+              <div class="sp-field">
+                <span class="sp-label">Icon</span>
+                <div class="sp-icon-grid">
+                  <template x-for="ico in serviceIcons" :key="ico.key">
+                    <button type="button"
+                      class="sp-icon-btn"
+                      :class="{ 'is-active': item.icon === ico.key }"
+                      @click.stop="item.icon = ico.key"
+                      :title="ico.label"
+                      :aria-pressed="String(item.icon === ico.key)">
+                      <span x-html="ico.svgHtml"></span>
+                      <span class="sp-icon-name" x-text="ico.label"></span>
+                    </button>
+                  </template>
+                </div>
               </div>
-              <div class="sp-grid sp-grid--2">
-                <label class="sp-field">
-                  <span class="sp-label">Name (DE)</span>
-                  <input type="text" x-model.lazy="item.name_de"
-                    autocomplete="off" class="s-input" />
-                </label>
-                <label class="sp-field">
-                  <span class="sp-label">Name (EN)</span>
-                  <input type="text" x-model.lazy="item.name_en"
-                    autocomplete="off" class="s-input" />
-                </label>
-              </div>
-              <div class="sp-grid sp-grid--2">
-                <label class="sp-field">
-                  <span class="sp-label">Beschreibung (DE)</span>
-                  <textarea x-model.lazy="item.description_de"
-                    rows="2" autocomplete="off"
-                    class="s-input sp-textarea"></textarea>
-                </label>
-                <label class="sp-field">
-                  <span class="sp-label">Beschreibung (EN)</span>
-                  <textarea x-model.lazy="item.description_en"
-                    rows="2" autocomplete="off"
-                    class="s-input sp-textarea"></textarea>
-                </label>
-              </div>
+
             </div>
           </template>
         </div>
@@ -267,7 +287,7 @@ input:-webkit-autofill:focus {
       <button type="button" @click="addItem()" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
       <button type="button" @click="saveItems()" :disabled="saving" class="v9-btn">
         <span x-show="!saving">Items speichern</span>
-        <span x-show="saving" x-cloak>Speichert …</span>
+        <span x-show="saving" x-cloak>Übersetzt & speichert …</span>
       </button>
     </div>
 
@@ -277,6 +297,22 @@ input:-webkit-autofill:focus {
 </div><!-- /.settings-page -->
 
 <script>
+  const mkSvg = (paths: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">${paths}</svg>`;
+
+  const SERVICE_ICONS = [
+    { key: 'bell',      label: 'Glocke',     svgHtml: mkSvg('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>') },
+    { key: 'coffee',    label: 'Kaffee',     svgHtml: mkSvg('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>') },
+    { key: 'clock',     label: 'Weckruf',    svgHtml: mkSvg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>') },
+    { key: 'key',       label: 'Check-out',  svgHtml: mkSvg('<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>') },
+    { key: 'briefcase', label: 'Gepäck',     svgHtml: mkSvg('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>') },
+    { key: 'car',       label: 'Taxi',       svgHtml: mkSvg('<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>') },
+    { key: 'droplet',   label: 'Handtücher', svgHtml: mkSvg('<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>') },
+    { key: 'moon',      label: 'Kissen',     svgHtml: mkSvg('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>') },
+    { key: 'sun',       label: 'Reinigung',  svgHtml: mkSvg('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>') },
+    { key: 'layers',    label: 'Sonstiges',  svgHtml: mkSvg('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>') },
+  ];
+
   document.addEventListener('alpine:init', () => {
 
     Alpine.data('siHours', () => {
@@ -356,32 +392,39 @@ input:-webkit-autofill:focus {
       return {
         items: raw.map((item, idx) => ({ _key: idx, ...item })) as Record<string, unknown>[],
         _nextKey: raw.length as number,
+        defaultLang: (init.defaultLang as string) || 'de',
+        langLabel:   (init.langLabel  as string) || 'Deutsch',
         saving: false,
         toast: '',
         toastKind: 'ok',
         _toastTimer: null as ReturnType<typeof setTimeout> | null,
+        serviceIcons: SERVICE_ICONS,
 
         addItem() {
           (this.items as Record<string, unknown>[]).push({
-            _key: (this._nextKey as number)++,
-            id: '', name_de: '', name_en: '',
-            description_de: '', description_en: '', icon: 'default',
+            _key:        (this._nextKey as number)++,
+            _orig_id:    '',
+            name:        '',
+            description: '',
+            icon:        'bell',
           });
         },
 
         removeItem(idx: number) {
-          if (confirm('Item wirklich entfernen?')) {
-            (this.items as unknown[]).splice(idx, 1);
-          }
+          (this as any).$store.confirm.ask(
+            'Dieses Service-Item wirklich entfernen?',
+            () => { (this.items as unknown[]).splice(idx, 1); },
+            'Entfernen',
+          );
         },
 
         async saveItems() {
           if (this.saving) return;
           this.saving = true;
           try {
-            const payload = (this.items as Record<string, unknown>[]).map(
-              ({ _key, ...rest }) => rest,
-            );
+            const payload = (this.items as Record<string, unknown>[])
+              .filter((it: any) => String(it.name ?? '').trim())
+              .map(({ _key, ...rest }) => rest);
             const res = await fetch('/api/admin/service/section', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
