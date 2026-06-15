@@ -76,8 +76,22 @@ const MODE_GREETING: Record<StayMode, Record<Lang, { hi: string; sub: string }>>
 };
 const greeting = MODE_GREETING[persona][l];
 
+// Kategorie-Farben — fester retaha-Satz, über alle Hotels gleich
+const MODULE_COLORS: Record<string, string> = {
+  pre_checkin: '#0F0E0C',
+  anfahrt:     '#5B7CB0',
+  wifi:        '#5B7CB0',
+  breakfast:   '#C28A3E',
+  eve:         '#B5664A',
+  service:     '#8A6A86',
+  places:      '#6E8B5E',
+  conference:  '#5E6B78',
+  checkout:    '#5E6B78',
+  wallet:      '#5E6B78',
+};
+
 // Actions-Pool — alle möglichen Module mit Key
-type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string; href?: string };
+type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string; href?: string; color?: string };
 const ACTION_POOL: ActionItem[] = [
   {
     key: 'pre_checkin',
@@ -166,12 +180,12 @@ const ACTION_POOL: ActionItem[] = [
 
 // 1. Feature-Toggle-Filter (hotel_settings)
 // 2. Mode-Filter (Reihenfolge aus MODULE_ORDER)
-// 3. Umnummerieren
+// 3. Umnummerieren + Kategorie-Farbe
 const featureFiltered = ACTION_POOL.filter((a: any) => a.visible !== false);
 const actions = MODULE_ORDER[persona]
   .map(key => featureFiltered.find(a => a.key === key))
   .filter(Boolean)
-  .map((a, i) => ({ ...a!, num: String(i + 1).padStart(2, '0') }));
+  .map((a, i) => ({ ...a!, num: String(i + 1).padStart(2, '0'), color: MODULE_COLORS[a!.key] ?? '#5B7CB0' }));
 
 const sharedProps = {
   hotel, hotelLogoDark, guest, room, token, lang,

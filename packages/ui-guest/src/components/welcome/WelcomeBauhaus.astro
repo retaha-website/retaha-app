@@ -287,16 +287,16 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
       <p class="bh-sec-label" style="margin-top:26px">{gridLabel[persona] ?? 'Services'}</p>
       <div class="bh-grid">
         {gridActions.map((action: any) => action.href ? (
-          <a class="bh-tile" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
-            <span class="bh-tile__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
+          <a class="bh-cell" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
+            <span class="bh-box" style={`background:${action.color ?? '#5B7CB0'}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#fff" set:html={action.icon} />
             </span>
             <span class="bh-tile__label">{action.label}</span>
           </a>
         ) : (
-          <button class="bh-tile" type="button" @click={action.handler}>
-            <span class="bh-tile__icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
+          <button class="bh-cell" type="button" @click={action.handler}>
+            <span class="bh-box" style={`background:${action.color ?? '#5B7CB0'}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#fff" set:html={action.icon} />
             </span>
             <span class="bh-tile__label">{action.label}</span>
           </button>
@@ -503,27 +503,41 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
 
   /* ── Action grid ─────────────────────────────────────────────────────── */
   .bh-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px 14px;
   }
-  .bh-tile {
-    background: var(--bh-surface); border: 1px solid var(--bh-border);
-    border-radius: var(--bh-radius); padding: 18px 10px 16px;
-    cursor: pointer;
-    transition: background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
-                border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
-                transform var(--dur-fast, 240ms) var(--ease-spring, cubic-bezier(0.34,1.3,0.64,1));
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    min-height: 118px; text-align: center;
+  .bh-cell {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; cursor: pointer;
+    background: none; border: 0; padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
   }
-  .bh-tile:hover { background: var(--hover); border-color: var(--hover); }
-  .bh-tile:active { transform: scale(0.97) !important; transition-duration: 90ms !important; }
-  .bh-tile__icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-  .bh-tile__icon svg { width: 40px; height: 40px; stroke: var(--bh-ink); stroke-width: 1.5; }
+  .bh-box {
+    width: 88px; height: 88px;
+    border-radius: 23px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 18px rgba(60,50,35,.18);
+    transition: transform 200ms cubic-bezier(0.34,1.3,0.64,1),
+                box-shadow 200ms ease;
+  }
+  .bh-box svg { width: 42px; height: 42px; stroke: #fff; color: #fff; }
+  .bh-cell:hover .bh-box {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 26px rgba(60,50,35,.26);
+  }
+  .bh-cell:active .bh-box {
+    transform: scale(.93);
+    box-shadow: 0 3px 8px rgba(60,50,35,.20);
+    transition-duration: 90ms;
+  }
+  .bh-cell:focus-visible .bh-box {
+    box-shadow: 0 0 0 3px #F4EEE0, 0 0 0 5.5px #6982cf;
+  }
   .bh-tile__label {
-    font-family: var(--bh-mono); font-size: 9px;
+    font-family: var(--bh-mono); font-size: 10px;
     letter-spacing: 0.10em; text-transform: uppercase;
-    font-weight: 500; line-height: 1.35;
-    color: var(--bh-ink);
+    font-weight: 600; line-height: 1.3;
+    color: var(--bh-ink); margin-top: 12px;
   }
 
   /* ── 56×22px ambient weather pill ───────────────────────────────────────── */
@@ -657,7 +671,8 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     .bh-win__glow, .bh-win__sun-rays, .bh-win__star,
     .bh-win__cloud, .bh-win__drop, .bh-win__flake, .bh-win__flash { animation: none !important; }
     .bh-head, .bh-readout, .bh-readout-rule, .bh-greet, .bh-hero, .bh-grid,
-    .bh-sec-label { animation: none; opacity: 1; }
+    .bh-primary-btn, .bh-sec-label { animation: none; opacity: 1; }
+    .bh-box { transition: none !important; }
   }
 
   /* ── Page entrance — sections rise and fade in, staggered ──────────────── */
@@ -666,6 +681,7 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
   .bh-readout-rule { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 60ms  both; }
   .bh-greet       { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 120ms both; }
   .bh-hero        { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 180ms both; }
+  .bh-primary-btn,
   .bh-sec-label,
   .bh-grid        { animation: bh-page-in var(--dur-slow, 650ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)) 240ms both; }
   @keyframes bh-page-in {
