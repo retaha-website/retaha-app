@@ -351,7 +351,19 @@ const pageData = {
         <p class="subtitle">{l.subtitle}</p>
       </div>
 
-      <div x-data={`serviceForm(${JSON.stringify(pageData)})`} x-cloak>
+      {/* Static item chips visible before Alpine loads — removed by x-init */}
+      {!existingBooking && (
+        <div class="svc-section" id="svc-items-preload">
+          <div class="svc-label">{l.chooseItem}</div>
+          <div class="v2-chips">
+            {localizedItems.map(item => (
+              <button type="button" class="v2-chip" disabled style="cursor:default">{item.name}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div x-data={`serviceForm(${JSON.stringify(pageData)})`} x-cloak x-init="document.getElementById('svc-items-preload')?.remove()">
 
         <!-- Status view -->
         <template x-if="view === 'status'">
