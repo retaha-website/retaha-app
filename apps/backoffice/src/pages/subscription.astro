@@ -94,7 +94,7 @@ const hasEveAddon  = currentAddons.includes('eve');
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
 >
   <div
-    class="sub-page"
+    class="settings-page"
     x-data="{
       interval: 'monthly',
       loading: '',
@@ -136,488 +136,419 @@ const hasEveAddon  = currentAddons.includes('eve');
     }"
   >
 
-    <!-- Breadcrumb -->
-    <nav class="sub-breadcrumb">
-      <a href="/uebersicht" class="sub-breadcrumb__crumb">Übersicht</a>
-      <span class="sub-breadcrumb__sep">/</span>
-      <span class="sub-breadcrumb__crumb sub-breadcrumb__crumb--current">Plan & Pakete</span>
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Plan & Pakete</span>
     </nav>
 
-    <!-- Hero -->
-    <section class="sub-hero">
-      <div class="sub-hero__eyebrow-row">
-        <span class="sub-hero__eyebrow">Plan & Pakete</span>
-        <span class={`sub-hero__current-badge sub-hero__current-badge--${currentPlan}`}>
-          Aktuell: {PLAN_LABEL[currentPlan] ?? currentPlan}
-        </span>
-      </div>
-      <h1 class="sub-hero__title">Wähle das richtige Paket<span class="sub-hero__dot">.</span></h1>
-      <p class="sub-hero__sub">
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Abrechnung</span>
+      <h1 class="settings-hero__title">Wähle das richtige Paket<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">
         {trial.isInTrial
           ? `Du bist im Trial${trialEndFormatted ? ` — endet am ${trialEndFormatted}` : ''}. Alle Pakete enthalten monatliche Kündigung.`
           : 'Alle Pakete monatlich kündbar. Jahresabo spart 20 %.'}
       </p>
     </section>
 
-    <!-- Interval Toggle -->
-    <div class="interval-toggle">
-      <button
-        type="button"
-        @click="interval = 'monthly'"
-        :class="interval === 'monthly' ? 'toggle-btn toggle-btn--active' : 'toggle-btn'"
-      >
-        Monatlich
-      </button>
-      <button
-        type="button"
-        @click="interval = 'yearly'"
-        :class="interval === 'yearly' ? 'toggle-btn toggle-btn--active' : 'toggle-btn'"
-      >
-        Jährlich <span class="toggle-discount">−20 %</span>
-      </button>
-    </div>
+    <div class="settings-sections">
 
-    <!-- Checkout-Fehler -->
-    <div
-      x-show="checkoutError !== ''"
-      style="display:none"
-      class="checkout-error"
-      role="alert"
-    >
-      <span x-text="checkoutError"></span>
-      <button type="button" @click="checkoutError = ''" class="checkout-error__close" aria-label="Schließen">×</button>
-    </div>
-
-    <!-- Plan Cards -->
-    <div class="plans-grid">
-      {PLANS.map(plan => {
-        const rank = TIER_RANK[plan.key] ?? 0;
-        const curRank = TIER_RANK[currentPlan] ?? 0;
-        const isCurrent   = plan.key === currentPlan;
-        const isUpgrade   = rank > curRank;
-        const isDowngrade = rank < curRank;
-
-        return (
-          <div class={[
-            'plan-card',
-            isCurrent   ? 'plan-card--current'   : '',
-            isUpgrade   ? 'plan-card--upgrade'    : '',
-            isDowngrade ? 'plan-card--downgrade'  : '',
-            plan.popular && !isCurrent ? 'plan-card--popular' : '',
-          ].filter(Boolean).join(' ')}>
-
-            {plan.popular && !isCurrent && (
-              <div class="plan-card__popular-bar">Empfohlen</div>
-            )}
-            {isCurrent && (
-              <div class="plan-card__current-bar">Dein aktueller Plan</div>
-            )}
-
-            <div class="plan-card__head">
-              <span class={`plan-card__tier plan-card__tier--${plan.key}`}>{plan.label}</span>
-              <span class="plan-card__tagline">{plan.tagline}</span>
-            </div>
-
-            <div class="plan-card__price">
-              {plan.price !== null ? (
-                <>
-                  {/* Monthly price */}
-                  <div x-show="interval === 'monthly'">
-                    <span class="plan-card__price-num">{plan.price} €</span>
-                    <span class="plan-card__price-per">/Monat</span>
-                    <div class="plan-card__price-year">
-                      Jährlich: {plan.priceYear} € <span class="plan-card__price-discount">−20 %</span>
-                    </div>
-                  </div>
-                  {/* Yearly price */}
-                  <div x-show="interval === 'yearly'" style="display:none">
-                    <span class="plan-card__price-num">{plan.priceYearlyPerMonth} €</span>
-                    <span class="plan-card__price-per">/Monat</span>
-                    <div class="plan-card__price-year">
-                      {plan.priceYear} €/Jahr · <span class="plan-card__price-discount">20 % gespart</span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <span class="plan-card__price-custom">Individuell</span>
-              )}
-            </div>
-
-            <ul class="plan-card__modules">
-              {plan.modules.map(m => (
-                <li class="plan-card__module-item">
-                  <span class="plan-card__module-check" aria-hidden="true">✓</span>
-                  {m}
-                </li>
-              ))}
-            </ul>
-
-            <div class="plan-card__cta">
-              {isCurrent ? (
-                <button type="button" class="plan-btn plan-btn--current" disabled>
-                  Aktueller Plan
-                </button>
-              ) : plan.key === 'enterprise' ? (
-                <a href="mailto:hallo@retaha.de" class="plan-btn plan-btn--contact">
-                  Kontakt aufnehmen
-                </a>
-              ) : isUpgrade ? (
-                <button
-                  type="button"
-                  class="plan-btn plan-btn--upgrade"
-                  @click={`checkout('${plan.key}')`}
-                  :disabled="loading !== ''"
-                  :class={`loading === '${plan.key}' ? 'plan-btn plan-btn--upgrade plan-btn--loading' : 'plan-btn plan-btn--upgrade'`}
-                >
-                  <span x-show={`loading !== '${plan.key}'`}>Upgrade auf {plan.label}</span>
-                  <span x-show={`loading === '${plan.key}'`} style="display:none">Wird vorbereitet…</span>
-                </button>
-              ) : (
-                <button type="button" class="plan-btn plan-btn--downgrade" disabled>
-                  Downgrade auf {plan.label}
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-
-    <!-- Eve Add-on (nur für Lite & Pro) -->
-    {showEveAddon && (
-      <section class="addon-section">
-        <div class="addon-card">
-          <div class="addon-card__left">
-            <div class="addon-card__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                   stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="addon-card__label">Eve KI-Concierge — Add-on</p>
-              <p class="addon-card__desc">
-                KI-Assistent für Gäste: Fragen, Buchungen, Empfehlungen — 24/7.
-                {hasEveAddon
-                  ? ' Bereits gebucht — Danke!'
-                  : ' Für Lite und Pro als monatliches Add-on buchbar.'}
-              </p>
-            </div>
-          </div>
-          <div class="addon-card__right">
-            <span class="addon-card__price">89 € <span class="addon-card__price-per">/Monat</span></span>
-            {hasEveAddon ? (
-              <span class="addon-badge addon-badge--active">Aktiv</span>
-            ) : (
-              <button
-                type="button"
-                class="plan-btn plan-btn--addon"
-                @click="checkoutAddon('eve')"
-                :disabled="loading !== ''"
-                :class="loading === 'eve' ? 'plan-btn plan-btn--addon plan-btn--loading' : 'plan-btn plan-btn--addon'"
-              >
-                <span x-show="loading !== 'eve'">Hinzufügen</span>
-                <span x-show="loading === 'eve'" style="display:none">Wird vorbereitet…</span>
-              </button>
+      <!-- 01 Aktueller Plan -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Aktueller Plan</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <div class="s-card__body">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class={`sub-plan-badge sub-plan-badge--${currentPlan}`}>
+              {PLAN_LABEL[currentPlan] ?? currentPlan}
+            </span>
+            {trial.isInTrial && trialEndFormatted && (
+              <span class="sub-trial-note">Trial endet am {trialEndFormatted}</span>
             )}
           </div>
         </div>
       </section>
-    )}
 
-    <!-- Footer-Notiz -->
-    <div class="sub-footer">
-      <p class="sub-footer__note">
-        Sichere Zahlung via Stripe. Monatlich kündbar, keine versteckten Gebühren.
-        Fragen? <a href="mailto:hallo@retaha.de" class="sub-footer__link">hallo@retaha.de</a>
-      </p>
-      <a href="/uebersicht" class="sub-footer__back">← Zurück zur Übersicht</a>
+      <!-- 02 Pakete -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Pakete vergleichen</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <div class="s-card__body">
+
+          <!-- Interval Toggle -->
+          <div class="sub-interval-toggle" style="margin-bottom:24px">
+            <button
+              type="button"
+              @click="interval = 'monthly'"
+              :class="interval === 'monthly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
+            >
+              Monatlich
+            </button>
+            <button
+              type="button"
+              @click="interval = 'yearly'"
+              :class="interval === 'yearly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
+            >
+              Jährlich <span class="sub-discount-badge">−20 %</span>
+            </button>
+          </div>
+
+          <!-- Checkout-Fehler -->
+          <div
+            x-show="checkoutError !== ''"
+            style="display:none"
+            class="s-flash s-flash--err"
+            role="alert"
+          >
+            <span x-text="checkoutError"></span>
+            <button type="button" @click="checkoutError = ''" class="sub-flash-close" aria-label="Schließen">×</button>
+          </div>
+
+          <!-- Plans Grid -->
+          <div class="sub-plans-grid">
+            {PLANS.map(plan => {
+              const rank = TIER_RANK[plan.key] ?? 0;
+              const curRank = TIER_RANK[currentPlan] ?? 0;
+              const isCurrent   = plan.key === currentPlan;
+              const isUpgrade   = rank > curRank;
+              const isDowngrade = rank < curRank;
+
+              return (
+                <div class={[
+                  'sub-plan-card',
+                  isCurrent   ? 'sub-plan-card--current'   : '',
+                  isUpgrade   ? 'sub-plan-card--upgrade'    : '',
+                  isDowngrade ? 'sub-plan-card--downgrade'  : '',
+                  plan.popular && !isCurrent ? 'sub-plan-card--popular' : '',
+                ].filter(Boolean).join(' ')}>
+
+                  {plan.popular && !isCurrent && (
+                    <div class="sub-plan-card__bar sub-plan-card__bar--popular">Empfohlen</div>
+                  )}
+                  {isCurrent && (
+                    <div class="sub-plan-card__bar sub-plan-card__bar--current">Dein aktueller Plan</div>
+                  )}
+
+                  <div class="sub-plan-card__head">
+                    <span class={`sub-plan-tier sub-plan-tier--${plan.key}`}>{plan.label}</span>
+                    <span class="sub-plan-tagline">{plan.tagline}</span>
+                  </div>
+
+                  <div class="sub-plan-card__price">
+                    {plan.price !== null ? (
+                      <>
+                        <div x-show="interval === 'monthly'">
+                          <span class="sub-plan-price-num">{plan.price} €</span>
+                          <span class="sub-plan-price-per">/Monat</span>
+                          <div class="sub-plan-price-year">
+                            Jährlich: {plan.priceYear} € <span class="sub-discount-tag">−20 %</span>
+                          </div>
+                        </div>
+                        <div x-show="interval === 'yearly'" style="display:none">
+                          <span class="sub-plan-price-num">{plan.priceYearlyPerMonth} €</span>
+                          <span class="sub-plan-price-per">/Monat</span>
+                          <div class="sub-plan-price-year">
+                            {plan.priceYear} €/Jahr · <span class="sub-discount-tag">20 % gespart</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <span class="sub-plan-price-custom">Individuell</span>
+                    )}
+                  </div>
+
+                  <ul class="sub-plan-modules">
+                    {plan.modules.map(m => (
+                      <li class="sub-plan-module-item">
+                        <span class="sub-plan-module-check" aria-hidden="true">✓</span>
+                        {m}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div class="sub-plan-card__cta">
+                    {isCurrent ? (
+                      <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--current" disabled>
+                        Aktueller Plan
+                      </button>
+                    ) : plan.key === 'enterprise' ? (
+                      <a href="mailto:hallo@retaha.de" class="v9-btn v9-btn--ghost sub-plan-btn">
+                        Kontakt aufnehmen
+                      </a>
+                    ) : isUpgrade ? (
+                      <button
+                        type="button"
+                        class="v9-btn v9-btn--primary sub-plan-btn"
+                        @click={`checkout('${plan.key}')`}
+                        :disabled="loading !== ''"
+                        :class={`loading === '${plan.key}' ? 'v9-btn v9-btn--primary sub-plan-btn sub-plan-btn--loading' : 'v9-btn v9-btn--primary sub-plan-btn'`}
+                      >
+                        <span x-show={`loading !== '${plan.key}'`}>Upgrade auf {plan.label}</span>
+                        <span x-show={`loading === '${plan.key}'`} style="display:none">Wird vorbereitet…</span>
+                      </button>
+                    ) : (
+                      <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--downgrade" disabled>
+                        Downgrade auf {plan.label}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 03 Eve Add-on (nur für Lite & Pro) -->
+      {showEveAddon && (
+        <section class="s-card">
+          <div class="s-card__head">
+            <h2 class="s-card__title">Add-ons</h2>
+            <span class="s-card__num">03</span>
+          </div>
+          <div class="s-card__body">
+            <div class="sub-addon-card">
+              <div class="sub-addon-card__left">
+                <div class="sub-addon-card__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                       stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="sub-addon-card__label">Eve KI-Concierge — Add-on</p>
+                  <p class="sub-addon-card__desc">
+                    KI-Assistent für Gäste: Fragen, Buchungen, Empfehlungen — 24/7.
+                    {hasEveAddon
+                      ? ' Bereits gebucht — Danke!'
+                      : ' Für Lite und Pro als monatliches Add-on buchbar.'}
+                  </p>
+                </div>
+              </div>
+              <div class="sub-addon-card__right">
+                <span class="sub-addon-price">89 € <span class="sub-addon-price-per">/Monat</span></span>
+                {hasEveAddon ? (
+                  <span class="sub-addon-badge">Aktiv</span>
+                ) : (
+                  <button
+                    type="button"
+                    class="v9-btn v9-btn--primary"
+                    @click="checkoutAddon('eve')"
+                    :disabled="loading !== ''"
+                    :class="loading === 'eve' ? 'v9-btn v9-btn--primary sub-plan-btn--loading' : 'v9-btn v9-btn--primary'"
+                  >
+                    <span x-show="loading !== 'eve'">Hinzufügen</span>
+                    <span x-show="loading === 'eve'" style="display:none">Wird vorbereitet…</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <!-- Footer-Notiz -->
+      <div class="sub-footer-note">
+        <p>
+          Sichere Zahlung via Stripe. Monatlich kündbar, keine versteckten Gebühren.
+          Fragen? <a href="mailto:hallo@retaha.de" class="sub-footer-link">hallo@retaha.de</a>
+        </p>
+        <a href="/uebersicht" class="v9-btn v9-btn--ghost">← Zurück zur Übersicht</a>
+      </div>
+
     </div>
-
   </div>
 </Layout>
 
 <style>
-  .sub-page {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 32px 80px;
+  /* ── Plan badge (current plan indicator in 01 card) ──────────────────────── */
+  .sub-plan-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+    padding: 4px 10px; border-radius: 99px; text-transform: uppercase;
   }
-  @media (max-width: 768px) { .sub-page { padding: 0 20px 64px; } }
+  .sub-plan-badge--lite       { background: #f5f5f5; color: #1a1a1a; border: 1px solid #d0d0d0; }
+  .sub-plan-badge--pro        { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
+  .sub-plan-badge--premium    { background: #f4f0fb; color: #6d28d9; border: 1px solid #c4b5f5; }
+  .sub-plan-badge--enterprise { background: #1a1a1a; color: #fff;    border: 1px solid #1a1a1a; }
 
-  /* Breadcrumb */
-  .sub-breadcrumb {
-    display: flex; align-items: center; gap: 10px;
-    padding: 16px 0;
+  .sub-trial-note {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #888;
-  }
-  .sub-breadcrumb__sep { color: #ccc; }
-  .sub-breadcrumb__crumb { color: #888; text-decoration: none; transition: color 150ms; }
-  .sub-breadcrumb__crumb:hover { color: #1a1a1a; }
-  .sub-breadcrumb__crumb--current { color: #1a1a1a; font-weight: 500; }
-
-  /* Hero */
-  .sub-hero {
-    padding: 40px 0 36px;
-    border-bottom: 1px solid #e5e5e5;
-    margin-bottom: 28px;
-  }
-  .sub-hero__eyebrow-row {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-  .sub-hero__eyebrow {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.18em; font-weight: 500;
-    color: #0A0A0A; background: #F5DF4D;
-    padding: 5px 10px; display: inline-block; border-radius: 4px;
-  }
-  .sub-hero__current-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.12em; font-weight: 500;
-    padding: 4px 10px; border-radius: 99px;
-    text-transform: uppercase;
-  }
-  .sub-hero__current-badge--lite       { background: #f5f5f5; color: #1a1a1a; border: 1px solid #d0d0d0; }
-  .sub-hero__current-badge--pro        { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
-  .sub-hero__current-badge--premium    { background: #f4f0fb; color: #6d28d9; border: 1px solid #c4b5f5; }
-  .sub-hero__current-badge--enterprise { background: #1a1a1a; color: #fff;    border: 1px solid #1a1a1a; }
-
-  .sub-hero__title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(28px, 4vw, 48px); font-weight: 400;
-    line-height: 1.05; letter-spacing: -0.025em;
-    margin-bottom: 12px; color: #1a1a1a;
-  }
-  .sub-hero__dot { color: #e0184d; }
-  .sub-hero__sub {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; color: #777; letter-spacing: 0.03em; line-height: 1.6;
+    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em;
   }
 
-  /* Interval Toggle */
-  .interval-toggle {
-    display: flex; gap: 4px;
-    margin-bottom: 24px;
-    background: #f5f5f5;
-    padding: 4px;
-    border-radius: 10px;
-    width: fit-content;
-  }
-  .toggle-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer;
-    background: transparent; color: #888;
-    transition: all 150ms; display: flex; align-items: center; gap: 6px;
-  }
-  .toggle-btn--active {
-    background: #fff; color: #1a1a1a;
-    box-shadow: 0 1px 4px rgba(0,0,0,.1);
-  }
-  .toggle-discount {
+  /* ── Interval Toggle ─────────────────────────────────────────────────────── */
+  .sub-interval-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sub-interval-btn { display: flex; align-items: center; gap: 6px; }
+
+  .sub-discount-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 8px; font-weight: 500; letter-spacing: 0.06em;
     color: #2e7d4f; background: #edf7f0;
     padding: 1px 5px; border-radius: 4px;
   }
 
-  /* Checkout Error */
-  .checkout-error {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 12px 16px; margin-bottom: 16px;
-    border: 1px solid #fca5a5; border-radius: 8px;
-    background: #fef2f2;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: #b91c1c; letter-spacing: 0.02em;
-  }
-  .checkout-error__close {
+  /* ── Flash close button ──────────────────────────────────────────────────── */
+  .sub-flash-close {
     background: none; border: none; cursor: pointer;
-    font-size: 16px; color: #b91c1c; line-height: 1;
-    padding: 0; flex-shrink: 0;
+    font-size: 16px; color: inherit; line-height: 1;
+    padding: 0; flex-shrink: 0; margin-left: auto;
   }
 
-  /* Plans Grid */
-  .plans-grid {
+  /* ── Plans Grid ──────────────────────────────────────────────────────────── */
+  .sub-plans-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-bottom: 40px;
   }
-  @media (max-width: 1000px) { .plans-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 600px)  { .plans-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1000px) { .sub-plans-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .sub-plans-grid { grid-template-columns: 1fr; } }
 
-  /* Plan Card */
-  .plan-card {
-    border: 1px solid #e5e5e5;
-    border-radius: 12px;
-    background: #fff;
+  /* ── Plan Card ───────────────────────────────────────────────────────────── */
+  .sub-plan-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r, 8px);
+    background: var(--surface);
     padding: 20px;
-    display: flex; flex-direction: column; gap: 0;
-    position: relative;
-    overflow: hidden;
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
     transition: box-shadow 150ms;
   }
-  .plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-  .plan-card--current  { border-color: #1a1a1a; border-width: 2px; }
-  .plan-card--popular  { border-color: #7c3aed; }
-  .plan-card--downgrade { opacity: 0.65; }
+  .sub-plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+  .sub-plan-card--current  { border-color: var(--ink, #1a1a1a); border-width: 2px; }
+  .sub-plan-card--popular  { border-color: #7c3aed; }
+  .sub-plan-card--downgrade { opacity: 0.65; }
 
-  .plan-card__popular-bar,
-  .plan-card__current-bar {
+  .sub-plan-card__bar {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
-    text-align: center;
-    padding: 4px;
+    text-align: center; padding: 4px;
     margin: -20px -20px 16px;
   }
-  .plan-card__popular-bar { background: #7c3aed; color: #fff; }
-  .plan-card__current-bar { background: #1a1a1a; color: #fff; }
+  .sub-plan-card__bar--popular { background: #7c3aed; color: #fff; }
+  .sub-plan-card__bar--current { background: var(--ink, #1a1a1a); color: #fff; }
 
-  .plan-card__head { margin-bottom: 14px; }
-  .plan-card__tier {
+  .sub-plan-card__head { margin-bottom: 14px; }
+
+  .sub-plan-tier {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
     padding: 3px 8px; border-radius: 99px; border: 1px solid;
     display: inline-block; margin-bottom: 6px;
   }
-  .plan-card__tier--lite       { background: transparent;  color: #555; border-color: #ccc; }
-  .plan-card__tier--pro        { background: #edf7f0;     color: #2e7d4f; border-color: #a8d5b8; }
-  .plan-card__tier--premium    { background: #f4f0fb;     color: #6d28d9; border-color: #c4b5f5; }
-  .plan-card__tier--enterprise { background: #1a1a1a;     color: #fff;    border-color: #1a1a1a; }
+  .sub-plan-tier--lite       { background: transparent; color: #555; border-color: #ccc; }
+  .sub-plan-tier--pro        { background: #edf7f0;    color: #2e7d4f; border-color: #a8d5b8; }
+  .sub-plan-tier--premium    { background: #f4f0fb;    color: #6d28d9; border-color: #c4b5f5; }
+  .sub-plan-tier--enterprise { background: #1a1a1a;    color: #fff;    border-color: #1a1a1a; }
 
-  .plan-card__tagline {
+  .sub-plan-tagline {
     display: block;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px; color: #888; font-weight: 400;
+    font-size: 13px; color: var(--ink-muted); font-weight: 400;
   }
 
-  .plan-card__price { margin-bottom: 18px; border-bottom: 1px solid #eee; padding-bottom: 16px; }
-  .plan-card__price-num {
+  .sub-plan-card__price {
+    margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
+  }
+  .sub-plan-price-num {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 28px; font-weight: 300; color: #1a1a1a;
-    letter-spacing: -0.02em; line-height: 1;
+    font-size: 28px; font-weight: 300; color: var(--ink); letter-spacing: -0.02em; line-height: 1;
   }
-  .plan-card__price-per {
+  .sub-plan-price-per {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: #999; margin-left: 2px;
+    font-size: 10px; color: var(--ink-muted); margin-left: 2px;
   }
-  .plan-card__price-year {
+  .sub-plan-price-year {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: #999; margin-top: 4px;
+    font-size: 10px; color: var(--ink-muted); margin-top: 4px;
   }
-  .plan-card__price-discount {
+  .sub-discount-tag {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
     color: #2e7d4f; background: #edf7f0;
     padding: 1px 5px; border-radius: 4px;
   }
-  .plan-card__price-custom {
+  .sub-plan-price-custom {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 22px; font-weight: 300; color: #1a1a1a;
+    font-size: 22px; font-weight: 300; color: var(--ink);
   }
 
-  .plan-card__modules {
+  .sub-plan-modules {
     list-style: none; padding: 0; margin: 0 0 20px;
-    display: flex; flex-direction: column; gap: 6px;
-    flex: 1;
+    display: flex; flex-direction: column; gap: 6px; flex: 1;
   }
-  .plan-card__module-item {
+  .sub-plan-module-item {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: #555; letter-spacing: 0.02em;
-    display: flex; align-items: flex-start; gap: 7px;
-    line-height: 1.4;
+    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.02em;
+    display: flex; align-items: flex-start; gap: 7px; line-height: 1.4;
   }
-  .plan-card__module-check {
-    color: #2e7d4f; flex-shrink: 0; font-size: 10px; margin-top: 1px;
+  .sub-plan-module-check { color: #2e7d4f; flex-shrink: 0; font-size: 10px; margin-top: 1px; }
+
+  .sub-plan-card__cta { margin-top: auto; }
+
+  .sub-plan-btn {
+    width: 100%; display: block; text-align: center; text-decoration: none;
+    font-size: 10px !important;
   }
+  .sub-plan-btn--current { opacity: 0.6; cursor: not-allowed; }
+  .sub-plan-btn--downgrade { opacity: 0.5; cursor: not-allowed; }
+  .sub-plan-btn--loading { opacity: 0.65; }
 
-  .plan-card__cta { margin-top: auto; }
-
-  /* Buttons */
-  .plan-btn {
-    width: 100%; padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    border-radius: 8px; cursor: pointer; border: 1px solid;
-    transition: all 150ms; white-space: nowrap;
-    display: block; text-align: center; text-decoration: none;
-  }
-  .plan-btn:disabled { cursor: not-allowed; }
-
-  .plan-btn--current  { background: #f5f5f5; color: #888; border-color: #ddd; }
-  .plan-btn--upgrade  { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-  .plan-btn--upgrade:not(:disabled):hover { background: #333; }
-  .plan-btn--upgrade:disabled { opacity: 0.5; cursor: not-allowed; }
-  .plan-btn--loading  { opacity: 0.65; }
-  .plan-btn--downgrade { background: transparent; color: #ccc; border-color: #eee; }
-  .plan-btn--contact  { background: transparent; color: #555; border-color: #ccc; }
-  .plan-btn--contact:hover { color: #1a1a1a; border-color: #888; }
-  .plan-btn--addon    { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-  .plan-btn--addon:not(:disabled):hover { background: #F5DF4D; color: #1a1a1a; border-color: #F5DF4D; }
-  .plan-btn--addon:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Eve Add-on */
-  .addon-section { margin-bottom: 40px; }
-  .addon-card {
+  /* ── Eve Add-on card ─────────────────────────────────────────────────────── */
+  .sub-addon-card {
     display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
     flex-wrap: wrap;
-    padding: 20px 24px;
-    border: 1px solid #e5e5e5; border-radius: 12px;
-    background: #fafafa;
+    padding: 16px 20px;
+    border: 1px solid var(--border); border-radius: var(--r, 8px);
+    background: var(--bg-deep, #F0EDE6);
   }
-  .addon-card__left { display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 0; }
-  .addon-card__icon {
+  .sub-addon-card__left { display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 0; }
+  .sub-addon-card__icon {
     width: 36px; height: 36px; border-radius: 8px;
-    background: #f0f0f0; display: flex; align-items: center; justify-content: center;
-    color: #555; flex-shrink: 0;
+    background: var(--border); display: flex; align-items: center; justify-content: center;
+    color: var(--ink-muted); flex-shrink: 0;
   }
-  .addon-card__label {
+  .sub-addon-card__label {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 14px; font-weight: 500; color: #1a1a1a; margin: 0 0 4px;
+    font-size: 14px; font-weight: 500; color: var(--ink); margin: 0 0 4px;
   }
-  .addon-card__desc {
+  .sub-addon-card__desc {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: #777; line-height: 1.5; margin: 0; letter-spacing: 0.02em;
+    font-size: 10px; color: var(--ink-muted); line-height: 1.5; margin: 0; letter-spacing: 0.02em;
   }
-  .addon-card__right {
+  .sub-addon-card__right {
     display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0;
   }
-  .addon-card__price {
+  .sub-addon-price {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 20px; font-weight: 300; color: #1a1a1a; line-height: 1;
+    font-size: 20px; font-weight: 300; color: var(--ink); line-height: 1;
   }
-  .addon-card__price-per {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: #999;
+  .sub-addon-price-per {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted);
   }
-  .addon-badge {
+  .sub-addon-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
     padding: 4px 10px; border-radius: 99px;
+    background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8;
   }
-  .addon-badge--active { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
 
-  /* Footer */
-  .sub-footer {
+  /* ── Footer note ─────────────────────────────────────────────────────────── */
+  .sub-footer-note {
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
     flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-muted); letter-spacing: 0.02em;
     padding: 16px 20px;
-    border: 1px solid #e5e5e5; border-radius: 10px;
-    background: #fafafa;
+    border: 1px solid var(--border); border-radius: var(--r, 8px);
+    background: var(--bg-deep, #F0EDE6);
   }
-  .sub-footer__note {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: #888; letter-spacing: 0.02em; margin: 0;
-  }
-  .sub-footer__link { color: #1a1a1a; text-decoration: underline; text-underline-offset: 2px; }
-  .sub-footer__back {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #888; text-decoration: none; white-space: nowrap;
-    transition: color 150ms;
-  }
-  .sub-footer__back:hover { color: #1a1a1a; }
+  .sub-footer-note p { margin: 0; }
+  .sub-footer-link { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 </style>

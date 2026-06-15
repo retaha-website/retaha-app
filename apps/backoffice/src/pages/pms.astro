@@ -1,6 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import {
   getUser,
   getUserHotels,
@@ -373,9 +372,6 @@ if (isConnected) {
 
 const productsCount = integration?.mews_products_count ?? 0;
 const productsAvailable = productsCount > 0;
-const pricingMewsLabelClass = productsAvailable
-  ? 'flex items-start gap-3 cursor-pointer'
-  : 'flex items-start gap-3 opacity-50 cursor-not-allowed';
 
 type ServiceMappingField = { name: string; label: string; current: string | null };
 // Sprint E1 Phase 3 — nur Frühstück-Mapping zeigen. Service + Konferenz
@@ -398,127 +394,297 @@ const lastSyncLabel = integration?.last_sync_at
     })
   : null;
 
-const syncStatusBadge: Record<string, { label: string; classes: string }> = {
-  idle: { label: 'Bereit', classes: 'bg-anthrazit/[0.06] text-anthrazit/70' },
-  syncing: { label: 'Läuft…', classes: 'bg-pink-shock/10 text-pink-shock' },
-  error: { label: 'Fehler', classes: 'bg-red-50 text-red-700' },
+const syncStatusLabels: Record<string, string> = {
+  idle: 'Bereit',
+  syncing: 'Läuft…',
+  error: 'Fehler',
 };
 const statusKey = integration?.sync_status ?? 'idle';
-const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
+const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 ---
 
-<Layout title="PMS-Integration" activeTab="backoffice">
+<Layout title="PMS-Integration" activeTab="backoffice" hotelName={hotel.name}>
 
-  <EditorialPageHeader
-    sectionNumber="30"
-    sectionLabel="Integrationen"
-    headlineLight="PMS-"
-    headlineBold="Integration"
-    subtitle="Verbinde dein Mews-Hotel mit retaha. Reservationen, Zimmer und Gäste-Daten werden automatisch synchronisiert."
-  />
+<style is:global>
+[x-cloak] { display: none !important; }
+
+.sp-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.sp-field:last-child { margin-bottom: 0; }
+.sp-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
+.sp-label-hint { font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 10px; opacity: 0.7; }
+
+.pms-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+  margin-bottom: 0;
+}
+@media (max-width: 480px) { .pms-meta-grid { grid-template-columns: 1fr; } }
+
+.pms-meta-item__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.pms-meta-item__value {
+  font-size: 13px;
+  color: var(--ink);
+  word-break: break-all;
+}
+.pms-meta-item__value--mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.pms-meta-item__hint { font-size: 11px; color: var(--ink-muted); font-style: italic; margin-top: 3px; }
+
+.pms-counts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.pms-count-cell {
+  border: 1px solid var(--border);
+  border-radius: var(--r, 8px);
+  padding: 16px 20px;
+  background: var(--surface);
+}
+.pms-count-cell__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+.pms-count-cell__num {
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.pms-status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+.pms-status-badge--idle { background: rgba(10,10,10,0.06); color: rgba(10,10,10,0.7); }
+.pms-status-badge--syncing { background: rgba(192,106,60,0.1); color: var(--accent, #C06A3C); }
+.pms-status-badge--error { background: #FEF2F2; color: #B91C1C; }
+
+.charge-toggle-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 560px) { .charge-toggle-grid { grid-template-columns: 1fr 1fr; } }
+
+.charge-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--bg-deep, #F0EDE6);
+  border: 1px solid var(--border);
+  border-radius: var(--r, 8px);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.charge-toggle-card:hover { border-color: var(--ink-muted); }
+.charge-toggle-info { min-width: 0; }
+.charge-toggle-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.charge-toggle-hint {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.pms-info-box {
+  padding: 16px 20px;
+  border-left: 3px solid var(--border);
+  background: var(--bg-deep, #F0EDE6);
+  border-radius: 0 var(--r-sm, 4px) var(--r-sm, 4px) 0;
+  margin-bottom: 20px;
+}
+.pms-info-box__eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+.pms-info-box ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+.pms-info-box li { font-size: 13px; color: var(--ink); line-height: 1.6; margin-bottom: 2px; }
+.pms-info-box__note { font-size: 11px; color: var(--ink-muted); font-style: italic; line-height: 1.5; margin-top: 8px; }
+
+.pms-pricing-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r, 8px);
+  cursor: pointer;
+  transition: border-color 0.12s;
+  margin-bottom: 8px;
+}
+.pms-pricing-option:last-child { margin-bottom: 0; }
+.pms-pricing-option:hover { border-color: var(--ink-muted); }
+.pms-pricing-option--disabled { opacity: 0.5; cursor: not-allowed; }
+.pms-pricing-option input[type="radio"] { margin-top: 2px; flex-shrink: 0; }
+.pms-pricing-option__title { font-size: 13px; font-weight: 500; color: var(--ink); }
+.pms-pricing-option__sub { font-size: 11px; color: var(--ink-muted); margin-top: 2px; line-height: 1.5; }
+
+.s-card__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.pms-footer-note {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-style: italic;
+  line-height: 1.6;
+  max-width: 560px;
+}
+</style>
+
+<div class="settings-page">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">PMS-Integration</span>
+  </nav>
+
+  <section class="settings-hero">
+    <span class="settings-hero__eyebrow">Integrationen</span>
+    <h1 class="settings-hero__title">PMS-Integration<span class="dot-pink">.</span></h1>
+    <p class="settings-hero__sub">Verbinde dein Mews-Hotel mit retaha. Reservationen, Zimmer und Gäste-Daten werden automatisch synchronisiert.</p>
+  </section>
 
   {message && (
-    <div class={`mb-8 px-4 py-3 text-sm border-l-4 ${
-      message.type === 'success'
-        ? 'bg-green-50 border-green-700 text-green-800'
-        : 'bg-red-50 border-red-700 text-red-800'
-    }`}>
+    <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`} style="margin-bottom: 24px;">
       {message.text}
     </div>
   )}
 
+  <div class="settings-sections">
+
   {isConnected && integration ? (
-    <div class="space-y-10 max-w-3xl">
 
-      <!-- Status-Block -->
-      <section class="border-t border-b border-anthrazit/[0.12] py-8">
-        <div class="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <p class="eyebrow text-pink-shock m-0">— Mews verbunden —</p>
-          <span class={`text-xs uppercase tracking-[0.12em] px-2.5 py-1 ${statusBadge.classes}`}>
-            {statusBadge.label}
-          </span>
+    <>
+      <!-- 01 Verbindungs-Status -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Mews verbunden</h2>
+          <span class="s-card__num">01</span>
         </div>
+        <div class="s-card__body">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+            <span class={`pms-status-badge pms-status-badge--${statusKey}`}>{statusBadge.label}</span>
+          </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
-          <div>
-            <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Enterprise-ID</p>
-            <p class="text-sm font-mono text-anthrazit break-all">{integration.enterprise_id}</p>
+          <div class="pms-meta-grid">
+            <div>
+              <p class="pms-meta-item__label">Enterprise-ID</p>
+              <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.enterprise_id}</p>
+            </div>
+            <div>
+              <p class="pms-meta-item__label">Environment</p>
+              <p class="pms-meta-item__value" style="text-transform:capitalize;">{integration.environment}</p>
+            </div>
+            <div>
+              <p class="pms-meta-item__label">Access-Token</p>
+              <p class="pms-meta-item__value pms-meta-item__value--mono">••••••••••••</p>
+              <p class="pms-meta-item__hint">verschlüsselt (AES-256-GCM)</p>
+            </div>
+            <div>
+              <p class="pms-meta-item__label">Letzter Sync</p>
+              <p class="pms-meta-item__value">{lastSyncLabel ?? 'noch nie'}</p>
+            </div>
           </div>
-          <div>
-            <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Environment</p>
-            <p class="text-base text-anthrazit capitalize">{integration.environment}</p>
-          </div>
-          <div>
-            <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Access-Token</p>
-            <p class="text-base font-mono text-anthrazit">••••••••••••</p>
-            <p class="text-xs italic text-anthrazit/55 mt-1">verschlüsselt (AES-256-GCM)</p>
-          </div>
-          <div>
-            <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Letzter Sync</p>
-            <p class="text-base text-anthrazit">{lastSyncLabel ?? 'noch nie'}</p>
-          </div>
+
+          {integration.sync_status === 'error' && integration.sync_error_message && (
+            <div class="s-flash s-flash--err" style="margin-top:16px;">
+              <strong>Letzter Sync-Fehler:</strong><br />
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;word-break:break-all;">{integration.sync_error_message}</span>
+            </div>
+          )}
         </div>
-
-        {integration.sync_status === 'error' && integration.sync_error_message && (
-          <div class="mt-6 px-4 py-3 text-sm bg-red-50 border-l-4 border-red-700 text-red-800">
-            <p class="font-semibold mb-1">Letzter Sync-Fehler:</p>
-            <p class="font-mono text-xs break-all">{integration.sync_error_message}</p>
-          </div>
-        )}
       </section>
 
-      <!-- Counts -->
+      <!-- 02 Synchronisierte Daten -->
       {counts && (
-        <section>
-          <p class="eyebrow text-anthrazit/55 mb-4">— Bisher synchronisiert —</p>
-          <div class="grid grid-cols-3 gap-4">
-            <div class="border border-stein p-6">
-              <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Zimmer</p>
-              <p class="text-3xl font-light text-anthrazit m-0">{counts.rooms}</p>
-            </div>
-            <div class="border border-stein p-6">
-              <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Aufenthalte</p>
-              <p class="text-3xl font-light text-anthrazit m-0">{counts.stays}</p>
-            </div>
-            <div class="border border-stein p-6">
-              <p class="text-xs uppercase tracking-[0.12em] text-anthrazit/55 mb-2">Gäste</p>
-              <p class="text-3xl font-light text-anthrazit m-0">{counts.guests}</p>
+        <section class="s-card">
+          <div class="s-card__head">
+            <h2 class="s-card__title">Bisher synchronisiert</h2>
+            <span class="s-card__num">02</span>
+          </div>
+          <div class="s-card__body">
+            <div class="pms-counts-grid">
+              <div class="pms-count-cell">
+                <p class="pms-count-cell__label">Zimmer</p>
+                <p class="pms-count-cell__num">{counts.rooms}</p>
+              </div>
+              <div class="pms-count-cell">
+                <p class="pms-count-cell__label">Aufenthalte</p>
+                <p class="pms-count-cell__num">{counts.stays}</p>
+              </div>
+              <div class="pms-count-cell">
+                <p class="pms-count-cell__label">Gäste</p>
+                <p class="pms-count-cell__num">{counts.guests}</p>
+              </div>
             </div>
           </div>
         </section>
       )}
 
-      <!-- Order-Konfiguration (Sprint C — Charge-to-Room) -->
-      <section>
-        <p class="eyebrow text-pink-shock mb-4">— Order-Konfiguration —</p>
-        <p class="text-sm text-anthrazit/70 mb-6 max-w-2xl leading-relaxed">
-          Wenn der Hotelier eine Buchung bestätigt, schickt retaha sie als Order
-          auf das Mews-Gast-Konto („Charge to Room"). Damit das funktioniert,
-          ordne pro Buchungstyp einen Mews-Service zu und setze deinen Tax-Code.
-        </p>
-
-        {servicesError && (
-          <div class="mb-6 px-4 py-3 text-sm bg-amber-50 border-l-4 border-amber-500 text-amber-800">
-            <strong>Services konnten nicht geladen werden:</strong> {servicesError}
-            <br />
-            Trotzdem speicherbar — Dropdowns sind leer. Bei nächstem Page-Load nochmal probieren.
-          </div>
-        )}
-
-        <form method="POST" class="space-y-6 max-w-2xl">
-          <input type="hidden" name="_action" value="save_config" />
-
-          <!-- Service-Mapping (Sprint E1 Phase 3 — nur Frühstück) -->
-          <p class="text-xs italic text-anthrazit/55 mb-4 max-w-xl leading-relaxed">
-            Charge-to-Room ist aktuell <strong>nur für Frühstück</strong> aktiv.
-            Service-Anfragen und Konferenz-Buchungen bleiben in retaha (Service ist meist
-            kostenfrei, Konferenz läuft über B2B-Vertrieb).
+      <!-- 03 Order-Konfiguration (Sprint C — Charge-to-Room) -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Order-Konfiguration</h2>
+          <span class="s-card__num">{counts ? '03' : '02'}</span>
+        </div>
+        <div class="s-card__body">
+          <p class="field__hint" style="margin-bottom:16px;">
+            Wenn der Hotelier eine Buchung bestätigt, schickt retaha sie als Order
+            auf das Mews-Gast-Konto ("Charge to Room"). Damit das funktioniert,
+            ordne pro Buchungstyp einen Mews-Service zu und setze deinen Tax-Code.
           </p>
-          <div class="space-y-5">
+
+          {servicesError && (
+            <div class="s-flash s-flash--err" style="margin-bottom:16px;">
+              <strong>Services konnten nicht geladen werden:</strong> {servicesError}
+              <br />Trotzdem speicherbar — Dropdowns sind leer. Bei nächstem Page-Load nochmal probieren.
+            </div>
+          )}
+
+          <form method="POST">
+            <input type="hidden" name="_action" value="save_config" />
+
+            <!-- Service-Mapping (Sprint E1 Phase 3 — nur Frühstück) -->
+            <p class="pms-meta-item__hint" style="margin-bottom:16px;">
+              Charge-to-Room ist aktuell <strong>nur für Frühstück</strong> aktiv.
+              Service-Anfragen und Konferenz-Buchungen bleiben in retaha (Service ist meist
+              kostenfrei, Konferenz läuft über B2B-Vertrieb).
+            </p>
+
             {serviceMappingFields.map(field => (
-              <label class="block">
-                <span class="eyebrow text-anthrazit/55 block mb-2">— Mews-Service für {field.label} —</span>
-                <select name={field.name} class="bauhaus-input">
+              <div class="sp-field">
+                <label class="sp-label">Mews-Service für {field.label}</label>
+                <select name={field.name} class="s-select">
                   <option value="">— nicht zugeordnet —</option>
                   {orderableServices.map(s => (
                     <option value={s.Id} selected={field.current === s.Id}>
@@ -526,103 +692,86 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
             ))}
-          </div>
 
-          <!-- Tax-Code (Sprint E1 Phase 2 — Dropdown wenn Liste da, sonst Input-Fallback) -->
-          <label class="block">
-            <span class="eyebrow text-anthrazit/55 block mb-2">— Tax-Code (Default) —</span>
-            {taxRateOptions.length > 0 ? (
-              <select
-                name="default_tax_code"
-                class="bauhaus-input bauhaus-input--mono"
-              >
-                <option value="">— bitte wählen —</option>
-                {taxRateOptions.map(opt => (
-                  <option value={opt.code} selected={integration.default_tax_code === opt.code}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                name="default_tax_code"
-                value={integration.default_tax_code ?? ''}
-                placeholder="z.B. UK-2022-20%, DE-2020-1-S, …"
-                autocomplete="off"
-                spellcheck="false"
-                class="bauhaus-input bauhaus-input--mono"
-              />
-            )}
-            <span class="text-xs italic text-anthrazit/55 mt-2 block">
-              {taxRateOptions.length > 0
-                ? <>Auswahl gefiltert auf Tax-Environment <span class="font-mono">{taxEnvironmentCode}</span>. Auswahl löst auch den numerischen Rate-Wert auf (für Net-Pricing-Hotels).</>
-                : <>Tax-Codes aus Mews konnten nicht geladen werden — bitte manuell eintragen. Tax-Environment: <span class="font-mono">{taxEnvironmentCode ?? '?'}</span></>}
-              {integration.default_tax_rate != null && (
-                <>
-                  <br />Aktueller Rate: <span class="font-mono">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span>
-                </>
+            <!-- Tax-Code (Sprint E1 Phase 2 — Dropdown wenn Liste da, sonst Input-Fallback) -->
+            <div class="sp-field">
+              <label class="sp-label">Tax-Code (Default)</label>
+              {taxRateOptions.length > 0 ? (
+                <select name="default_tax_code" class="s-select" style="font-family:'JetBrains Mono',monospace;">
+                  <option value="">— bitte wählen —</option>
+                  {taxRateOptions.map(opt => (
+                    <option value={opt.code} selected={integration.default_tax_code === opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="default_tax_code"
+                  value={integration.default_tax_code ?? ''}
+                  placeholder="z.B. UK-2022-20%, DE-2020-1-S, …"
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="s-input"
+                  style="font-family:'JetBrains Mono',monospace;"
+                />
               )}
-            </span>
-          </label>
-
-          <!-- Currency + Pricing-Mode (read-only Anzeige) -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div>
-              <span class="eyebrow text-anthrazit/55 block mb-2">— Default-Currency —</span>
-              <p class="text-base font-mono text-anthrazit m-0">
-                {integration.default_currency ?? '(nicht gesetzt)'}
-              </p>
-              <span class="text-xs italic text-anthrazit/55 mt-1 block">Aus configuration.Enterprise.Currencies (IsDefault=true).</span>
-            </div>
-            <div>
-              <span class="eyebrow text-anthrazit/55 block mb-2">— Pricing-Mode —</span>
-              <p class="text-base font-mono text-anthrazit m-0">
-                {integration.pricing_mode ?? '(nicht gesetzt)'}
-              </p>
-              <span class="text-xs italic text-anthrazit/55 mt-1 block">
-                Aus Enterprise.Pricing. Gross = orders/add nutzt UnitAmount.GrossValue; Net = NetValue.
+              <span class="sp-label-hint" style="font-size:11px;color:var(--ink-muted);font-style:italic;margin-top:2px;">
+                {taxRateOptions.length > 0
+                  ? <>Auswahl gefiltert auf Tax-Environment <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode}</span>. Löst auch den numerischen Rate-Wert auf (für Net-Pricing-Hotels).</>
+                  : <>Tax-Codes aus Mews konnten nicht geladen werden — bitte manuell eintragen. Tax-Environment: <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode ?? '?'}</span></>}
+                {integration.default_tax_rate != null && (
+                  <><br />Aktueller Rate: <span style="font-family:'JetBrains Mono',monospace;">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span></>
+                )}
               </span>
             </div>
-          </div>
 
-          <!-- Pricing-Source-Toggle -->
-          <fieldset class="border-t border-anthrazit/[0.12] pt-6">
-            <legend class="eyebrow text-anthrazit/55 mb-3">— Preis-Quelle —</legend>
-            <div class="space-y-3">
-              <label class="flex items-start gap-3 cursor-pointer">
+            <!-- Currency + Pricing-Mode (read-only Anzeige) -->
+            <div class="pms-meta-grid" style="margin-bottom:20px;">
+              <div>
+                <p class="pms-meta-item__label">Default-Currency</p>
+                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.default_currency ?? '(nicht gesetzt)'}</p>
+                <p class="pms-meta-item__hint">Aus configuration.Enterprise.Currencies (IsDefault=true).</p>
+              </div>
+              <div>
+                <p class="pms-meta-item__label">Pricing-Mode</p>
+                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.pricing_mode ?? '(nicht gesetzt)'}</p>
+                <p class="pms-meta-item__hint">Gross = GrossValue; Net = NetValue bei orders/add.</p>
+              </div>
+            </div>
+
+            <!-- Pricing-Source-Toggle -->
+            <div class="sp-field" style="margin-bottom:20px;">
+              <span class="sp-label">Preis-Quelle</span>
+              <label class="pms-pricing-option">
                 <input
                   type="radio"
                   name="pricing_source"
                   value="retaha"
                   checked={integration.pricing_source !== 'mews'}
-                  class="mt-1"
                 />
                 <span>
-                  <span class="block text-sm font-medium text-anthrazit">Preise in retaha pflegen</span>
-                  <span class="block text-xs text-anthrazit/55 mt-0.5">
-                    Hotelier pflegt Preise direkt in den retaha-Modulen. Push als Custom-Items.
-                  </span>
+                  <span class="pms-pricing-option__title">Preise in retaha pflegen</span>
+                  <span class="pms-pricing-option__sub">Hotelier pflegt Preise direkt in den retaha-Modulen. Push als Custom-Items.</span>
                 </span>
               </label>
-
-              <label class={pricingMewsLabelClass}>
+              <label class={`pms-pricing-option${!productsAvailable ? ' pms-pricing-option--disabled' : ''}`}>
                 <input
                   type="radio"
                   name="pricing_source"
                   value="mews"
                   checked={integration.pricing_source === 'mews'}
                   disabled={!productsAvailable}
-                  class="mt-1"
                 />
                 <span>
-                  <span class="block text-sm font-medium text-anthrazit">
+                  <span class="pms-pricing-option__title">
                     Preise aus Mews-Products abrufen
-                    <span class="text-xs font-mono text-anthrazit/55 ml-2">({productsCount} Products in Mews)</span>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-muted);margin-left:6px;">({productsCount} Products)</span>
                   </span>
-                  <span class="block text-xs text-anthrazit/55 mt-0.5">
+                  <span class="pms-pricing-option__sub">
                     {productsAvailable
                       ? 'Verfügbar. Hinweis: Pfad C+ ist noch nicht implementiert (Backlog) — auswählbar, aber wird beim Push einen Fehler werfen.'
                       : 'Nicht verfügbar — dein Mews-Hotel hat keine Products angelegt. Lege Products in Mews an und verbinde neu.'}
@@ -630,251 +779,236 @@ const statusBadge = syncStatusBadge[statusKey] ?? syncStatusBadge.idle;
                 </span>
               </label>
             </div>
-          </fieldset>
 
-          <div class="pt-2">
-            <button type="submit" class="bauhaus-button bauhaus-button--primary">
-              Order-Konfiguration speichern
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <!-- UX-017 P3 — Charge-Required-Toggle pro Booking-Type -->
-      <section class="border-t border-anthrazit/[0.12] pt-8 mt-8">
-        <p class="themed-eyebrow-flank text-pink-shock mb-2 inline-block">Charge-Konfiguration</p>
-        <h2 class="text-2xl font-light mb-3">
-          Welche Buchungen werden Mews-belastet<span class="h-dot">.</span>
-        </h2>
-        <p class="text-sm text-anthrazit/60 mb-6 max-w-2xl">
-          Pro Buchungs-Typ: Soll bei Bestätigung automatisch eine
-          Mews-Charge an das Gäste-Zimmer geschickt werden? Deaktiviere
-          für Reservation-only-Typen (z.B. Spa, wo Zahlung vor Ort erfolgt).
-        </p>
-
-        <form method="POST" class="space-y-3 max-w-2xl">
-          <input type="hidden" name="_action" value="save_charge_config" />
-
-          <div class="charge-toggle-grid">
-            {[
-              { type: 'breakfast',     label: 'Frühstück',     hint: 'Preis aus /admin/breakfast' },
-              { type: 'conference',    label: 'Konferenz',     hint: 'Preis aus /admin/conference' },
-              { type: 'service',       label: 'Service',       hint: 'Preis aus /admin/service' },
-              { type: 'restaurant',    label: 'Restaurant',    hint: 'Reservation-only — Zahlung vor Ort' },
-              { type: 'spa',           label: 'Spa',           hint: 'Reservation-only — Zahlung vor Ort' },
-              { type: 'late_checkout', label: 'Late Checkout', hint: 'Kostet meist extra' },
-              { type: 'housekeeping',  label: 'Housekeeping',  hint: 'Kostenfreier Service' },
-            ].map(({ type, label, hint }) => {
-              const colKey = `${type}_charge_enabled` as keyof typeof integration;
-              // null → fallback true (Backward-Compat fuer Rows ohne Default)
-              const checked = (integration as any)?.[colKey] !== false;
-              return (
-                <label class="charge-toggle-card">
-                  <div class="charge-toggle-info">
-                    <p class="charge-toggle-label">{label}</p>
-                    <p class="charge-toggle-hint">{hint}</p>
-                  </div>
-                  <span style="position:relative;display:inline-block;flex-shrink:0;">
-                    <input
-                      type="checkbox"
-                      name={`${type}_charge_enabled`}
-                      checked={checked}
-                      class="sr-only"
-                    />
-                    <span class="bt-visual"><span class="bt-knob"></span></span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-
-          <div class="pt-4">
-            <button type="submit" class="bauhaus-button bauhaus-button--primary">
-              Charge-Konfiguration speichern
-            </button>
-          </div>
-        </form>
-
-        <style>
-          .charge-toggle-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-          @media (min-width: 640px) {
-            .charge-toggle-grid { grid-template-columns: 1fr 1fr; }
-          }
-          .charge-toggle-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 14px 16px;
-            background: var(--theme-bg-secondary);
-            border: 1px solid var(--theme-border);
-            border-radius: var(--theme-radius);
-            cursor: pointer;
-            transition: border-color 0.15s ease;
-          }
-          .charge-toggle-card:hover { border-color: var(--theme-accent); }
-          .charge-toggle-info { min-width: 0; }
-          .charge-toggle-label {
-            margin: 0;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--theme-text-primary);
-            text-transform: lowercase;
-          }
-          .charge-toggle-hint {
-            margin: 2px 0 0;
-            font-size: 11px;
-            color: color-mix(in srgb, var(--theme-text-primary) 0.55, transparent);
-          }
-        </style>
-      </section>
-
-      <!-- Aktionen -->
-      <section class="flex gap-6 flex-wrap items-center pt-2">
-        <button
-          id="sync-button"
-          type="button"
-          class="bauhaus-button bauhaus-button--primary"
-        >
-          Jetzt synchronisieren
-        </button>
-        <form
-          method="POST"
-          id="disconnect-form"
-          class="m-0"
-        >
-          <input type="hidden" name="_action" value="disconnect" />
-          <button
-            type="submit"
-            class="bauhaus-button bauhaus-button--ghost"
-          >
-            Verbindung trennen
-          </button>
-        </form>
-      </section>
-
-      <p class="text-xs italic text-anthrazit/55 max-w-xl leading-relaxed">
-        Sync läuft über getMewsClientForHotel(hotel_id) — der Access-Token wird beim
-        Sync server-seitig entschlüsselt und nie ans Frontend gesendet. Synchronisiert
-        werden Reservationen der letzten 30 Tage (rolling window).
-      </p>
-    </div>
-
-    <script is:inline>
-      (function () {
-        const syncBtn = document.getElementById('sync-button');
-        const disconnectForm = document.getElementById('disconnect-form');
-
-        if (syncBtn) {
-          syncBtn.addEventListener('click', async () => {
-            const originalText = syncBtn.textContent;
-            syncBtn.disabled = true;
-            syncBtn.textContent = 'Synchronisiere…';
-            try {
-              const resp = await fetch('/api/admin/mews/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ windowDays: 30 }),
-              });
-              const data = await resp.json();
-              if (data.ok) {
-                window.location.href = '/pms?saved=sync';
-              } else {
-                alert('Sync fehlgeschlagen: ' + (data.error || 'unbekannter Fehler'));
-                syncBtn.disabled = false;
-                syncBtn.textContent = originalText;
-              }
-            } catch (err) {
-              alert('Netzwerk-Fehler: ' + (err && err.message ? err.message : err));
-              syncBtn.disabled = false;
-              syncBtn.textContent = originalText;
-            }
-          });
-        }
-
-        if (disconnectForm) {
-          disconnectForm.addEventListener('submit', (e) => {
-            if (!confirm('Mews-Verbindung wirklich trennen? Bisher synchronisierte Daten bleiben erhalten, der Sync stoppt aber sofort.')) {
-              e.preventDefault();
-            }
-          });
-        }
-      })();
-    </script>
-  ) : (
-    <div class="max-w-2xl">
-      <p class="text-anthrazit/80 leading-relaxed text-base mb-6">
-        Verbinde dein Mews-Property mit retaha. Du brauchst nur deinen
-        <strong>Access-Token</strong> für die Connector-API — die Enterprise-ID lesen
-        wir automatisch aus der Mews-API aus.
-      </p>
-
-      <!-- Sprint E1 Phase 8 — Mews-Doku-Hilfe-Box -->
-      <aside class="mb-10 p-5 border-l-4 border-pink-shock/60 bg-anthrazit/5">
-        <p class="eyebrow text-anthrazit/55 mb-2">— Token-Generierung —</p>
-        <p class="text-sm text-anthrazit/80 leading-relaxed mb-3">
-          So findest du deinen Access-Token in Mews Commander:
-        </p>
-        <ol class="text-sm text-anthrazit/80 leading-relaxed list-decimal pl-5 space-y-1 mb-3">
-          <li>Mews Commander öffnen → <strong>Marketplace</strong></li>
-          <li>Eintrag „retaha" suchen und <strong>Connect</strong> klicken</li>
-          <li>Access-Token kopieren und hier einfügen</li>
-        </ol>
-        <p class="text-xs text-anthrazit/55 italic leading-relaxed">
-          Falls retaha noch nicht im Marketplace ist: Mews-Support kontaktieren
-          („Connector-API-Integration mit retaha") oder die offizielle
-          <a href="https://mews-systems.gitbook.io/connector-api/" target="_blank" rel="noopener" class="underline hover:text-pink-shock">
-            Connector-API-Doku
-          </a>
-          öffnen.
-        </p>
-      </aside>
-
-      <form method="POST" class="space-y-8">
-        <input type="hidden" name="_action" value="connect" />
-
-        <label class="block">
-          <span class="eyebrow text-anthrazit/55 block mb-2">— Access-Token —</span>
-          <input
-            type="password"
-            name="access_token"
-            placeholder="••••••••••••"
-            required
-            autocomplete="off"
-            spellcheck="false"
-            class="bauhaus-input bauhaus-input--mono"
-          />
-          <span class="text-xs italic text-anthrazit/55 mt-2 block">
-            Wird verschlüsselt gespeichert (AES-256-GCM) — niemals im Klartext in der Datenbank.
-          </span>
-        </label>
-
-        <label class="block">
-          <span class="eyebrow text-anthrazit/55 block mb-2">— Environment —</span>
-          <select
-            name="environment"
-            required
-            class="bauhaus-input"
-          >
-            <option value="demo">Demo (api.mews-demo.com)</option>
-            <option value="production">Production (api.mews.com)</option>
-          </select>
-          <span class="text-xs italic text-anthrazit/55 mt-2 block">
-            Für erste Tests: Demo. Echte Reservationen: Production.
-          </span>
-        </label>
-
-        <div class="pt-4">
-          <button type="submit" class="bauhaus-button bauhaus-button--primary">
-            Verbinden
-          </button>
+            <div class="s-card__footer">
+              <button type="submit" class="v9-btn v9-btn--primary">
+                Order-Konfiguration speichern
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
-    </div>
+      </section>
+
+      <!-- 04 Charge-Konfiguration (UX-017 P3) -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Charge-Konfiguration</h2>
+          <span class="s-card__num">{counts ? '04' : '03'}</span>
+        </div>
+        <div class="s-card__body">
+          <p class="field__hint" style="margin-bottom:16px;">
+            Pro Buchungs-Typ: Soll bei Bestätigung automatisch eine
+            Mews-Charge an das Gäste-Zimmer geschickt werden? Deaktiviere
+            für Reservation-only-Typen (z.B. Spa, wo Zahlung vor Ort erfolgt).
+          </p>
+
+          <form method="POST">
+            <input type="hidden" name="_action" value="save_charge_config" />
+
+            <div class="charge-toggle-grid" style="margin-bottom:20px;">
+              {[
+                { type: 'breakfast',     label: 'Frühstück',     hint: 'Preis aus /admin/breakfast' },
+                { type: 'conference',    label: 'Konferenz',     hint: 'Preis aus /admin/conference' },
+                { type: 'service',       label: 'Service',       hint: 'Preis aus /admin/service' },
+                { type: 'restaurant',    label: 'Restaurant',    hint: 'Reservation-only — Zahlung vor Ort' },
+                { type: 'spa',           label: 'Spa',           hint: 'Reservation-only — Zahlung vor Ort' },
+                { type: 'late_checkout', label: 'Late Checkout', hint: 'Kostet meist extra' },
+                { type: 'housekeeping',  label: 'Housekeeping',  hint: 'Kostenfreier Service' },
+              ].map(({ type, label, hint }) => {
+                const colKey = `${type}_charge_enabled` as keyof typeof integration;
+                // null → fallback true (Backward-Compat fuer Rows ohne Default)
+                const checked = (integration as any)?.[colKey] !== false;
+                return (
+                  <label class="charge-toggle-card">
+                    <div class="charge-toggle-info">
+                      <p class="charge-toggle-label">{label}</p>
+                      <p class="charge-toggle-hint">{hint}</p>
+                    </div>
+                    <span style="position:relative;display:inline-block;flex-shrink:0;">
+                      <input
+                        type="checkbox"
+                        name={`${type}_charge_enabled`}
+                        checked={checked}
+                        class="sr-only"
+                      />
+                      <span class="bt-visual"><span class="bt-knob"></span></span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div class="s-card__footer">
+              <button type="submit" class="v9-btn v9-btn--primary">
+                Charge-Konfiguration speichern
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 05 Aktionen -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Aktionen</h2>
+          <span class="s-card__num">{counts ? '05' : '04'}</span>
+        </div>
+        <div class="s-card__body">
+          <div class="s-card__actions">
+            <button
+              id="sync-button"
+              type="button"
+              class="v9-btn v9-btn--primary"
+            >
+              Jetzt synchronisieren
+            </button>
+            <form method="POST" id="disconnect-form" style="margin:0;">
+              <input type="hidden" name="_action" value="disconnect" />
+              <button type="submit" class="v9-btn v9-btn--ghost">
+                Verbindung trennen
+              </button>
+            </form>
+          </div>
+          <p class="pms-footer-note" style="margin-top:16px;">
+            Sync läuft über getMewsClientForHotel(hotel_id) — der Access-Token wird beim
+            Sync server-seitig entschlüsselt und nie ans Frontend gesendet. Synchronisiert
+            werden Reservationen der letzten 30 Tage (rolling window).
+          </p>
+        </div>
+      </section>
+    </>
+
+  ) : (
+
+    <>
+      <!-- 01 Token-Hilfe -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Token-Generierung</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <div class="s-card__body">
+          <p class="field__hint" style="margin-bottom:12px;">
+            Verbinde dein Mews-Property mit retaha. Du brauchst nur deinen
+            <strong>Access-Token</strong> für die Connector-API — die Enterprise-ID lesen
+            wir automatisch aus der Mews-API aus.
+          </p>
+          <div class="pms-info-box">
+            <p class="pms-info-box__eyebrow">So findest du deinen Access-Token in Mews Commander</p>
+            <ol>
+              <li>Mews Commander öffnen → <strong>Marketplace</strong></li>
+              <li>Eintrag "retaha" suchen und <strong>Connect</strong> klicken</li>
+              <li>Access-Token kopieren und hier einfügen</li>
+            </ol>
+            <p class="pms-info-box__note">
+              Falls retaha noch nicht im Marketplace ist: Mews-Support kontaktieren
+              ("Connector-API-Integration mit retaha") oder die offizielle
+              <a href="https://mews-systems.gitbook.io/connector-api/" target="_blank" rel="noopener" style="text-decoration:underline;">
+                Connector-API-Doku
+              </a>
+              öffnen.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 Verbinden -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Mews verbinden</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <div class="s-card__body">
+          <form method="POST">
+            <input type="hidden" name="_action" value="connect" />
+
+            <div class="sp-field">
+              <label class="sp-label">
+                Access-Token
+                <span class="sp-label-hint">(Pflichtfeld)</span>
+              </label>
+              <input
+                type="password"
+                name="access_token"
+                placeholder="••••••••••••"
+                required
+                autocomplete="off"
+                spellcheck="false"
+                class="s-input"
+                style="font-family:'JetBrains Mono',monospace;"
+              />
+              <span style="font-size:11px;color:var(--ink-muted);font-style:italic;">
+                Wird verschlüsselt gespeichert (AES-256-GCM) — niemals im Klartext in der Datenbank.
+              </span>
+            </div>
+
+            <div class="sp-field">
+              <label class="sp-label">Environment</label>
+              <select name="environment" required class="s-select">
+                <option value="demo">Demo (api.mews-demo.com)</option>
+                <option value="production">Production (api.mews.com)</option>
+              </select>
+              <span style="font-size:11px;color:var(--ink-muted);font-style:italic;">
+                Für erste Tests: Demo. Echte Reservationen: Production.
+              </span>
+            </div>
+
+            <div class="s-card__footer">
+              <button type="submit" class="v9-btn v9-btn--primary">
+                Verbinden
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </>
+
   )}
+
+  </div><!-- /.settings-sections -->
+
+</div><!-- /.settings-page -->
+
+<script is:inline>
+  (function () {
+    const syncBtn = document.getElementById('sync-button');
+    const disconnectForm = document.getElementById('disconnect-form');
+
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        const originalText = syncBtn.textContent;
+        syncBtn.disabled = true;
+        syncBtn.textContent = 'Synchronisiere…';
+        try {
+          const resp = await fetch('/api/admin/mews/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ windowDays: 30 }),
+          });
+          const data = await resp.json();
+          if (data.ok) {
+            window.location.href = '/pms?saved=sync';
+          } else {
+            alert('Sync fehlgeschlagen: ' + (data.error || 'unbekannter Fehler'));
+            syncBtn.disabled = false;
+            syncBtn.textContent = originalText;
+          }
+        } catch (err) {
+          alert('Netzwerk-Fehler: ' + (err && err.message ? err.message : err));
+          syncBtn.disabled = false;
+          syncBtn.textContent = originalText;
+        }
+      });
+    }
+
+    if (disconnectForm) {
+      disconnectForm.addEventListener('submit', (e) => {
+        if (!confirm('Mews-Verbindung wirklich trennen? Bisher synchronisierte Daten bleiben erhalten, der Sync stoppt aber sofort.')) {
+          e.preventDefault();
+        }
+      });
+    }
+  })();
+</script>
 
 </Layout>

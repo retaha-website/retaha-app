@@ -2,7 +2,7 @@
 /**
  * /admin/sicherheit — 2FA Setup-Wizard (4 Steps)
  *
- * 1:1 CSS aus Prototyp mfa_v2_setup_wizard.html (User-finalisiert).
+ * v9 design system rewrite — uses s-card, breadcrumb, settings-hero, v9-btn patterns.
  *
  * Steps:
  *   1. Vorbereiten (Checklist) — kein API-Call
@@ -36,7 +36,265 @@ const isRequired = Astro.url.searchParams.get('required') === 'true';
 
 <Layout title="Zwei-Faktor-Authentifizierung" activeTab="backoffice">
 
-  <main class="admin-shell" x-data={`{
+<style is:global>
+  [x-cloak] { display: none !important; }
+
+  /* ── Step indicator ────────────────────────────────────────────────────────── */
+  .sec-step-indicator {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .sec-step-cell {
+    padding-top: 12px;
+    border-top: 2px solid var(--border);
+    transition: border-color 400ms ease;
+  }
+  .sec-step-cell.is-active  { border-top-color: var(--accent); }
+  .sec-step-cell.is-complete { border-top-color: #5C9070; }
+  .sec-step-cell__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 4px;
+  }
+  .sec-step-cell.is-active .sec-step-cell__label,
+  .sec-step-cell.is-complete .sec-step-cell__label { color: var(--ink); }
+  .sec-step-cell__title {
+    font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .sec-step-cell.is-not-yet .sec-step-cell__title { color: var(--ink-muted); opacity: 0.5; }
+  .sec-step-cell__num {
+    display: inline-block;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    margin-right: 8px;
+  }
+  .sec-step-cell.is-complete .sec-step-cell__num { color: #5C9070; }
+  .sec-step-cell.is-not-yet .sec-step-cell__num { color: var(--ink-muted); opacity: 0.4; }
+
+  /* ── Error banner ──────────────────────────────────────────────────────────── */
+  .sec-error {
+    padding: 12px 16px;
+    background: rgba(140, 33, 40, 0.06);
+    border-left: 3px solid #8C2128;
+    border-radius: var(--r-sm, 4px);
+    margin-bottom: 24px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .sec-error::before {
+    content: "▲ ";
+    color: #8C2128;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* ── Step panels ───────────────────────────────────────────────────────────── */
+  .sec-panel {
+    animation: secPanelEnter 400ms ease;
+  }
+  @keyframes secPanelEnter {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sec-panel { animation: none; }
+  }
+
+  /* ── Enforcement notice ────────────────────────────────────────────────────── */
+  .sec-enforcement {
+    padding: 14px 16px;
+    background: rgba(192, 106, 60, 0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r-sm, 4px);
+    margin-bottom: 24px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  /* ── Checklist (Step 1) ────────────────────────────────────────────────────── */
+  .sec-checklist { display: flex; flex-direction: column; gap: 10px; }
+  .sec-checklist-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r, 8px);
+  }
+  .sec-checklist-item__num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .sec-checklist-item__content h4 {
+    font-size: 13px; font-weight: 500;
+    color: var(--ink); margin-bottom: 4px;
+  }
+  .sec-checklist-item__content p {
+    font-size: 12px; color: var(--ink-muted); line-height: 1.5;
+  }
+  .sec-checklist-item__content a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(192, 106, 60, 0.3);
+  }
+  .sec-checklist-item__content a:hover { border-bottom-color: var(--accent); }
+
+  /* ── QR display (Step 2) ───────────────────────────────────────────────────── */
+  .sec-qr-display {
+    display: grid; grid-template-columns: 1fr; gap: 24px;
+    margin-bottom: 24px;
+  }
+  @media (min-width: 640px) {
+    .sec-qr-display { grid-template-columns: auto 1fr; align-items: center; }
+  }
+  .sec-qr-code {
+    width: 192px; height: 192px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--r, 8px);
+    padding: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sec-qr-code img { width: 100%; height: 100%; }
+  .sec-qr-info h4 {
+    font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 10px;
+  }
+  .sec-qr-info p {
+    font-size: 12px; color: var(--ink-muted); line-height: 1.55; margin-bottom: 14px;
+  }
+  .sec-secret-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; border: 1px solid var(--border);
+    padding: 7px 12px;
+    border-radius: var(--r-sm, 4px);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: border-color 180ms ease, color 180ms ease;
+  }
+  .sec-secret-toggle:hover { border-color: var(--ink); color: var(--ink); }
+  .sec-secret-value {
+    margin-top: 10px; padding: 10px 12px;
+    background: var(--bg-deep, #F0EDE6);
+    border-radius: var(--r-sm, 4px);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--ink);
+    letter-spacing: 0.1em; word-break: break-all;
+  }
+
+  /* ── TOTP code inputs (Step 3) ─────────────────────────────────────────────── */
+  .sec-code-group {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+    max-width: 360px;
+  }
+  .sec-code-input {
+    width: 100%; aspect-ratio: 1; max-height: 54px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--r-sm, 4px);
+    background: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 500;
+    text-align: center;
+    color: var(--ink);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .sec-code-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(192, 106, 60, 0.15);
+  }
+  .sec-code-input.is-filled { border-color: var(--ink-muted); }
+
+  /* ── Recovery codes (Step 4) ───────────────────────────────────────────────── */
+  .sec-complete-indicator {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 24px 0;
+    margin-bottom: 8px;
+  }
+  .sec-complete-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #5C9070;
+  }
+  .sec-recovery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r, 8px);
+    margin-bottom: 20px;
+  }
+  .sec-recovery-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; letter-spacing: 0.08em;
+    color: var(--ink);
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm, 4px);
+    text-align: center;
+  }
+  .sec-recovery-actions {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .sec-recovery-warning {
+    padding: 14px 16px;
+    background: rgba(140, 33, 40, 0.05);
+    border-left: 3px solid #8C2128;
+    border-radius: var(--r-sm, 4px);
+    margin-bottom: 24px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .sec-recovery-warning::before {
+    content: "▲ ";
+    color: #8C2128;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+  }
+  .sec-recovery-warning strong { color: var(--ink); font-weight: 500; }
+  .sec-recovery-checkbox {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 24px;
+    cursor: pointer;
+  }
+  .sec-recovery-checkbox input {
+    margin-top: 3px; width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer; flex-shrink: 0;
+  }
+  .sec-recovery-checkbox label {
+    font-size: 13px; color: var(--ink); cursor: pointer; line-height: 1.5;
+  }
+
+  /* ── Step action bar ───────────────────────────────────────────────────────── */
+  .sec-actions {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    margin-top: 20px;
+  }
+
+  /* Print: only show recovery codes */
+  @media print {
+    body * { visibility: hidden; }
+    .sec-recovery-grid, .sec-recovery-grid * { visibility: visible; }
+    .sec-recovery-grid { position: absolute; top: 0; left: 0; background: white; border: 1px solid black; }
+  }
+</style>
+
+<div class="settings-page"
+  x-data={`{
     step: 1,
     code: ['', '', '', '', '', ''],
     secretRevealed: false,
@@ -72,9 +330,8 @@ const isRequired = Astro.url.searchParams.get('required') === 'true';
 
     async advance() {
       if (this.step === 1) {
-        // Lade QR-Code wenn 1 -> 2
         await this.startSetup();
-        if (!this.qrDataUrl) return; // Error already set
+        if (!this.qrDataUrl) return;
         this.step = 2;
       } else if (this.step === 2) {
         this.step = 3;
@@ -150,568 +407,239 @@ const isRequired = Astro.url.searchParams.get('required') === 'true';
     }
   }`}>
 
-    {isRequired && (
-      <div class="enforcement-notice">
-        <p><strong>Pflicht-Setup:</strong> Dein Hotel-Owner hat 2FA fuer das Team aktiviert. Du musst es jetzt einrichten.</p>
-      </div>
-    )}
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">Sicherheit &amp; 2FA</span>
+  </nav>
 
-    <p class="page-eyebrow">— sicherheit —</p>
-    <h1 class="page-title">Zwei-Faktor-Authentifizierung<span class="h-dot">.</span></h1>
-    <p class="page-sub">
+  <!-- Hero -->
+  <section class="settings-hero">
+    <span class="settings-hero__eyebrow">— Sicherheit —</span>
+    <h1 class="settings-hero__title">Zwei-Faktor-Authentifizierung<span class="dot-pink">.</span></h1>
+    <p class="settings-hero__sub">
       Schütze dein retaha-Konto mit einem zusätzlichen Sicherheits-Schlüssel.
       Du brauchst eine Authenticator-App auf deinem Smartphone — wir empfehlen
       Google Authenticator, 1Password oder den iCloud-Schlüsselbund.
     </p>
+  </section>
 
-    <!-- STEP INDICATOR -->
-    <nav class="step-indicator" aria-label="Setup-Fortschritt">
-      {[
-        { num: '01', title: 'Vorbereiten' },
-        { num: '02', title: 'QR-Code scannen' },
-        { num: '03', title: 'Code verifizieren' },
-        { num: '04', title: 'Recovery-Codes' },
-      ].map((cell, i) => (
-        <div class="step-cell" x-bind:class={`{
-          'is-active': step === ${i + 1},
-          'is-complete': step > ${i + 1},
-          'is-not-yet': step < ${i + 1}
-        }`}>
-          <p class="step-cell__label"><span class="step-cell__num">{cell.num}</span>SCHRITT</p>
-          <p class="step-cell__title">{cell.title}</p>
-        </div>
-      ))}
-    </nav>
+  <!-- Enforcement notice -->
+  {isRequired && (
+    <div class="sec-enforcement">
+      <strong>Pflicht-Setup:</strong> Dein Hotel-Owner hat 2FA für das Team aktiviert. Du musst es jetzt einrichten.
+    </div>
+  )}
 
-    <!-- Error Banner (global) -->
-    <div x-show="errorMessage" x-cloak class="setup-error" x-text="errorMessage"></div>
+  <div class="settings-sections">
 
-    <!-- STEP 1: VORBEREITEN -->
-    <section class="step-panel" x-show="step === 1">
-      <h2 class="step-panel__title">Was du brauchst<span class="h-dot">.</span></h2>
-      <p class="step-panel__desc">
-        Bevor wir starten — bereite eine <strong>Authenticator-App</strong> auf deinem
-        Smartphone vor. Falls du noch keine hast, kein Problem:
-      </p>
-
-      <div class="checklist">
-        <div class="checklist-item">
-          <span class="checklist-item__num">01</span>
-          <div class="checklist-item__content">
-            <h4>Authenticator-App installieren</h4>
-            <p>
-              Empfohlen:
-              <a href="https://apps.apple.com/de/app/google-authenticator/id388497605" target="_blank" rel="noopener">Google Authenticator</a>,
-              <a href="https://1password.com" target="_blank" rel="noopener">1Password</a>
-              oder der iCloud-Schlüsselbund (bereits auf deinem iPhone).
-            </p>
-          </div>
-        </div>
-        <div class="checklist-item">
-          <span class="checklist-item__num">02</span>
-          <div class="checklist-item__content">
-            <h4>Smartphone bereithalten</h4>
-            <p>Du brauchst es für den QR-Code-Scan im nächsten Schritt.</p>
-          </div>
-        </div>
-        <div class="checklist-item">
-          <span class="checklist-item__num">03</span>
-          <div class="checklist-item__content">
-            <h4>Recovery-Codes notieren</h4>
-            <p>
-              Am Ende bekommst du 8 Backup-Codes für den Notfall — falls du dein
-              Phone verlierst. Halte einen Drucker oder Stift bereit.
-            </p>
-          </div>
-        </div>
+    <!-- Wizard card -->
+    <section class="s-card">
+      <div class="s-card__head">
+        <h2 class="s-card__title">2FA einrichten</h2>
+        <span class="s-card__num">01</span>
       </div>
 
-      <div class="step-actions">
-        <button class="btn-primary" x-on:click="advance()" x-bind:disabled="isStarting">
-          <span x-show="!isStarting">Ich bin bereit</span>
-          <span x-show="isStarting" x-cloak>Wird vorbereitet ...</span>
-        </button>
-      </div>
-    </section>
+      <div class="s-card__body">
 
-    <!-- STEP 2: QR-CODE -->
-    <section class="step-panel" x-show="step === 2" x-cloak>
-      <h2 class="step-panel__title">QR-Code scannen<span class="h-dot">.</span></h2>
-      <p class="step-panel__desc">
-        Öffne deine Authenticator-App und tippe auf <strong>"+ Hinzufügen"</strong>.
-        Scanne dann den QR-Code mit der Kamera.
-      </p>
+        <!-- Step indicator -->
+        <nav class="sec-step-indicator" aria-label="Setup-Fortschritt">
+          {[
+            { num: '01', title: 'Vorbereiten' },
+            { num: '02', title: 'QR-Code scannen' },
+            { num: '03', title: 'Code verifizieren' },
+            { num: '04', title: 'Recovery-Codes' },
+          ].map((cell, i) => (
+            <div class="sec-step-cell" x-bind:class={`{
+              'is-active': step === ${i + 1},
+              'is-complete': step > ${i + 1},
+              'is-not-yet': step < ${i + 1}
+            }`}>
+              <p class="sec-step-cell__label">
+                <span class="sec-step-cell__num">{cell.num}</span>SCHRITT
+              </p>
+              <p class="sec-step-cell__title">{cell.title}</p>
+            </div>
+          ))}
+        </nav>
 
-      <div class="qr-display">
-        <div class="qr-code">
-          <img x-bind:src="qrDataUrl" alt="QR-Code für Authenticator-App-Setup" x-show="qrDataUrl" />
-        </div>
+        <!-- Global error banner -->
+        <div x-show="errorMessage" x-cloak class="sec-error" x-text="errorMessage"></div>
 
-        <div class="qr-info">
-          <h4>retaha · 2FA Setup</h4>
-          <p>
-            Falls dein Phone den QR-Code nicht scannen kann, kannst du den
-            Setup-Schlüssel auch manuell eintippen:
+        <!-- ── STEP 1: VORBEREITEN ─────────────────────────────────────────────── -->
+        <div class="sec-panel" x-show="step === 1">
+          <p class="field__hint" style="margin-bottom:20px;">
+            Bevor wir starten — bereite eine <strong>Authenticator-App</strong> auf deinem
+            Smartphone vor. Falls du noch keine hast, kein Problem:
           </p>
-          <button class="qr-secret-toggle" type="button" x-on:click="secretRevealed = !secretRevealed">
-            <span x-text="secretRevealed ? '← Schlüssel verbergen' : '→ Schlüssel anzeigen'"></span>
-          </button>
-          <div x-show="secretRevealed" x-cloak class="qr-secret-value" x-text="secretForManualEntry"></div>
+
+          <div class="sec-checklist">
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">01</span>
+              <div class="sec-checklist-item__content">
+                <h4>Authenticator-App installieren</h4>
+                <p>
+                  Empfohlen:
+                  <a href="https://apps.apple.com/de/app/google-authenticator/id388497605" target="_blank" rel="noopener">Google Authenticator</a>,
+                  <a href="https://1password.com" target="_blank" rel="noopener">1Password</a>
+                  oder der iCloud-Schlüsselbund (bereits auf deinem iPhone).
+                </p>
+              </div>
+            </div>
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">02</span>
+              <div class="sec-checklist-item__content">
+                <h4>Smartphone bereithalten</h4>
+                <p>Du brauchst es für den QR-Code-Scan im nächsten Schritt.</p>
+              </div>
+            </div>
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">03</span>
+              <div class="sec-checklist-item__content">
+                <h4>Recovery-Codes notieren</h4>
+                <p>
+                  Am Ende bekommst du 8 Backup-Codes für den Notfall — falls du dein
+                  Phone verlierst. Halte einen Drucker oder Stift bereit.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-actions">
+            <button class="v9-btn v9-btn--primary" x-on:click="advance()" x-bind:disabled="isStarting">
+              <span x-show="!isStarting">Ich bin bereit</span>
+              <span x-show="isStarting" x-cloak>Wird vorbereitet …</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div class="step-actions">
-        <button class="step-back" type="button" x-on:click="back()">← Zurück</button>
-        <button class="btn-primary" x-on:click="advance()">
-          Weiter zur Verifizierung
-        </button>
-      </div>
-    </section>
+        <!-- ── STEP 2: QR-CODE ────────────────────────────────────────────────── -->
+        <div class="sec-panel" x-show="step === 2" x-cloak>
+          <p class="field__hint" style="margin-bottom:20px;">
+            Öffne deine Authenticator-App und tippe auf <strong>"+ Hinzufügen"</strong>.
+            Scanne dann den QR-Code mit der Kamera.
+          </p>
 
-    <!-- STEP 3: VERIFIZIEREN -->
-    <section class="step-panel" x-show="step === 3" x-cloak>
-      <h2 class="step-panel__title">Code verifizieren<span class="h-dot">.</span></h2>
-      <p class="step-panel__desc">
-        Deine App zeigt jetzt einen <strong>6-stelligen Code</strong> der alle 30 Sekunden
-        neu generiert wird. Gib den aktuellen Code hier ein:
-      </p>
+          <div class="sec-qr-display">
+            <div class="sec-qr-code">
+              <img x-bind:src="qrDataUrl" alt="QR-Code für Authenticator-App-Setup" x-show="qrDataUrl" />
+            </div>
 
-      <div class="code-input-group">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <input
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="1"
-            class="code-input"
-            x-bind:class={`{ 'is-filled': code[${index}] !== '' }`}
-            x-ref={`input${index}`}
-            x-bind:value={`code[${index}]`}
-            x-on:input={`onCodeInput(${index}, $event)`}
-            x-on:keydown={`onCodeKeydown(${index}, $event)`}
-            x-bind:disabled="isVerifying"
-            aria-label={`Ziffer ${index + 1} von 6`}
-          />
-        ))}
-      </div>
+            <div class="sec-qr-info">
+              <h4>retaha · 2FA Setup</h4>
+              <p>
+                Falls dein Phone den QR-Code nicht scannen kann, kannst du den
+                Setup-Schlüssel auch manuell eintippen:
+              </p>
+              <button class="sec-secret-toggle" type="button" x-on:click="secretRevealed = !secretRevealed">
+                <span x-text="secretRevealed ? '← Schlüssel verbergen' : '→ Schlüssel anzeigen'"></span>
+              </button>
+              <div x-show="secretRevealed" x-cloak class="sec-secret-value" x-text="secretForManualEntry"></div>
+            </div>
+          </div>
 
-      <div class="step-actions">
-        <button class="step-back" type="button" x-on:click="back()">← Zurück</button>
-        <button class="btn-primary"
-                x-bind:disabled="!isComplete() || isVerifying"
-                x-on:click="verifySetup()">
-          <span x-show="!isVerifying">Code prüfen</span>
-          <span x-show="isVerifying" x-cloak>Wird geprüft ...</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- STEP 4: RECOVERY-CODES -->
-    <section class="step-panel" x-show="step === 4" x-cloak>
-
-      <div class="setup-complete">
-        <div class="setup-complete__indicator">
-          <TrianglePulse variant="sage" motion="once" label="Setup erfolgreich abgeschlossen" />
-          <span class="setup-complete__label">Erfolgreich aktiviert</span>
+          <div class="sec-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
+            <button class="v9-btn v9-btn--primary" x-on:click="advance()">
+              Weiter zur Verifizierung
+            </button>
+          </div>
         </div>
-      </div>
 
-      <h2 class="step-panel__title" style="text-align: center;">
-        Bestens<span class="h-dot">.</span>
-      </h2>
-      <p class="step-panel__desc" style="text-align: center;">
-        2FA ist jetzt aktiv. Hier sind deine <strong>8 Recovery-Codes</strong> — bewahre
-        sie sicher auf. Jeder Code funktioniert nur einmal und ersetzt deine
-        Authenticator-App im Notfall.
-      </p>
+        <!-- ── STEP 3: VERIFIZIEREN ──────────────────────────────────────────── -->
+        <div class="sec-panel" x-show="step === 3" x-cloak>
+          <p class="field__hint" style="margin-bottom:20px;">
+            Deine App zeigt jetzt einen <strong>6-stelligen Code</strong> der alle 30 Sekunden
+            neu generiert wird. Gib den aktuellen Code hier ein:
+          </p>
 
-      <div class="recovery-codes">
-        <template x-for="rcode in recoveryCodes" x-bind:key="rcode">
-          <span class="recovery-code" x-text="rcode"></span>
-        </template>
-      </div>
+          <div class="sec-code-group">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <input
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="1"
+                class="sec-code-input s-input s-input--mono"
+                x-bind:class={`{ 'is-filled': code[${index}] !== '' }`}
+                x-ref={`input${index}`}
+                x-bind:value={`code[${index}]`}
+                x-on:input={`onCodeInput(${index}, $event)`}
+                x-on:keydown={`onCodeKeydown(${index}, $event)`}
+                x-bind:disabled="isVerifying"
+                aria-label={`Ziffer ${index + 1} von 6`}
+              />
+            ))}
+          </div>
 
-      <div class="recovery-actions">
-        <button class="btn-secondary" type="button" x-on:click="copyRecoveryCodes()">
-          Codes kopieren
-        </button>
-        <button class="btn-secondary" type="button" x-on:click="printRecoveryCodes()">
-          Drucken
-        </button>
-      </div>
+          <div class="sec-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
+            <button class="v9-btn v9-btn--primary"
+                    x-bind:disabled="!isComplete() || isVerifying"
+                    x-on:click="verifySetup()">
+              <span x-show="!isVerifying">Code prüfen</span>
+              <span x-show="isVerifying" x-cloak>Wird geprüft …</span>
+            </button>
+          </div>
+        </div>
 
-      <div class="recovery-warning">
-        <strong>Wichtig:</strong> Diese Codes werden dir NICHT erneut angezeigt.
-        Bewahre sie an einem sicheren Ort auf — z.B. im Passwort-Manager oder
-        gedruckt im Safe.
-      </div>
+        <!-- ── STEP 4: RECOVERY-CODES ────────────────────────────────────────── -->
+        <div class="sec-panel" x-show="step === 4" x-cloak>
 
-      <div class="recovery-checkbox">
-        <input type="checkbox" id="confirm-saved" x-model="confirmedSaved" />
-        <label for="confirm-saved">
-          Ich habe meine Recovery-Codes sicher gespeichert.
-        </label>
-      </div>
+          <div class="sec-complete-indicator">
+            <TrianglePulse variant="sage" motion="once" label="Setup erfolgreich abgeschlossen" />
+            <span class="sec-complete-label">Erfolgreich aktiviert</span>
+          </div>
 
-      <div class="step-actions">
-        <a class="btn-primary"
-           x-bind:class="confirmedSaved ? '' : 'is-disabled'"
-           x-bind:href="confirmedSaved ? '/uebersicht' : '#'"
-           style="flex: 1; text-decoration: none;">
-          fertig — zum dashboard
-        </a>
-      </div>
+          <p class="field__hint" style="text-align:center;margin-bottom:20px;">
+            2FA ist jetzt aktiv. Hier sind deine <strong>8 Recovery-Codes</strong> — bewahre
+            sie sicher auf. Jeder Code funktioniert nur einmal und ersetzt deine
+            Authenticator-App im Notfall.
+          </p>
+
+          <div class="sec-recovery-grid">
+            <template x-for="rcode in recoveryCodes" x-bind:key="rcode">
+              <span class="sec-recovery-code" x-text="rcode"></span>
+            </template>
+          </div>
+
+          <div class="sec-recovery-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="copyRecoveryCodes()">
+              Codes kopieren
+            </button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="printRecoveryCodes()">
+              Drucken
+            </button>
+          </div>
+
+          <div class="sec-recovery-warning">
+            <strong>Wichtig:</strong> Diese Codes werden dir NICHT erneut angezeigt.
+            Bewahre sie an einem sicheren Ort auf — z.B. im Passwort-Manager oder
+            gedruckt im Safe.
+          </div>
+
+          <div class="sec-recovery-checkbox">
+            <input type="checkbox" id="confirm-saved" x-model="confirmedSaved" />
+            <label for="confirm-saved">
+              Ich habe meine Recovery-Codes sicher gespeichert.
+            </label>
+          </div>
+
+          <div class="sec-actions">
+            <a class="v9-btn v9-btn--primary"
+               x-bind:class="confirmedSaved ? '' : 'is-disabled'"
+               x-bind:href="confirmedSaved ? '/uebersicht' : '#'"
+               style="flex:1;text-decoration:none;justify-content:center;">
+              fertig — zum Dashboard
+            </a>
+          </div>
+        </div>
+
+      </div><!-- /.s-card__body -->
     </section>
 
-  </main>
+  </div><!-- /.settings-sections -->
+</div><!-- /.settings-page -->
 
-  <style>
-    :root {
-      --color-pink-shock: #FF4A82;
-      --color-pink-glow: rgba(255, 74, 130, 0.18);
-      --color-pink-soft: rgba(255, 74, 130, 0.08);
-      --color-anthrazit: #1A1A1A;
-      --color-anthrazit-soft: #2A2A2A;
-      --color-sage: #5C9070;
-      --color-white: #FFFFFF;
-      --radius: 3px;
-      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-      --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    [x-cloak] { display: none !important; }
-
-    .admin-shell {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 32px 24px 80px;
-    }
-
-    .enforcement-notice {
-      padding: 16px;
-      background: rgba(255, 74, 130, 0.06);
-      border-left: 3px solid var(--color-pink-shock);
-      border-radius: var(--radius);
-      margin-bottom: 32px;
-      font-size: 14px;
-    }
-
-    .page-eyebrow {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--color-pink-shock); margin-bottom: 16px;
-    }
-    .page-title {
-      font-size: 36px; font-weight: 500; line-height: 1.15;
-      letter-spacing: -0.02em; color: var(--color-anthrazit); margin-bottom: 12px;
-    }
-    .page-title .h-dot { color: var(--color-pink-shock); }
-    .page-sub {
-      font-size: 15px; color: rgba(26, 26, 26, 0.6);
-      line-height: 1.55; max-width: 560px; margin-bottom: 48px;
-    }
-
-    .step-indicator {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 48px;
-    }
-    .step-cell {
-      padding-top: 12px;
-      border-top: 2px solid rgba(26, 26, 26, 0.1);
-      transition: border-color 400ms var(--ease-out-expo);
-    }
-    .step-cell.is-active { border-top-color: var(--color-pink-shock); }
-    .step-cell.is-complete { border-top-color: var(--color-sage); }
-    .step-cell__label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
-      color: rgba(26, 26, 26, 0.4);
-      margin-bottom: 4px;
-    }
-    .step-cell.is-active .step-cell__label,
-    .step-cell.is-complete .step-cell__label { color: var(--color-anthrazit); }
-    .step-cell__title {
-      font-size: 13px; font-weight: 500; color: var(--color-anthrazit);
-    }
-    .step-cell.is-not-yet .step-cell__title { color: rgba(26, 26, 26, 0.3); }
-    .step-cell__num {
-      display: inline-block;
-      color: var(--color-pink-shock);
-      font-family: 'JetBrains Mono', monospace;
-      margin-right: 8px;
-    }
-    .step-cell.is-complete .step-cell__num { color: var(--color-sage); }
-    .step-cell.is-not-yet .step-cell__num { color: rgba(26, 26, 26, 0.3); }
-
-    .setup-error {
-      padding: 12px 16px;
-      background: rgba(255, 74, 130, 0.08);
-      border-left: 3px solid var(--color-pink-shock);
-      border-radius: var(--radius);
-      margin-bottom: 24px;
-      font-size: 13px;
-    }
-    .setup-error::before {
-      content: "▲ ";
-      color: var(--color-pink-shock);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-    }
-
-    .step-panel {
-      animation: panelEnter 500ms var(--ease-out-expo);
-    }
-    @keyframes panelEnter {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .step-panel { animation: none; }
-    }
-    .step-panel__title {
-      font-size: 24px; font-weight: 500; letter-spacing: -0.015em;
-      color: var(--color-anthrazit); margin-bottom: 12px;
-    }
-    .step-panel__title .h-dot { color: var(--color-pink-shock); }
-    .step-panel__desc {
-      font-size: 14px; color: rgba(26, 26, 26, 0.65);
-      line-height: 1.6; margin-bottom: 32px;
-    }
-    .step-panel__desc strong { color: var(--color-anthrazit); font-weight: 500; }
-
-    /* STEP 1 — Checklist */
-    .checklist { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-    .checklist-item {
-      padding: 16px;
-      background: rgba(26, 26, 26, 0.02);
-      border: 1px solid rgba(26, 26, 26, 0.06);
-      border-radius: var(--radius);
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-    }
-    .checklist-item__num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--color-pink-shock);
-      letter-spacing: 0.1em;
-      flex-shrink: 0;
-      padding-top: 2px;
-    }
-    .checklist-item__content h4 {
-      font-size: 14px; font-weight: 500;
-      color: var(--color-anthrazit); margin-bottom: 4px;
-    }
-    .checklist-item__content p {
-      font-size: 13px; color: rgba(26, 26, 26, 0.6); line-height: 1.5;
-    }
-    .checklist-item__content a {
-      color: var(--color-pink-shock);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(255, 74, 130, 0.3);
-    }
-
-    /* STEP 2 — QR-Code */
-    .qr-display { display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 32px; }
-    @media (min-width: 640px) {
-      .qr-display { grid-template-columns: auto 1fr; align-items: center; }
-    }
-    .qr-code {
-      width: 200px; height: 200px;
-      background: var(--color-white);
-      border: 1px solid rgba(26, 26, 26, 0.1);
-      border-radius: var(--radius);
-      padding: 16px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .qr-code img { width: 100%; height: 100%; }
-    .qr-info h4 { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
-    .qr-info p { font-size: 13px; color: rgba(26, 26, 26, 0.6); line-height: 1.55; margin-bottom: 16px; }
-    .qr-secret-toggle {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: transparent; border: 1px solid rgba(26, 26, 26, 0.15);
-      padding: 8px 12px;
-      border-radius: var(--radius);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
-      color: rgba(26, 26, 26, 0.65);
-      cursor: pointer;
-      transition: all 200ms ease;
-    }
-    .qr-secret-toggle:hover { border-color: var(--te-yellow); color: var(--ink); }
-    .qr-secret-value {
-      margin-top: 12px; padding: 12px;
-      background: rgba(26, 26, 26, 0.04);
-      border-radius: var(--radius);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px; color: var(--color-anthrazit);
-      letter-spacing: 0.1em; word-break: break-all;
-    }
-
-    /* STEP 3 — Code-Input */
-    .code-input-group {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 12px;
-      margin-bottom: 24px;
-      max-width: 380px;
-    }
-    .code-input {
-      width: 100%; aspect-ratio: 1; max-height: 56px;
-      border: 1.5px solid rgba(26, 26, 26, 0.15);
-      border-radius: var(--radius);
-      background: var(--color-white);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 22px; font-weight: 500;
-      text-align: center;
-      color: var(--color-anthrazit);
-      transition: all 250ms var(--ease-out-expo);
-    }
-    .code-input:focus {
-      outline: none;
-      border-color: var(--color-pink-shock);
-      box-shadow: 0 0 0 4px var(--color-pink-soft);
-    }
-    .code-input.is-filled { border-color: rgba(26, 26, 26, 0.4); }
-
-    /* STEP 4 — Recovery */
-    .setup-complete { text-align: center; padding: 32px 0; }
-    .setup-complete__indicator {
-      display: inline-flex; align-items: center; gap: 12px;
-      margin-bottom: 24px;
-    }
-    .setup-complete__label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--color-sage);
-    }
-
-    .recovery-codes {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      padding: 24px;
-      background: rgba(26, 26, 26, 0.02);
-      border: 1px solid rgba(26, 26, 26, 0.06);
-      border-radius: var(--radius);
-      margin-bottom: 24px;
-    }
-    .recovery-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px; letter-spacing: 0.08em;
-      color: var(--color-anthrazit);
-      padding: 8px 12px;
-      background: var(--color-white);
-      border: 1px solid rgba(26, 26, 26, 0.06);
-      border-radius: 2px;
-      text-align: center;
-    }
-
-    .recovery-actions {
-      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;
-    }
-    .btn-secondary {
-      display: inline-flex; align-items: center; justify-content: center;
-      gap: 8px; padding: 12px 16px;
-      background: transparent;
-      border: 1px solid rgba(26, 26, 26, 0.15);
-      border-radius: var(--radius);
-      font-family: inherit; font-size: 13px;
-      color: var(--color-anthrazit);
-      cursor: pointer;
-      transition: all 200ms ease;
-    }
-    .btn-secondary:hover {
-      border-color: var(--color-pink-shock); color: var(--color-pink-shock);
-    }
-
-    .recovery-warning {
-      padding: 16px;
-      background: rgba(255, 74, 130, 0.06);
-      border-left: 3px solid var(--color-pink-shock);
-      border-radius: var(--radius);
-      margin-bottom: 32px;
-      font-size: 13px;
-    }
-    .recovery-warning::before {
-      content: "▲ ";
-      color: var(--color-pink-shock);
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: bold;
-    }
-    .recovery-warning strong { color: var(--color-anthrazit); font-weight: 500; }
-
-    .recovery-checkbox {
-      display: flex; align-items: flex-start; gap: 12px;
-      margin-bottom: 24px;
-      cursor: pointer;
-    }
-    .recovery-checkbox input {
-      margin-top: 3px;
-      width: 16px; height: 16px;
-      accent-color: var(--color-pink-shock);
-      cursor: pointer;
-    }
-    .recovery-checkbox label {
-      font-size: 13px; color: var(--color-anthrazit); cursor: pointer; line-height: 1.5;
-    }
-
-    /* Buttons */
-    .btn-primary {
-      display: flex; align-items: center; justify-content: center;
-      gap: 12px; padding: 16px 24px;
-      border: none; border-radius: var(--radius);
-      background: var(--color-anthrazit); color: var(--color-white);
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 14px; font-weight: 500; cursor: pointer;
-      transition: all 280ms var(--ease-out-quint);
-      min-height: 48px;
-      text-decoration: none;
-    }
-    .btn-primary::before {
-      content: ''; width: 5px; height: 5px;
-      background: var(--color-pink-shock);
-      border-radius: 50%; flex-shrink: 0;
-    }
-    .btn-primary:hover:not(:disabled):not(.is-disabled) {
-      background: var(--color-anthrazit-soft);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px var(--color-pink-glow);
-    }
-    .btn-primary:disabled,
-    .btn-primary.is-disabled {
-      opacity: 0.5; cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    .step-actions {
-      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-      margin-top: 8px;
-    }
-    .step-back {
-      background: transparent; border: none; font-family: inherit;
-      font-size: 13px; color: rgba(26, 26, 26, 0.55); cursor: pointer;
-      padding: 12px 16px; border-radius: var(--radius);
-      transition: all 200ms ease;
-    }
-    .step-back:hover {
-      color: var(--color-anthrazit);
-      background: rgba(26, 26, 26, 0.04);
-    }
-
-    /* Print-Stil: nur Recovery-Codes drucken */
-    @media print {
-      body * { visibility: hidden; }
-      .recovery-codes,
-      .recovery-codes * {
-        visibility: visible;
-      }
-      .recovery-codes {
-        position: absolute; top: 0; left: 0;
-        background: white; border: 1px solid black;
-      }
-    }
-  </style>
 </Layout>
