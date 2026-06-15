@@ -1,293 +1,415 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import ModStatusLed from '../components/shared/ModStatusLed.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) return Astro.redirect('/admin/login');
+if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
-const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const supabase = createSupabaseServiceRoleInstance();
 
-let saved: { ok: boolean; msg: string } | null = null;
-
-if (Astro.request.method === 'POST') {
-  const form = await Astro.request.formData();
-  const action = form.get('_action')?.toString();
-
-  if (action === 'save_times') {
-    const { error } = await client.from('hotel_settings').upsert({
-      hotel_id: hotel.id,
-      service_start_time: form.get('service_start_time')?.toString() || '08:00',
-      service_end_time:   form.get('service_end_time')?.toString()   || '22:00',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'hotel_id' });
-    saved = error
-      ? { ok: false, msg: `Fehler: ${error.message}` }
-      : { ok: true,  msg: '✓ Service-Zeiten gespeichert' };
-
-  } else if (action === 'save_items') {
-    const raw = form.get('items_json')?.toString();
-    if (raw) {
-      try {
-        const items = JSON.parse(raw);
-        if (!Array.isArray(items)) throw new Error('Kein Array');
-        const { error } = await client.from('hotel_settings').upsert({
-          hotel_id: hotel.id,
-          service_items: items,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'hotel_id' });
-        saved = error
-          ? { ok: false, msg: `Fehler: ${error.message}` }
-          : { ok: true,  msg: `✓ ${items.length} Item${items.length !== 1 ? 's' : ''} gespeichert` };
-      } catch (e: any) {
-        saved = { ok: false, msg: `Ungültige Daten: ${e.message}` };
-      }
-    }
-  }
-}
-
-const { data: settings } = await client
+const { data: settings } = await supabase
   .from('hotel_settings')
-  .select('service_items, service_start_time, service_end_time')
+  .select('features, service_items, service_hours, service_start_time, service_end_time')
   .eq('hotel_id', hotel.id)
   .maybeSingle();
 
-const items     = ((settings?.service_items as any[]) ?? []);
-const startTime = ((settings as any)?.service_start_time || '08:00').substring(0, 5);
-const endTime   = ((settings as any)?.service_end_time   || '22:00').substring(0, 5);
+const s = settings || ({} as Record<string, any>);
+const features   = ((s.features as Record<string, unknown>) ?? {});
+const serviceOn  = features.service !== false;
+const startTime  = ((s.service_start_time as string | undefined) || '08:00').substring(0, 5);
+const endTime    = ((s.service_end_time   as string | undefined) || '22:00').substring(0, 5);
+
+const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const rawServiceHours = (s.service_hours as Record<string, any> | null | undefined) ?? null;
+const initialHours: Record<string, { start: string; end: string; closed: boolean }> = {};
+for (const day of WEEK_DAYS) {
+  const bh = rawServiceHours?.[day];
+  initialHours[day] = {
+    start:  (bh?.start  as string  | undefined) || startTime,
+    end:    (bh?.end    as string  | undefined) || endTime,
+    closed: bh?.closed === true,
+  };
+}
+
+const items = ((s.service_items as any[]) ?? []);
+
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 ---
 
 <Layout title="Service-Items" activeTab="backoffice" hotelName={hotel.name}>
-  <div class="settings-page">
 
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
-      <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Service-Items</span>
-    </nav>
+<script is:inline define:vars={{ _siInit: { hours: initialHours, items, serviceOn } }}>
+  window._siInit = _siInit;
+</script>
 
-    {saved && (
-      <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
-    )}
+<style is:global>
+[x-cloak] { display: none !important; }
+textarea.s-input { resize: none; min-height: 72px; }
+.settings-page .toggle-row { min-height: 44px; }
 
-    <!-- ZEITEN -->
-    <section class="s-card" id="service-times">
+/* suppress browser autofill yellow */
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg, #FAFAF8) inset !important;
+  -webkit-text-fill-color: var(--ink, #0A0A0A) !important;
+  transition: background-color 9999s ease;
+}
+
+/* hours grid — same as .bp-hours-* from breakfast */
+.sp-hours-grid { border: 1px solid var(--border); border-radius: var(--r-sm, 4px); overflow: hidden; margin-bottom: 16px; }
+.sp-hours-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); min-height: 52px; }
+.sp-hours-row:last-child { border-bottom: none; }
+.sp-hours-row--closed { opacity: 0.6; }
+.sp-hours-day { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+.sp-hours-inputs { display: flex; align-items: center; gap: 6px; }
+.sp-hours-sep { font-size: 13px; color: var(--ink-muted); flex-shrink: 0; }
+.sp-hours-closed-txt { font-size: 12px; color: var(--ink-muted); font-style: italic; }
+.s-input--time { width: 110px; min-width: 88px; }
+@media (max-width: 480px) {
+  .s-input--time { width: 88px; }
+  .sp-hours-row { grid-template-columns: 36px 1fr auto; gap: 8px; padding: 8px 10px; }
+}
+
+/* items list */
+.sp-row { border: 1px solid var(--border); padding: 20px; margin-bottom: 12px; }
+.sp-row:last-child { margin-bottom: 0; }
+.sp-row__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.sp-row__num {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+  letter-spacing: 0.12em; color: var(--ink-muted); background: var(--bg-deep); padding: 3px 8px;
+}
+.sp-grid { display: grid; gap: 12px; margin-bottom: 12px; }
+.sp-grid--2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 600px) { .sp-grid--2 { grid-template-columns: 1fr; } }
+.sp-field { display: flex; flex-direction: column; gap: 5px; }
+.sp-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
+.sp-label--mono { font-family: 'JetBrains Mono', monospace; }
+.sp-mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.sp-textarea { min-height: 62px; resize: vertical; }
+.sp-empty { font-size: 13px; color: var(--ink-muted); padding: 48px 32px; text-align: center; font-style: italic; }
+.sp-footer { display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; }
+
+/* toast — same as breakfast bp-toast */
+.bp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14); white-space: nowrap; pointer-events: none; }
+.bp-toast--ok  { background: #0A0A0A; color: white; }
+.bp-toast--err { background: #8C2128; color: white; }
+</style>
+
+<div class="settings-page">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">Service-Items</span>
+  </nav>
+
+  <section class="settings-hero">
+    <span class="settings-hero__eyebrow">Service-Modul</span>
+    <h1 class="settings-hero__title">Service-Anfragen<span class="dot-pink">.</span></h1>
+    <p class="settings-hero__sub">Zeiten und Items, die Gäste im Check-in anfordern können.</p>
+  </section>
+
+  <div class="settings-sections">
+
+    <!-- 01 Modul-Status -->
+    <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Service-Zeiten</h2>
+        <h2 class="s-card__title">Service-Modul</h2>
         <span class="s-card__num">01</span>
       </div>
-      <form method="POST" class="s-card__body">
-        <input type="hidden" name="_action" value="save_times" />
-        <div class="field field--row">
-          <span class="field__label">Verfügbar von</span>
-          <div class="field__input-wrap time-row">
-            <label class="time-field">
-              <span class="field__hint">Beginn</span>
-              <input type="time" name="service_start_time" value={startTime} class="s-input s-input--time" />
-            </label>
-            <span class="time-sep">–</span>
-            <label class="time-field">
-              <span class="field__hint">Ende</span>
-              <input type="time" name="service_end_time" value={endTime} class="s-input s-input--time" />
-            </label>
+      <div class="s-card__body">
+        <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <ModStatusLed on={serviceOn} />
+          <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">
+            In der Gäste-App-Vorschau steuern →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 Service-Zeiten (pro Wochentag) -->
+    <section class="s-card">
+      <div class="s-card__head">
+        <h2 class="s-card__title">Service-Zeiten</h2>
+        <span class="s-card__num">02</span>
+      </div>
+      <div x-data="siHours()">
+        <div class="s-card__body">
+          <p class="field__hint">Buchbare Zeitfenster pro Wochentag — geschlossene Tage zeigen keine Service-Option.</p>
+          <div class="sp-hours-grid">
+            <template x-for="d in days" :key="d.key">
+              <div class="sp-hours-row" :class="{'sp-hours-row--closed': hours[d.key].closed}">
+                <span class="sp-hours-day" x-text="d.label"></span>
+                <div class="sp-hours-inputs">
+                  <input type="time" class="s-input s-input--time"
+                    x-show="!hours[d.key].closed"
+                    :value="hours[d.key].start"
+                    @change="hours[d.key].start = $event.target.value" />
+                  <span class="sp-hours-sep" x-show="!hours[d.key].closed">–</span>
+                  <input type="time" class="s-input s-input--time"
+                    x-show="!hours[d.key].closed"
+                    :value="hours[d.key].end"
+                    @change="hours[d.key].end = $event.target.value" />
+                  <span x-show="hours[d.key].closed" class="sp-hours-closed-txt">Geschlossen</span>
+                </div>
+                <label class="toggle-row" style="margin:0;gap:6px">
+                  <input type="checkbox"
+                    :checked="hours[d.key].closed"
+                    @change="hours[d.key].closed = $event.target.checked"
+                    class="sr-only" />
+                  <span class="bt-visual" :class="{'is-checked': hours[d.key].closed}">
+                    <span class="bt-knob"></span>
+                  </span>
+                  <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">Zu</span>
+                </label>
+              </div>
+            </template>
+          </div>
+          <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="button" @click="copyMonToAll()" class="v9-btn v9-btn--ghost" style="font-size:10px;padding:6px 12px">
+              Auf alle Tage übernehmen
+            </button>
+            <span style="font-size:12px;color:var(--ink-muted)">Montag-Zeiten auf alle Tage</span>
           </div>
         </div>
         <div class="s-card__footer">
-          <button type="submit" class="v9-btn">Zeiten speichern</button>
+          <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
+          <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
+          <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
         </div>
-      </form>
-    </section>
-
-    <!-- ITEMS -->
-    <section class="s-card" id="service-items-list">
-      <div class="s-card__head">
-        <h2 class="s-card__title">Service-Items</h2>
-        <span class="s-card__num">02</span>
       </div>
-      <form method="POST" id="items-form" class="s-card__body">
-        <input type="hidden" name="_action" value="save_items" />
-        <input type="hidden" name="items_json" id="items-json" />
-        <div id="items-container"></div>
-        <div class="s-card__footer si-footer">
-          <button type="button" id="add-item-btn" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
-          <button type="submit" class="v9-btn">Items speichern</button>
-        </div>
-      </form>
     </section>
 
-  </div>
+  </div><!-- /.settings-sections -->
 
-  <script is:inline define:vars={{ initialItems: items }}>
-    let items = JSON.parse(JSON.stringify(initialItems || []));
+  <!-- 03 Service-Items -->
+  <section class="s-card" style="margin-top:20px" x-data="siItems()">
+    <div class="s-card__head" style="align-items:center">
+      <div>
+        <span class="s-card__num" style="display:block;margin-bottom:6px">Service-Items</span>
+        <h2 class="s-card__title">Was Gäste anfragen können<span class="dot-pink">.</span></h2>
+      </div>
+      <button type="button" @click="addItem()" class="v9-btn" style="flex-shrink:0">+ Item hinzufügen</button>
+    </div>
 
-    function esc(s) {
-      return String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
+    <div class="s-card__body">
+      <p class="field__hint" style="margin-bottom:16px">Jedes Item erscheint als Kachel in der Service-Anfrage der Gäste-App (nur für In-House-Gäste sichtbar).</p>
 
-    function sync() {
-      document.getElementById('items-json').value = JSON.stringify(items);
-    }
+      <template x-if="items.length === 0">
+        <div class="sp-empty">
+          <p>Noch keine Service-Items. Klicke auf „+ Item hinzufügen".</p>
+          <button type="button" @click="addItem()" class="v9-btn" style="margin-top:14px">Erstes Item anlegen</button>
+        </div>
+      </template>
 
-    function render() {
-      const container = document.getElementById('items-container');
-      if (items.length === 0) {
-        container.innerHTML = '<p class="si-empty">Noch keine Items. Klicke auf "+ Item hinzufügen".</p>';
-        sync();
-        return;
-      }
-      container.innerHTML = '';
-      items.forEach((item, idx) => {
-        const el = document.createElement('div');
-        el.className = 'si-row';
-        el.innerHTML = `
-          <div class="si-row__head">
-            <span class="si-row__num">${String(idx + 1).padStart(2, '0')}</span>
-            <button type="button" data-action="delete" data-idx="${idx}"
-              class="v9-btn v9-btn--ghost si-delete">Entfernen</button>
-          </div>
-          <div class="si-grid si-grid--2">
-            <label class="si-field">
-              <span class="si-label si-label--mono">Slug (id)</span>
-              <input type="text" data-idx="${idx}" data-field="id"
-                value="${esc(item.id)}" placeholder="z.B. extra-towels" class="s-input si-mono" />
-            </label>
-            <label class="si-field">
-              <span class="si-label si-label--mono">Icon-Key</span>
-              <input type="text" data-idx="${idx}" data-field="icon"
-                value="${esc(item.icon)}" placeholder="towels" class="s-input si-mono" />
-            </label>
-          </div>
-          <div class="si-grid si-grid--2">
-            <label class="si-field">
-              <span class="si-label">Name (DE)</span>
-              <input type="text" data-idx="${idx}" data-field="name_de"
-                value="${esc(item.name_de)}" class="s-input" />
-            </label>
-            <label class="si-field">
-              <span class="si-label">Name (EN)</span>
-              <input type="text" data-idx="${idx}" data-field="name_en"
-                value="${esc(item.name_en)}" class="s-input" />
-            </label>
-          </div>
-          <div class="si-grid si-grid--2">
-            <label class="si-field">
-              <span class="si-label">Beschreibung (DE)</span>
-              <textarea data-idx="${idx}" data-field="description_de"
-                rows="2" class="s-input si-textarea">${esc(item.description_de)}</textarea>
-            </label>
-            <label class="si-field">
-              <span class="si-label">Beschreibung (EN)</span>
-              <textarea data-idx="${idx}" data-field="description_en"
-                rows="2" class="s-input si-textarea">${esc(item.description_en)}</textarea>
-            </label>
-          </div>
-        `;
-        container.appendChild(el);
-      });
+      <template x-if="items.length > 0">
+        <div>
+          <template x-for="(item, idx) in items" :key="item._key">
+            <div class="sp-row">
+              <div class="sp-row__head">
+                <span class="sp-row__num" x-text="String(idx + 1).padStart(2, '0')"></span>
+                <button type="button" @click="removeItem(idx)"
+                  class="v9-btn v9-btn--ghost" style="font-size:11px">Entfernen</button>
+              </div>
+              <div class="sp-grid sp-grid--2">
+                <label class="sp-field">
+                  <span class="sp-label sp-label--mono">Slug (id)</span>
+                  <input type="text" x-model.lazy="item.id"
+                    placeholder="z.B. extra-towels" autocomplete="off"
+                    class="s-input sp-mono" />
+                </label>
+                <label class="sp-field">
+                  <span class="sp-label sp-label--mono">Icon-Key</span>
+                  <input type="text" x-model.lazy="item.icon"
+                    placeholder="towels" autocomplete="off"
+                    class="s-input sp-mono" />
+                </label>
+              </div>
+              <div class="sp-grid sp-grid--2">
+                <label class="sp-field">
+                  <span class="sp-label">Name (DE)</span>
+                  <input type="text" x-model.lazy="item.name_de"
+                    autocomplete="off" class="s-input" />
+                </label>
+                <label class="sp-field">
+                  <span class="sp-label">Name (EN)</span>
+                  <input type="text" x-model.lazy="item.name_en"
+                    autocomplete="off" class="s-input" />
+                </label>
+              </div>
+              <div class="sp-grid sp-grid--2">
+                <label class="sp-field">
+                  <span class="sp-label">Beschreibung (DE)</span>
+                  <textarea x-model.lazy="item.description_de"
+                    rows="2" autocomplete="off"
+                    class="s-input sp-textarea"></textarea>
+                </label>
+                <label class="sp-field">
+                  <span class="sp-label">Beschreibung (EN)</span>
+                  <textarea x-model.lazy="item.description_en"
+                    rows="2" autocomplete="off"
+                    class="s-input sp-textarea"></textarea>
+                </label>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
 
-      container.querySelectorAll('input[data-field], textarea[data-field]').forEach(el => {
-        el.addEventListener('input', e => {
-          const t = e.target;
-          items[parseInt(t.dataset.idx)][t.dataset.field] = t.value;
-          sync();
-        });
-      });
+    <div class="s-card__footer" style="gap:12px">
+      <button type="button" @click="addItem()" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
+      <button type="button" @click="saveItems()" :disabled="saving" class="v9-btn">
+        <span x-show="!saving">Items speichern</span>
+        <span x-show="saving" x-cloak>Speichert …</span>
+      </button>
+    </div>
 
-      container.querySelectorAll('[data-action="delete"]').forEach(btn => {
-        btn.addEventListener('click', e => {
-          const idx = parseInt(e.currentTarget.dataset.idx);
-          if (confirm('Item wirklich entfernen?')) { items.splice(idx, 1); render(); }
-        });
-      });
+    <div x-show="toast" x-cloak :class="'bp-toast bp-toast--' + toastKind" x-text="toast"></div>
+  </section>
 
-      sync();
-    }
+</div><!-- /.settings-page -->
 
-    document.getElementById('add-item-btn').addEventListener('click', () => {
-      items.push({ id: '', name_de: '', name_en: '', description_de: '', description_en: '', icon: 'default' });
-      render();
+<script>
+  document.addEventListener('alpine:init', () => {
+
+    Alpine.data('siHours', () => {
+      const init = (window as any)._siInit || {};
+      return {
+        hours: init.hours || {},
+        saving: false,
+        success: false,
+        error: '',
+        _origStr: '',
+        _timer: null as ReturnType<typeof setTimeout> | null,
+        _beforeUnload: null as ((e: BeforeUnloadEvent) => void) | null,
+
+        days: [
+          { key: 'mon', label: 'Mo' },
+          { key: 'tue', label: 'Di' },
+          { key: 'wed', label: 'Mi' },
+          { key: 'thu', label: 'Do' },
+          { key: 'fri', label: 'Fr' },
+          { key: 'sat', label: 'Sa' },
+          { key: 'sun', label: 'So' },
+        ],
+
+        init() {
+          this._origStr = JSON.stringify(this.hours);
+          this._beforeUnload = (e: BeforeUnloadEvent) => {
+            if (this.isDirty) { e.preventDefault(); e.returnValue = ''; }
+          };
+          window.addEventListener('beforeunload', this._beforeUnload);
+        },
+
+        destroy() {
+          if (this._beforeUnload) window.removeEventListener('beforeunload', this._beforeUnload);
+        },
+
+        get isDirty(): boolean {
+          return JSON.stringify(this.hours) !== this._origStr;
+        },
+
+        copyMonToAll() {
+          const src = this.hours['mon'];
+          if (!src || src.closed) return;
+          this.days.forEach((d: { key: string }) => {
+            this.hours[d.key] = { ...this.hours[d.key], start: src.start, end: src.end };
+          });
+        },
+
+        async save() {
+          if (!this.isDirty || this.saving) return;
+          this.saving = true;
+          this.success = false;
+          this.error = '';
+          if (this._timer) clearTimeout(this._timer);
+          try {
+            const res = await fetch('/api/admin/service/section', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ section: 'hours', service_hours: this.hours }),
+            });
+            const d = await res.json();
+            if (!d.ok) { this.error = d.error || 'Fehler'; return; }
+            this.success = true;
+            this._origStr = JSON.stringify(this.hours);
+            this._timer = setTimeout(() => { this.success = false; }, 3000);
+          } catch {
+            this.error = 'Netzwerk-Fehler';
+          } finally {
+            this.saving = false;
+          }
+        },
+      };
     });
 
-    document.getElementById('items-form').addEventListener('submit', sync);
+    Alpine.data('siItems', () => {
+      const init = (window as any)._siInit || {};
+      const raw = (init.items || []) as Record<string, unknown>[];
+      return {
+        items: raw.map((item, idx) => ({ _key: idx, ...item })) as Record<string, unknown>[],
+        _nextKey: raw.length as number,
+        saving: false,
+        toast: '',
+        toastKind: 'ok',
+        _toastTimer: null as ReturnType<typeof setTimeout> | null,
 
-    render();
-  </script>
+        addItem() {
+          (this.items as Record<string, unknown>[]).push({
+            _key: (this._nextKey as number)++,
+            id: '', name_de: '', name_en: '',
+            description_de: '', description_en: '', icon: 'default',
+          });
+        },
 
-  <style>
-    .settings-page {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 32px 24px 80px;
-    }
+        removeItem(idx: number) {
+          if (confirm('Item wirklich entfernen?')) {
+            (this.items as unknown[]).splice(idx, 1);
+          }
+        },
 
-    /* flash already defined globally via s-flash */
+        async saveItems() {
+          if (this.saving) return;
+          this.saving = true;
+          try {
+            const payload = (this.items as Record<string, unknown>[]).map(
+              ({ _key, ...rest }) => rest,
+            );
+            const res = await fetch('/api/admin/service/section', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ section: 'items', service_items: payload }),
+            });
+            const d = await res.json();
+            if (d.ok) {
+              this.showToast(`✓ ${payload.length} Item${payload.length !== 1 ? 's' : ''} gespeichert`, 'ok');
+            } else {
+              this.showToast(d.error || 'Fehler beim Speichern', 'err');
+            }
+          } catch {
+            this.showToast('Netzwerk-Fehler', 'err');
+          } finally {
+            this.saving = false;
+          }
+        },
 
-    .time-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-    }
-    .time-field { display: flex; flex-direction: column; gap: 4px; }
-    .time-sep { font-size: 18px; color: var(--ink-muted); padding-bottom: 10px; }
-    .s-input--time { width: 130px; }
+        showToast(msg: string, kind: string) {
+          this.toast = msg;
+          this.toastKind = kind;
+          if (this._toastTimer) clearTimeout(this._toastTimer);
+          this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
+        },
+      };
+    });
 
-    /* ── Item list ── */
-    .si-empty {
-      font-size: 13px;
-      color: var(--ink-muted);
-      padding: 24px 0;
-      text-align: center;
-    }
+  });
+</script>
 
-    .si-row {
-      border: 1px solid var(--border);
-      padding: 20px;
-      margin-bottom: 12px;
-    }
-    .si-row:last-child { margin-bottom: 0; }
-
-    .si-row__head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .si-row__num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.12em;
-      color: var(--ink-muted);
-      background: var(--bg-deep);
-      padding: 3px 8px;
-    }
-    .si-delete { font-size: 11px; }
-
-    .si-grid {
-      display: grid;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .si-grid--2 { grid-template-columns: 1fr 1fr; }
-    @media (max-width: 600px) { .si-grid--2 { grid-template-columns: 1fr; } }
-
-    .si-field { display: flex; flex-direction: column; gap: 5px; }
-    .si-label {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      color: var(--ink-muted);
-      text-transform: uppercase;
-    }
-    .si-label--mono { font-family: 'JetBrains Mono', monospace; }
-
-    .si-mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-    .si-textarea { min-height: 62px; resize: vertical; }
-
-    .si-footer { display: flex; gap: 12px; }
-  </style>
 </Layout>
