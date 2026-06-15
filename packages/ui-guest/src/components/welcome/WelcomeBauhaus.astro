@@ -20,6 +20,7 @@ interface Props {
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
   greeting?: { hi: string; sub: string };
+  preCheckinAvailable?: boolean;
 }
 
 const {
@@ -27,7 +28,11 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
   greeting = { hi: 'Willkommen,', sub: '' },
+  preCheckinAvailable = false,
 } = Astro.props;
+
+const preCheckinAction = actions.find((a: any) => a.key === 'pre_checkin') ?? null;
+const gridActions = actions.filter((a: any) => a.key !== 'pre_checkin');
 
 const name = guest?.first_name ?? hotel.name;
 
@@ -264,39 +269,55 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     </section>
   )}
 
+  <!-- PRIMARY CTA (pre_checkin only) -->
+  {preCheckinAction && (
+    <a class="bh-primary-btn" href={preCheckinAction.href} data-astro-reload>
+      <span class="bh-pb__dot" aria-hidden="true"></span>
+      <span class="bh-pb__inner">
+        <span class="bh-pb__ml">{preCheckinAction.label}</span>
+        <span class="bh-pb__lb">{preCheckinAction.sub}</span>
+      </span>
+      <span class="bh-pb__chev" aria-hidden="true">→</span>
+    </a>
+  )}
+
   <!-- ACTION GRID -->
-  <p class="bh-sec-label" style="margin-top:26px">{gridLabel[persona] ?? 'Services'}</p>
-  <div class="bh-grid">
-    {actions.map((action: any) => action.href ? (
-      <a class="bh-tile" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
-        <span class="bh-tile__icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
-        </span>
-        <span class="bh-tile__label">{action.label}</span>
-      </a>
-    ) : (
-      <button class="bh-tile" type="button" @click={action.handler}>
-        <span class="bh-tile__icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
-        </span>
-        <span class="bh-tile__label">{action.label}</span>
-      </button>
-    ))}
-  </div>
+  {gridActions.length > 0 && (
+    <>
+      <p class="bh-sec-label" style="margin-top:26px">{gridLabel[persona] ?? 'Services'}</p>
+      <div class="bh-grid">
+        {gridActions.map((action: any) => action.href ? (
+          <a class="bh-tile" href={action.href} data-astro-reload style="text-decoration:none;color:inherit">
+            <span class="bh-tile__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
+            </span>
+            <span class="bh-tile__label">{action.label}</span>
+          </a>
+        ) : (
+          <button class="bh-tile" type="button" @click={action.handler}>
+            <span class="bh-tile__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" set:html={action.icon} />
+            </span>
+            <span class="bh-tile__label">{action.label}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  )}
 
   <!-- CRAFT FOOTER -->
   <CraftFooter />
 </div>
 
 <style>
-  /* ── Tokens (match prototype exactly) ─────────────────────────────────── */
+  /* ── Tokens ─────────────────────────────────────────────────────────── */
   .bh-root {
-    --bh-bg: #FAFAF6;
-    --bh-surface: #FFFFFF;
-    --bh-ink: #0A0A0A;
+    --bh-bg: #F4EEE0;
+    --bh-surface: #FFFEFB;
+    --bh-ink: #0F0E0C;
     --bh-ink-muted: #6B6B66;
     --bh-ink-faint: #A8A8A2;
-    --bh-border: #E3E1DA;
+    --bh-border: #E7DECB;
     --bh-pink: #FF4A82;
     --bh-yellow: #FFE600;
     /* Brand overrides: palette-vars set on <html>, derived from brand_primary */
@@ -309,6 +330,7 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     --bh-display: 'Space Grotesk', sans-serif;
     font-family: var(--bh-display);
     color: var(--bh-ink);
+    background: var(--bh-bg);
     padding: 0 22px 110px;
   }
 
@@ -452,27 +474,54 @@ const visibleCards = heroCards.filter((c: any) => c.is_published !== false);
     font-size: 11px; color: var(--bh-ink-muted); margin: 3px 0 0;
   }
 
+  /* ── Primary CTA button (pre_checkin) ───────────────────────────────── */
+  .bh-primary-btn {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; margin-top: 24px;
+    background: var(--bh-ink); border-radius: 18px;
+    padding: 16px 20px; text-decoration: none; border: 0; cursor: pointer;
+    transition: opacity 160ms ease;
+  }
+  .bh-primary-btn:active { opacity: 0.85; }
+  .bh-pb__dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+  .bh-pb__inner { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .bh-pb__ml {
+    font-family: var(--bh-mono); font-size: 9px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(244,238,224,0.55);
+  }
+  .bh-pb__lb {
+    font-family: var(--bh-display); font-size: 17px;
+    font-weight: 600; color: #F4EEE0;
+  }
+  .bh-pb__chev {
+    font-size: 18px; color: rgba(244,238,224,0.55); flex-shrink: 0;
+  }
+
   /* ── Action grid ─────────────────────────────────────────────────────── */
   .bh-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px;
   }
   .bh-tile {
     background: var(--bh-surface); border: 1px solid var(--bh-border);
-    border-radius: var(--bh-radius); padding: 14px 10px 12px;
+    border-radius: var(--bh-radius); padding: 18px 10px 16px;
     cursor: pointer;
     transition: background var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
                 border-color var(--dur-fast, 240ms) var(--ease-out, cubic-bezier(0.22,1,0.36,1)),
                 transform var(--dur-fast, 240ms) var(--ease-spring, cubic-bezier(0.34,1.3,0.64,1));
-    display: flex; flex-direction: column; gap: 8px; min-height: 84px;
-    text-align: left;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    min-height: 118px; text-align: center;
   }
   .bh-tile:hover { background: var(--hover); border-color: var(--hover); }
   .bh-tile:active { transform: scale(0.97) !important; transition-duration: 90ms !important; }
-  .bh-tile__icon { width: 19px; height: 19px; display: flex; align-items: center; }
-  .bh-tile__icon svg { width: 19px; height: 19px; stroke: var(--bh-ink); }
+  .bh-tile__icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+  .bh-tile__icon svg { width: 40px; height: 40px; stroke: var(--bh-ink); stroke-width: 1.5; }
   .bh-tile__label {
     font-family: var(--bh-mono); font-size: 9px;
-    letter-spacing: 0.07em; text-transform: uppercase;
+    letter-spacing: 0.10em; text-transform: uppercase;
     font-weight: 500; line-height: 1.35;
     color: var(--bh-ink);
   }
