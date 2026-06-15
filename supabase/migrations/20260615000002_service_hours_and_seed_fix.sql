@@ -1,19 +1,16 @@
--- Add per-weekday service hours to hotel_settings (same pattern as breakfast_hours).
-ALTER TABLE hotel_settings ADD COLUMN IF NOT EXISTS service_hours jsonb;
+-- Service-Zeiten pro Wochentag (1:1 nach Muster 20260612014108_breakfast_weekday_hours).
+-- Backfill aus bestehenden Einzelzeiten für alle vorhandenen Zeilen.
 
--- Backfill: set all 7 days from existing global start/end for hotels that have them.
-UPDATE hotel_settings
-SET service_hours = jsonb_build_object(
-  'mon', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'tue', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'wed', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'thu', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'fri', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'sat', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false),
-  'sun', jsonb_build_object('start', COALESCE(LEFT(service_start_time::text, 5), '08:00'), 'end', COALESCE(LEFT(service_end_time::text, 5), '22:00'), 'closed', false)
+alter table public.hotel_settings
+  add column if not exists service_hours jsonb;
+
+update public.hotel_settings
+set service_hours = (
+  select jsonb_object_agg(d, jsonb_build_object(
+    'start',  to_char(coalesce(service_start_time, time '07:00'), 'HH24:MI'),
+    'end',    to_char(coalesce(service_end_time,   time '22:00'), 'HH24:MI'),
+    'closed', false
+  ))
+  from unnest(array['mon','tue','wed','thu','fri','sat','sun']) as d
 )
-WHERE service_hours IS NULL;
-
--- NOTE: Seed-Items werden über die /service-items Backoffice-Seite eingetragen.
--- Die hotel_id c827efae-7343-4979-90e7-3d44fbcc266a war falsch (FK-Fehler).
--- Kein Seed-INSERT hier — Taha trägt die Items manuell via Backoffice ein.
+where service_hours is null;
