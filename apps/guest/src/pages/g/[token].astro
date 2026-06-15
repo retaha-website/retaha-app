@@ -1,9 +1,8 @@
 ---
-import { loadStayByToken, loadBookingsForStay } from '@retaha/db';
+import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import { isModuleAvailable } from '../../lib/plan-modules';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
 import EveFloatingBubble from '../../components/eve/EveFloatingBubble.astro';
@@ -158,8 +157,6 @@ if (!isPreviewEmbed && (!existingSession || existingSession.stay_id !== stay.id 
   });
 }
 
-const existingServiceBookings = await loadBookingsForStay(stay.id, 'service');
-const activeServiceBooking = existingServiceBookings[0] || null;
 
 // Sprint i18n Phase 7 — Sprach-Resolution erweitert um Browser-Locale + enabled_languages
 // Hierarchie: ?lang= URL > guest.language > Accept-Language (gegen enabled) > hotel.default_language > 'de'
@@ -672,14 +669,14 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           )}
 
           {avail('service') && f.service !== false && settings.service_items && settings.service_items.length > 0 && (
-            <button class="gate-tile" data-tile="service" type="button" @click="openSheet('service')">
+            <a class="gate-tile" data-tile="service" href={`/g/${token}/service?persona=${stayPersona}${langParam ? `&lang=${langParam}` : ''}`} data-astro-reload style="text-decoration:none;color:inherit">
               <span class="gate-tile-badge orange">{t('tile.service.badge', lang)}</span>
               <span class="gate-tile-icon">
                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
               </span>
               <span class="gate-tile-label">{t('tile.service', lang)}</span>
               <span class="gate-tile-sub">{t('tile.service.sub', lang)}</span>
-            </button>
+            </a>
           )}
 
           {avail('recommendations') && f.recommendations !== false && (
@@ -737,20 +734,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       </Fragment>
       )}
 
-      <!-- SHEETS (rendered as overlays, alle Themes) -->
-      {avail('service') && f.service !== false && settings.service_items && settings.service_items.length > 0 && (
-        <ServiceSheet
-          lang={lang}
-          items={settings.service_items}
-          startTime={settings.service_start_time || '07:00'}
-          endTime={settings.service_end_time || '22:00'}
-          accessToken={token!}
-          existingBooking={activeServiceBooking}
-          conciergeName={settings.eve_name || 'das Team'}
-          checkIn={stay.check_in}
-          checkOut={stay.check_out}
-        />
-      )}
 
       {avail('eve') && f.eve !== false && (
         <>
@@ -1226,7 +1209,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                 if (typeof (this as any).eveMaybeWelcome === 'function') (this as any).eveMaybeWelcome();
                 return;
               }
-              if (sheetId === 'wifi' || sheetId === 'breakfast' || sheetId === 'places') {
+              if (sheetId === 'wifi' || sheetId === 'breakfast' || sheetId === 'places' || sheetId === 'service') {
                 const _parts = window.location.pathname.split('/').filter(Boolean);
                 const _tok = _parts[1] ?? '';
                 const _pers = new URLSearchParams(window.location.search).get('persona') ?? 'in_house';
@@ -1234,10 +1217,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                 window.location.href = `/g/${_tok}/${_dest}?persona=${_pers}`;
                 return;
               }
-              const KNOWN_SHEETS = new Set(['service']);
-              if (KNOWN_SHEETS.has(sheetId)) {
-                this.openSheet(sheetId);
-              } else {
+              {
                 this._showRecToast('Diese Funktion ist bald verfügbar.');
               }
               return;
@@ -1408,84 +1388,6 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
                   duration_hours: this.form.duration_hours,
                   people: this.form.people,
                   occasion: this.form.occasion.trim(),
-                  notes: this.form.notes.trim() || null,
-                },
-              }),
-            });
-
-            const data = await resp.json();
-            if (!data.ok) {
-              alert('Fehler: ' + (data.error || 'unbekannt'));
-              this.submitting = false;
-              return;
-            }
-
-            this.existingBooking = data.booking;
-            this.view = 'status';
-          } catch (err: any) {
-            alert('Netzwerk-Fehler: ' + (err.message || 'unbekannt'));
-          } finally {
-            this.submitting = false;
-          }
-        },
-      }));
-
-      // @ts-expect-error - Alpine types
-      Alpine.data('serviceForm', (initial: any) => ({
-        items: initial.items,
-        allSlots: initial.allSlots,
-        labels: initial.labels,
-        accessToken: initial.accessToken,
-        existingBooking: initial.existingBooking,
-        lang: initial.lang,
-
-        view: initial.existingBooking ? 'status' : 'form',
-        submitting: false,
-
-        form: {
-          item_id: '',
-          timing: '',
-          time: '',
-          notes: '',
-        },
-
-        get canSubmit() {
-          if (!this.form.item_id || !this.form.timing) return false;
-          if (this.form.timing === 'scheduled' && !this.form.time) return false;
-          return true;
-        },
-
-        get statusInfo() {
-          const status = (this.existingBooking?.status || 'pending').toLowerCase();
-          if (status === 'confirmed') return { title: this.labels.statusConfirmedTitle, sub: this.labels.statusConfirmedSub };
-          if (status === 'cancelled') return { title: this.labels.statusCancelledTitle, sub: this.labels.statusCancelledSub };
-          return { title: this.labels.statusPendingTitle, sub: this.labels.statusPendingSub };
-        },
-
-        startRebook() {
-          this.form = { item_id: '', timing: '', time: '', notes: '' };
-          this.existingBooking = null;
-          this.view = 'form';
-        },
-
-        async submit() {
-          if (!this.canSubmit || this.submitting) return;
-          this.submitting = true;
-
-          const item = this.items.find((i: any) => i.id === this.form.item_id);
-
-          try {
-            const resp = await fetch('/api/bookings/create', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                access_token: this.accessToken,
-                type: 'service',
-                details: {
-                  item_id: this.form.item_id,
-                  item_name: item?.name || '',
-                  timing: this.form.timing,
-                  time: this.form.timing === 'scheduled' ? this.form.time : null,
                   notes: this.form.notes.trim() || null,
                 },
               }),

@@ -1,0 +1,542 @@
+---
+import { loadGuestCtx } from '../../../lib/showcase/guest-ctx';
+import { loadBookingsForStay } from '@retaha/db';
+import { normalizeLang, type Lang } from '@retaha/i18n';
+import { setStaySessionCookie, getStaySession, computeBrandPalette } from '@retaha/auth';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@retaha/ui-guest/base';
+
+const { token } = Astro.params;
+if (!token) return new Response('Token fehlt', { status: 400 });
+
+const url = new URL(Astro.request.url);
+const persona   = url.searchParams.get('persona') ?? 'in_house';
+const langParam = url.searchParams.get('lang');
+
+const ctxResult = await loadGuestCtx(token);
+if (!ctxResult) return Astro.redirect(`/g/${token}`);
+const { ctx, isShowcase } = ctxResult;
+const { stay, guest, hotel, settings } = ctx;
+
+// Feature guard
+const f            = (settings as any)?.features ?? {};
+const serviceItems = ((settings as any)?.service_items ?? []) as any[];
+if (f.service === false || serviceItems.length === 0) return Astro.redirect(`/g/${token}`);
+
+// Session cookie
+const session = await getStaySession(Astro.cookies);
+if (!session || session.stay_id !== stay.id) {
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: stay.id,
+    hotel_id: (hotel as any).id,
+    check_out_utc: stay.check_out,
+    is_showcase: isShowcase,
+  });
+}
+
+// Existing booking
+const existingBooking = isShowcase
+  ? null
+  : ((await loadBookingsForStay(stay.id, 'service'))[0] ?? null);
+
+// Lang
+const SUPPORTED = ['de', 'en', 'fr', 'es'] as const;
+type SvcLang = typeof SUPPORTED[number];
+const rawLang: Lang = normalizeLang(langParam ?? (guest as any)?.language ?? (hotel as any).default_language ?? 'de');
+const lk: SvcLang  = (SUPPORTED.includes(rawLang as SvcLang) ? rawLang : 'de') as SvcLang;
+
+// Time slots
+const startTime: string = (settings as any).service_start_time || '07:00';
+const endTime: string   = (settings as any).service_end_time   || '22:00';
+const [sH, sM] = startTime.substring(0, 5).split(':').map(Number);
+const [eH, eM] = endTime.substring(0, 5).split(':').map(Number);
+const startMin = sH * 60 + sM;
+const endMin   = eH * 60 + eM;
+const allSlots: { value: string; label: string }[] = [];
+for (let m = startMin; m < endMin; m += 30) {
+  const h  = Math.floor(m / 60);
+  const mm = m % 60;
+  const t  = `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  allSlots.push({ value: t, label: t });
+}
+
+// Localized items
+const localizedItems = serviceItems.map((item: any) => ({
+  id:          item.id,
+  name:        item[`name_${lk}`] || item.name_de || '',
+  description: item[`description_${lk}`] || item.description_de || '',
+}));
+
+// Brand
+const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
+const brandStyle = brandPrimary
+  ? (() => { const p = computeBrandPalette(brandPrimary); return `--accent:${brandPrimary};--accent-soft:${p.soft};--accent-on:${p.onAccent}`; })()
+  : undefined;
+
+const backHref = `/g/${token}?persona=${persona}${langParam ? `&lang=${langParam}` : ''}`;
+
+// i18n
+const labelMap = {
+  de: {
+    pageTitle: `${(hotel as any).name} · Service`,
+    eyebrow: 'Service',
+    title: 'Was brauchst ',
+    titleAccent: 'du?',
+    subtitle: 'Wir bringen es dir aufs Zimmer.',
+    chooseItem: 'Was möchtest du?',
+    timingLabel: 'Wann?',
+    timingNow: 'So schnell wie möglich',
+    timingScheduled: 'Zu einer bestimmten Zeit',
+    timeLabel: 'Uhrzeit',
+    notesLabel: 'Notiz (optional)',
+    notesPlaceholder: 'z.B. extra-saugfähige Handtücher, kohlensäurefreies Wasser …',
+    submitBtn: 'Service anfragen',
+    rebookBtn: 'Neue Anfrage',
+    statusPendingTitle: 'Wir haben deine Anfrage.',
+    statusPendingSub: 'Kommt zu dir aufs Zimmer.',
+    statusConfirmedTitle: 'Bestätigt.',
+    statusConfirmedSub: 'Wir bringen es dir gleich.',
+    statusCancelledTitle: 'Anfrage abgelehnt.',
+    statusCancelledSub: 'Bitte sprich mit dem Empfang.',
+    yourSelection: 'Deine Auswahl',
+    summaryItem: 'Service', summaryTime: 'Wann', summaryNote: 'Notiz',
+  },
+  en: {
+    pageTitle: `${(hotel as any).name} · Service`,
+    eyebrow: 'Service',
+    title: 'What do ',
+    titleAccent: 'you need?',
+    subtitle: 'We bring it to your room.',
+    chooseItem: 'What would you like?',
+    timingLabel: 'When?',
+    timingNow: 'As soon as possible',
+    timingScheduled: 'At a specific time',
+    timeLabel: 'Time',
+    notesLabel: 'Note (optional)',
+    notesPlaceholder: 'e.g. extra-absorbent towels, still water …',
+    submitBtn: 'Request service',
+    rebookBtn: 'New request',
+    statusPendingTitle: 'We got your request.',
+    statusPendingSub: 'Coming to your room.',
+    statusConfirmedTitle: 'Confirmed.',
+    statusConfirmedSub: 'We bring it shortly.',
+    statusCancelledTitle: 'Request declined.',
+    statusCancelledSub: 'Please speak with reception.',
+    yourSelection: 'Your selection',
+    summaryItem: 'Service', summaryTime: 'When', summaryNote: 'Note',
+  },
+  fr: {
+    pageTitle: `${(hotel as any).name} · Service`,
+    eyebrow: 'Service',
+    title: 'De quoi ',
+    titleAccent: 'avez-vous besoin ?',
+    subtitle: "Nous l'apportons dans votre chambre.",
+    chooseItem: 'Que souhaitez-vous ?',
+    timingLabel: 'Quand ?',
+    timingNow: 'Dès que possible',
+    timingScheduled: 'À une heure précise',
+    timeLabel: 'Heure',
+    notesLabel: 'Note (optionnel)',
+    notesPlaceholder: 'ex. serviettes très absorbantes, eau plate …',
+    submitBtn: 'Demander le service',
+    rebookBtn: 'Nouvelle demande',
+    statusPendingTitle: 'Demande reçue.',
+    statusPendingSub: 'Arrive dans votre chambre.',
+    statusConfirmedTitle: 'Confirmé.',
+    statusConfirmedSub: 'Nous arrivons.',
+    statusCancelledTitle: 'Demande refusée.',
+    statusCancelledSub: 'Veuillez parler à la réception.',
+    yourSelection: 'Votre sélection',
+    summaryItem: 'Service', summaryTime: 'Quand', summaryNote: 'Note',
+  },
+  es: {
+    pageTitle: `${(hotel as any).name} · Servicio`,
+    eyebrow: 'Servicio',
+    title: '¿Qué ',
+    titleAccent: 'necesitas?',
+    subtitle: 'Te lo llevamos a la habitación.',
+    chooseItem: '¿Qué te gustaría?',
+    timingLabel: '¿Cuándo?',
+    timingNow: 'Lo antes posible',
+    timingScheduled: 'A una hora concreta',
+    timeLabel: 'Hora',
+    notesLabel: 'Nota (opcional)',
+    notesPlaceholder: 'ej. toallas extra absorbentes, agua sin gas …',
+    submitBtn: 'Solicitar servicio',
+    rebookBtn: 'Nueva solicitud',
+    statusPendingTitle: 'Solicitud recibida.',
+    statusPendingSub: 'Va a tu habitación.',
+    statusConfirmedTitle: 'Confirmado.',
+    statusConfirmedSub: 'Lo traemos enseguida.',
+    statusCancelledTitle: 'Solicitud rechazada.',
+    statusCancelledSub: 'Por favor habla con recepción.',
+    yourSelection: 'Tu selección',
+    summaryItem: 'Servicio', summaryTime: 'Cuándo', summaryNote: 'Nota',
+  },
+} as const;
+const l = labelMap[lk];
+
+const pageData = {
+  items: localizedItems,
+  allSlots,
+  labels: l,
+  accessToken: token,
+  existingBooking,
+};
+---
+
+<!DOCTYPE html>
+<html lang={lk} style={brandStyle}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>{l.pageTitle}</title>
+    <style>
+      [x-cloak] { display: none !important; }
+      *, *::before, *::after { box-sizing: border-box; }
+
+      :root {
+        --accent:        #0A0A0A;
+        --accent-soft:   rgba(10,10,10,0.08);
+        --ink:           #0F0F0D;
+        --ink-muted:     #6B6B63;
+        --ink-faint:     #A8A8A0;
+        --border:        #E7E4DD;
+        --bg:            #FBFAF7;
+        --surface:       #FFFFFF;
+        --success:       #3D8C5C;
+        --radius:        12px;
+        --mono:    'JetBrains Mono', 'Courier New', monospace;
+        --display: 'Space Grotesk', system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0; padding: 0;
+        background: var(--bg); color: var(--ink);
+        font-family: var(--display);
+        min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 480px; margin: 0 auto;
+        padding: calc(env(safe-area-inset-top, 0px) + 72px) 22px calc(env(safe-area-inset-bottom, 20px) + 48px);
+        animation: page-in 280ms cubic-bezier(0.22,1,0.36,1) both;
+      }
+      @keyframes page-in {
+        from { transform: translateY(-12px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
+
+      /* ── Close button ───────────────────────────────────────────────── */
+      .close-btn {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 16px); right: 20px;
+        width: 36px; height: 36px; border-radius: 50%;
+        background: #EFEDE8; display: grid; place-items: center;
+        text-decoration: none; color: var(--ink);
+        transition: background 0.14s; z-index: 10;
+      }
+      .close-btn:hover  { background: #E0DDD7; }
+      .close-btn svg    { width: 16px; height: 16px; }
+
+      /* ── Hero ───────────────────────────────────────────────────────── */
+      .hero { padding: 28px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 28px; }
+      .eyebrow {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+        font-weight: 500; color: var(--accent); margin: 0 0 14px; display: block;
+      }
+      .title {
+        font-size: clamp(28px, 7vw, 38px); font-weight: 700;
+        letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 8px;
+      }
+      .title .accent { color: var(--accent); }
+      .subtitle { font-size: 14px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+      /* ── Chips ──────────────────────────────────────────────────────── */
+      .v2-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .v2-chip {
+        display: inline-flex; align-items: center;
+        padding: 8px 14px; min-height: 40px;
+        background: var(--surface); border: 1px solid #D0CCC5;
+        border-radius: 8px; font-family: var(--display); font-size: 14px;
+        font-weight: 500; color: var(--ink); cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: border-color 80ms, background 80ms, color 80ms;
+      }
+      .v2-chip:active { transform: scale(0.96); }
+      .v2-chip[data-active="true"] { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+      .v2-chip:hover:not([data-active="true"]) { border-color: #C0BCB5; }
+
+      /* ── Section ────────────────────────────────────────────────────── */
+      .svc-section { margin-bottom: 24px; }
+      .svc-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+        font-weight: 600; text-transform: uppercase; color: var(--ink-faint);
+        margin-bottom: 10px;
+      }
+      .svc-textarea {
+        width: 100%; padding: 12px 14px;
+        border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--surface); font-family: var(--display); font-size: 14px;
+        color: var(--ink); resize: none; outline: none;
+        transition: border-color 0.14s;
+      }
+      .svc-textarea:focus { border-color: #0A0A0A; }
+      .svc-textarea::placeholder { color: var(--ink-faint); }
+
+      /* ── Submit ─────────────────────────────────────────────────────── */
+      .svc-cta {
+        width: 100%; padding: 14px; background: #0A0A0A; color: #fff;
+        border: none; border-radius: 10px; font-family: var(--display);
+        font-size: 15px; font-weight: 700; cursor: pointer;
+        transition: background 0.14s; -webkit-tap-highlight-color: transparent;
+      }
+      .svc-cta:hover:not(:disabled) { background: #2A2A2A; }
+      .svc-cta:disabled { opacity: 0.4; cursor: default; }
+
+      /* ── Status card ────────────────────────────────────────────────── */
+      .status-card  { text-align: center; padding: 8px 0 24px; }
+      .status-icon  {
+        width: 48px; height: 48px; border-radius: 50%;
+        background: var(--accent); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+      .status-icon.confirmed { background: var(--success); }
+      .status-icon.cancelled { background: var(--ink-muted); }
+      .status-icon svg { width: 22px; height: 22px; }
+      .status-title { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+      .status-sub   { font-size: 14px; color: var(--ink-muted); margin: 0 0 24px; line-height: 1.4; }
+
+      .summary-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); overflow: hidden; margin-bottom: 20px;
+      }
+      .summary-row {
+        display: flex; justify-content: space-between; align-items: baseline;
+        padding: 12px 16px; border-bottom: 1px solid var(--border);
+      }
+      .summary-row:last-child { border-bottom: none; }
+      .summary-label {
+        font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--ink-faint);
+      }
+      .summary-value { font-size: 14px; font-weight: 500; color: var(--ink); }
+      .rebook-btn {
+        width: 100%; padding: 13px; border: 1px solid var(--border);
+        border-radius: 8px; background: transparent; color: var(--ink-muted);
+        font-family: var(--display); font-size: 14px; cursor: pointer;
+        transition: border-color 0.12s, color 0.12s;
+      }
+      .rebook-btn:hover { border-color: #0A0A0A; color: #0A0A0A; }
+    </style>
+  </head>
+  <body>
+    <a class="close-btn" href={backHref} data-astro-reload aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </a>
+
+    <div class="page">
+      <div class="hero">
+        <span class="eyebrow">{l.eyebrow}</span>
+        <h1 class="title">{l.title}<span class="accent">{l.titleAccent}</span></h1>
+        <p class="subtitle">{l.subtitle}</p>
+      </div>
+
+      <div x-data={`serviceForm(${JSON.stringify(pageData)})`} x-cloak>
+
+        <!-- Status view -->
+        <template x-if="view === 'status'">
+          <div class="status-card">
+            <div class="status-icon" :class="statusInfo.cls">
+              <template x-if="statusInfo.icon === 'check'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </template>
+              <template x-if="statusInfo.icon === 'clock'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/>
+                </svg>
+              </template>
+              <template x-if="statusInfo.icon === 'cross'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </template>
+            </div>
+            <p class="status-title" x-text="statusInfo.title"></p>
+            <p class="status-sub"   x-text="statusInfo.sub"></p>
+            <div class="summary-card">
+              <div class="summary-row">
+                <span class="summary-label" x-text="labels.summaryItem"></span>
+                <span class="summary-value"  x-text="existingBooking.details?.item_name || '—'"></span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label" x-text="labels.summaryTime"></span>
+                <span class="summary-value"  x-text="existingBooking.details?.time || labels.timingNow"></span>
+              </div>
+              <div class="summary-row" x-show="existingBooking.details?.notes">
+                <span class="summary-label" x-text="labels.summaryNote"></span>
+                <span class="summary-value"  x-text="existingBooking.details?.notes"></span>
+              </div>
+            </div>
+            <button type="button" class="rebook-btn"
+              x-show="existingBooking.status === 'cancelled' || existingBooking.status === 'confirmed'"
+              x-text="labels.rebookBtn"
+              @click="startRebook()">
+            </button>
+          </div>
+        </template>
+
+        <!-- Form view -->
+        <template x-if="view === 'form'">
+          <div>
+            <!-- Items -->
+            <div class="svc-section">
+              <div class="svc-label" x-text="labels.chooseItem"></div>
+              <div class="v2-chips">
+                <template x-for="item in items" :key="item.id">
+                  <button type="button" class="v2-chip"
+                    :data-active="form.item_id === item.id"
+                    @click="form.item_id = item.id"
+                    x-text="item.name">
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <!-- Timing -->
+            <div class="svc-section" x-show="form.item_id">
+              <div class="svc-label" x-text="labels.timingLabel"></div>
+              <div class="v2-chips">
+                <button type="button" class="v2-chip"
+                  :data-active="form.timing === 'now'"
+                  @click="form.timing = 'now'; form.time = ''"
+                  x-text="labels.timingNow">
+                </button>
+                <button type="button" class="v2-chip"
+                  :data-active="form.timing === 'scheduled'"
+                  @click="form.timing = 'scheduled'"
+                  x-text="labels.timingScheduled">
+                </button>
+              </div>
+            </div>
+
+            <!-- Time slots -->
+            <div class="svc-section" x-show="form.timing === 'scheduled'">
+              <div class="svc-label" x-text="labels.timeLabel"></div>
+              <div class="v2-chips">
+                <template x-for="slot in allSlots" :key="slot.value">
+                  <button type="button" class="v2-chip"
+                    :data-active="form.time === slot.value"
+                    @click="form.time = slot.value"
+                    x-text="slot.label">
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="svc-section" x-show="form.item_id && form.timing">
+              <div class="svc-label" x-text="labels.notesLabel"></div>
+              <textarea class="svc-textarea" rows="3"
+                :placeholder="labels.notesPlaceholder"
+                x-model="form.notes">
+              </textarea>
+            </div>
+
+            <!-- Submit -->
+            <button type="button" class="svc-cta"
+              :disabled="!canSubmit || submitting"
+              @click="submit()">
+              <span x-show="!submitting" x-text="labels.submitBtn"></span>
+              <span x-show="submitting">…</span>
+            </button>
+          </div>
+        </template>
+
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('alpine:init', () => {
+        const Alpine = (window as any).Alpine;
+        if (!Alpine) return;
+
+        Alpine.data('serviceForm', (initial: any) => ({
+          items:           initial.items,
+          allSlots:        initial.allSlots,
+          labels:          initial.labels,
+          accessToken:     initial.accessToken,
+          existingBooking: initial.existingBooking,
+
+          view: initial.existingBooking ? 'status' : 'form',
+          submitting: false,
+
+          form: { item_id: '', timing: '', time: '', notes: '' },
+
+          get canSubmit(): boolean {
+            if (!this.form.item_id || !this.form.timing) return false;
+            if (this.form.timing === 'scheduled' && !this.form.time) return false;
+            return true;
+          },
+
+          get statusInfo() {
+            const s = (this.existingBooking?.status || 'pending').toLowerCase();
+            if (s === 'confirmed') return { title: this.labels.statusConfirmedTitle, sub: this.labels.statusConfirmedSub, icon: 'check', cls: 'confirmed' };
+            if (s === 'cancelled') return { title: this.labels.statusCancelledTitle, sub: this.labels.statusCancelledSub, icon: 'cross', cls: 'cancelled' };
+            return { title: this.labels.statusPendingTitle, sub: this.labels.statusPendingSub, icon: 'clock', cls: '' };
+          },
+
+          startRebook() {
+            this.form = { item_id: '', timing: '', time: '', notes: '' };
+            this.existingBooking = null;
+            this.view = 'form';
+          },
+
+          async submit() {
+            if (!this.canSubmit || this.submitting) return;
+            this.submitting = true;
+            const item = this.items.find((i: any) => i.id === this.form.item_id);
+            try {
+              const resp = await fetch('/api/bookings/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  access_token: this.accessToken,
+                  type: 'service',
+                  details: {
+                    item_id:   this.form.item_id,
+                    item_name: item?.name || '',
+                    timing:    this.form.timing,
+                    time:      this.form.timing === 'scheduled' ? this.form.time : null,
+                    notes:     this.form.notes.trim() || null,
+                  },
+                }),
+              });
+              const data = await resp.json();
+              if (!data.ok) { alert('Fehler: ' + (data.error || 'unbekannt')); this.submitting = false; return; }
+              this.existingBooking = data.booking;
+              this.view = 'status';
+            } catch (err: any) {
+              alert('Netzwerk-Fehler: ' + (err.message || 'unbekannt'));
+            } finally {
+              this.submitting = false;
+            }
+          },
+        }));
+
+        Alpine.start();
+      });
+    </script>
+  </body>
+</html>
