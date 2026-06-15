@@ -13,11 +13,12 @@ interface Props {
   checkInLabel: string;
   lang: string;
   previewUrl: string | null;
+  eyebrowTagline: string | null;
 }
 
 const {
   token, guestName, hotelName, heroImageUrl, logoUrl,
-  brandPrimary, gateState, checkInLabel, lang, previewUrl,
+  brandPrimary, gateState, checkInLabel, lang, previewUrl, eyebrowTagline,
 } = Astro.props;
 
 const fn = guestName ?? '';
@@ -36,7 +37,8 @@ const l = (['de','en','fr','es','it','pt','nl','ru','ar','zh'].includes(lang) ? 
 
 type Txt = {
   headline: string; sub: string;
-  slider: string; skip: string;
+  slider: string; skip: string; completing: string;
+  tagline: string;
   eyebrow: string; mockGreet: string;
   eveMsg: string; chip1: string; chip2: string; eveInput: string;
   headlineDone: string; subDone: string;
@@ -48,6 +50,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Bereite deinen Check-in vor – dann geht\'s bei der Ankunft ganz schnell.',
     slider:       'Check-in vorbereiten',
     skip:         'Später erledigen',
+    completing:   'Check-in wird geöffnet …',
+    tagline:      'Für eine sternenvolle Nacht',
     eyebrow:      'Dein Aufenthalt',
     mockGreet:    fn ? `Hallo, ${fn}` : 'Hallo',
     eveMsg:       'Ich hab Tipps & Empfehlungen für deinen Aufenthalt zusammengestellt.',
@@ -62,6 +66,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Prepare your check-in now – for a smooth and quick arrival.',
     slider:       'Prepare Check-in',
     skip:         'Maybe later',
+    completing:   'Opening check-in …',
+    tagline:      'For a stellar night',
     eyebrow:      'Your Stay',
     mockGreet:    fn ? `Hello, ${fn}` : 'Hello',
     eveMsg:       'I\'ve put together tips and recommendations for your stay.',
@@ -76,6 +82,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Préparez votre enregistrement – pour une arrivée rapide et sans attente.',
     slider:       'Préparer le check-in',
     skip:         'Plus tard',
+    completing:   'Ouverture du check-in …',
+    tagline:      'Pour une nuit étoilée',
     eyebrow:      'Votre séjour',
     mockGreet:    fn ? `Bonjour, ${fn}` : 'Bonjour',
     eveMsg:       'J\'ai préparé des conseils et recommandations pour votre séjour.',
@@ -90,6 +98,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Prepara tu check-in – para una llegada rápida y sin esperas.',
     slider:       'Preparar el check-in',
     skip:         'Más tarde',
+    completing:   'Abriendo check-in …',
+    tagline:      'Para una noche estelar',
     eyebrow:      'Tu estancia',
     mockGreet:    fn ? `Hola, ${fn}` : 'Hola',
     eveMsg:       'He preparado consejos y recomendaciones para tu estancia.',
@@ -104,6 +114,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Prepara il tuo check-in – per un arrivo rapido e senza attese.',
     slider:       'Prepara il check-in',
     skip:         'Più tardi',
+    completing:   'Apertura del check-in …',
+    tagline:      'Per una notte stellare',
     eyebrow:      'Il tuo soggiorno',
     mockGreet:    fn ? `Ciao, ${fn}` : 'Ciao',
     eveMsg:       'Ho preparato consigli e suggerimenti per il tuo soggiorno.',
@@ -118,6 +130,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Prepare o seu check-in – para uma chegada rápida e sem esperas.',
     slider:       'Preparar check-in',
     skip:         'Mais tarde',
+    completing:   'A abrir o check-in …',
+    tagline:      'Para uma noite estrelada',
     eyebrow:      'A sua estadia',
     mockGreet:    fn ? `Olá, ${fn}` : 'Olá',
     eveMsg:       'Preparei dicas e recomendações para a sua estadia.',
@@ -132,6 +146,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Bereid je check-in voor – voor een vlotte aankomst zonder wachten.',
     slider:       'Check-in voorbereiden',
     skip:         'Later',
+    completing:   'Check-in wordt geopend …',
+    tagline:      'Voor een sterrenrijke nacht',
     eyebrow:      'Jouw verblijf',
     mockGreet:    fn ? `Hallo, ${fn}` : 'Hallo',
     eveMsg:       'Ik heb tips en aanbevelingen voor jouw verblijf samengesteld.',
@@ -146,6 +162,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'Подготовьтесь к заезду – чтобы прибытие прошло быстро.',
     slider:       'Подготовить заезд',
     skip:         'Позже',
+    completing:   'Открываем заезд …',
+    tagline:      'Для звёздной ночи',
     eyebrow:      'Ваше пребывание',
     mockGreet:    fn ? `Привет, ${fn}` : 'Привет',
     eveMsg:       'Я подготовила советы и рекомендации для вашего пребывания.',
@@ -160,6 +178,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          'جهّز تسجيل وصولك – للوصول بسرعة دون انتظار.',
     slider:       'التحضير للوصول',
     skip:         'لاحقاً',
+    completing:   'جارٍ فتح تسجيل الوصول …',
+    tagline:      'لليلة مضيئة بالنجوم',
     eyebrow:      'إقامتك',
     mockGreet:    fn ? `مرحباً، ${fn}` : 'مرحباً',
     eveMsg:       'لقد أعددت نصائح وتوصيات لإقامتك.',
@@ -174,6 +194,8 @@ const LABELS: Record<Lang, Txt> = {
     sub:          '提前完成入住登记 – 到达时无需排队，快速入住。',
     slider:       '准备入住登记',
     skip:         '稍后',
+    completing:   '正在打开入住登记 …',
+    tagline:      '为一个繁星之夜',
     eyebrow:      '您的住宿',
     mockGreet:    fn ? `你好，${fn}` : '你好',
     eveMsg:       '我为您的住宿准备了提示和建议。',
@@ -195,6 +217,17 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
   class={`wc-screen${isCompleted ? ' wc-completed' : ''}`}
   style={`--accent:${brandPrimary};--accent-rgb:${accentRgb};`}
 >
+
+  {/* ── Star field ── */}
+  <div class="wc-bgfx" aria-hidden="true">
+    <div class="wc-stars"></div>
+    <div class="wc-stars2"></div>
+    <div class="wc-stars3"></div>
+    <div class="wc-spark" style="top:72px;left:48px;font-size:11px;animation-delay:.6s">✦</div>
+    <div class="wc-spark" style="top:138px;right:52px;font-size:8px;animation-delay:1.2s">✦</div>
+    <div class="wc-spark" style="top:218px;left:34px;font-size:7px;animation-delay:2s">✦</div>
+    <div class="wc-spark" style="top:88px;right:78px;font-size:9px;animation-delay:.3s">✦</div>
+  </div>
 
   {/* ── Logo ── */}
   <div class="wc-brand">
@@ -291,31 +324,33 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
 
       {/* Copy */}
       <div class="wc-copy">
+        <div class="wc-eyebrow">
+          <span class="wc-es" aria-hidden="true">✦</span>
+          {eyebrowTagline ?? txt.tagline}
+        </div>
         <h1 class="wc-headline">{txt.headline}</h1>
         <p class="wc-sub">{txt.sub}</p>
       </div>
 
       {/* CTA: Slider + Skip */}
       <div class="wc-cta">
-        <div
-          id="wc-track"
-          class="wc-track"
-          role="button"
-          tabindex="0"
-          aria-label={txt.slider}
-          data-url={preCheckinUrl}
-        >
-          <div id="wc-fill" class="wc-fill"></div>
-          <div id="wc-knob" class="wc-knob">
-            <div class="wc-arr" aria-hidden="true">
-              {/* Arrow right */}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </div>
+        <div class="wc-slide" id="wc-slide">
+          <div
+            id="wc-track"
+            class="wc-track"
+            role="button"
+            tabindex="0"
+            aria-label={txt.slider}
+            data-url={preCheckinUrl}
+            data-completing={txt.completing}
+          >
+            <div id="wc-fill" class="wc-fill"></div>
+            <span id="wc-lbl" class="wc-lbl">{txt.slider}</span>
+            <span class="wc-chevs" aria-hidden="true">›&#8203;›&#8203;›</span>
           </div>
-          <span class="wc-track-lbl">{txt.slider}</span>
+          <div id="wc-knob" class="wc-knob">
+            <span class="wc-arr" aria-hidden="true">→</span>
+          </div>
         </div>
         <button id="wc-skip" class="wc-skip" type="button">
           {txt.skip}
@@ -337,8 +372,78 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     overflow: hidden;
   }
 
+  /* ── Star field ─────────────────────────────────────────────────── */
+  .wc-bgfx {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .wc-stars, .wc-stars2, .wc-stars3 {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1px; height: 1px;
+    border-radius: 50%;
+    background: transparent;
+  }
+  .wc-stars {
+    box-shadow:
+      43px 58px 0 rgba(255,255,255,.58), 182px 23px 0 rgba(255,255,255,.46),
+      321px 41px 0 rgba(255,255,255,.52), 76px 112px 0 rgba(255,255,255,.42),
+      259px 87px 0 rgba(255,255,255,.50), 134px 167px 0 rgba(255,255,255,.44),
+      378px 134px 0 rgba(255,255,255,.48), 19px 234px 0 rgba(255,255,255,.40),
+      203px 198px 0 rgba(255,255,255,.54), 342px 256px 0 rgba(255,255,255,.46),
+      89px 312px 0 rgba(255,255,255,.40), 167px 378px 0 rgba(255,255,255,.44),
+      278px 334px 0 rgba(255,255,255,.48), 57px 456px 0 rgba(255,255,255,.38),
+      231px 423px 0 rgba(255,255,255,.44), 356px 478px 0 rgba(255,255,255,.50),
+      112px 534px 0 rgba(255,255,255,.40), 287px 512px 0 rgba(255,255,255,.44),
+      145px 612px 0 rgba(255,255,255,.36), 378px 589px 0 rgba(255,255,255,.42),
+      34px 667px 0 rgba(255,255,255,.38), 201px 645px 0 rgba(255,255,255,.44),
+      312px 712px 0 rgba(255,255,255,.40), 78px 723px 0 rgba(255,255,255,.36),
+      256px 756px 0 rgba(255,255,255,.42), 389px 634px 0 rgba(255,255,255,.38),
+      156px 801px 0 rgba(255,255,255,.34), 45px 178px 0 rgba(255,255,255,.48),
+      278px 145px 0 rgba(255,255,255,.46), 123px 289px 0 rgba(255,255,255,.42),
+      334px 367px 0 rgba(255,255,255,.44), 189px 489px 0 rgba(255,255,255,.40),
+      67px 556px 0 rgba(255,255,255,.38), 345px 567px 0 rgba(255,255,255,.42),
+      23px 601px 0 rgba(255,255,255,.36), 267px 689px 0 rgba(255,255,255,.40),
+      123px 734px 0 rgba(255,255,255,.38), 298px 289px 0 rgba(255,255,255,.44);
+  }
+  .wc-stars2 {
+    box-shadow:
+      156px 45px 0 rgba(255,255,255,.80), 312px 112px 0 rgba(255,255,255,.76),
+      56px 189px 0 rgba(255,255,255,.72), 234px 267px 0 rgba(255,255,255,.78),
+      345px 312px 0 rgba(255,255,255,.74), 89px 423px 0 rgba(255,255,255,.80),
+      178px 534px 0 rgba(255,255,255,.76), 267px 601px 0 rgba(255,255,255,.72),
+      123px 667px 0 rgba(255,255,255,.78), 345px 689px 0 rgba(255,255,255,.74),
+      56px 756px 0 rgba(255,255,255,.80), 234px 801px 0 rgba(255,255,255,.76),
+      312px 756px 0 rgba(255,255,255,.72), 178px 145px 0 rgba(255,255,255,.78);
+    animation: wc-tw 5s ease-in-out infinite;
+  }
+  .wc-stars3 {
+    width: 2px; height: 2px;
+    box-shadow:
+      78px 78px 1px rgba(255,255,255,.90), 298px 198px 1px rgba(255,255,255,.88),
+      167px 389px 1px rgba(255,255,255,.92), 312px 534px 1px rgba(255,255,255,.86),
+      89px 623px 1px rgba(255,255,255,.90), 234px 712px 1px rgba(255,255,255,.88);
+    animation: wc-tw 7.5s ease-in-out infinite 1.8s;
+  }
+  .wc-spark {
+    position: absolute;
+    color: rgba(170,183,234,.70);
+    pointer-events: none;
+    animation: wc-tw 3.5s ease-in-out infinite;
+    line-height: 1;
+  }
+  @keyframes wc-tw {
+    0%,100% { opacity: .30; }
+    50%      { opacity: .95; }
+  }
+
   /* ── Logo / Brand ────────────────────────────────────────────────── */
   .wc-brand {
+    position: relative;
+    z-index: 1;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -364,6 +469,7 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
   .wc-stage {
     flex: 1;
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -600,9 +706,28 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
 
   /* ── Copy ────────────────────────────────────────────────────────── */
   .wc-copy {
+    position: relative;
+    z-index: 1;
     text-align: center;
-    padding: 18px 28px 4px;
+    padding: 14px 28px 4px;
     animation: wc-copy-up .7s .9s ease-out both;
+  }
+  .wc-eyebrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-style: italic;
+    letter-spacing: .05em;
+    color: rgba(var(--accent-rgb), .88);
+    margin-bottom: 10px;
+  }
+  .wc-es {
+    font-style: normal;
+    font-size: 9px;
+    animation: wc-tw 2.5s ease-in-out infinite;
   }
   .wc-headline {
     font-family: 'Space Grotesk', sans-serif;
@@ -625,7 +750,9 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
 
   /* ── CTA: Slide + Skip ───────────────────────────────────────────── */
   .wc-cta {
-    padding: 20px 24px max(env(safe-area-inset-bottom, 0px), 34px);
+    position: relative;
+    z-index: 1;
+    padding: 16px 24px max(env(safe-area-inset-bottom, 0px), 34px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -633,69 +760,112 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     animation: wc-cta-fade .6s 1.1s ease-out both;
   }
 
-  /* Slide track */
-  .wc-track {
+  /* Slide wrapper */
+  .wc-slide {
     position: relative;
     width: 100%;
-    height: 56px;
-    border-radius: 28px;
-    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04));
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid rgba(255,255,255,.16);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -6px 14px rgba(0,0,0,.18);
-    overflow: hidden;
-    cursor: pointer;
+    height: 62px;
     user-select: none;
-    touch-action: none;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Glass track */
+  .wc-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 31px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04));
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+    border: 1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -8px 16px rgba(0,0,0,.22);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  /* Accent fill (grows as knob slides) */
   .wc-fill {
     position: absolute;
-    inset: 0;
-    right: auto;
-    width: 0%;
-    background: linear-gradient(90deg, rgba(var(--accent-rgb),.0), rgba(var(--accent-rgb),.28));
-    border-radius: 28px;
+    left: 0; top: 0; bottom: 0;
+    width: 54px;
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),.0), rgba(var(--accent-rgb),.30));
+    opacity: 0;
+    transition: opacity .15s;
     pointer-events: none;
   }
-  .wc-knob {
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    width: 48px;
-    height: 48px;
-    border-radius: 24px;
-    background: var(--accent, #6982cf);
-    box-shadow: 0 0 22px rgba(var(--accent-rgb), .52), 0 2px 8px rgba(0,0,0,.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
+
+  /* Track label */
+  .wc-lbl {
+    position: relative;
     z-index: 2;
-    will-change: transform;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .wc-knob:active { cursor: grabbing; }
-  .wc-track-lbl {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-left: 58px;
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 600;
     font-size: 15px;
-    color: rgba(255,255,255,.72);
     letter-spacing: -.01em;
+    color: rgba(255,255,255,.80);
+    padding-left: 48px;
+    padding-right: 8px;
     pointer-events: none;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right: 16px;
+    transition: opacity .15s;
+    text-align: center;
+    flex: 1;
   }
+
+  /* Animated chevron hint */
+  .wc-chevs {
+    position: relative;
+    z-index: 2;
+    color: rgba(170,183,234,.72);
+    font-size: 15px;
+    letter-spacing: -3px;
+    pointer-events: none;
+    animation: wc-shimmer 1.8s linear infinite;
+    flex-shrink: 0;
+    padding-right: 10px;
+  }
+  @keyframes wc-shimmer {
+    0%,100% { opacity: .18; }
+    50%      { opacity: .88; }
+  }
+
+  /* White glass knob */
+  .wc-knob {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    background: radial-gradient(circle at 38% 30%, rgba(255,255,255,.98), rgba(218,224,245,.86));
+    box-shadow: 0 6px 18px rgba(0,0,0,.45), 0 0 20px rgba(var(--accent-rgb),.40), inset 0 1px 1px rgba(255,255,255,.90);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wc-knob:active { cursor: grabbing; }
+  .wc-arr {
+    color: #2b3460;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    font-style: normal;
+  }
+  .wc-knob.wc-done {
+    background: radial-gradient(circle at 38% 30%, #c2ead4, #4e8a68);
+  }
+  .wc-knob.wc-done .wc-arr { color: #fff; }
 
   /* Skip link */
   .wc-skip {
@@ -703,16 +873,15 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     border: none;
     padding: 8px 16px;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    font-size: 11.5px;
+    font-size: 11px;
     letter-spacing: .06em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,.42);
+    text-transform: lowercase;
+    color: rgba(255,255,255,.40);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: color .15s;
   }
-  .wc-skip:hover, .wc-skip:active { color: rgba(255,255,255,.66); }
+  .wc-skip:hover, .wc-skip:active { color: rgba(255,255,255,.64); }
 
   /* ── Bis-bald-State ──────────────────────────────────────────────── */
   .wc-done-body {
@@ -799,7 +968,8 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
     .wc-cta     { animation: none; opacity: 1; }
     .wc-check-circle { animation: none; opacity: 1; transform: none; }
     .wc-check-glow   { animation: none; opacity: .5; }
-    .wc-if { transition: none; }
+    .wc-if      { transition: none; }
+    .wc-stars2, .wc-stars3, .wc-spark, .wc-es, .wc-chevs { animation: none; opacity: .55; }
   }
 </style>
 
@@ -833,118 +1003,107 @@ const preCheckinUrl = `/g/${token}/pre-checkin`;
 {!isCompleted && (
   <script>
     (function () {
+      var slide = document.getElementById('wc-slide');
       var track = document.getElementById('wc-track');
       var knob  = document.getElementById('wc-knob');
       var fill  = document.getElementById('wc-fill');
-      if (!track || !knob || !fill) return;
+      var lbl   = document.getElementById('wc-lbl');
+      if (!slide || !track || !knob || !fill || !lbl) return;
 
-      var url  = track.dataset.url;
-      var done = false;
-      var currentDx = 0;
-      var dragging  = false;
-      var startX    = 0;
+      var url        = track.dataset.url || '';
+      var completing = track.dataset.completing || '…';
+      var dragging   = false, dragged = false;
+      var startX = 0, x = 0, max = 0, done = false;
+      var KNOB_W = knob.offsetWidth;
 
       var CHECK_SVG =
         '<svg width="20" height="20" viewBox="0 0 40 40" fill="none" aria-hidden="true">' +
         '<polyline points="10 20 17 27 30 13" stroke="#fff" stroke-width="3"' +
         ' stroke-linecap="square" stroke-linejoin="miter"/></svg>';
 
-      function trackW() { return track.offsetWidth - knob.offsetWidth - 8; }
+      function setMax() { max = slide.clientWidth - KNOB_W - 8; }
+      setMax();
+      window.addEventListener('resize', setMax, { passive: true });
+
+      function move(px) {
+        x = Math.max(0, Math.min(max, px));
+        knob.style.transition = 'none';
+        knob.style.left = (4 + x) + 'px';
+        var p = x / max;
+        fill.style.width = (KNOB_W + x) + 'px';
+        fill.style.opacity = p > 0.02 ? '1' : '0';
+        lbl.style.opacity = String(1 - Math.min(1, p * 1.4));
+      }
 
       function complete() {
         if (done) return;
         done = true;
-        var w = trackW();
-        knob.style.transition = 'transform .24s ease';
-        fill.style.transition = 'width .24s ease';
-        knob.style.transform  = 'translateX(' + w + 'px)';
-        fill.style.width      = '100%';
+        x = max;
+        knob.style.transition = 'left .4s cubic-bezier(.2,.7,.2,1)';
+        knob.style.left = (4 + max) + 'px';
+        knob.classList.add('wc-done');
         var arr = knob.querySelector('.wc-arr');
         if (arr) arr.innerHTML = CHECK_SVG;
-        setTimeout(function () { window.location.href = url; }, 350);
+        lbl.textContent = completing;
+        lbl.style.opacity = '1';
+        lbl.style.paddingLeft = '0';
+        fill.style.width = '100%';
+        fill.style.opacity = '1';
+        setTimeout(function () { window.location.href = url; }, 500);
       }
 
       function snapBack() {
-        knob.style.transition = 'transform .35s cubic-bezier(.5,0,.2,1)';
-        fill.style.transition = 'width .35s cubic-bezier(.5,0,.2,1)';
-        knob.style.transform  = 'translateX(0)';
-        fill.style.width      = '0%';
-        currentDx = 0;
-        setTimeout(function () {
-          knob.style.transition = '';
-          fill.style.transition = '';
-        }, 380);
+        x = 0;
+        knob.style.transition = 'left .35s cubic-bezier(.5,0,.2,1)';
+        knob.style.left = '4px';
+        fill.style.opacity = '0';
+        fill.style.width = KNOB_W + 'px';
+        lbl.style.opacity = '1';
       }
 
-      function moveKnob(dx) {
-        var w = trackW();
-        currentDx = Math.min(Math.max(dx, 0), w);
-        knob.style.transform = 'translateX(' + currentDx + 'px)';
-        fill.style.width = (w > 0 ? currentDx / w * 100 : 0) + '%';
+      function down(e) {
+        if (done) return;
+        dragging = true; dragged = false;
+        startX = (e.touches ? e.touches[0].clientX : e.clientX) - x;
+      }
+      function mv(e) {
+        if (!dragging) return;
+        e.preventDefault();
+        var cx = e.touches ? e.touches[0].clientX : e.clientX;
+        var nx = cx - startX;
+        if (nx > 4) dragged = true;
+        move(nx);
+      }
+      function up() {
+        if (!dragging) return;
+        dragging = false;
+        knob.style.transition = 'left .25s cubic-bezier(.2,.7,.2,1)';
+        if (x > max * 0.85) { complete(); }
+        else { snapBack(); }
       }
 
-      // Tap on track → complete
-      track.addEventListener('click', function (e) {
+      function tapComplete() {
         if (done) return;
-        // Only if the tap didn't start a drag
-        if (currentDx < 4) complete();
-      });
+        knob.style.transition = 'left .5s cubic-bezier(.2,.7,.2,1)';
+        x = max; knob.style.left = (4 + max) + 'px';
+        fill.style.width = '100%'; fill.style.opacity = '1';
+        lbl.style.opacity = '0';
+        setTimeout(complete, 320);
+      }
 
-      // ── Touch ──────────────────────────────────────────────────────
-      knob.addEventListener('touchstart', function (e) {
-        if (done) return;
-        startX   = e.touches[0].clientX;
-        dragging = true;
-        knob.style.transition = '';
-        fill.style.transition = '';
-        e.preventDefault();
-        e.stopPropagation();
-      }, { passive: false });
+      knob.addEventListener('mousedown', down);
+      window.addEventListener('mousemove', mv);
+      window.addEventListener('mouseup', up);
+      knob.addEventListener('touchstart', down, { passive: false });
+      window.addEventListener('touchmove', mv, { passive: false });
+      window.addEventListener('touchend', up);
 
-      document.addEventListener('touchmove', function (e) {
-        if (!dragging || done) return;
-        moveKnob(e.touches[0].clientX - startX);
-        e.preventDefault();
-      }, { passive: false });
-
-      document.addEventListener('touchend', function () {
-        if (!dragging || done) return;
-        dragging = false;
-        var w = trackW();
-        if (w > 0 && currentDx / w >= 0.85) { complete(); }
-        else { snapBack(); }
-      });
-
-      // ── Mouse (desktop testing) ────────────────────────────────────
-      knob.addEventListener('mousedown', function (e) {
-        if (done) return;
-        startX   = e.clientX;
-        dragging = true;
-        knob.style.transition = '';
-        fill.style.transition = '';
-        e.preventDefault();
-      });
-
-      document.addEventListener('mousemove', function (e) {
-        if (!dragging || done) return;
-        moveKnob(e.clientX - startX);
-      });
-
-      document.addEventListener('mouseup', function () {
-        if (!dragging || done) return;
-        dragging = false;
-        var w = trackW();
-        if (w > 0 && currentDx / w >= 0.85) { complete(); }
-        else { snapBack(); }
-      });
-
-      // ── Keyboard (accessibility) ───────────────────────────────────
+      track.addEventListener('click', function () { if (done || dragged) return; tapComplete(); });
       track.addEventListener('keydown', function (e) {
         if (done) return;
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); complete(); }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tapComplete(); }
       });
 
-      // ── Skip button ────────────────────────────────────────────────
       var skip = document.getElementById('wc-skip');
       if (skip) {
         skip.addEventListener('click', function () {

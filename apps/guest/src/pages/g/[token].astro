@@ -429,6 +429,10 @@ const gateState: 'default' | 'skipped' | 'completed' =
 // default/completed → PreArrivalGate (Welcome oder Bis-bald)
 const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipped';
 
+// Eyebrow-Tagline: optionales Hotel-Override aus hotel_settings.features
+const gateEyebrowTagline: string | null =
+  (settings as any)?.features?.pre_arrival_tagline ?? null;
+
 // Live-iframe für Device-Mockup: zeigt die App in in_house-Persona
 // Showcase: selbes Token mit ?persona=in_house (kein Rekursionsrisiko — in_house zeigt kein Gate)
 // Echter Gast: Hotel-Showcase-Token aus DB (falls vorhanden)
@@ -487,6 +491,7 @@ if (showPreArrivalGate) {
         checkInLabel={checkInLabel}
         lang={lang}
         previewUrl={gatePreviewUrl}
+        eyebrowTagline={gateEyebrowTagline}
       />
     ) : (
     <main x-data="guestPage" x-cloak>
