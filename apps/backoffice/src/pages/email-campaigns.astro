@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ComingSoonModal from '@retaha/ui/components/admin/ComingSoonModal.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<Layout title="Email-Kampagnen" activeTab="backoffice">
+  <ComingSoonModal
+    feature_name="email-kampagnen"
+    feature_eyebrow="außerhalb des aufenthalts"
+    feature_description="Begeistere ehemalige Gäste mit gezielten Email-Kampagnen — Newsletter, Special-Offers, Saison-Aktionen."
+    planned_release="Q1 2027"
+  />
+</Layout>

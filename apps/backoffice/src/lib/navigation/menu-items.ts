@@ -26,6 +26,23 @@ export const menuSections: MenuSection[] = [
     ],
   },
   {
+    title: 'Marketing',
+    items: [
+      {
+        label: 'Marketing',
+        sub: 'Kampagnen · Drips · Übersicht',
+        href: '/marketing',
+        icon: icon('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'),
+      },
+      {
+        label: 'Email-Domain',
+        sub: 'Eigene Absender-Adresse',
+        href: '/email-domain',
+        icon: icon('<path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6z"/><path d="M22 10l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/>'),
+      },
+    ],
+  },
+  {
     title: 'Gäste-Module',
     items: [
       {

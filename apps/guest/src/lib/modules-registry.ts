@@ -49,7 +49,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     label: 'Service-Anfragen',
     desc: 'Handtücher, Zimmerservice, Wasser — per Tap, ohne Anruf.',
     tier: 'lite',
-    linkedRoute: '/service',
+    backofficeRoute: '/service-items',
     icon: `<path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>`,
   },
   {
@@ -152,7 +152,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     label: 'Marketing (Drips + Kampagnen)',
     desc: 'Automatische Email-Sequenzen und manuelle Kampagnen an Wallet-Gäste.',
     tier: 'premium',
-    linkedRoute: '/marketing',
+    backofficeRoute: '/marketing',
     icon: `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
   },
   {
@@ -245,7 +245,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     label: 'Custom Email-Domain',
     desc: 'Emails kommen von @deinehotel.de statt @retaha.de.',
     tier: 'enterprise',
-    linkedRoute: '/email-domain',
+    backofficeRoute: '/email-domain',
     icon: `<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>`,
   },
 

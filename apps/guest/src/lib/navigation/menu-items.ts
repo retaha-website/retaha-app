@@ -59,12 +59,6 @@ export const menuSections: MenuSection[] = [
         icon: icon('<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'),
       },
       {
-        label: 'Service',
-        sub: 'Anfragen · Aufgaben',
-        href: '/service',
-        icon: icon('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'),
-      },
-      {
         label: 'Konferenz',
         sub: 'Räume · Buchungen',
         href: '/conference',
@@ -102,31 +96,13 @@ export const menuSections: MenuSection[] = [
     ],
   },
   {
-    title: 'Marketing',
+    title: 'Stay-Pushes & Tools',
     items: [
       {
         label: 'Stay-Pushes',
         sub: 'Automatische Nachrichten',
         href: '/stay-pushes',
         icon: icon('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
-      },
-      {
-        label: 'Kampagnen',
-        sub: 'E-Mail · Zielgruppen',
-        href: '/marketing',
-        icon: icon('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'),
-      },
-      {
-        label: 'Drips',
-        sub: 'Automatisierte Flows',
-        href: '/marketing',
-        icon: icon('<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>'),
-      },
-      {
-        label: 'Templates',
-        sub: 'E-Mail-Vorlagen',
-        href: '/marketing',
-        icon: icon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'),
       },
       {
         label: 'Feedback-Anfragen',

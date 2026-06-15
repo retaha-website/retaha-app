@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ComingSoonModal from '@retaha/ui/components/admin/ComingSoonModal.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+---
+
+<Layout title="Marketing" activeTab="backoffice">
+  <ComingSoonModal
+    feature_name="marketing"
+    feature_eyebrow="gäste-marketing"
+    feature_description="Kampagnen, Drip-Sequenzen und Templates — alles an einem Ort. Gäste vor, während und nach dem Aufenthalt erreichen."
+    planned_release="Q3 2026"
+  />
+</Layout>

@@ -1,26 +1,15 @@
 ---
-import HotelierLayout from '../layouts/HotelierLayout.astro';
-import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
-import {
-  getUser,
-  getUserHotels,
-  createSupabaseServiceRoleInstance,
-} from '@retaha/auth';
-import { resendGetDomain, type ResendDomainRecord } from '../lib/email/resend';
+import Layout from '../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { resendGetDomain, resendAddDomain, resendVerifyDomain, resendDeleteDomain, type ResendDomainRecord } from '../lib/resend-domain';
 import { getEnv } from '@retaha/db';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user || !user.email) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const sb = createSupabaseServiceRoleInstance();
 const { data: settings } = await sb
@@ -33,62 +22,96 @@ const resendApiKeySet = !!getEnv('RESEND_API_KEY');
 
 let message: { type: 'success' | 'error'; text: string } | null = null;
 
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString();
+
+  if (action === 'add') {
+    const domain = form.get('domain')?.toString().trim().toLowerCase();
+    if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
+      message = { type: 'error', text: 'Ungültiges Domain-Format (z.B. gategardenhotel.de — ohne https:// oder www.).' };
+    } else {
+      const resp = await resendAddDomain(domain);
+      if (!resp.ok) {
+        message = { type: 'error', text: `Resend-API-Fehler: ${resp.error}` };
+      } else {
+        const { error: dbErr } = await sb.from('hotel_settings').upsert(
+          { hotel_id: hotel.id, custom_email_domain: domain, custom_email_status: 'pending', resend_domain_id: resp.data.id, updated_at: new Date().toISOString() },
+          { onConflict: 'hotel_id' },
+        );
+        if (dbErr) message = { type: 'error', text: `Speichern fehlgeschlagen: ${dbErr.message}` };
+        else message = { type: 'success', text: 'Domain bei Resend angelegt. Bitte die unten gezeigten DNS-Einträge bei deinem Domain-Provider hinterlegen, dann „Domain verifizieren" klicken.' };
+        return Astro.redirect('/email-domain?saved=added');
+      }
+    }
+  } else if (action === 'verify') {
+    if (!settings?.resend_domain_id) {
+      message = { type: 'error', text: 'Keine Domain konfiguriert.' };
+    } else {
+      const resp = await resendVerifyDomain(settings.resend_domain_id);
+      const newStatus = resp.ok ? resp.data.status : 'failed';
+      await sb.from('hotel_settings').upsert(
+        { hotel_id: hotel.id, custom_email_status: newStatus, updated_at: new Date().toISOString() },
+        { onConflict: 'hotel_id' },
+      );
+      return Astro.redirect(`/email-domain?saved=verified&status=${newStatus}`);
+    }
+  } else if (action === 'remove') {
+    if (settings?.resend_domain_id) {
+      await resendDeleteDomain(settings.resend_domain_id);
+    }
+    await sb.from('hotel_settings').upsert(
+      { hotel_id: hotel.id, custom_email_domain: null, custom_email_status: null, resend_domain_id: null, updated_at: new Date().toISOString() },
+      { onConflict: 'hotel_id' },
+    );
+    return Astro.redirect('/email-domain?saved=removed');
+  }
+}
+
 const saved = Astro.url.searchParams.get('saved');
-const err = Astro.url.searchParams.get('err');
-const detail = Astro.url.searchParams.get('detail');
 const status = Astro.url.searchParams.get('status');
 
-if (saved === 'added') {
-  message = { type: 'success', text: 'Domain bei Resend angelegt. Bitte die unten gezeigten DNS-Einträge bei deinem Domain-Provider hinterlegen, dann „Domain verifizieren" klicken.' };
-} else if (saved === 'verified' && status === 'verified') {
-  message = { type: 'success', text: 'Domain verifiziert! Gast-Mails werden ab sofort von deiner Custom-Domain versendet.' };
-} else if (saved === 'verified' && status === 'pending') {
-  message = { type: 'error', text: 'Domain noch nicht verifiziert — DNS-Propagation kann bis 24h dauern. Bitte später nochmal versuchen.' };
-} else if (saved === 'verified' && status === 'failed') {
-  message = { type: 'error', text: 'Verifikation fehlgeschlagen — bitte DNS-Einträge prüfen.' };
-} else if (saved === 'removed') {
-  message = { type: 'success', text: 'Domain entfernt. Mails werden wieder von noreply@retaha.de versendet.' };
-} else if (err) {
-  const errTexts: Record<string, string> = {
-    no_domain: 'Bitte eine Domain eingeben.',
-    invalid_domain: 'Ungültiges Domain-Format (z.B. gategardenhotel.de — ohne https:// oder www.).',
-    resend: `Resend-API-Fehler: ${detail ?? 'unbekannt'}`,
-    db_save: 'Speichern in Datenbank fehlgeschlagen.',
-    no_domain_id: 'Keine Domain konfiguriert.',
-    invalid_form: 'Formular-Daten ungültig.',
-    unknown_action: 'Unbekannte Aktion.',
-  };
-  message = { type: 'error', text: errTexts[err] ?? err };
+if (!message) {
+  if (saved === 'added') message = { type: 'success', text: 'Domain bei Resend angelegt. Bitte die DNS-Einträge unten hinterlegen, dann „Domain verifizieren" klicken.' };
+  else if (saved === 'verified' && status === 'verified') message = { type: 'success', text: 'Domain verifiziert! Gast-Mails werden ab sofort von deiner Custom-Domain versendet.' };
+  else if (saved === 'verified' && status === 'pending') message = { type: 'error', text: 'Domain noch nicht verifiziert — DNS-Propagation kann bis 24h dauern.' };
+  else if (saved === 'verified' && status === 'failed') message = { type: 'error', text: 'Verifikation fehlgeschlagen — bitte DNS-Einträge prüfen.' };
+  else if (saved === 'removed') message = { type: 'success', text: 'Domain entfernt. Mails werden wieder von noreply@retaha.de versendet.' };
 }
+
+const { data: freshSettings } = await sb
+  .from('hotel_settings')
+  .select('custom_email_domain, custom_email_status, resend_domain_id')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
 
 let domainDetail: { status: string; records: ResendDomainRecord[] } | null = null;
 let domainDetailError: string | null = null;
-if (settings?.resend_domain_id) {
-  const resp = await resendGetDomain(settings.resend_domain_id);
+if (freshSettings?.resend_domain_id) {
+  const resp = await resendGetDomain(freshSettings.resend_domain_id);
   if (resp.ok) {
-    domainDetail = {
-      status: resp.data.status,
-      records: resp.data.records ?? [],
-    };
+    domainDetail = { status: resp.data.status, records: resp.data.records ?? [] };
   } else {
     domainDetailError = resp.error;
   }
 }
 ---
 
-<HotelierLayout title="Email-Domain" activeTab="gast" hotelName={hotel.name}>
-  <EditorialPageHeader
-    sectionNumber="41"
-    sectionLabel="Email"
-    headlineLight="Eigene"
-    headlineBold="Absender-Domain"
-    subtitle="Customer-Facing-Mails (Pre-Arrival-Invite, später weitere Gast-Mails) versenden wir auf Wunsch von welcome@deine-domain.de statt von noreply@retaha.de. Premium-Vertrauen statt Service-Provider-Optik."
-  />
+<Layout title="Email-Domain" activeTab="backoffice" hotelName={hotel.name}>
+
+  <div class="page-header mb-8">
+    <p class="eyebrow text-anthrazit/55 mb-2">— Email —</p>
+    <h1 class="text-3xl font-light text-anthrazit">Eigene <strong class="font-bold">Absender-Domain</strong></h1>
+    <p class="text-anthrazit/70 mt-3 max-w-2xl leading-relaxed">
+      Customer-Facing-Mails (Pre-Arrival-Invite u.a.) versenden wir auf Wunsch von
+      <span class="font-mono">welcome@deine-domain.de</span> statt von <span class="font-mono">noreply@retaha.de</span>.
+      Premium-Vertrauen statt Service-Provider-Optik.
+    </p>
+  </div>
 
   {!resendApiKeySet && (
     <div class="mb-6 px-4 py-3 text-sm bg-amber-50 border-l-4 border-amber-500 text-amber-800">
       <strong>RESEND_API_KEY nicht konfiguriert</strong> — kontaktiere Taha für API-Key-Setup.
-      Bis dahin werden alle Customer-Facing-Mails über die Microsoft-Fallback-Adresse (noreply@retaha.de) versendet.
     </div>
   )}
 
@@ -102,15 +125,14 @@ if (settings?.resend_domain_id) {
     </div>
   )}
 
-  {!settings?.custom_email_domain ? (
+  {!freshSettings?.custom_email_domain ? (
     <div class="max-w-2xl">
       <p class="text-anthrazit/80 leading-relaxed text-base mb-8">
         Trage deine Hotel-Domain ein (z.B. <span class="font-mono">gategardenhotel.de</span>).
-        Wir legen sie bei Resend an und zeigen dir die DNS-Einträge, die du bei deinem Domain-Provider
-        (Strato, IONOS, Cloudflare, GoDaddy, etc.) hinterlegen musst.
+        Wir legen sie bei Resend an und zeigen dir die DNS-Einträge.
       </p>
 
-      <form method="POST" action="/api/email-domain" class="space-y-6">
+      <form method="POST" class="space-y-6">
         <input type="hidden" name="_action" value="add" />
 
         <label class="block">
@@ -142,7 +164,7 @@ if (settings?.resend_domain_id) {
         <div class="flex items-center justify-between gap-4 mb-6 flex-wrap">
           <p class="eyebrow text-pink-shock m-0">— Konfigurierte Domain —</p>
           {(() => {
-            const statusValue = settings.custom_email_status ?? 'pending';
+            const statusValue = freshSettings.custom_email_status ?? 'pending';
             const badge = statusValue === 'verified'
               ? { label: '✓ Verifiziert', classes: 'bg-green-100 text-green-800' }
               : statusValue === 'failed'
@@ -157,12 +179,12 @@ if (settings?.resend_domain_id) {
         </div>
 
         <p class="text-2xl font-mono text-anthrazit m-0 mb-4">
-          welcome@<strong class="font-bold">{settings.custom_email_domain}</strong>
+          welcome@<strong class="font-bold">{freshSettings.custom_email_domain}</strong>
         </p>
 
-        {settings.custom_email_status === 'verified' ? (
+        {freshSettings.custom_email_status === 'verified' ? (
           <p class="text-sm text-anthrazit/70 leading-relaxed">
-            Customer-Facing-Mails (Pre-Arrival etc.) gehen ab sofort von deiner Domain raus.
+            Customer-Facing-Mails gehen ab sofort von deiner Domain raus.
             Hotelier-interne Mails (Booking-Notifications) bleiben über noreply@retaha.de.
           </p>
         ) : (
@@ -183,8 +205,8 @@ if (settings?.resend_domain_id) {
         <section>
           <p class="eyebrow text-anthrazit/55 mb-4">— DNS-Einträge —</p>
           <p class="text-xs italic text-anthrazit/55 mb-4 max-w-xl">
-            Diese Einträge bei deinem Domain-Provider hinterlegen. Genauer Klick-Pfad siehe Provider-Doku
-            (bei Strato unter „Domains → DNS-Verwaltung", bei IONOS unter „Domain → Domain-Tools").
+            Diese Einträge bei deinem Domain-Provider hinterlegen (Strato: „Domains → DNS-Verwaltung",
+            IONOS: „Domain → Domain-Tools").
           </p>
           <div class="overflow-x-auto border border-stein">
             <table class="w-full text-sm">
@@ -216,15 +238,15 @@ if (settings?.resend_domain_id) {
       )}
 
       <section class="flex gap-4 flex-wrap items-center pt-2">
-        {settings.custom_email_status !== 'verified' && (
-          <form method="POST" action="/api/email-domain" class="m-0">
+        {freshSettings.custom_email_status !== 'verified' && (
+          <form method="POST" class="m-0">
             <input type="hidden" name="_action" value="verify" />
             <button type="submit" class="bauhaus-button bauhaus-button--primary">
               Domain verifizieren
             </button>
           </form>
         )}
-        <form method="POST" action="/api/email-domain" class="m-0"
+        <form method="POST" class="m-0"
               onsubmit="return confirm('Domain wirklich entfernen? Mails gehen dann wieder von noreply@retaha.de raus.')">
           <input type="hidden" name="_action" value="remove" />
           <button type="submit" class="bauhaus-button bauhaus-button--ghost">
@@ -234,4 +256,4 @@ if (settings?.resend_domain_id) {
       </section>
     </div>
   )}
-</HotelierLayout>
+</Layout>
