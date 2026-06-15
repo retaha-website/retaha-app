@@ -24,7 +24,6 @@ interface Props {
   roomLabel?: string;
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
-  preCheckinAvailable?: boolean;
 }
 
 const {
@@ -32,15 +31,14 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   f, wifiConfigured = false,
   heroCards = [], weather, persona = 'in_house',
-  preCheckinAvailable = false,
 } = Astro.props;
 
-type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt' | 'pre_checkin';
+type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt';
 type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
 
 // Module-Reihenfolge und Sichtbarkeit pro Mode
 const MODULE_ORDER: Record<StayMode, ModuleKey[]> = {
-  pre_arrival:  ['pre_checkin', 'anfahrt', 'breakfast', 'wifi', 'eve', 'places', 'wallet'],
+  pre_arrival:  ['anfahrt', 'breakfast', 'wifi', 'eve', 'places', 'wallet'],
   in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'checkout', 'wallet'],
   checking_out: ['checkout', 'eve', 'wallet', 'breakfast', 'places'],
 };
@@ -79,16 +77,6 @@ const greeting = MODE_GREETING[persona][l];
 // Actions-Pool — alle möglichen Module mit Key
 type ActionItem = { key: ModuleKey; num: string; icon: string; label: string; sub: string; handler: string; href?: string };
 const ACTION_POOL: ActionItem[] = [
-  {
-    key: 'pre_checkin',
-    num: '00',
-    icon: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
-    label: 'Voranmeldung',
-    sub: 'Jetzt ausfüllen',
-    handler: '',
-    href: `/g/${token}/pre-checkin`,
-    visible: preCheckinAvailable,
-  } as any,
   {
     key: 'wifi',
     num: '01',

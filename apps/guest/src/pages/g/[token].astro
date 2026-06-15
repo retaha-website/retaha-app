@@ -3,7 +3,6 @@ import { loadStayByToken, loadBookingsForStay } from '@retaha/db';
 import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
-import PreArrivalGate from '../../components/PreArrivalGate.astro';
 import ServiceSheet from '../../components/sheets/ServiceSheet.astro';
 import { isModuleAvailable } from '../../lib/plan-modules';
 import EveChatSheet from '../../components/eve/EveChatSheet.astro';
@@ -399,64 +398,11 @@ if (stayEnded) {
 }
 const showPostStay = stayEnded && !hasStayFeedback;
 
-// Pre-Checkin Tile: sichtbar bis physischer Check-in durch Rezeption (checked_in_at IS NULL)
-const { data: _stayMeta } = !isShowcase
-  ? await sbSr.from('stays').select('checked_in_at').eq('id', stay.id).maybeSingle()
-  : { data: null };
-const stayCheckedInAt: string | null = (_stayMeta as any)?.checked_in_at ?? null;
-
 // Stay-Persona für Welcome-Screen (pre_arrival / in_house / checking_out)
 const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
   Date.parse(stay.check_in) > Date.now() ? 'pre_arrival' :
   new Date(stay.check_out).toDateString() === new Date().toDateString() ? 'checking_out' :
   'in_house';
-
-// Gate-Strecke: Pre-Checkin Status + Soft-Skip Cookie
-let gatePreCheckinCompleted = false;
-if (stayPersona === 'pre_arrival' && !isShowcase) {
-  const { data: _pcRow } = await sbSr
-    .from('stay_pre_checkin')
-    .select('status')
-    .eq('stay_id', stay.id)
-    .maybeSingle();
-  gatePreCheckinCompleted = (_pcRow as any)?.status === 'completed';
-}
-const gateSkipped = !isShowcase && Astro.cookies.get('gate_skip')?.value === 'true';
-const gateState: 'default' | 'skipped' | 'completed' =
-  gatePreCheckinCompleted ? 'completed' : gateSkipped ? 'skipped' : 'default';
-
-// skipped → App zeigen (Soft-Skip: Session-Cookie gesetzt)
-// default/completed → PreArrivalGate (Welcome oder Bis-bald)
-const showPreArrivalGate = stayPersona === 'pre_arrival' && gateState !== 'skipped';
-
-// Eyebrow-Tagline: optionales Hotel-Override aus hotel_settings.features
-const gateEyebrowTagline: string | null =
-  (settings as any)?.features?.pre_arrival_tagline ?? null;
-
-// Live-iframe für Device-Mockup: zeigt die App in in_house-Persona
-// Showcase: selbes Token mit ?persona=in_house (kein Rekursionsrisiko — in_house zeigt kein Gate)
-// Echter Gast: Hotel-Showcase-Token aus DB (falls vorhanden)
-// Immer same-origin via Astro.url.origin
-let gatePreviewUrl: string | null = null;
-if (showPreArrivalGate) {
-  const origin = Astro.url.origin;
-  if (isShowcase && token) {
-    gatePreviewUrl = `${origin}/g/${token}?persona=in_house&_preview=1`;
-  } else {
-    const { data: existingShowcase } = await sbSr
-      .from('showcase_sessions')
-      .select('token')
-      .eq('hotel_id', hotel.id)
-      .eq('is_active', true)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existingShowcase?.token) {
-      gatePreviewUrl = `${origin}/g/${existingShowcase.token}?persona=in_house&_preview=1`;
-    }
-  }
-}
 
 ---
 
@@ -465,35 +411,10 @@ if (showPreArrivalGate) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content={showPreArrivalGate ? '#0a0b0d' : '#ffffff'} />
-    {showPreArrivalGate && (
-      <>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="mobile-web-app-capable" content="yes" />
-      </>
-    )}
+    <meta name="theme-color" content="#ffffff" />
     <title>{hotel.name} · {greetingName}</title>
   </head>
-  <body
-    class={`gate-guest gate-theme-${activeTheme}`}
-    style={showPreArrivalGate ? 'background:#0a0b0d;' : undefined}
-  >
-    {showPreArrivalGate ? (
-      <PreArrivalGate
-        token={token!}
-        guestName={guest?.first_name ?? null}
-        hotelName={(hotel as any)?.name ?? ''}
-        heroImageUrl={hotelHeroBg}
-        logoUrl={(hotelGeoRow as any)?.logo_primary ?? (hotel as any)?.logo_primary ?? null}
-        brandPrimary={brandPrimary ?? '#6982cf'}
-        gateState={gateState === 'completed' ? 'completed' : 'default'}
-        checkInLabel={checkInLabel}
-        lang={lang}
-        previewUrl={gatePreviewUrl}
-        eyebrowTagline={gateEyebrowTagline}
-      />
-    ) : (
+  <body class={`gate-guest gate-theme-${activeTheme}`}>
     <main x-data="guestPage" x-cloak>
 
       {/* ── Themed Welcome (bauhaus | editorial | maison) — unified WelcomeScreen ── */}
@@ -519,7 +440,6 @@ if (showPreArrivalGate) {
           roomLabel={t('hero.stay.room', lang as Lang)}
           weather={weather}
           persona={stayPersona}
-          preCheckinAvailable={!stayCheckedInAt && avail('pre_checkin') && f.pre_checkin !== false}
         />
       )}
 
@@ -679,19 +599,6 @@ if (showPreArrivalGate) {
         </div>
 
         <div class="gate-grid">
-          {!stayCheckedInAt && avail('pre_checkin') && f.pre_checkin !== false && (
-            <a class="gate-tile" href={`/g/${token}/pre-checkin`} data-astro-reload style="text-decoration:none;color:inherit">
-              <span class="gate-tile-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-                  <rect x="9" y="3" width="6" height="4" rx="1"/>
-                  <path d="M9 12h6M9 16h4"/>
-                </svg>
-              </span>
-              <span class="gate-tile-label">{t('tile.precheckin', lang)}</span>
-              <span class="gate-tile-sub">{t('tile.precheckin.sub', lang)}</span>
-            </a>
-          )}
 
           {Date.parse(stay.check_in) > Date.now() && f.special_requests !== false && (
             <a class="gate-tile" href={`/g/${token}/requests`} data-astro-reload style="text-decoration:none;color:inherit">
@@ -864,9 +771,8 @@ if (showPreArrivalGate) {
         <WalletAddSheet lang={lang} hotelName={hotel.name} />
       )}
     </main>
-    )} {/* /gate-else: pre_arrival renders PreArrivalGate instead */}
 
-    {!showPreArrivalGate && <ConsentModule stayToken={token} />}
+    <ConsentModule stayToken={token} />
 
     <script>
       import Alpine from 'alpinejs';
