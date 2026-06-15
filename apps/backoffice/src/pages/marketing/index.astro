@@ -1,0 +1,331 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const canWrite = true;
+
+const client = createSupabaseServiceRoleInstance();
+
+// ── KPIs ─────────────────────────────────────────────────────────────
+const { count: walletHoldersTotal } = await client
+  .from('wallet_passes')
+  .select('id', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id)
+  .eq('state', 'active');
+
+const { count: optInCount } = await client
+  .from('wallet_passes')
+  .select('id', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id)
+  .eq('state', 'active')
+  .eq('marketing_consent_given', true);
+
+const { count: activeDrips } = await client
+  .from('marketing_drips')
+  .select('id', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id)
+  .eq('is_active', true);
+
+const monthStart = new Date();
+monthStart.setUTCDate(1);
+monthStart.setUTCHours(0, 0, 0, 0);
+const { data: monthSendsRows } = await client
+  .from('marketing_sends')
+  .select('id, campaigns:campaign_id!inner(hotel_id)', { count: 'exact' })
+  .eq('campaigns.hotel_id', hotel.id)
+  .not('sent_at', 'is', null)
+  .gte('sent_at', monthStart.toISOString());
+const sendsThisMonth = monthSendsRows?.length ?? 0;
+
+const optInRate = walletHoldersTotal && walletHoldersTotal > 0
+  ? Math.round(((optInCount ?? 0) / walletHoldersTotal) * 100)
+  : 0;
+
+// ── Time-Series: letzte 30 Tage ─────────────────────────────────────
+const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
+thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
+
+const { data: seriesRows } = await client
+  .from('marketing_sends')
+  .select('sent_at, opened_at, clicked_at, campaigns:campaign_id!inner(hotel_id)')
+  .eq('campaigns.hotel_id', hotel.id)
+  .gte('sent_at', thirtyDaysAgo.toISOString())
+  .not('sent_at', 'is', null);
+
+// Aggregate by day
+const seriesMap = new Map<string, { sends: number; opens: number; clicks: number }>();
+for (let i = 0; i < 30; i++) {
+  const d = new Date(thirtyDaysAgo);
+  d.setUTCDate(thirtyDaysAgo.getUTCDate() + i);
+  seriesMap.set(d.toISOString().slice(0, 10), { sends: 0, opens: 0, clicks: 0 });
+}
+for (const row of (seriesRows ?? [])) {
+  if (!row.sent_at) continue;
+  const dayKey = new Date(row.sent_at).toISOString().slice(0, 10);
+  const bucket = seriesMap.get(dayKey);
+  if (!bucket) continue;
+  bucket.sends++;
+  if (row.opened_at) bucket.opens++;
+  if (row.clicked_at) bucket.clicks++;
+}
+const chartLabels = Array.from(seriesMap.keys());
+const chartSends  = chartLabels.map(k => seriesMap.get(k)!.sends);
+const chartOpens  = chartLabels.map(k => seriesMap.get(k)!.opens);
+const chartClicks = chartLabels.map(k => seriesMap.get(k)!.clicks);
+
+// ── Top-Performer ────────────────────────────────────────────────────
+const { data: topCampaigns } = await client
+  .from('marketing_campaigns')
+  .select('id, name, recipients_count, open_count, click_count, sent_at, title_i18n')
+  .eq('hotel_id', hotel.id)
+  .eq('status', 'sent')
+  .order('sent_at', { ascending: false })
+  .limit(20);
+
+const ranked = (topCampaigns ?? [])
+  .map((c: any) => ({
+    ...c,
+    open_rate: c.recipients_count > 0 ? c.open_count / c.recipients_count : 0,
+    click_rate: c.recipients_count > 0 ? c.click_count / c.recipients_count : 0,
+  }))
+  .sort((a: any, b: any) => b.click_rate - a.click_rate)
+  .slice(0, 3);
+
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+function pickI18n(jsonb: any): string {
+  if (!jsonb) return '—';
+  return jsonb[hotelDefaultLang]?.value ?? Object.values(jsonb)[0]?.value ?? '—';
+}
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+}
+function pct(n: number): string {
+  return (n * 100).toFixed(1) + '%';
+}
+---
+
+<Layout title="Marketing" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Marketing</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Gäste-Marketing</span>
+      <h1 class="settings-hero__title">Marketing-Übersicht<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Kampagnen, Drip-Sequenzen und Vorlagen — alles auf einen Blick.</p>
+    </section>
+
+    <!-- Section 1: KPI-Cards -->
+    <section class="md-kpis">
+      <div class="md-kpi">
+        <div class="md-kpi-label">Wallet-Holder</div>
+        <div class="md-kpi-value">{walletHoldersTotal ?? 0}</div>
+        <div class="md-kpi-sub">aktive Pässe</div>
+      </div>
+      <div class="md-kpi">
+        <div class="md-kpi-label">Marketing-Opt-In</div>
+        <div class="md-kpi-value">{optInRate}%</div>
+        <div class="md-kpi-sub">{optInCount ?? 0} von {walletHoldersTotal ?? 0}</div>
+      </div>
+      <div class="md-kpi">
+        <div class="md-kpi-label">Aktive Drips</div>
+        <div class="md-kpi-value">{activeDrips ?? 0}</div>
+        <div class="md-kpi-sub">automatisierte Sequenzen</div>
+      </div>
+      <div class="md-kpi">
+        <div class="md-kpi-label">Sends diesen Monat</div>
+        <div class="md-kpi-value">{sendsThisMonth}</div>
+        <div class="md-kpi-sub">aus Kampagnen + Drips</div>
+      </div>
+    </section>
+
+    <!-- Section 2: Time-Series Chart -->
+    <section class="md-chart-section">
+      <div class="md-section-head">
+        <div>
+          <p class="md-section-eyebrow">— letzte 30 Tage —</p>
+          <h2 class="md-section-title">Aktivität über Zeit</h2>
+        </div>
+        <div class="md-chart-legend">
+          <span class="md-legend-item"><i class="md-dot md-dot-burgundy"></i>Sends</span>
+          <span class="md-legend-item"><i class="md-dot md-dot-anthrazit"></i>Opens</span>
+          <span class="md-legend-item"><i class="md-dot md-dot-gold"></i>Clicks</span>
+        </div>
+      </div>
+      <div class="md-chart-wrap">
+        <canvas id="md-chart"></canvas>
+      </div>
+    </section>
+
+    <!-- Section 3: Top-Performer -->
+    <section class="md-top-section">
+      <p class="md-section-eyebrow">— Top 3 nach Click-Rate —</p>
+      <h2 class="md-section-title">Was kommt am besten an</h2>
+
+      {ranked.length === 0 ? (
+        <p class="md-empty">Noch keine versandten Kampagnen.</p>
+      ) : (
+        <div class="md-top-grid">
+          {ranked.map((c: any) => (
+            <a href={`/marketing/campaigns/${c.id}`} class="md-top-card">
+              <div class="md-top-name">{c.name}</div>
+              <div class="md-top-title">{pickI18n(c.title_i18n)}</div>
+              <div class="md-top-meta">
+                <span>{c.recipients_count} Sends</span>
+                <span>·</span>
+                <span>{fmtDate(c.sent_at)}</span>
+              </div>
+              <div class="md-bar-row">
+                <span class="md-bar-label">Open</span>
+                <span class="md-bar-track"><span class="md-bar-fill md-bar-fill--anthrazit" style={`width: ${Math.round(c.open_rate * 100)}%`}></span></span>
+                <span class="md-bar-pct">{pct(c.open_rate)}</span>
+              </div>
+              <div class="md-bar-row">
+                <span class="md-bar-label">Click</span>
+                <span class="md-bar-track"><span class="md-bar-fill md-bar-fill--gold" style={`width: ${Math.round(c.click_rate * 100)}%`}></span></span>
+                <span class="md-bar-pct">{pct(c.click_rate)}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <!-- Section 4: Quick-Actions -->
+    {canWrite && (
+      <section class="md-quick-section">
+        <p class="md-section-eyebrow">— Quick Actions —</p>
+        <h2 class="md-section-title">Was möchtest du tun</h2>
+        <div class="md-quick-grid">
+          <a href="/marketing/campaigns/new" class="md-quick-card md-quick-card--primary">
+            <div class="md-quick-label">Neue Kampagne</div>
+            <div class="md-quick-sub">Einmaliger Versand</div>
+          </a>
+          <a href="/marketing/templates/new" class="md-quick-card">
+            <div class="md-quick-label">Neue Vorlage</div>
+            <div class="md-quick-sub">Wiederverwendbar</div>
+          </a>
+          <a href="/marketing/drips/new" class="md-quick-card">
+            <div class="md-quick-label">Neue Drip-Sequenz</div>
+            <div class="md-quick-sub">Automatisch nach Trigger</div>
+          </a>
+        </div>
+      </section>
+    )}
+
+    <div class="md-sub-nav">
+      <a href="/marketing/campaigns" class="md-sub-link">→ Alle Kampagnen</a>
+      <a href="/marketing/templates" class="md-sub-link">→ Alle Vorlagen</a>
+      <a href="/marketing/drips" class="md-sub-link">→ Alle Drips</a>
+    </div>
+  </div>
+
+  <script is:inline define:vars={{ CHART_LABELS: chartLabels, CHART_SENDS: chartSends, CHART_OPENS: chartOpens, CHART_CLICKS: chartClicks }}>
+    window.__MD_CHART__ = { labels: CHART_LABELS, sends: CHART_SENDS, opens: CHART_OPENS, clicks: CHART_CLICKS };
+  </script>
+  <script>
+    import { Chart, registerables } from 'chart.js';
+    Chart.register(...registerables);
+
+    const cfg = (window as any).__MD_CHART__;
+    const ctx = (document.getElementById('md-chart') as HTMLCanvasElement)?.getContext('2d');
+    if (ctx && cfg) {
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: cfg.labels.map((iso: string) => {
+            const d = new Date(iso);
+            return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+          }),
+          datasets: [
+            { label: 'Sends',  data: cfg.sends,  borderColor: '#8c2128', backgroundColor: 'rgba(140,33,40,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
+            { label: 'Opens',  data: cfg.opens,  borderColor: '#1f1812', backgroundColor: 'rgba(31,24,18,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
+            { label: 'Clicks', data: cfg.clicks, borderColor: '#C49A2C', backgroundColor: 'rgba(196,154,44,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 11 } } },
+            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.08)' }, ticks: { font: { size: 11 }, precision: 0 } },
+          },
+          interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        },
+      });
+    }
+  </script>
+
+  <style>
+    .md-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 720px) { .md-kpis { grid-template-columns: repeat(2, 1fr); } }
+    .md-kpi { background: var(--surface); border: 1px solid var(--border); padding: 20px; position: relative; }
+    .md-kpi::before { content: ''; position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; background: #8c2128; }
+    .md-kpi-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
+    .md-kpi-value { font-size: 32px; font-weight: 300; line-height: 1; margin: 8px 0 4px; color: var(--ink); }
+    .md-kpi-sub { font-size: 12px; color: var(--ink-muted); }
+
+    /* Section heads */
+    .md-section-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-muted); margin: 0 0 4px; }
+    .md-section-title { font-size: 20px; font-weight: 300; margin: 0; color: var(--ink); }
+    .md-section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+
+    /* Chart */
+    .md-chart-section { background: var(--surface); border: 1px solid var(--border); padding: 24px; margin-bottom: 32px; }
+    .md-chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-muted); }
+    .md-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .md-dot { display: inline-block; width: 10px; height: 10px; }
+    .md-dot-burgundy { background: #8c2128; }
+    .md-dot-anthrazit { background: #1f1812; }
+    .md-dot-gold { background: #C49A2C; }
+    .md-chart-wrap { height: 280px; position: relative; }
+
+    /* Top-Performer */
+    .md-top-section { margin-bottom: 32px; }
+    .md-top-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+    @media (max-width: 800px) { .md-top-grid { grid-template-columns: 1fr; } }
+    .md-top-card { display: block; background: var(--surface); border: 1px solid var(--border); padding: 16px; text-decoration: none; color: inherit; transition: border-color .15s; }
+    .md-top-card:hover { border-color: var(--ink); }
+    .md-top-name { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 4px; font-weight: 500; }
+    .md-top-title { font-size: 14px; color: var(--ink); line-height: 1.4; margin-bottom: 6px; min-height: 38px; }
+    .md-top-meta { font-size: 11px; color: var(--ink-muted); display: flex; gap: 4px; margin-bottom: 12px; }
+    .md-bar-row { display: grid; grid-template-columns: 40px 1fr 50px; gap: 8px; align-items: center; margin: 6px 0; }
+    .md-bar-label { font-size: 11px; color: var(--ink-muted); }
+    .md-bar-track { height: 6px; background: var(--bg-deep); position: relative; overflow: hidden; }
+    .md-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; transition: width .3s ease; }
+    .md-bar-fill--anthrazit { background: #1f1812; }
+    .md-bar-fill--gold { background: #C49A2C; }
+    .md-bar-pct { font-size: 11px; color: var(--ink-muted); font-variant-numeric: tabular-nums; text-align: right; }
+    .md-empty { padding: 24px; background: var(--surface); border: 1px dashed var(--border); text-align: center; font-style: italic; color: var(--ink-muted); }
+
+    /* Quick Actions */
+    .md-quick-section { margin-bottom: 32px; }
+    .md-quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+    @media (max-width: 720px) { .md-quick-grid { grid-template-columns: 1fr; } }
+    .md-quick-card { display: block; background: var(--surface); border: 1px solid var(--border); padding: 24px; text-decoration: none; color: inherit; transition: all .15s; }
+    .md-quick-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+    .md-quick-card--primary { background: #1f1812; color: var(--surface); border-color: #1f1812; }
+    .md-quick-card--primary:hover { background: #8c2128; border-color: #8c2128; }
+    .md-quick-label { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+    .md-quick-sub { font-size: 12px; opacity: .65; }
+
+    .md-sub-nav { display: flex; gap: 24px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .md-sub-link { font-size: 13px; color: var(--ink-muted); text-decoration: none; }
+    .md-sub-link:hover { color: var(--accent); }
+  </style>
+</Layout>

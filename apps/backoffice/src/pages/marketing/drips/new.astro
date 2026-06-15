@@ -1,0 +1,48 @@
+---
+// Sprint Wallet · Phase 14 — Neue Drip-Sequenz (Backoffice)
+
+import Layout from '../../../layouts/Layout.astro';
+import DripEditor from '../../../components/admin/DripEditor.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const sb = createSupabaseServiceRoleInstance();
+const { data: templates } = await sb
+  .from('marketing_templates')
+  .select('id, name')
+  .eq('hotel_id', hotel.id)
+  .eq('is_archived', false)
+  .order('name');
+---
+
+<Layout title="Neue Drip-Sequenz" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing/drips" class="breadcrumb__crumb">Drip-Sequenzen</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Neu</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Marketing</span>
+      <h1 class="settings-hero__title">Neue Drip-Sequenz<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Wähle einen Trigger und baue deine Sequenz aus Vorlagen auf — Steps werden automatisch nach Tages-Verzögerung versendet.</p>
+    </section>
+
+    <DripEditor
+      drip={null}
+      initialSteps={[]}
+      templates={templates ?? []}
+    />
+  </div>
+</Layout>

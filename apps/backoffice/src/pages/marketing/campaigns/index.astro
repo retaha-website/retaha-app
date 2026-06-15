@@ -1,0 +1,143 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const canWrite = true;
+
+const url = new URL(Astro.request.url);
+const filter = url.searchParams.get('status') || 'all';
+
+const client = createSupabaseServiceRoleInstance();
+let q = client
+  .from('marketing_campaigns')
+  .select('id, name, status, scheduled_at, sent_at, recipients_count, open_count, click_count, skipped_count, title_i18n')
+  .eq('hotel_id', hotel.id)
+  .order('created_at', { ascending: false })
+  .limit(100);
+if (filter !== 'all') q = q.eq('status', filter);
+
+const { data: rows } = await q;
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+function pickI18n(jsonb: any): string {
+  if (!jsonb) return '—';
+  return jsonb[hotelDefaultLang]?.value ?? Object.values(jsonb)[0]?.value ?? '—';
+}
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+const STATUS_LABELS: Record<string, { label: string; class: string }> = {
+  draft:     { label: 'Entwurf',     class: 'mc-status--draft' },
+  scheduled: { label: 'Geplant',     class: 'mc-status--scheduled' },
+  sending:   { label: 'Versandt …',  class: 'mc-status--sending' },
+  sent:      { label: 'Gesendet',    class: 'mc-status--sent' },
+  cancelled: { label: 'Abgebrochen', class: 'mc-status--cancelled' },
+  failed:    { label: 'Fehler',      class: 'mc-status--failed' },
+};
+---
+
+<Layout title="Marketing · Kampagnen" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Kampagnen</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Marketing</span>
+      <h1 class="settings-hero__title">Alle Kampagnen<span class="dot-pink">.</span></h1>
+    </section>
+
+    <div class="mc-bar">
+      <div class="mc-tabs">
+        <a href="?status=all"       class={`mc-tab${filter === 'all' ? ' is-active' : ''}`}>Alle</a>
+        <a href="?status=draft"     class={`mc-tab${filter === 'draft' ? ' is-active' : ''}`}>Entwurf</a>
+        <a href="?status=scheduled" class={`mc-tab${filter === 'scheduled' ? ' is-active' : ''}`}>Geplant</a>
+        <a href="?status=sent"      class={`mc-tab${filter === 'sent' ? ' is-active' : ''}`}>Gesendet</a>
+        <a href="?status=failed"    class={`mc-tab${filter === 'failed' ? ' is-active' : ''}`}>Fehler</a>
+      </div>
+      {canWrite && <a href="/marketing/campaigns/new" class="mc-btn-primary">+ Neue Kampagne</a>}
+    </div>
+
+    {!rows || rows.length === 0 ? (
+      <div class="mc-empty">
+        <p>Keine Kampagnen in diesem Filter.</p>
+        {canWrite && <a href="/marketing/campaigns/new" class="mc-btn-primary">+ Erste Kampagne anlegen</a>}
+      </div>
+    ) : (
+      <div class="mc-list">
+        {rows.map((c: any) => {
+          const s = STATUS_LABELS[c.status] ?? { label: c.status, class: '' };
+          const openRate = c.recipients_count > 0 ? Math.round((c.open_count / c.recipients_count) * 100) : 0;
+          const clickRate = c.recipients_count > 0 ? Math.round((c.click_count / c.recipients_count) * 100) : 0;
+          return (
+            <a href={`/marketing/campaigns/${c.id}`} class="mc-row">
+              <div class="mc-row-main">
+                <div class="mc-row-head">
+                  <span class={`mc-status ${s.class}`}>{s.label}</span>
+                  <span class="mc-row-name">{c.name}</span>
+                </div>
+                <p class="mc-row-title">{pickI18n(c.title_i18n)}</p>
+              </div>
+              <div class="mc-row-meta">
+                <div class="mc-meta-block">
+                  <span class="mc-meta-label">{c.status === 'sent' ? 'Gesendet' : c.status === 'scheduled' ? 'Geplant für' : 'Erstellt'}</span>
+                  <span class="mc-meta-val">{fmtDate(c.sent_at || c.scheduled_at)}</span>
+                </div>
+                {c.status === 'sent' && (
+                  <>
+                    <div class="mc-meta-block"><span class="mc-meta-label">Recipients</span><span class="mc-meta-val">{c.recipients_count}</span></div>
+                    <div class="mc-meta-block"><span class="mc-meta-label">Open</span><span class="mc-meta-val">{openRate}%</span></div>
+                    <div class="mc-meta-block"><span class="mc-meta-label">Click</span><span class="mc-meta-val">{clickRate}%</span></div>
+                  </>
+                )}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  <style>
+    .mc-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .mc-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .mc-tab { padding: 10px 14px; font-size: 13px; color: var(--ink-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .mc-tab:hover { color: var(--ink); }
+    .mc-tab.is-active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+    .mc-btn-primary { padding: 10px 18px; background: #1f1812; color: #fff; text-decoration: none; font-size: 13px; font-weight: 500; }
+    .mc-btn-primary:hover { background: #8c2128; }
+    .mc-empty { padding: 60px 24px; background: var(--surface); border: 1px dashed var(--border); text-align: center; color: var(--ink-muted); }
+    .mc-empty p { margin: 0 0 20px; font-style: italic; }
+    .mc-list { display: flex; flex-direction: column; gap: 8px; }
+    .mc-row { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 16px; background: var(--surface); border: 1px solid var(--border); text-decoration: none; color: inherit; transition: border-color .15s; }
+    .mc-row:hover { border-color: var(--ink); }
+    .mc-row-main { min-width: 0; }
+    .mc-row-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .mc-status { font-size: 10px; padding: 3px 8px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .mc-status--draft     { background: var(--bg-deep); color: var(--ink-muted); }
+    .mc-status--scheduled { background: #fff8e1; color: #6b4f00; border: 1px solid #f5d77a; }
+    .mc-status--sending   { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+    .mc-status--sent      { background: #e8f5ec; color: #145c2a; border: 1px solid #a8d9b6; }
+    .mc-status--cancelled { background: var(--bg-deep); color: var(--ink-muted); text-decoration: line-through; }
+    .mc-status--failed    { background: #fdeaea; color: #7a1515; border: 1px solid #f3b8b8; }
+    .mc-row-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+    .mc-row-title { margin: 0; font-size: 13px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 600px; }
+    .mc-row-meta { display: flex; gap: 16px; align-items: center; }
+    @media (max-width: 720px) { .mc-row { grid-template-columns: 1fr; } .mc-row-meta { flex-wrap: wrap; } }
+    .mc-meta-block { display: flex; flex-direction: column; align-items: flex-end; }
+    .mc-meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); }
+    .mc-meta-val { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  </style>
+</Layout>

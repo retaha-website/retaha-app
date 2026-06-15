@@ -1,0 +1,48 @@
+---
+// Sprint Wallet · Phase 9 — Marketing-Template Create-Page (Backoffice)
+
+import Layout from '../../../layouts/Layout.astro';
+import MarketingEditor from '../../../components/admin/MarketingEditor.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+---
+
+<Layout title="Neue Vorlage" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing/templates" class="breadcrumb__crumb">Vorlagen</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Neu</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Marketing</span>
+      <h1 class="settings-hero__title">Neue Vorlage<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Schreibe hier in deiner Hotel-Sprache — du kannst die Vorlage in Drip-Sequenzen und Kampagnen wiederverwenden.</p>
+    </section>
+
+    <MarketingEditor
+      templateId={null}
+      initialTitle=""
+      initialBodyHtml=""
+      initialCtaLabel=""
+      initialCtaUrl=""
+      initialHeroUrl=""
+      initialName=""
+      initialCategory={null}
+      hotelDefaultLang={hotelDefaultLang}
+    />
+  </div>
+</Layout>

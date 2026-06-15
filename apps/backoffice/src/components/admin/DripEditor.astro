@@ -133,7 +133,7 @@ const TRIGGERS = [
   </template>
 
   <div class="de-actions">
-    <a href="/admin/marketing/drips" class="de-btn-ghost">Abbrechen</a>
+    <a href="/marketing/drips" class="de-btn-ghost">Abbrechen</a>
     <button type="button" class="de-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? 'Wird gespeichert …' : (isEditMode ? 'Änderungen speichern' : 'Drip anlegen')"></button>
   </div>
 </div>
@@ -251,7 +251,7 @@ const TRIGGERS = [
         try {
           if (this.cfg.IS_EDIT) {
             // Update Drip + Steps separat
-            const r1 = await fetch(`/api/admin/marketing/drips/${this.cfg.DRIP.id}`, {
+            const r1 = await fetch(`/api/marketing/drips/${this.cfg.DRIP.id}`, {
               method: 'PUT', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -262,16 +262,16 @@ const TRIGGERS = [
             });
             const d1 = await r1.json();
             if (!d1.ok) { this.errorMsg = d1.error || 'Update fehlgeschlagen.'; return; }
-            const r2 = await fetch(`/api/admin/marketing/drips/${this.cfg.DRIP.id}/steps`, {
+            const r2 = await fetch(`/api/marketing/drips/${this.cfg.DRIP.id}/steps`, {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ steps: stepsPayload }),
             });
             const d2 = await r2.json();
             if (!d2.ok) { this.errorMsg = d2.error || 'Steps-Update fehlgeschlagen.'; return; }
-            window.location.href = `/admin/marketing/drips/${this.cfg.DRIP.id}`;
+            window.location.href = `/marketing/drips/${this.cfg.DRIP.id}`;
           } else {
-            const res = await fetch('/api/admin/marketing/drips/create', {
+            const res = await fetch('/api/marketing/drips/create', {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -284,7 +284,7 @@ const TRIGGERS = [
             });
             const data = await res.json();
             if (!data.ok) { this.errorMsg = data.error || 'Speichern fehlgeschlagen.'; return; }
-            window.location.href = `/admin/marketing/drips/${data.id}`;
+            window.location.href = `/marketing/drips/${data.id}`;
           }
         } catch (err: any) {
           this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');

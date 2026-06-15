@@ -1,0 +1,88 @@
+---
+// Sprint Wallet · Phase 9 — Marketing-Template Edit-Page (Backoffice)
+//
+// Lädt das Template, gibt Default-Sprach-Werte an den Editor.
+// Zeigt Archiviert-Hinweis wenn is_archived = true.
+
+import Layout from '../../../../layouts/Layout.astro';
+import MarketingEditor from '../../../../components/admin/MarketingEditor.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const templateId = Astro.params.id;
+if (!templateId) return Astro.redirect('/marketing/templates');
+
+const sb = createSupabaseServiceRoleInstance();
+const { data: template } = await sb
+  .from('marketing_templates')
+  .select('id, hotel_id, name, category, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url, is_archived')
+  .eq('id', templateId)
+  .maybeSingle();
+
+if (!template || template.hotel_id !== hotel.id) {
+  return Astro.redirect('/marketing/templates');
+}
+
+const hotelDefaultLang = (hotel as any).default_language || 'de';
+
+function pickDefault(jsonb: any): string {
+  if (!jsonb) return '';
+  return jsonb[hotelDefaultLang]?.value ?? '';
+}
+
+const initialTitle    = pickDefault(template.title_i18n);
+const initialBodyHtml = pickDefault(template.body_i18n);
+const initialCtaLabel = pickDefault(template.cta_label_i18n);
+---
+
+<Layout title={template.name} activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing/templates" class="breadcrumb__crumb">Vorlagen</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{template.name}</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Marketing</span>
+      <h1 class="settings-hero__title">{template.name}<span class="dot-pink">.</span></h1>
+    </section>
+
+    {template.is_archived && (
+      <div class="s-flash s-flash--warn">Diese Vorlage ist archiviert.</div>
+    )}
+
+    <MarketingEditor
+      templateId={templateId}
+      initialTitle={initialTitle}
+      initialBodyHtml={initialBodyHtml}
+      initialCtaLabel={initialCtaLabel}
+      initialCtaUrl={template.cta_url ?? ''}
+      initialHeroUrl={template.hero_image_url ?? ''}
+      initialName={template.name}
+      initialCategory={template.category ?? null}
+      hotelDefaultLang={hotelDefaultLang}
+    />
+  </div>
+</Layout>
+
+<style>
+  .s-flash--warn {
+    background: #fff8e1;
+    border-left: 3px solid #f5d77a;
+    color: #6b4f00;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+</style>

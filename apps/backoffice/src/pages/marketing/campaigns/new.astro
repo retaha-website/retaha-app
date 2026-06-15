@@ -1,0 +1,51 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import CampaignEditor from '../../../components/admin/CampaignEditor.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const client = createSupabaseServiceRoleInstance();
+const { data: templates } = await client
+  .from('marketing_templates')
+  .select('id, name, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url')
+  .eq('hotel_id', hotel.id)
+  .eq('is_archived', false)
+  .order('updated_at', { ascending: false });
+
+const enabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
+  ? (hotel as any).enabled_languages
+  : [(hotel as any).default_language || 'de'];
+---
+
+<Layout title="Marketing · Neue Kampagne" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <span class="breadcrumb__sep">/</span>
+      <a href="/marketing/campaigns" class="breadcrumb__crumb">Kampagnen</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Neue Kampagne</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Marketing</span>
+      <h1 class="settings-hero__title">Neue Kampagne<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Wähle eine Vorlage oder schreib Ad-hoc. Inhalt wird beim Speichern in alle aktivierten Sprachen übersetzt.</p>
+    </section>
+
+    <CampaignEditor
+      templates={templates ?? []}
+      hotelName={hotel.name}
+      hotelDefaultLang={(hotel as any).default_language || 'de'}
+      enabledLangs={enabledLangs}
+    />
+  </div>
+</Layout>
