@@ -12,10 +12,16 @@ if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const supabase = createSupabaseServiceRoleInstance();
 
-const [{ data: settings }, { data: hotelRow }] = await Promise.all([
+// Split into two queries so a missing service_hours column never silences service_items.
+const [{ data: settings }, { data: hoursRow }, { data: hotelRow }] = await Promise.all([
   supabase
     .from('hotel_settings')
-    .select('features, service_items, service_hours, service_start_time, service_end_time')
+    .select('features, service_items, service_start_time, service_end_time')
+    .eq('hotel_id', hotel.id)
+    .maybeSingle(),
+  supabase
+    .from('hotel_settings')
+    .select('service_hours')
     .eq('hotel_id', hotel.id)
     .maybeSingle(),
   supabase
@@ -32,7 +38,7 @@ const startTime = ((s.service_start_time as string | undefined) || '08:00').subs
 const endTime   = ((s.service_end_time   as string | undefined) || '22:00').substring(0, 5);
 
 const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-const rawServiceHours = (s.service_hours as Record<string, any> | null | undefined) ?? null;
+const rawServiceHours = ((hoursRow?.service_hours) as Record<string, any> | null | undefined) ?? null;
 const initialHours: Record<string, { start: string; end: string; closed: boolean }> = {};
 for (const day of WEEK_DAYS) {
   const bh = rawServiceHours?.[day];
