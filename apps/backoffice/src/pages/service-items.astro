@@ -1,0 +1,293 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+let saved: { ok: boolean; msg: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString();
+
+  if (action === 'save_times') {
+    const { error } = await client.from('hotel_settings').upsert({
+      hotel_id: hotel.id,
+      service_start_time: form.get('service_start_time')?.toString() || '08:00',
+      service_end_time:   form.get('service_end_time')?.toString()   || '22:00',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'hotel_id' });
+    saved = error
+      ? { ok: false, msg: `Fehler: ${error.message}` }
+      : { ok: true,  msg: '✓ Service-Zeiten gespeichert' };
+
+  } else if (action === 'save_items') {
+    const raw = form.get('items_json')?.toString();
+    if (raw) {
+      try {
+        const items = JSON.parse(raw);
+        if (!Array.isArray(items)) throw new Error('Kein Array');
+        const { error } = await client.from('hotel_settings').upsert({
+          hotel_id: hotel.id,
+          service_items: items,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'hotel_id' });
+        saved = error
+          ? { ok: false, msg: `Fehler: ${error.message}` }
+          : { ok: true,  msg: `✓ ${items.length} Item${items.length !== 1 ? 's' : ''} gespeichert` };
+      } catch (e: any) {
+        saved = { ok: false, msg: `Ungültige Daten: ${e.message}` };
+      }
+    }
+  }
+}
+
+const { data: settings } = await client
+  .from('hotel_settings')
+  .select('service_items, service_start_time, service_end_time')
+  .eq('hotel_id', hotel.id)
+  .maybeSingle();
+
+const items     = ((settings?.service_items as any[]) ?? []);
+const startTime = ((settings as any)?.service_start_time || '08:00').substring(0, 5);
+const endTime   = ((settings as any)?.service_end_time   || '22:00').substring(0, 5);
+---
+
+<Layout title="Service-Items" activeTab="backoffice" hotelName={hotel.name}>
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Service-Items</span>
+    </nav>
+
+    {saved && (
+      <div class={`s-flash ${saved.ok ? 's-flash--ok' : 's-flash--err'}`}>{saved.msg}</div>
+    )}
+
+    <!-- ZEITEN -->
+    <section class="s-card" id="service-times">
+      <div class="s-card__head">
+        <h2 class="s-card__title">Service-Zeiten</h2>
+        <span class="s-card__num">01</span>
+      </div>
+      <form method="POST" class="s-card__body">
+        <input type="hidden" name="_action" value="save_times" />
+        <div class="field field--row">
+          <span class="field__label">Verfügbar von</span>
+          <div class="field__input-wrap time-row">
+            <label class="time-field">
+              <span class="field__hint">Beginn</span>
+              <input type="time" name="service_start_time" value={startTime} class="s-input s-input--time" />
+            </label>
+            <span class="time-sep">–</span>
+            <label class="time-field">
+              <span class="field__hint">Ende</span>
+              <input type="time" name="service_end_time" value={endTime} class="s-input s-input--time" />
+            </label>
+          </div>
+        </div>
+        <div class="s-card__footer">
+          <button type="submit" class="v9-btn">Zeiten speichern</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ITEMS -->
+    <section class="s-card" id="service-items-list">
+      <div class="s-card__head">
+        <h2 class="s-card__title">Service-Items</h2>
+        <span class="s-card__num">02</span>
+      </div>
+      <form method="POST" id="items-form" class="s-card__body">
+        <input type="hidden" name="_action" value="save_items" />
+        <input type="hidden" name="items_json" id="items-json" />
+        <div id="items-container"></div>
+        <div class="s-card__footer si-footer">
+          <button type="button" id="add-item-btn" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
+          <button type="submit" class="v9-btn">Items speichern</button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+
+  <script is:inline define:vars={{ initialItems: items }}>
+    let items = JSON.parse(JSON.stringify(initialItems || []));
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function sync() {
+      document.getElementById('items-json').value = JSON.stringify(items);
+    }
+
+    function render() {
+      const container = document.getElementById('items-container');
+      if (items.length === 0) {
+        container.innerHTML = '<p class="si-empty">Noch keine Items. Klicke auf "+ Item hinzufügen".</p>';
+        sync();
+        return;
+      }
+      container.innerHTML = '';
+      items.forEach((item, idx) => {
+        const el = document.createElement('div');
+        el.className = 'si-row';
+        el.innerHTML = `
+          <div class="si-row__head">
+            <span class="si-row__num">${String(idx + 1).padStart(2, '0')}</span>
+            <button type="button" data-action="delete" data-idx="${idx}"
+              class="v9-btn v9-btn--ghost si-delete">Entfernen</button>
+          </div>
+          <div class="si-grid si-grid--2">
+            <label class="si-field">
+              <span class="si-label si-label--mono">Slug (id)</span>
+              <input type="text" data-idx="${idx}" data-field="id"
+                value="${esc(item.id)}" placeholder="z.B. extra-towels" class="s-input si-mono" />
+            </label>
+            <label class="si-field">
+              <span class="si-label si-label--mono">Icon-Key</span>
+              <input type="text" data-idx="${idx}" data-field="icon"
+                value="${esc(item.icon)}" placeholder="towels" class="s-input si-mono" />
+            </label>
+          </div>
+          <div class="si-grid si-grid--2">
+            <label class="si-field">
+              <span class="si-label">Name (DE)</span>
+              <input type="text" data-idx="${idx}" data-field="name_de"
+                value="${esc(item.name_de)}" class="s-input" />
+            </label>
+            <label class="si-field">
+              <span class="si-label">Name (EN)</span>
+              <input type="text" data-idx="${idx}" data-field="name_en"
+                value="${esc(item.name_en)}" class="s-input" />
+            </label>
+          </div>
+          <div class="si-grid si-grid--2">
+            <label class="si-field">
+              <span class="si-label">Beschreibung (DE)</span>
+              <textarea data-idx="${idx}" data-field="description_de"
+                rows="2" class="s-input si-textarea">${esc(item.description_de)}</textarea>
+            </label>
+            <label class="si-field">
+              <span class="si-label">Beschreibung (EN)</span>
+              <textarea data-idx="${idx}" data-field="description_en"
+                rows="2" class="s-input si-textarea">${esc(item.description_en)}</textarea>
+            </label>
+          </div>
+        `;
+        container.appendChild(el);
+      });
+
+      container.querySelectorAll('input[data-field], textarea[data-field]').forEach(el => {
+        el.addEventListener('input', e => {
+          const t = e.target;
+          items[parseInt(t.dataset.idx)][t.dataset.field] = t.value;
+          sync();
+        });
+      });
+
+      container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const idx = parseInt(e.currentTarget.dataset.idx);
+          if (confirm('Item wirklich entfernen?')) { items.splice(idx, 1); render(); }
+        });
+      });
+
+      sync();
+    }
+
+    document.getElementById('add-item-btn').addEventListener('click', () => {
+      items.push({ id: '', name_de: '', name_en: '', description_de: '', description_en: '', icon: 'default' });
+      render();
+    });
+
+    document.getElementById('items-form').addEventListener('submit', sync);
+
+    render();
+  </script>
+
+  <style>
+    .settings-page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    /* flash already defined globally via s-flash */
+
+    .time-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+    .time-field { display: flex; flex-direction: column; gap: 4px; }
+    .time-sep { font-size: 18px; color: var(--ink-muted); padding-bottom: 10px; }
+    .s-input--time { width: 130px; }
+
+    /* ── Item list ── */
+    .si-empty {
+      font-size: 13px;
+      color: var(--ink-muted);
+      padding: 24px 0;
+      text-align: center;
+    }
+
+    .si-row {
+      border: 1px solid var(--border);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+    .si-row:last-child { margin-bottom: 0; }
+
+    .si-row__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .si-row__num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--ink-muted);
+      background: var(--bg-deep);
+      padding: 3px 8px;
+    }
+    .si-delete { font-size: 11px; }
+
+    .si-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .si-grid--2 { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 600px) { .si-grid--2 { grid-template-columns: 1fr; } }
+
+    .si-field { display: flex; flex-direction: column; gap: 5px; }
+    .si-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+    }
+    .si-label--mono { font-family: 'JetBrains Mono', monospace; }
+
+    .si-mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    .si-textarea { min-height: 62px; resize: vertical; }
+
+    .si-footer { display: flex; gap: 12px; }
+  </style>
+</Layout>
