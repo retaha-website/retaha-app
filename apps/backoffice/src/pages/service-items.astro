@@ -111,7 +111,7 @@ input:-webkit-autofill:focus {
   transition: border-color 0.12s, background 0.12s;
 }
 .sp-icon-btn:hover { border-color: var(--ink-muted); }
-.sp-icon-btn.is-active { border-color: var(--accent, #C06A3C); background: color-mix(in srgb, var(--accent, #C06A3C) 8%, transparent); }
+.sp-icon-btn.is-active { border-color: var(--accent, #C06A3C); background: rgba(192, 106, 60, 0.08); }
 .sp-icon-btn svg { color: var(--ink-muted); }
 .sp-icon-btn.is-active svg { color: var(--accent, #C06A3C); }
 .sp-icon-name { font-size: 9px; color: var(--ink-muted); text-align: center; line-height: 1.2; white-space: nowrap; }
@@ -133,7 +133,7 @@ input:-webkit-autofill:focus {
 .si-card:hover { border-color: #D8D3C8; box-shadow: 0 2px 8px rgba(10,10,10,.05); }
 .si-card--editing {
   border-color: var(--accent, #C06A3C);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #C06A3C) 15%, transparent);
+  background: rgba(192, 106, 60, 0.04);
 }
 
 .si-card__icon {
@@ -245,7 +245,7 @@ input:-webkit-autofill:focus {
               </div>
             </template>
           </div>
-          <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <button type="button" @click="copyMonToAll()" class="v9-btn v9-btn--ghost" style="font-size:10px;padding:6px 12px">
               Auf alle Tage übernehmen
             </button>
@@ -263,7 +263,7 @@ input:-webkit-autofill:focus {
   </div><!-- /.settings-sections -->
 
   <!-- 03 Service-Items -->
-  <section class="s-card" style="margin-top:20px" x-data="siItems()">
+  <section class="s-card" id="service-items" style="margin-top:20px" x-data="siItems()">
     <div class="s-card__head" style="align-items:center">
       <div>
         <span class="s-card__num" style="display:block;margin-bottom:6px">Service-Items</span>
@@ -275,7 +275,7 @@ input:-webkit-autofill:focus {
     </div>
 
     <div class="s-card__body">
-      <p class="field__hint" style="margin-bottom:16px">
+      <p class="field__hint">
         Name und Beschreibung auf <strong x-text="langLabel"></strong> eingeben — das Backend übersetzt automatisch in alle Gastsprachen.
       </p>
 
@@ -379,8 +379,9 @@ input:-webkit-autofill:focus {
 </div><!-- /.settings-page -->
 
 <script>
-  const mkSvg = (paths: string) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">${paths}</svg>`;
+  function mkSvg(paths) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">' + paths + '</svg>';
+  }
 
   const SERVICE_ICONS = [
     { key: 'bell',      label: 'Glocke',     svgHtml: mkSvg('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>') },
@@ -395,18 +396,20 @@ input:-webkit-autofill:focus {
     { key: 'layers',    label: 'Sonstiges',  svgHtml: mkSvg('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>') },
   ];
 
-  document.addEventListener('alpine:init', () => {
+  document.addEventListener('alpine:init', function () {
+    var A = window.Alpine;
+    if (!A) return;
 
-    Alpine.data('siHours', () => {
-      const init = (window as any)._siInit || {};
+    A.data('siHours', function () {
+      var init = window._siInit || {};
       return {
         hours: init.hours || {},
         saving: false,
         success: false,
         error: '',
         _origStr: '',
-        _timer: null as ReturnType<typeof setTimeout> | null,
-        _beforeUnload: null as ((e: BeforeUnloadEvent) => void) | null,
+        _timer: null,
+        _beforeUnload: null,
 
         days: [
           { key: 'mon', label: 'Mo' },
@@ -418,48 +421,49 @@ input:-webkit-autofill:focus {
           { key: 'sun', label: 'So' },
         ],
 
-        init() {
+        init: function () {
+          var self = this;
           this._origStr = JSON.stringify(this.hours);
-          this._beforeUnload = (e: BeforeUnloadEvent) => {
-            if (this.isDirty) { e.preventDefault(); e.returnValue = ''; }
+          this._beforeUnload = function (e) {
+            if (self.isDirty) { e.preventDefault(); e.returnValue = ''; }
           };
           window.addEventListener('beforeunload', this._beforeUnload);
         },
 
-        destroy() {
+        destroy: function () {
           if (this._beforeUnload) window.removeEventListener('beforeunload', this._beforeUnload);
         },
 
-        get isDirty(): boolean {
+        get isDirty() {
           return JSON.stringify(this.hours) !== this._origStr;
         },
 
-        copyMonToAll() {
-          const src = this.hours['mon'];
+        copyMonToAll: function () {
+          var src = this.hours['mon'];
           if (!src || src.closed) return;
-          this.days.forEach((d: { key: string }) => {
-            this.hours[d.key] = { ...this.hours[d.key], start: src.start, end: src.end };
-          });
+          this.days.forEach(function (d) {
+            this.hours[d.key] = Object.assign({}, this.hours[d.key], { start: src.start, end: src.end });
+          }, this);
         },
 
-        async save() {
+        save: async function () {
           if (!this.isDirty || this.saving) return;
           this.saving = true;
           this.success = false;
           this.error = '';
           if (this._timer) clearTimeout(this._timer);
           try {
-            const res = await fetch('/api/admin/service/section', {
+            var res = await fetch('/api/admin/service/section', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ section: 'hours', service_hours: this.hours }),
             });
-            const d = await res.json();
+            var d = await res.json();
             if (!d.ok) { this.error = d.error || 'Fehler'; return; }
             this.success = true;
             this._origStr = JSON.stringify(this.hours);
-            this._timer = setTimeout(() => { this.success = false; }, 3000);
-          } catch {
+            this._timer = setTimeout(function () { this.success = false; }.bind(this), 3000);
+          } catch (err) {
             this.error = 'Netzwerk-Fehler';
           } finally {
             this.saving = false;
@@ -468,75 +472,68 @@ input:-webkit-autofill:focus {
       };
     });
 
-    Alpine.data('siItems', () => {
-      const init = (window as any)._siInit || {};
-      const raw = (init.items || []) as Record<string, unknown>[];
+    A.data('siItems', function () {
+      var init = window._siInit || {};
+      var raw = init.items || [];
       return {
-        items: raw.map((item, idx) => ({ _key: idx, ...item })) as Record<string, unknown>[],
-        _nextKey: raw.length as number,
-        defaultLang: (init.defaultLang as string) || 'de',
-        langLabel:   (init.langLabel  as string) || 'Deutsch',
+        items: raw.map(function (item, idx) { return Object.assign({ _key: idx }, item); }),
+        _nextKey: raw.length,
+        defaultLang: init.defaultLang || 'de',
+        langLabel:   init.langLabel   || 'Deutsch',
 
-        editingItem: null as Record<string, unknown> | null,
-        editingKey: null as number | null,
+        editingItem: null,
+        editingKey: null,
 
         saving: false,
         toast: '',
         toastKind: 'ok',
-        _toastTimer: null as ReturnType<typeof setTimeout> | null,
+        _toastTimer: null,
         serviceIcons: SERVICE_ICONS,
 
-        iconHtml(key: string): string {
-          const ico = SERVICE_ICONS.find(i => i.key === key);
+        iconHtml: function (key) {
+          var ico = SERVICE_ICONS.find(function (i) { return i.key === key; });
           return ico ? ico.svgHtml : SERVICE_ICONS[0].svgHtml;
         },
 
-        openAdd() {
-          this.editingItem = {
-            _key:        (this._nextKey as number)++,
-            _orig_id:    '',
-            name:        '',
-            description: '',
-            icon:        'bell',
-          };
+        openAdd: function () {
+          this.editingItem = { _key: this._nextKey++, _orig_id: '', name: '', description: '', icon: 'bell' };
           this.editingKey = null;
         },
 
-        openEdit(item: Record<string, unknown>) {
-          this.editingItem = { ...item };
-          this.editingKey = item._key as number;
+        openEdit: function (item) {
+          this.editingItem = Object.assign({}, item);
+          this.editingKey = item._key;
         },
 
-        cancelEdit() {
+        cancelEdit: function () {
           this.editingItem = null;
           this.editingKey = null;
         },
 
-        removeItem(key: number) {
-          (this as any).$store.confirm.ask(
+        removeItem: function (key) {
+          var self = this;
+          this.$store.confirm.ask(
             'Dieses Service-Item wirklich entfernen?',
-            async () => {
-              (this.items as Record<string, unknown>[]) =
-                (this.items as any[]).filter((it: any) => it._key !== key);
-              await this._persistItems();
+            async function () {
+              self.items = self.items.filter(function (it) { return it._key !== key; });
+              await self._persistItems();
             },
             'Entfernen',
           );
         },
 
-        async saveEdit() {
+        saveEdit: async function () {
           if (this.saving || !this.editingItem) return;
-          const item = this.editingItem as Record<string, unknown>;
-          if (!String(item.name ?? '').trim()) {
+          if (!String(this.editingItem.name || '').trim()) {
             this.showToast('Name darf nicht leer sein', 'err');
             return;
           }
 
           if (this.editingKey === null) {
-            (this.items as Record<string, unknown>[]).push({ ...item });
+            this.items.push(Object.assign({}, this.editingItem));
           } else {
-            const idx = (this.items as any[]).findIndex((it: any) => it._key === this.editingKey);
-            if (idx !== -1) (this.items as any[])[idx] = { ...item };
+            var idx = this.items.findIndex(function (it) { return it._key === this.editingKey; }, this);
+            if (idx !== -1) this.items[idx] = Object.assign({}, this.editingItem);
           }
 
           this.editingItem = null;
@@ -544,35 +541,35 @@ input:-webkit-autofill:focus {
           await this._persistItems();
         },
 
-        async _persistItems() {
+        _persistItems: async function () {
           this.saving = true;
           try {
-            const payload = (this.items as Record<string, unknown>[])
-              .filter((it: any) => String(it.name ?? '').trim())
-              .map(({ _key, ...rest }) => rest);
-            const res = await fetch('/api/admin/service/section', {
+            var payload = this.items
+              .filter(function (it) { return String(it.name || '').trim(); })
+              .map(function (it) { var r = Object.assign({}, it); delete r._key; return r; });
+            var res = await fetch('/api/admin/service/section', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ section: 'items', service_items: payload }),
             });
-            const d = await res.json();
+            var d = await res.json();
             if (d.ok) {
-              this.showToast(`✓ ${payload.length} Item${payload.length !== 1 ? 's' : ''} gespeichert`, 'ok');
+              this.showToast('✓ ' + payload.length + ' Item' + (payload.length !== 1 ? 's' : '') + ' gespeichert', 'ok');
             } else {
               this.showToast(d.error || 'Fehler beim Speichern', 'err');
             }
-          } catch {
+          } catch (err) {
             this.showToast('Netzwerk-Fehler', 'err');
           } finally {
             this.saving = false;
           }
         },
 
-        showToast(msg: string, kind: string) {
+        showToast: function (msg, kind) {
           this.toast = msg;
           this.toastKind = kind;
           if (this._toastTimer) clearTimeout(this._toastTimer);
-          this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
+          this._toastTimer = setTimeout(function () { this.toast = ''; }.bind(this), 3000);
         },
       };
     });
