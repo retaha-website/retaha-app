@@ -13,7 +13,7 @@ export const POST: APIRoute = async ({ request }) => {
   catch { return json({ ok: false, error: 'invalid_json' }, 400); }
 
   const email = (body?.email ?? '').toLowerCase().trim();
-  if (!/^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+  if (!/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
     return json({ ok: false, error: 'invalid_email' }, 400);
   }
 
@@ -84,7 +84,8 @@ export const POST: APIRoute = async ({ request }) => {
         .update({ confirmation_sent_at: new Date().toISOString() })
         .eq('id', waitlistId);
     } else {
-      console.warn('[consent/subscribe] ACS send failed:', sendResult.error);
+      console.error('[consent/subscribe] ACS send failed');
+      console.error('[consent/subscribe] error:', sendResult.error);
     }
   } else {
     console.warn('[consent/subscribe] ACS ENVs fehlen — Bestätigungs-Mail nicht gesendet');

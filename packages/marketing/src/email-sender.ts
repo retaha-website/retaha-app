@@ -45,8 +45,11 @@ export class AcsEmailSender implements EmailSender {
         return { ok: true, id: res.headers.get('x-ms-request-id') ?? undefined };
       }
       const text = await res.text();
+      console.error(`[AcsEmailSender] HTTP ${res.status} from ${url}`);
+      console.error(`[AcsEmailSender] Response body: ${text.slice(0, 500)}`);
       return { ok: false, error: `acs_${res.status}: ${text.slice(0, 300)}` };
     } catch (err) {
+      console.error('[AcsEmailSender] fetch exception:', (err as Error).message);
       return { ok: false, error: (err as Error).message };
     }
   }
@@ -80,7 +83,7 @@ export class AcsEmailSender implements EmailSender {
       'x-ms-date': date,
       'x-ms-content-sha256': contentHash,
       'host': host,
-      'Authorization': `HMAC-SHA256 Credential=${accessKey}&SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
+      'Authorization': `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
     };
   }
 }
