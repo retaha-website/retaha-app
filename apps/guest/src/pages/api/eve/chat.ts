@@ -282,7 +282,7 @@ async function loadEveChatContext(sb: any, hotelId: string, stayOrShowcaseId: st
   // Sprint H Group 2 — Showcase: Pseudo-Stay/Guest aus showcase_sessions.demo_data
   if (isShowcase) {
     const [hotelRes, settingsRes, knowledgeRes, showcaseRes] = await Promise.all([
-      sb.from('hotels').select('id, name, city, country, default_language').eq('id', hotelId).maybeSingle(),
+      sb.from('hotels').select('id, name, city, country, phone, default_language').eq('id', hotelId).maybeSingle(),
       sb.from('hotel_settings').select('eve_enabled, eve_name, eve_tonality, eve_custom_persona, eve_tuning_rules, guest_address_form, wifi_ssid, wifi_password, wifi_speed_mbits, breakfast_start_time, breakfast_end_time, breakfast_location_de, breakfast_location_en, breakfast_location_fr, breakfast_location_es, conference_rooms, conference_start_time, conference_end_time').eq('hotel_id', hotelId).maybeSingle(),
       sb.from('eve_knowledge').select('category, question, answer').eq('hotel_id', hotelId).eq('language_code', 'de').eq('is_published', true),
       sb.from('showcase_sessions').select('demo_data').eq('id', stayOrShowcaseId).maybeSingle(),

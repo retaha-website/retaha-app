@@ -7,4 +7,5 @@
 export { supabase, createServerClient } from './supabase';
 export { getEnv } from './env';
 export * from './queries';
+export { telHref } from './format';
 export type { SupabaseClient } from '@supabase/supabase-js';

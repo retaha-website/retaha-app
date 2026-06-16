@@ -25,6 +25,7 @@ export interface EveHotel {
   name: string;
   city?: string | null;
   country?: string | null;
+  phone?: string | null;
 }
 
 export interface EveHotelSettings {
@@ -371,6 +372,7 @@ function buildHotelInfoSection(hotel: EveHotel, s: EveHotelSettings, lang: Lang)
   const lines: string[] = [h.hotel, ''];
   lines.push(`Hotel-Name: ${hotel.name}`);
   if (hotel.city) lines.push(`Stadt: ${hotel.city}${hotel.country ? ', ' + hotel.country : ''}`);
+  if (hotel.phone) lines.push(`Rezeption-Telefon: ${hotel.phone}`);
 
   if (s.wifi_ssid) {
     let wifi = `WLAN: "${s.wifi_ssid}"`;
