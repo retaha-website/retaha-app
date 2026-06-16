@@ -1,0 +1,184 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/onboarding/locale');
+
+const sb = createSupabaseServiceRoleInstance();
+
+// Wallet-Push Opt-ins
+const { count: walletOptInTotal } = await sb.from('wallet_passes')
+  .select('id', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id)
+  .eq('marketing_consent_given', true);
+
+const { count: walletActive } = await sb.from('wallet_passes')
+  .select('id', { count: 'exact', head: true })
+  .eq('hotel_id', hotel.id)
+  .eq('marketing_consent_given', true)
+  .eq('state', 'active');
+
+// Email DOI Stats (global, aus marketing_waitlist — Zuordnung via wallet_passes.guest_email)
+const { data: hotelEmails } = await sb.from('wallet_passes')
+  .select('guest_email')
+  .eq('hotel_id', hotel.id)
+  .not('guest_email', 'is', null);
+
+const emailSet = (hotelEmails ?? []).map(p => p.guest_email!.toLowerCase());
+
+// Lade Waitlist-Entries für diese Emails
+const { data: waitlistRows } = emailSet.length > 0
+  ? await sb.from('marketing_waitlist')
+      .select('id, email, confirmed_at, unsubscribed_at, pending_at, confirmation_sent_at')
+      .in('email', emailSet)
+  : { data: [] };
+
+const wlTotal = waitlistRows?.length ?? 0;
+const wlConfirmed = waitlistRows?.filter(w => w.confirmed_at && !w.unsubscribed_at).length ?? 0;
+const wlPending = waitlistRows?.filter(w => !w.confirmed_at && !w.unsubscribed_at).length ?? 0;
+const wlUnsubscribed = waitlistRows?.filter(w => w.unsubscribed_at).length ?? 0;
+
+// Recent consents
+const { data: recentConsents } = await sb.from('marketing_consents')
+  .select('id, action, source, policy_version, created_at, wallet_pass_id, waitlist_id')
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+---
+
+<Layout title="Consent-Dashboard" activeTab="backoffice" hotelName={hotel.name}>
+<style>
+.consent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.consent-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.consent-kpi__val { font-size: 32px; font-weight: 700; color: var(--ink); line-height: 1; }
+.consent-kpi__label { font-size: 12px; color: var(--ink-muted); margin-top: 6px; }
+.consent-kpi--green .consent-kpi__val { color: #145c2a; }
+.consent-kpi--orange .consent-kpi__val { color: #8c4a0e; }
+.consent-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.consent-table th { text-align: left; padding: 8px 12px; color: var(--ink-muted); font-size: 12px; border-bottom: 1px solid var(--border); }
+.consent-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+.consent-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.consent-badge--granted { background: #e8f5ec; color: #145c2a; }
+.consent-badge--revoked { background: #fce8e8; color: #8c2128; }
+</style>
+
+<div class="settings-page">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <span class="breadcrumb__sep">/</span>
+    <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">Consent-Dashboard</span>
+  </nav>
+
+  <section class="settings-hero">
+    <span class="settings-hero__eyebrow">DSGVO</span>
+    <h1 class="settings-hero__title">Consent<span class="dot-pink">.</span></h1>
+    <p class="settings-hero__sub">Opt-in-Status deiner Gäste — Wallet-Push und E-Mail getrennt.</p>
+  </section>
+
+  <div class="settings-sections" style="--settings-cols: 1;">
+    <!-- Wallet-Push Opt-ins -->
+    <section class="s-card">
+      <div class="s-card__head">
+        <h2 class="s-card__title">Wallet-Push Opt-ins</h2>
+        <span class="s-card__num">01</span>
+      </div>
+      <div class="s-card__body">
+        <div class="consent-grid">
+          <div class="consent-kpi consent-kpi--green">
+            <div class="consent-kpi__val">{walletActive ?? 0}</div>
+            <div class="consent-kpi__label">Aktive Push-Consent</div>
+          </div>
+          <div class="consent-kpi">
+            <div class="consent-kpi__val">{walletOptInTotal ?? 0}</div>
+            <div class="consent-kpi__label">Gesamt Opt-in</div>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--ink-muted);">
+          Gäste mit <code>marketing_consent_given = true</code> auf ihrem Wallet-Pass. Gesteuert via Double-Opt-in beim Pass-Add.
+        </p>
+      </div>
+    </section>
+
+    <!-- Email DOI -->
+    <section class="s-card">
+      <div class="s-card__head">
+        <h2 class="s-card__title">E-Mail Double-Opt-in</h2>
+        <span class="s-card__num">02</span>
+      </div>
+      <div class="s-card__body">
+        <div class="consent-grid">
+          <div class="consent-kpi consent-kpi--green">
+            <div class="consent-kpi__val">{wlConfirmed}</div>
+            <div class="consent-kpi__label">Bestätigt</div>
+          </div>
+          <div class="consent-kpi consent-kpi--orange">
+            <div class="consent-kpi__val">{wlPending}</div>
+            <div class="consent-kpi__label">Ausstehend (nicht bestätigt)</div>
+          </div>
+          <div class="consent-kpi">
+            <div class="consent-kpi__val">{wlUnsubscribed}</div>
+            <div class="consent-kpi__label">Abgemeldet</div>
+          </div>
+          <div class="consent-kpi">
+            <div class="consent-kpi__val">{wlTotal}</div>
+            <div class="consent-kpi__label">Gesamt Einträge</div>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--ink-muted);">
+          Nur Gäste-Emails dieses Hotels (Überschneidung mit Wallet-Pässen). E-Mail-Kampagnen gehen NUR an bestätigte Abonnenten.
+        </p>
+      </div>
+    </section>
+
+    <!-- Recent Consents -->
+    <section class="s-card">
+      <div class="s-card__head">
+        <h2 class="s-card__title">Letzte Consent-Ereignisse</h2>
+        <span class="s-card__num">03</span>
+      </div>
+      <div class="s-card__body">
+        {(recentConsents?.length ?? 0) === 0 ? (
+          <p style="color:var(--ink-muted);font-size:14px;">Noch keine Consent-Ereignisse.</p>
+        ) : (
+          <table class="consent-table">
+            <thead>
+              <tr>
+                <th>Aktion</th>
+                <th>Quelle</th>
+                <th>Kanal</th>
+                <th>Policy</th>
+                <th>Datum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentConsents!.map(c => (
+                <tr>
+                  <td>
+                    <span class={`consent-badge consent-badge--${c.action}`}>
+                      {c.action === 'granted' ? '✓ Erteilt' : '× Widerrufen'}
+                    </span>
+                  </td>
+                  <td style="color:var(--ink-muted)">{c.source}</td>
+                  <td style="color:var(--ink-muted)">{c.wallet_pass_id ? 'Wallet' : 'E-Mail'}</td>
+                  <td style="color:var(--ink-muted)">{c.policy_version}</td>
+                  <td style="color:var(--ink-muted)">{fmtDate(c.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
+  </div>
+</div>
+</Layout>

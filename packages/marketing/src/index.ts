@@ -2,6 +2,7 @@
 // Marketing-Lib: Drips, Bulk-Send, Translate-with-Vars, Variables, HTML-Sanitize.
 
 export * from './drips';
+export * from './email-sender';
 export * from './send';
 export * from './translate-with-vars';
 export * from './html-sanitize';

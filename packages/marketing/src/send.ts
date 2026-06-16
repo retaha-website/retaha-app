@@ -34,6 +34,7 @@ import { asLanguageCode } from '@retaha/i18n';
 import { buildOptOutUrl } from '@retaha/wallet';
 import { getEnv } from '@retaha/db';
 import type { LanguageCode } from '@retaha/i18n';
+import { AcsEmailSender, buildMarketingEmailHtml } from './email-sender';
 
 // Marketing-Campaign-Status — string literal types
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
@@ -330,6 +331,112 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
           delivered: false,
           failed_reason: 'uncaught_exception: ' + (err as Error).message.slice(0, 200),
         }, { onConflict: 'campaign_id,wallet_pass_id' });
+      }
+    }
+
+    // ── 6b. Email-Kanal (wenn aktiviert) ──────────────────────────────────────────
+    const channels = (campaign as any).channels as string[] ?? ['wallet_push'];
+    if (channels.includes('email')) {
+      const acsConnString = getEnv('ACS_CONNECTION_STRING');
+      const acsMailFrom = getEnv('ACS_MAIL_FROM');
+      if (!acsConnString || !acsMailFrom) {
+        console.warn('[campaign-send] Email-Kanal aktiviert, aber ACS_CONNECTION_STRING/ACS_MAIL_FROM fehlen — Email-Send übersprungen');
+      } else {
+        const emailSender = new AcsEmailSender(acsConnString, acsMailFrom);
+        const backofficeUrl = (getEnv('PUBLIC_BACKOFFICE_URL') || 'https://backoffice.retaha.de').replace(/\/$/, '');
+
+        // Bestätigte Abonnenten laden (global; Hotelzuordnung via wallet_passes)
+        const { data: waitlistEntries } = await sb
+          .from('marketing_waitlist')
+          .select('id, email, confirmation_token')
+          .not('confirmed_at', 'is', null)
+          .is('unsubscribed_at', null);
+
+        // Email → Pass-Map für Gastname + Sprache
+        const emailToPass = new Map<string, any>();
+        for (const pass of allPasses ?? []) {
+          if (pass.guest_email) emailToPass.set(pass.guest_email.toLowerCase(), pass);
+        }
+
+        // Nur Gäste dieses Hotels (Email-Überschneidung mit wallet_passes)
+        const hotelTargets = (waitlistEntries ?? []).filter(w =>
+          emailToPass.has(w.email.toLowerCase())
+        );
+
+        for (const target of hotelTargets) {
+          try {
+            const pass = emailToPass.get(target.email.toLowerCase());
+            const passLang = asLanguageCode(passLangs.get(target.email.toLowerCase()) || hotelDefault);
+
+            // Doppelversand-Check: existiert bereits ein Email-Send für diese Kampagne+Waitlist-ID?
+            const { data: existingRow } = await sb
+              .from('marketing_sends')
+              .select('id')
+              .eq('campaign_id', campaign.id)
+              .eq('waitlist_id', target.id)
+              .eq('channel', 'email')
+              .maybeSingle();
+            if (existingRow) continue;
+
+            // Send-Row vorab anlegen um ID für Tracking-Pixel zu erhalten
+            const { data: sendRow, error: insErr } = await sb
+              .from('marketing_sends')
+              .insert({
+                campaign_id: campaign.id,
+                wallet_pass_id: null,
+                waitlist_id: target.id,
+                channel: 'email',
+                sent_at: null,
+                lang_used: passLang.slice(0, 2),
+              })
+              .select('id')
+              .single();
+            if (insErr || !sendRow) {
+              console.warn('[campaign-send] email send-row insert failed:', insErr?.message);
+              continue;
+            }
+
+            // Tracking-Pixel + Unsubscribe-URL
+            const trackingPixelUrl = `${backofficeUrl}/api/marketing/track/open/${sendRow.id}`;
+            const unsubscribeUrl = `${backofficeUrl}/api/marketing/consent/unsubscribe?token=${target.confirmation_token}`;
+            const wrappedCta = campaignCtaUrl
+              ? `${siteOrigin.replace(/\/$/, '')}/m/${sendRow.id}?to=${encodeURIComponent(campaignCtaUrl)}`
+              : null;
+
+            // Content rendern
+            const titleRaw = pickI18n(campaign.title_i18n as any, hotelDefault, passLang);
+            const bodyHtml = pickI18n(campaign.body_i18n as any, hotelDefault, passLang);
+            const ctaLabelRaw = pickI18n((campaign as any).cta_label_i18n, hotelDefault, passLang);
+            const ctx = buildVarContext(pass ?? { guest_first_name: '', guest_last_name: '', visit_count: 1, last_visit_at: null, first_visit_at: null }, hotelName, passLang);
+
+            const html = buildMarketingEmailHtml({
+              title: renderVariables(titleRaw, ctx),
+              body: renderVariables(bodyHtml, ctx),
+              ctaLabel: ctaLabelRaw ? renderVariables(ctaLabelRaw, ctx) : undefined,
+              ctaUrl: wrappedCta ?? undefined,
+              unsubscribeUrl,
+              trackingPixelUrl,
+              hotelName,
+            });
+
+            const emailResult = await emailSender.send({
+              to: target.email,
+              subject: renderVariables(titleRaw, ctx),
+              html,
+            });
+
+            await sb.from('marketing_sends').update({
+              sent_at: emailResult.ok ? new Date().toISOString() : null,
+              delivered: emailResult.ok ? null : false,
+              failed_reason: emailResult.ok ? null : emailResult.error?.slice(0, 200),
+            }).eq('id', sendRow.id);
+
+            if (emailResult.ok) sentCount++; else failedCount++;
+          } catch (err) {
+            failedCount++;
+            console.warn('[campaign-send] email-send failed:', (err as Error).message);
+          }
+        }
       }
     }
 
