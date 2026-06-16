@@ -4,12 +4,14 @@
  * Prüft Cross-Subdomain-Session-Cookie. Wenn fehlt: 302 zu auth.retaha.de/login.
  *
  * Public-Routes-Whitelist:
- *   - /api/webhooks/*    (externe Webhooks z.B. Stripe, falls in backoffice)
- *   - /api/health        (Health-Check)
- *   - /api/cron/*        (Vercel-Cron-Trigger via CRON_SECRET header)
- *   - /admin/login       (eigene Login-Page, fallback wenn SSO down)
- *   - /admin/auth/*      (Legacy Login/Logout-Endpoints)
- *   - /onboarding/*      (Self-Service-Onboarding — public bis Hotelier-Setup fertig)
+ *   - /api/webhooks/*             (externe Webhooks z.B. Stripe, falls in backoffice)
+ *   - /api/health                 (Health-Check)
+ *   - /api/cron/*                 (Vercel-Cron-Trigger via CRON_SECRET header)
+ *   - /admin/login                (eigene Login-Page, fallback wenn SSO down)
+ *   - /admin/auth/*               (Legacy Login/Logout-Endpoints)
+ *   - /onboarding/*               (Self-Service-Onboarding — public bis Hotelier-Setup fertig)
+ *   - /api/marketing/consent/*    (subscribe: guest-proxy server-to-server; confirm+unsubscribe: Email-Links)
+ *   - /api/marketing/track/*      (Email-Pixel, aufgerufen von Mail-Clients ohne Session)
  *
  * Beim Hit auf protected route:
  *   1. Token aus Cookie via getSessionToken()
@@ -28,6 +30,8 @@ const PUBLIC_PATTERNS = [
   /^\/admin\/login$/,
   /^\/admin\/auth\//,
   /^\/onboarding\//,
+  /^\/api\/marketing\/consent\//,
+  /^\/api\/marketing\/track\//,
 ];
 
 function isPublic(pathname: string): boolean {

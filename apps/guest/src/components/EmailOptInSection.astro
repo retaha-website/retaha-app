@@ -575,13 +575,16 @@ const isRtl = lang === 'ar';
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: this.email.trim() }),
           });
-          const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch(() => null);
 
-          if (data.status === 'already_confirmed') {
+          if (!data || typeof data.ok === 'undefined') {
+            // Proxy-Fehler (kein gültiger JSON-Body) — nie stilles {} durchlassen
+            this.state = 'error';
+          } else if (data.status === 'already_confirmed') {
             this.state = 'already_confirmed';
           } else if (data.ok) {
             this.state = 'success';
-          } else if (res.status === 400 && data.error === 'invalid_email') {
+          } else if (data.error === 'invalid_email') {
             this.fieldError = L_invalidEmail;
             this.state = 'idle';
           } else {

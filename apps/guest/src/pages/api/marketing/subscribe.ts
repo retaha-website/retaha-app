@@ -40,6 +40,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     res = await fetch(`${BACKOFFICE_URL}/api/marketing/consent/subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // redirect: 'error' verhindert stilles Verschlucken von SSO-Redirects (302 → Login-HTML)
+      redirect: 'error',
       body: JSON.stringify({
         email,
         hotel_id: session.hotel_id,
@@ -48,10 +50,22 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       }),
     });
   } catch (err) {
-    console.error('[marketing/subscribe] proxy fetch failed:', (err as Error).message);
+    console.error('[marketing/subscribe] backoffice fetch failed:', (err as Error).message);
     return json({ ok: false, error: 'proxy_error' }, 502);
   }
 
-  const data = await res.json().catch(() => ({}));
+  let data: any;
+  try {
+    data = await res.json();
+  } catch (err) {
+    console.error('[marketing/subscribe] backoffice response not JSON — status:', res.status, 'url:', res.url);
+    return json({ ok: false, error: 'backoffice_bad_response' }, 502);
+  }
+
+  if (!res.ok) {
+    console.error('[marketing/subscribe] backoffice error — status:', res.status, 'data:', JSON.stringify(data));
+    return json({ ok: false, error: data?.error ?? 'backoffice_error' }, res.status);
+  }
+
   return json(data, res.status);
 };
