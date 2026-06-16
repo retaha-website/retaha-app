@@ -17,6 +17,9 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: false, error: 'invalid_email' }, 400);
   }
 
+  const hotelId: string | null = body?.hotel_id ?? null;
+  const hotelName: string = ((body?.hotel_name ?? '') as string).slice(0, 200).trim();
+
   const sb = createSupabaseServiceRoleInstance();
 
   // Upsert — schon bestätigt? → noop
@@ -40,7 +43,7 @@ export const POST: APIRoute = async ({ request }) => {
     const source = body?.source ?? 'api';
     const { data: inserted, error } = await sb
       .from('marketing_waitlist')
-      .insert({ email, source })
+      .insert({ email, source, ...(hotelId ? { hotel_id: hotelId } : {}) })
       .select('id, confirmation_token')
       .single();
     if (error || !inserted) return json({ ok: false, error: error?.message ?? 'insert_failed' }, 500);
@@ -56,20 +59,38 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (acsConnString && acsFrom) {
     const sender = new AcsEmailSender(acsConnString, acsFrom);
+    const senderName = hotelName || 'retaha';
     const htmlBody = `<!DOCTYPE html>
 <html lang="de">
-<head><meta charset="utf-8"></head>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;color:#1f1812;">
-  <h1 style="font-size:22px;margin-bottom:16px;">E-Mail-Adresse bestätigen</h1>
-  <p>Bitte klicke auf den Button, um deine Anmeldung für Marketing-E-Mails zu bestätigen.</p>
-  <p style="margin:28px 0;">
-    <a href="${confirmUrl}" style="background:#8c2128;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
-      E-Mail bestätigen
-    </a>
-  </p>
-  <p style="font-size:12px;color:#a09080;">
-    Falls du diese E-Mail nicht angefordert hast, kannst du sie ignorieren.
-  </p>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8f5f2;font-family:system-ui,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+<tr><td align="center" style="padding:32px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;background:#fff;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:36px 40px 0;">
+    <p style="font-family:system-ui,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#a09080;margin:0 0 18px;">
+      ${senderName.toUpperCase()}
+    </p>
+    <h1 style="font-size:22px;font-weight:700;color:#1f1812;margin:0 0 16px;line-height:1.25;">
+      E-Mail-Adresse bestätigen
+    </h1>
+    <p style="font-size:15px;line-height:1.6;color:#3d3530;margin:0 0 28px;">
+      ${hotelName ? `Bestätige deine Anmeldung für Angebote und Neuigkeiten von <strong>${hotelName}</strong>.` : 'Bitte klicke auf den Button, um deine Anmeldung zu bestätigen.'}
+    </p>
+    <p style="margin:0 0 36px;">
+      <a href="${confirmUrl}" style="background:#0a0a0a;color:#fbfaf7;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">
+        E-Mail bestätigen
+      </a>
+    </p>
+  </td></tr>
+  <tr><td style="padding:20px 40px 32px;border-top:1px solid #ede8e3;">
+    <p style="font-size:12px;color:#a09080;margin:0;line-height:1.6;">
+      Falls du diese E-Mail nicht angefordert hast, kannst du sie ignorieren — es passiert nichts.
+    </p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>`;
 

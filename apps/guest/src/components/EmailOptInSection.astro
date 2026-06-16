@@ -1,0 +1,596 @@
+---
+// Gastseitiger E-Mail-Opt-in — DOI-Einstiegspunkt im Checkout-Success-Screen.
+// 10-Sprachen, DSGVO-konform (explizite Checkbox, unkontrolliert by default).
+// Props: lang (10-lang), hotelName (für Consent-Text)
+
+interface Props {
+  lang: string;
+  hotelName: string;
+}
+const { lang, hotelName } = Astro.props;
+
+type L10n = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  consentText: string;
+  privacyLabel: string;
+  submitBtn: string;
+  loadingBtn: string;
+  successTitle: string;
+  successHint: string;
+  alreadyConfirmed: string;
+  genericError: string;
+  invalidEmail: string;
+  consentRequired: string;
+  retryBtn: string;
+};
+
+const translations: Record<string, L10n> = {
+  de: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Immer top informiert.',
+    subtitle: `Angebote & Neuigkeiten von ${hotelName} direkt ins Postfach.`,
+    placeholder: 'E-Mail-Adresse',
+    consentText: `Ich stimme zu, Angebote und Neuigkeiten von ${hotelName} per E-Mail zu erhalten.`,
+    privacyLabel: 'Datenschutzerklärung',
+    submitBtn: 'Abonnieren',
+    loadingBtn: 'Wird gesendet…',
+    successTitle: 'Bestätigungs-E-Mail gesendet.',
+    successHint: 'Bitte prüfe dein Postfach und klicke den Bestätigungs-Link.',
+    alreadyConfirmed: 'Du bist bereits angemeldet.',
+    genericError: 'Etwas ist schiefgelaufen — bitte nochmal versuchen.',
+    invalidEmail: 'Bitte gültige E-Mail-Adresse eingeben.',
+    consentRequired: 'Bitte Zustimmung anklicken.',
+    retryBtn: 'Nochmal versuchen',
+  },
+  en: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Stay in the loop.',
+    subtitle: `Offers & news from ${hotelName} straight to your inbox.`,
+    placeholder: 'Email address',
+    consentText: `I agree to receive offers and news from ${hotelName} by email.`,
+    privacyLabel: 'Privacy Policy',
+    submitBtn: 'Subscribe',
+    loadingBtn: 'Sending…',
+    successTitle: 'Confirmation email sent.',
+    successHint: 'Please check your inbox and click the confirmation link.',
+    alreadyConfirmed: 'You are already subscribed.',
+    genericError: 'Something went wrong — please try again.',
+    invalidEmail: 'Please enter a valid email address.',
+    consentRequired: 'Please tick the consent box.',
+    retryBtn: 'Try again',
+  },
+  fr: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Restez informé.',
+    subtitle: `Offres et actualités de ${hotelName} directement dans votre boîte mail.`,
+    placeholder: 'Adresse e-mail',
+    consentText: `J'accepte de recevoir les offres et actualités de ${hotelName} par e-mail.`,
+    privacyLabel: 'Politique de confidentialité',
+    submitBtn: "S'inscrire",
+    loadingBtn: 'Envoi…',
+    successTitle: 'E-mail de confirmation envoyé.',
+    successHint: 'Veuillez vérifier votre boîte mail et cliquer sur le lien de confirmation.',
+    alreadyConfirmed: 'Vous êtes déjà inscrit(e).',
+    genericError: 'Une erreur est survenue — veuillez réessayer.',
+    invalidEmail: 'Veuillez saisir une adresse e-mail valide.',
+    consentRequired: 'Veuillez cocher la case de consentement.',
+    retryBtn: 'Réessayer',
+  },
+  es: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Mantente al día.',
+    subtitle: `Ofertas y novedades de ${hotelName} directamente en tu buzón.`,
+    placeholder: 'Dirección de correo',
+    consentText: `Acepto recibir ofertas y novedades de ${hotelName} por correo electrónico.`,
+    privacyLabel: 'Política de privacidad',
+    submitBtn: 'Suscribirme',
+    loadingBtn: 'Enviando…',
+    successTitle: 'Correo de confirmación enviado.',
+    successHint: 'Por favor revisa tu bandeja de entrada y haz clic en el enlace de confirmación.',
+    alreadyConfirmed: 'Ya estás suscrito/a.',
+    genericError: 'Algo salió mal — inténtalo de nuevo.',
+    invalidEmail: 'Por favor ingresa un correo electrónico válido.',
+    consentRequired: 'Por favor marca la casilla de consentimiento.',
+    retryBtn: 'Reintentar',
+  },
+  it: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Resta aggiornato.',
+    subtitle: `Offerte e novità di ${hotelName} direttamente nella tua casella.`,
+    placeholder: 'Indirizzo e-mail',
+    consentText: `Accetto di ricevere offerte e novità di ${hotelName} via e-mail.`,
+    privacyLabel: 'Informativa sulla privacy',
+    submitBtn: 'Iscriviti',
+    loadingBtn: 'Invio…',
+    successTitle: 'Email di conferma inviata.',
+    successHint: 'Controlla la tua casella e fai clic sul link di conferma.',
+    alreadyConfirmed: 'Sei già iscritto/a.',
+    genericError: 'Si è verificato un errore — riprova.',
+    invalidEmail: 'Inserisci un indirizzo e-mail valido.',
+    consentRequired: 'Spunta la casella di consenso.',
+    retryBtn: 'Riprova',
+  },
+  pt: {
+    eyebrow: 'NEWSLETTER',
+    title: 'Fique por dentro.',
+    subtitle: `Ofertas e novidades de ${hotelName} diretamente para a sua caixa.`,
+    placeholder: 'Endereço de e-mail',
+    consentText: `Concordo em receber ofertas e novidades de ${hotelName} por e-mail.`,
+    privacyLabel: 'Política de privacidade',
+    submitBtn: 'Inscrever-me',
+    loadingBtn: 'Enviando…',
+    successTitle: 'Email de confirmação enviado.',
+    successHint: 'Por favor verifique a sua caixa de entrada e clique no link de confirmação.',
+    alreadyConfirmed: 'Já está inscrito/a.',
+    genericError: 'Ocorreu um erro — tente novamente.',
+    invalidEmail: 'Por favor insira um endereço de e-mail válido.',
+    consentRequired: 'Por favor marque a caixa de consentimento.',
+    retryBtn: 'Tentar novamente',
+  },
+  nl: {
+    eyebrow: 'NIEUWSBRIEF',
+    title: 'Blijf op de hoogte.',
+    subtitle: `Aanbiedingen en nieuws van ${hotelName} direct in uw inbox.`,
+    placeholder: 'E-mailadres',
+    consentText: `Ik ga akkoord met het ontvangen van aanbiedingen en nieuws van ${hotelName} per e-mail.`,
+    privacyLabel: 'Privacybeleid',
+    submitBtn: 'Aanmelden',
+    loadingBtn: 'Versturen…',
+    successTitle: 'Bevestigings-e-mail verzonden.',
+    successHint: 'Controleer uw inbox en klik op de bevestigingslink.',
+    alreadyConfirmed: 'U bent al aangemeld.',
+    genericError: 'Er is iets misgegaan — probeer het opnieuw.',
+    invalidEmail: 'Voer een geldig e-mailadres in.',
+    consentRequired: 'Vink het toestemmingsvakje aan.',
+    retryBtn: 'Opnieuw proberen',
+  },
+  ru: {
+    eyebrow: 'НОВОСТИ',
+    title: 'Будьте в курсе.',
+    subtitle: `Предложения и новости от ${hotelName} прямо на почту.`,
+    placeholder: 'Адрес эл. почты',
+    consentText: `Я согласен получать предложения и новости от ${hotelName} по электронной почте.`,
+    privacyLabel: 'Политика конфиденциальности',
+    submitBtn: 'Подписаться',
+    loadingBtn: 'Отправка…',
+    successTitle: 'Письмо подтверждения отправлено.',
+    successHint: 'Проверьте ваш почтовый ящик и нажмите ссылку подтверждения.',
+    alreadyConfirmed: 'Вы уже подписаны.',
+    genericError: 'Что-то пошло не так — попробуйте ещё раз.',
+    invalidEmail: 'Пожалуйста, введите действительный адрес эл. почты.',
+    consentRequired: 'Поставьте галочку согласия.',
+    retryBtn: 'Попробовать снова',
+  },
+  ar: {
+    eyebrow: 'النشرة الإخبارية',
+    title: 'ابقَ على اطلاع.',
+    subtitle: `عروض وأخبار ${hotelName} مباشرة إلى صندوق بريدك.`,
+    placeholder: 'عنوان البريد الإلكتروني',
+    consentText: `أوافق على تلقي عروض وأخبار ${hotelName} عبر البريد الإلكتروني.`,
+    privacyLabel: 'سياسة الخصوصية',
+    submitBtn: 'اشترك',
+    loadingBtn: 'جارٍ الإرسال…',
+    successTitle: 'تم إرسال بريد التأكيد.',
+    successHint: 'يرجى التحقق من بريدك والنقر على رابط التأكيد.',
+    alreadyConfirmed: 'أنت مشترك بالفعل.',
+    genericError: 'حدث خطأ ما — يرجى المحاولة مرة أخرى.',
+    invalidEmail: 'يرجى إدخال عنوان بريد إلكتروني صالح.',
+    consentRequired: 'يرجى تحديد مربع الموافقة.',
+    retryBtn: 'حاول مجددًا',
+  },
+  zh: {
+    eyebrow: '新闻通讯',
+    title: '保持了解。',
+    subtitle: `${hotelName}的优惠和新闻直接发送到您的邮箱。`,
+    placeholder: '电子邮件地址',
+    consentText: `我同意通过电子邮件接收${hotelName}的优惠和新闻。`,
+    privacyLabel: '隐私政策',
+    submitBtn: '订阅',
+    loadingBtn: '发送中…',
+    successTitle: '确认邮件已发送。',
+    successHint: '请查看您的收件箱并点击确认链接。',
+    alreadyConfirmed: '您已经订阅。',
+    genericError: '出现错误 — 请重试。',
+    invalidEmail: '请输入有效的电子邮件地址。',
+    consentRequired: '请勾选同意框。',
+    retryBtn: '重试',
+  },
+};
+
+const L = translations[lang] ?? translations['de'];
+const isRtl = lang === 'ar';
+---
+
+<div class="optin-section" dir={isRtl ? 'rtl' : 'ltr'} x-data="emailOptIn()">
+
+  {/* Trennlinie */}
+  <div class="optin-divider"></div>
+
+  {/* Header */}
+  <div class="optin-header">
+    <span class="optin-eyebrow">{L.eyebrow}</span>
+    <h2 class="optin-title">{L.title}</h2>
+    <p class="optin-subtitle">{L.subtitle}</p>
+  </div>
+
+  {/* Form */}
+  <template x-if="state === 'idle' || state === 'loading'">
+    <div class="optin-form">
+      <div class="optin-input-wrap">
+        <input
+          class="optin-input"
+          type="email"
+          autocomplete="email"
+          inputmode="email"
+          placeholder={L.placeholder}
+          x-model="email"
+          :disabled="state === 'loading'"
+          @keydown.enter="submit()"
+        />
+      </div>
+
+      <label class="optin-checkbox-label">
+        <input
+          class="optin-checkbox"
+          type="checkbox"
+          x-model="consented"
+          :disabled="state === 'loading'"
+        />
+        <span class="optin-checkbox-text">
+          {L.consentText}
+          {' '}
+          <a class="optin-privacy-link" href="/datenschutz" target="_blank" rel="noopener">{L.privacyLabel}</a>
+        </span>
+      </label>
+
+      <template x-if="fieldError">
+        <p class="optin-field-error" x-text="fieldError"></p>
+      </template>
+
+      <button
+        class="optin-btn"
+        type="button"
+        :disabled="state === 'loading'"
+        @click="submit()"
+      >
+        <template x-if="state === 'loading'">
+          <svg class="optin-spinner" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" stroke-dasharray="32" stroke-dashoffset="8" stroke-linecap="round"/>
+          </svg>
+        </template>
+        <span x-text="state === 'loading' ? loadingBtn : submitBtn"></span>
+      </button>
+    </div>
+  </template>
+
+  {/* Success */}
+  <template x-if="state === 'success'">
+    <div class="optin-success">
+      <div class="optin-success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <p class="optin-success-title" x-text="successTitle"></p>
+      <p class="optin-success-hint" x-text="successHint"></p>
+    </div>
+  </template>
+
+  {/* Already confirmed */}
+  <template x-if="state === 'already_confirmed'">
+    <div class="optin-success">
+      <div class="optin-success-icon optin-success-icon--muted">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <p class="optin-success-title" x-text="alreadyConfirmedMsg"></p>
+    </div>
+  </template>
+
+  {/* Generic error */}
+  <template x-if="state === 'error'">
+    <div class="optin-error-state">
+      <p class="optin-error-msg" x-text="genericError"></p>
+      <button class="optin-retry-btn" type="button" @click="state = 'idle'; fieldError = ''" x-text="retryBtn"></button>
+    </div>
+  </template>
+
+</div>
+
+<style>
+  .optin-section {
+    margin-top: 40px;
+  }
+
+  .optin-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+
+  .optin-header {
+    margin-bottom: 20px;
+  }
+
+  .optin-eyebrow {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    font-weight: 500;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .optin-title {
+    font-size: clamp(22px, 5.5vw, 28px);
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+
+  .optin-subtitle {
+    font-size: 14px;
+    color: var(--ink-muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* Form */
+  .optin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .optin-input-wrap {
+    position: relative;
+  }
+
+  .optin-input {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 15px;
+    font-family: var(--display);
+    outline: none;
+    transition: border-color 140ms ease;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+  }
+  .optin-input:focus {
+    border-color: var(--ink);
+  }
+  .optin-input:disabled {
+    opacity: 0.55;
+  }
+  .optin-input::placeholder {
+    color: var(--ink-faint);
+  }
+
+  /* Checkbox */
+  .optin-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .optin-checkbox {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    accent-color: var(--ink);
+    cursor: pointer;
+  }
+
+  .optin-checkbox-text {
+    font-size: 13px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+
+  .optin-privacy-link {
+    color: var(--ink-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .optin-field-error {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #8C2128;
+    margin: 0;
+    padding: 8px 12px;
+    background: #FFF0F0;
+    border: 1px solid #F5C6C6;
+    border-radius: 8px;
+  }
+
+  /* Submit button */
+  .optin-btn {
+    width: 100%;
+    padding: 14px 20px;
+    background: var(--ink);
+    color: #FBFAF7;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--display);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+    margin-top: 4px;
+  }
+  .optin-btn:hover:not(:disabled) {
+    background: #2A2A2A;
+  }
+  .optin-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  /* Spinner */
+  .optin-spinner {
+    width: 16px;
+    height: 16px;
+    animation: optin-spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes optin-spin { to { transform: rotate(360deg); } }
+
+  /* Success */
+  .optin-success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 8px 0 4px;
+    gap: 10px;
+  }
+
+  .optin-success-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--success);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .optin-success-icon--muted {
+    background: var(--border-strong);
+  }
+  .optin-success-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: #fff;
+  }
+
+  .optin-success-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .optin-success-hint {
+    font-size: 13px;
+    color: var(--ink-muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* Error state */
+  .optin-error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+  }
+
+  .optin-error-msg {
+    font-size: 14px;
+    color: #8C2128;
+    margin: 0;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .optin-retry-btn {
+    background: none;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-family: var(--display);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .optin-retry-btn:hover {
+    border-color: var(--ink);
+  }
+</style>
+
+<script is:inline define:vars={{
+  L_submitBtn: L.submitBtn,
+  L_loadingBtn: L.loadingBtn,
+  L_successTitle: L.successTitle,
+  L_successHint: L.successHint,
+  L_alreadyConfirmed: L.alreadyConfirmed,
+  L_genericError: L.genericError,
+  L_invalidEmail: L.invalidEmail,
+  L_consentRequired: L.consentRequired,
+  L_retryBtn: L.retryBtn,
+}}>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('emailOptIn', () => ({
+      state: 'idle',
+      email: '',
+      consented: false,
+      fieldError: '',
+      submitBtn: L_submitBtn,
+      loadingBtn: L_loadingBtn,
+      successTitle: L_successTitle,
+      successHint: L_successHint,
+      alreadyConfirmedMsg: L_alreadyConfirmed,
+      genericError: L_genericError,
+      retryBtn: L_retryBtn,
+
+      async submit() {
+        this.fieldError = '';
+        if (!this.email.trim() || !/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(this.email.trim())) {
+          this.fieldError = L_invalidEmail;
+          return;
+        }
+        if (!this.consented) {
+          this.fieldError = L_consentRequired;
+          return;
+        }
+
+        this.state = 'loading';
+        try {
+          const res = await fetch('/api/marketing/subscribe', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: this.email.trim() }),
+          });
+          const data = await res.json().catch(() => ({}));
+
+          if (data.status === 'already_confirmed') {
+            this.state = 'already_confirmed';
+          } else if (data.ok) {
+            this.state = 'success';
+          } else if (res.status === 400 && data.error === 'invalid_email') {
+            this.fieldError = L_invalidEmail;
+            this.state = 'idle';
+          } else {
+            this.state = 'error';
+          }
+        } catch {
+          this.state = 'error';
+        }
+      },
+    }));
+  });
+</script>
