@@ -394,7 +394,7 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
     <meta name="theme-color" content="#FBFAF7" />
     <title>{L.pageTitle}</title>
     <style>
-      [x-cloak] { display: none !important; }
+      :global([x-cloak]) { display: none !important; }
       *, *::before, *::after { box-sizing: border-box; }
 
       :root {
@@ -1001,48 +1001,54 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
         });
       }
 
-      // ── Alpine-Daten für PostStaySheet (Zustand D) ────────────────────────
-      document.addEventListener('alpine:init', () => {
-        Alpine.data('checkoutSuccess', () => ({
-          postStayOpen:       false,
-          postStayRating:     0,
-          postStayHover:      0,
-          postStayComment:    '',
-          postStaySubmitting: false,
-          postStayDone:       false,
-          postStayError:      '',
-          // Kein Auto-Open auf der Checkout-Seite — nur explizit via Review-Button.
-          init() { this.postStayOpen = false; },
-          postStayDismiss() {
-            this.postStayOpen = false;
-            const cfg = window.__RETAHA_POSTSTAY__;
-            if (!cfg) return;
-            try { localStorage.setItem('retaha_poststay_dismissed_' + cfg.stayId, String(Date.now())); } catch(_) {}
-          },
-          async postStaySubmit() {
-            if (!this.postStayRating || this.postStaySubmitting) return;
-            this.postStaySubmitting = true;
-            this.postStayError = '';
-            try {
-              const res  = await fetch('/api/g/stay-feedback', {
-                method: 'POST', credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  rating:  this.postStayRating,
-                  comment: this.postStayComment.trim() || undefined,
-                }),
-              });
-              const data = await res.json();
-              if (!data.ok) { this.postStayError = data.error || 'unknown'; return; }
-              this.postStayDone = true;
-            } catch (err) {
-              this.postStayError = err instanceof Error ? err.message : 'network';
-            } finally {
-              this.postStaySubmitting = false;
-            }
-          },
-        }));
-      });
+    </script>
+
+    <script>
+      // Alpine.js laden — benötigt für PostStaySheet (x-show/x-cloak) und EmailOptInSection
+      import Alpine from 'alpinejs';
+      // Als Global setzen, damit is:inline-Scripts (PostStaySheet, EmailOptInSection) Alpine.data nutzen können
+      (window as any).Alpine = Alpine;
+
+      Alpine.data('checkoutSuccess', () => ({
+        postStayOpen:       false,
+        postStayRating:     0,
+        postStayHover:      0,
+        postStayComment:    '',
+        postStaySubmitting: false,
+        postStayDone:       false,
+        postStayError:      '',
+        init() { this.postStayOpen = false; },
+        postStayDismiss() {
+          this.postStayOpen = false;
+          const cfg = (window as any).__RETAHA_POSTSTAY__;
+          if (!cfg) return;
+          try { localStorage.setItem('retaha_poststay_dismissed_' + cfg.stayId, String(Date.now())); } catch(_) {}
+        },
+        async postStaySubmit() {
+          if (!this.postStayRating || this.postStaySubmitting) return;
+          this.postStaySubmitting = true;
+          this.postStayError = '';
+          try {
+            const res = await fetch('/api/g/stay-feedback', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rating:  this.postStayRating,
+                comment: this.postStayComment.trim() || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!data.ok) { this.postStayError = data.error || 'unknown'; return; }
+            this.postStayDone = true;
+          } catch (err) {
+            this.postStayError = err instanceof Error ? err.message : 'network';
+          } finally {
+            this.postStaySubmitting = false;
+          }
+        },
+      }));
+
+      Alpine.start();
     </script>
   </body>
 </html>
