@@ -219,6 +219,8 @@ const isRtl = lang === 'ar';
   {/* Form */}
   <template x-if="state === 'idle' || state === 'loading'">
     <div class="optin-form">
+      {/* Honeypot — für Bots unsichtbar, echter Nutzer füllt es nie aus */}
+      <input type="text" name="company_url" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" x-model="company_url" />
       <div class="optin-input-wrap">
         <input
           class="optin-input"
@@ -546,6 +548,7 @@ const isRtl = lang === 'ar';
     Alpine.data('emailOptIn', () => ({
       state: 'idle',
       email: '',
+      company_url: '',
       consented: false,
       fieldError: '',
       submitBtn: L_submitBtn,
@@ -573,7 +576,7 @@ const isRtl = lang === 'ar';
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: this.email.trim() }),
+            body: JSON.stringify({ email: this.email.trim(), company_url: this.company_url }),
           });
           const data = await res.json().catch(() => null);
 

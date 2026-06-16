@@ -7,10 +7,20 @@ function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+async function sha256hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export const POST: APIRoute = async ({ request }) => {
   let body: any;
   try { body = await request.json(); }
   catch { return json({ ok: false, error: 'invalid_json' }, 400); }
+
+  // Schicht 0: Honeypot — Bots füllen versteckte Felder aus
+  if (body?.company_url) {
+    return json({ ok: true, status: 'pending_confirmation' });
+  }
 
   const email = (body?.email ?? '').toLowerCase().trim();
   if (!/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
@@ -22,19 +32,69 @@ export const POST: APIRoute = async ({ request }) => {
 
   const sb = createSupabaseServiceRoleInstance();
 
-  // Upsert — schon bestätigt? → noop
+  // Schicht 2: Per-IP-Throttle — nur für direkte Aufrufe (nicht wenn Guest-Proxy vertraut wird)
+  const proxySecret = (import.meta.env.INTERNAL_PROXY_SECRET as string | undefined) ?? '';
+  const incomingSecret = request.headers.get('x-internal-proxy') ?? '';
+  const isTrustedProxy = proxySecret.length > 0 && incomingSecret === proxySecret;
+
+  if (!isTrustedProxy) {
+    const forwarded = request.headers.get('x-forwarded-for') ?? '';
+    const clientIp = forwarded.split(',')[0].trim() || 'direct';
+    const pepper = (import.meta.env.MARKETING_RL_PEPPER as string | undefined) ?? '';
+    const ipHash = await sha256hex(pepper + clientIp);
+
+    const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const { count: ipCount } = await sb
+      .from('marketing_subscribe_attempts')
+      .select('id', { count: 'exact', head: true })
+      .eq('ip_hash', ipHash)
+      .gte('created_at', oneHourAgo);
+
+    if ((ipCount ?? 0) >= 8) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+
+    await sb.from('marketing_subscribe_attempts').insert({ ip_hash: ipHash });
+  }
+
+  // Schicht 3: Globaler Backstop — verhindert Mail-Storm bei koordiniertem Angriff
+  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const { count: globalCount } = await sb
+    .from('marketing_waitlist')
+    .select('id', { count: 'exact', head: true })
+    .not('confirmation_sent_at', 'is', null)
+    .gte('confirmation_sent_at', oneHourAgo);
+
+  if ((globalCount ?? 0) >= 60) {
+    return json({ ok: false, error: 'service_busy' }, 503);
+  }
+
+  // Opportunistisches Cleanup (10% Chance, 24h Retention)
+  if (Math.random() < 0.1) {
+    const cutoff = new Date(Date.now() - 24 * 3_600_000).toISOString();
+    await sb.from('marketing_subscribe_attempts').delete().lt('created_at', cutoff);
+  }
+
   const { data: existing } = await sb
     .from('marketing_waitlist')
     .select('id, confirmation_token, confirmed_at, confirmation_sent_at')
     .eq('email', email)
     .maybeSingle();
 
-  let token: string;
-  let waitlistId: string;
-
   if (existing?.confirmed_at) {
     return json({ ok: true, status: 'already_confirmed' });
   }
+
+  // Schicht 1: Per-E-Mail-Cooldown (60 min) — idempotentes OK, kein Re-Send
+  if (existing?.confirmation_sent_at) {
+    const sentAt = new Date(existing.confirmation_sent_at).getTime();
+    if (Date.now() - sentAt < 60 * 60_000) {
+      return json({ ok: true, status: 'pending_confirmation' });
+    }
+  }
+
+  let token: string;
+  let waitlistId: string;
 
   if (existing) {
     token = existing.confirmation_token;
@@ -51,7 +111,6 @@ export const POST: APIRoute = async ({ request }) => {
     waitlistId = inserted.id;
   }
 
-  // Bestätigungs-Mail via ACS
   const acsConnString = getEnv('ACS_CONNECTION_STRING');
   const acsFrom = getEnv('ACS_MAIL_FROM');
   const backofficeUrl = (getEnv('PUBLIC_BACKOFFICE_URL') || 'https://backoffice.retaha.de').replace(/\/$/, '');
