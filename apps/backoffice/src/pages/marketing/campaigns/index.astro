@@ -16,7 +16,7 @@ const filter = url.searchParams.get('status') || 'all';
 const client = createSupabaseServiceRoleInstance();
 let q = client
   .from('marketing_campaigns')
-  .select('id, name, status, scheduled_at, sent_at, recipients_count, open_count, click_count, skipped_count, title_i18n')
+  .select('id, name, status, scheduled_at, sent_at, recipients_count, open_count, click_count, skipped_count, title_i18n, channels')
   .eq('hotel_id', hotel.id)
   .order('created_at', { ascending: false })
   .limit(100);
@@ -32,6 +32,11 @@ function fmtDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+const CHANNEL_LABELS: Record<string, string> = {
+  wallet_push: 'Wallet-Push',
+  email: 'E-Mail',
+};
 
 const STATUS_LABELS: Record<string, { label: string; class: string }> = {
   draft:     { label: 'Entwurf',     class: 'mc-status--draft' },
@@ -87,6 +92,9 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
                 <div class="mc-row-head">
                   <span class={`mc-status ${s.class}`}>{s.label}</span>
                   <span class="mc-row-name">{c.name}</span>
+                  {Array.isArray(c.channels) && c.channels.map((ch: string) => (
+                    <span class="mc-channel-chip">{CHANNEL_LABELS[ch] ?? ch}</span>
+                  ))}
                 </div>
                 <p class="mc-row-title">{pickI18n(c.title_i18n)}</p>
               </div>
@@ -139,5 +147,6 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
     .mc-meta-block { display: flex; flex-direction: column; align-items: flex-end; }
     .mc-meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); }
     .mc-meta-val { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .mc-channel-chip { font-size: 10px; padding: 2px 7px; border: 1px solid var(--border); color: var(--ink-muted); background: var(--bg-deep); letter-spacing: 0.03em; }
   </style>
 </Layout>

@@ -42,6 +42,11 @@ const skipped = campaign.skipped_count ?? 0;
 const skipReasons = (campaign.skip_reasons || {}) as Record<string, number>;
 const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + (b as number), 0);
 
+const CHANNEL_LABELS: Record<string, string> = {
+  wallet_push: 'Wallet-Push',
+  email: 'E-Mail',
+};
+
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Entwurf', scheduled: 'Geplant', sending: 'Versand läuft', sent: 'Gesendet', cancelled: 'Abgebrochen', failed: 'Fehler',
 };
@@ -81,6 +86,13 @@ const SKIP_REASON_LABELS: Record<string, string> = {
         <span class="cd-meta-label">{campaign.status === 'sent' ? 'Gesendet:' : campaign.status === 'scheduled' ? 'Geplant:' : 'Erstellt:'}</span>
         <span class="cd-meta-val">{fmtDate(campaign.sent_at || campaign.scheduled_at || campaign.created_at)}</span>
       </div>
+      {Array.isArray(campaign.channels) && (
+        <div class="cd-channels">
+          {campaign.channels.map((ch: string) => (
+            <span class="cd-channel-chip">{CHANNEL_LABELS[ch] ?? ch}</span>
+          ))}
+        </div>
+      )}
     </div>
 
     {(canWrite && (campaign.status === 'draft' || campaign.status === 'scheduled')) && (
@@ -181,6 +193,8 @@ const SKIP_REASON_LABELS: Record<string, string> = {
     .cd-meta-row { font-size: 12px; color: var(--ink-muted); display: flex; gap: 6px; }
     .cd-meta-label { color: var(--ink-muted); }
     .cd-meta-val { color: var(--ink); }
+    .cd-channels { display: flex; gap: 6px; }
+    .cd-channel-chip { font-size: 10px; padding: 2px 8px; border: 1px solid var(--border); color: var(--ink-muted); background: var(--bg-deep); letter-spacing: 0.03em; }
 
     .cd-action-bar { display: flex; gap: 12px; margin-bottom: 24px; }
     .cd-btn-primary { padding: 12px 24px; background: #1f1812; color: #fff; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }

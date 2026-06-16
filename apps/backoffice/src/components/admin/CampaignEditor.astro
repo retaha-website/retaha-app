@@ -51,6 +51,23 @@ const DEMO_CTX = {
     <div class="ce-col ce-col-settings">
       <h3 class="ce-section-title">Einstellungen</h3>
 
+      <div class="ce-field">
+        <span class="ce-label">Kanäle</span>
+        <div class="ce-channel-row">
+          <button type="button"
+            class="ce-preset-chip"
+            :class="form.channels.includes('wallet_push') ? 'is-on' : ''"
+            @click="toggleChannel('wallet_push')"
+          >📲 Wallet-Push</button>
+          <button type="button"
+            class="ce-preset-chip"
+            :class="form.channels.includes('email') ? 'is-on' : ''"
+            @click="toggleChannel('email')"
+          >✉️ E-Mail</button>
+        </div>
+        <span class="ce-hint">Wallet = Pass-Holder · E-Mail = bestätigte Opt-ins. Mindestens 1 Kanal Pflicht.</span>
+      </div>
+
       <label class="ce-field">
         <span class="ce-label">Kampagnen-Name</span>
         <input type="text" x-model="form.name" placeholder="z.B. Sommerfest 2026" class="ce-input" />
@@ -232,6 +249,7 @@ const DEMO_CTX = {
       previewLang: this.cfg?.HOTEL_DEFAULT ?? 'de',
       form: {
         name: '',
+        channels: ['wallet_push', 'email'] as string[],
         template_id: '',
         target_lang: '',
         min_visits: 0,
@@ -303,6 +321,15 @@ const DEMO_CTX = {
         this.editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
       },
 
+      toggleChannel(ch: string) {
+        const idx = this.form.channels.indexOf(ch);
+        if (idx === -1) {
+          this.form.channels.push(ch);
+        } else if (this.form.channels.length > 1) {
+          this.form.channels.splice(idx, 1);
+        }
+      },
+
       insertVariable(key: string) {
         if (!this.editor) return;
         this.editor.chain().focus().insertContent(`{{${key}}}`).run();
@@ -343,8 +370,11 @@ const DEMO_CTX = {
         if (this.form.target_lang) target_filter.language = this.form.target_lang;
         if (this.form.min_visits > 0) target_filter.min_visit_count = this.form.min_visits;
 
+        if (this.form.channels.length === 0) { this.errorMsg = 'Bitte mindestens einen Kanal auswählen.'; return; }
+
         const payload: any = {
           name: this.form.name.trim(),
+          channels: this.form.channels,
           target_filter: Object.keys(target_filter).length ? target_filter : null,
         };
         if (this.form.template_id) {
@@ -414,6 +444,7 @@ const DEMO_CTX = {
   .ce-cta-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
   .ce-radio-group { display: flex; gap: 12px; }
   .ce-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .ce-channel-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
   .ce-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .ce-preset-chip { padding: 6px 12px; background: transparent; border: 1px solid var(--theme-border); color: color-mix(in srgb, var(--theme-text-primary) .7, transparent); font-size: 12px; cursor: pointer; font-family: inherit; }
   .ce-preset-chip:hover { border-color: var(--theme-burgund); color: var(--theme-burgund); }

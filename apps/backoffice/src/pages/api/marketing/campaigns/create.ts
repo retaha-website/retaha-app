@@ -20,8 +20,11 @@ function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+const VALID_CHANNELS = new Set(['wallet_push', 'email']);
+
 interface Body {
   name?: string;
+  channels?: string[];
   template_id?: string;
   target_filter?: { language?: string; min_visit_count?: number };
   scheduled_at?: string;
@@ -43,6 +46,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const name = body.name?.toString().trim();
   if (!name) return json({ ok: false, error: 'missing_name' }, 400);
+
+  const rawChannels = Array.isArray(body.channels) ? body.channels : ['wallet_push', 'email'];
+  const channels = rawChannels.filter(c => VALID_CHANNELS.has(c));
+  if (channels.length === 0) return json({ ok: false, error: 'invalid_channels' }, 400);
 
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
@@ -131,6 +138,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     hotel_id: hotel.id,
     template_id: body.template_id ?? null,
     name,
+    channels,
     title_i18n: titleI18n,
     body_i18n: bodyI18n,
     cta_label_i18n: ctaLabelI18n,
