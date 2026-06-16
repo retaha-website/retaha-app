@@ -10,16 +10,64 @@ const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const client = createSupabaseServiceRoleInstance();
-const { data: templates } = await client
-  .from('marketing_templates')
-  .select('id, name, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url')
-  .eq('hotel_id', hotel.id)
-  .eq('is_archived', false)
-  .order('updated_at', { ascending: false });
+
+const [
+  { data: templates },
+  { data: hotelBranding },
+  { count: allWalletCount },
+  { count: loyalCount },
+  { count: lapsedCount },
+  { count: emailCount },
+] = await Promise.all([
+  client
+    .from('marketing_templates')
+    .select('id, name, title_i18n, body_i18n, cta_label_i18n, cta_url, hero_image_url')
+    .eq('hotel_id', hotel.id)
+    .eq('is_archived', false)
+    .order('updated_at', { ascending: false }),
+  client
+    .from('hotels')
+    .select('brand_primary, logo_primary')
+    .eq('id', hotel.id)
+    .maybeSingle(),
+  client
+    .from('wallet_passes')
+    .select('*', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('marketing_consent_given', true)
+    .eq('state', 'active'),
+  client
+    .from('wallet_passes')
+    .select('*', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('marketing_consent_given', true)
+    .eq('state', 'active')
+    .gte('visit_count', 3),
+  client
+    .from('wallet_passes')
+    .select('*', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .eq('marketing_consent_given', true)
+    .eq('state', 'active')
+    .lt('last_visit_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()),
+  client
+    .from('marketing_waitlist')
+    .select('*', { count: 'exact', head: true })
+    .eq('hotel_id', hotel.id)
+    .not('confirmed_at', 'is', null)
+    .is('unsubscribed_at', null),
+]);
 
 const enabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
   ? (hotel as any).enabled_languages
   : [(hotel as any).default_language || 'de'];
+
+const segmentCounts = {
+  allWallet: allWalletCount ?? 0,
+  allEmail: emailCount ?? 0,
+  loyal: loyalCount ?? 0,
+  lapsed: lapsedCount ?? 0,
+};
 ---
 
 <Layout title="Marketing · Neue Kampagne" activeTab="backoffice" hotelName={hotel.name}>
@@ -38,7 +86,7 @@ const enabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
     <section class="settings-hero">
       <span class="settings-hero__eyebrow">Marketing</span>
       <h1 class="settings-hero__title">Neue Kampagne<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Wähle eine Vorlage oder schreib Ad-hoc. Inhalt wird beim Speichern in alle aktivierten Sprachen übersetzt.</p>
+      <p class="settings-hero__sub">Wähle einen Anlass oder schreib Ad-hoc. Beim Speichern automatische Übersetzung in alle aktivierten Sprachen.</p>
     </section>
 
     <CampaignEditor
@@ -46,6 +94,9 @@ const enabledLangs: string[] = Array.isArray((hotel as any).enabled_languages)
       hotelName={hotel.name}
       hotelDefaultLang={(hotel as any).default_language || 'de'}
       enabledLangs={enabledLangs}
+      brandPrimary={(hotelBranding as any)?.brand_primary ?? '#FF4A82'}
+      logoUrl={(hotelBranding as any)?.logo_primary ?? null}
+      segmentCounts={segmentCounts}
     />
   </div>
 </Layout>
