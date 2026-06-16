@@ -122,7 +122,7 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
     .update({ status: 'sending', send_started_at: new Date().toISOString() })
     .in('status', ['draft', 'scheduled'])
     .eq('id', campaignId)
-    .select('id, hotel_id, title_i18n, body_i18n, cta_label_i18n, cta_url, target_filter, name')
+    .select('id, hotel_id, title_i18n, body_i18n, cta_label_i18n, cta_url, target_filter, name, channels')
     .single();
 
   if (lockErr || !lockedRows) {
@@ -345,23 +345,21 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
         const emailSender = new AcsEmailSender(acsConnString, acsMailFrom);
         const backofficeUrl = (getEnv('PUBLIC_BACKOFFICE_URL') || 'https://backoffice.retaha.de').replace(/\/$/, '');
 
-        // Bestätigte Abonnenten laden (global; Hotelzuordnung via wallet_passes)
+        // Bestätigte Abonnenten dieses Hotels laden (hotel_id-Filter = Single Source of Truth)
         const { data: waitlistEntries } = await sb
           .from('marketing_waitlist')
           .select('id, email, confirmation_token')
           .not('confirmed_at', 'is', null)
-          .is('unsubscribed_at', null);
+          .is('unsubscribed_at', null)
+          .eq('hotel_id', campaign.hotel_id);
 
-        // Email → Pass-Map für Gastname + Sprache
+        // Email → Pass-Map für optionalen Gastname + Sprache (kein Pflicht-Match)
         const emailToPass = new Map<string, any>();
         for (const pass of allPasses ?? []) {
           if (pass.guest_email) emailToPass.set(pass.guest_email.toLowerCase(), pass);
         }
 
-        // Nur Gäste dieses Hotels (Email-Überschneidung mit wallet_passes)
-        const hotelTargets = (waitlistEntries ?? []).filter(w =>
-          emailToPass.has(w.email.toLowerCase())
-        );
+        const hotelTargets = waitlistEntries ?? [];
 
         for (const target of hotelTargets) {
           try {
