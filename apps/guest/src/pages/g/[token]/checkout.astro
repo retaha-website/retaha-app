@@ -70,12 +70,18 @@ const { stay, guest, hotel, settings } = ctx;
 const features = (settings?.features ?? {}) as Record<string, boolean>;
 if (!isCompletedStay && features.self_checkout === false) return Astro.redirect(`/g/${token}`);
 
-// Session
+// Session — für ausgecheckte Stays liegt check_out in der Vergangenheit;
+// Cookie-Expiry = check_out + 6h wäre sofort abgelaufen. Daher verwenden wir
+// für isCompletedStay ein virtuelles Ablaufdatum (jetzt + 48h), damit der
+// Gast auf dem Success-Screen (Opt-in, PostStay) noch eine gültige Session hat.
 const existingSession = await getStaySession(Astro.cookies);
 if (!existingSession || existingSession.stay_id !== stay.id) {
+  const sessionCheckOut = isCompletedStay
+    ? new Date(Date.now() + 48 * 3600 * 1000).toISOString()
+    : stay.check_out;
   await setStaySessionCookie(Astro.cookies, {
     stay_id: stay.id, hotel_id: hotel.id,
-    check_out_utc: stay.check_out, is_showcase: false,
+    check_out_utc: sessionCheckOut, is_showcase: false,
   });
 }
 
