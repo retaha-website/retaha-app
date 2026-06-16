@@ -412,6 +412,17 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
         --radius:        12px;
         --mono:   'JetBrains Mono', 'Courier New', monospace;
         --display:'Space Grotesk', system-ui, sans-serif;
+
+        /* PostStaySheet nutzt --theme-* Variablen (aus dem Theme-System).
+           Die Checkout-Seite hat kein data-theme → Fallbacks auf eigene Tokens. */
+        --theme-bg-primary:    #FFFFFF;
+        --theme-bg-secondary:  #FBFAF7;
+        --theme-bg-anthrazit:  #0F0F0D;
+        --theme-text-primary:  #0F0F0D;
+        --theme-accent:        #0A0A0A;
+        --theme-accent-rgb:    10, 10, 10;
+        --theme-border:        #E7E4DD;
+        --theme-success:       #3D8C5C;
       }
 
       body {
@@ -1000,7 +1011,14 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
           postStaySubmitting: false,
           postStayDone:       false,
           postStayError:      '',
-          postStayDismiss() { this.postStayOpen = false; },
+          // Kein Auto-Open auf der Checkout-Seite — nur explizit via Review-Button.
+          init() { this.postStayOpen = false; },
+          postStayDismiss() {
+            this.postStayOpen = false;
+            const cfg = window.__RETAHA_POSTSTAY__;
+            if (!cfg) return;
+            try { localStorage.setItem('retaha_poststay_dismissed_' + cfg.stayId, String(Date.now())); } catch(_) {}
+          },
           async postStaySubmit() {
             if (!this.postStayRating || this.postStaySubmitting) return;
             this.postStaySubmitting = true;
