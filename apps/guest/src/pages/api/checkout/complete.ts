@@ -10,6 +10,7 @@ import type { APIRoute } from 'astro';
 import { getStaySession, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isDemoSession } from '../../../lib/showcase/session';
 import { awardStayPoints } from '@retaha/loyalty';
+import { computeCheckoutGate } from '../../../lib/checkout/availability';
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -68,18 +69,21 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return json({ ok: true, already_done: true });
   }
 
-  // Checkout-Zeit prüfen (nur am oder nach Abreise-Tag)
-  const checkoutDate = new Date((stayRow as any).check_out);
-  const now = new Date();
-  const checkoutDay = checkoutDate.toDateString();
-  const today = now.toDateString();
-  const isPastCheckout = now.getTime() > checkoutDate.getTime();
+  // Verfügbarkeit: zeitbewusst gegen die konfigurierte Checkout-Zeit (Hotel-TZ) —
+  // gleiche Regel wie der Gast-Screen (Vorabend-Öffnung + checkout_time + Grace).
+  const [{ data: hotelRow }, { data: htRow }] = await Promise.all([
+    sbSr.from('hotels').select('timezone').eq('id', (stayRow as any).hotel_id).maybeSingle(),
+    sbSr.from('hotel_settings').select('checkout_time').eq('hotel_id', (stayRow as any).hotel_id).maybeSingle(),
+  ]);
+  const hotelTz = (hotelRow as any)?.timezone ?? 'Europe/Berlin';
+  const checkoutTimeCfg = (htRow as any)?.checkout_time ?? '11:00:00';
 
-  if (checkoutDay !== today && !isPastCheckout) {
+  const gate = computeCheckoutGate({ checkOut: (stayRow as any).check_out, hotelTz, checkoutTime: checkoutTimeCfg });
+  if (gate === 'not_yet') {
     return json({ ok: false, error: 'too_early', checkout_date: (stayRow as any).check_out }, 400);
   }
 
-  const checkedOutAt = now.toISOString();
+  const checkedOutAt = new Date().toISOString();
 
   // Stay als ausgecheckt markieren
   const { error: updateErr } = await sbSr

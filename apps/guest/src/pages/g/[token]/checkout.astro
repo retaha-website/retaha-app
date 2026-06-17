@@ -14,6 +14,7 @@ import { loadStayByToken, telHref } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
+import { computeCheckoutGate, type GateState } from '../../../lib/checkout/availability';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -142,19 +143,23 @@ const locale = localeMap[lk];
 // Hotel-TZ — alle Datumsvergleiche in Hotel-Zeitzone
 const hotelTz: string = (hotel as any).timezone ?? 'Europe/Berlin';
 
-// Datum-Gate (YYYY-MM-DD Strings in Hotel-TZ — direkt vergleichbar)
+// Konfigurierte Checkout-Zeit (treibt Verfügbarkeit + Anzeige); Default 11:00.
+const { data: htTimes } = await createSupabaseServiceRoleInstance()
+  .from('hotel_settings').select('checkout_time').eq('hotel_id', (hotel as any).id).maybeSingle();
+const checkoutTimeCfg: string = (htTimes as any)?.checkout_time ?? '11:00:00';
+
+// Datum-Strings in Hotel-TZ (Kalenderblatt / nightsRemaining / Showcase-Gate)
 const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: hotelTz });
 const checkoutStr = new Date(stay.check_out).toLocaleDateString('en-CA', { timeZone: hotelTz });
 
-type GateState = 'not_yet' | 'checkout_day' | 'overstay';
-const gateState: GateState =
-  todayStr < checkoutStr ? 'not_yet'      :
-  todayStr === checkoutStr ? 'checkout_day' : 'overstay';
+// Gate: Showcase bleibt datumsbasiert (Demo-Verhalten bewahren); echte Stays
+// zeitbewusst (Vorabend-Öffnung + checkout_time + Grace) via shared Helper.
+const gateState: GateState = isShowcaseMode
+  ? (todayStr < checkoutStr ? 'not_yet' : todayStr === checkoutStr ? 'checkout_day' : 'overstay')
+  : computeCheckoutGate({ checkOut: stay.check_out, hotelTz, checkoutTime: checkoutTimeCfg });
 
-// Checkout-Uhrzeit + Datumsformate
-const checkoutTime = new Date(stay.check_out).toLocaleTimeString(locale, {
-  hour: '2-digit', minute: '2-digit', timeZone: hotelTz,
-});
+// Checkout-Uhrzeit (aus Config) + Datumsformate
+const checkoutTime = checkoutTimeCfg.slice(0, 5); // 'HH:MM'
 const checkoutDateFull = new Date(stay.check_out).toLocaleDateString(locale, {
   weekday: 'long', day: '2-digit', month: 'long', timeZone: hotelTz,
 });
