@@ -21,10 +21,12 @@ import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getStaySession } from '@retaha/auth';
 import { getEnv } from '@retaha/db';
 import {
+  createPassClass,
   createPassObject,
   updatePassObject,
   signSaveLink,
   type PassObjectInput,
+  type PassClassInput,
 } from '@retaha/wallet';
 import { isWalletConfigured, getWalletConfig, buildPassObjectId } from '@retaha/wallet';
 import { triggerDripsForEvent } from '@retaha/marketing';
@@ -53,6 +55,28 @@ function clientIp(request: Request): string | null {
   return request.headers.get('x-real-ip');
 }
 
+// Relative Asset-Pfade (z.B. "/hotel-assets/logo.svg") zu absoluten URLs machen —
+// Google fetcht Logo/Hero server-side und braucht öffentliche https-URLs.
+function absoluteUrl(maybeRelative: string | null | undefined, origin: string): string | null {
+  if (!maybeRelative) return null;
+  if (/^https?:\/\//i.test(maybeRelative)) return maybeRelative;
+  return origin.replace(/\/$/, '') + (maybeRelative.startsWith('/') ? maybeRelative : `/${maybeRelative}`);
+}
+
+// Hotel-Row → PassClassInput. wallet_pass_bg/brand_color sind oft NULL →
+// brand_primary (DB-Default #FF4A82) bzw. Anthrazit als Farb-Fallback, damit
+// die Pass-Klasse nicht ohne Hintergrund/Hero kahl wirkt.
+function buildClassInput(hotel: any, hotelId: string, origin: string): PassClassInput {
+  return {
+    hotelId,
+    hotelName: hotel?.name || 'Hotel',
+    brandColorHex: hotel?.brand_color || hotel?.brand_primary || '#1A1A1A',
+    logoUrl: absoluteUrl(hotel?.logo_primary ?? hotel?.logo_dark ?? null, origin),
+    heroImageUrl: absoluteUrl(hotel?.wallet_pass_bg ?? hotel?.hero_image_url ?? null, origin),
+    defaultLang: hotel?.default_language || 'de',
+  };
+}
+
 export const POST: APIRoute = async ({ cookies, request }) => {
   if (!isWalletConfigured()) {
     return json({ ok: false, error: 'wallet_not_configured' }, 503);
@@ -76,6 +100,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const marketingConsent = body.marketing_consent === true;
 
   const sb = createSupabaseServiceRoleInstance();
+  const origin = new URL(request.url).origin;
 
   // ── Showcase-Pfad (Demo-Session) ──────────────────────────────────────────
   if (isDemoSession(session)) {
@@ -144,7 +169,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
     const { data: hotel } = await sb
       .from('hotels')
-      .select('name, default_language')
+      .select('name, default_language, brand_color, brand_primary, logo_primary, logo_dark, wallet_pass_bg, hero_image_url')
       .eq('id', sc.hotel_id)
       .maybeSingle();
 
@@ -164,6 +189,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     if (isReturning && existing?.google_object_id) {
       googleResult = await updatePassObject(passObjectInput);
     } else {
+      // Klasse muss existieren, bevor das Objekt sie referenziert (sonst Google:
+      // „Could not find necessary class"). Idempotent — 409 → already_exists.
+      const classResult = await createPassClass(buildClassInput(hotel, sc.hotel_id, origin));
+      if (!classResult.ok) console.warn('[wallet/create] showcase class ensure failed:', classResult);
       googleResult = await createPassObject(passObjectInput);
     }
 
@@ -175,7 +204,6 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       }).eq('id', walletPassId);
     }
 
-    const origin = new URL(request.url).origin;
     const saveLink = signSaveLink(passObjectInput, [origin]);
     if (!saveLink.ok || !saveLink.url) {
       return json({ ok: false, error: 'save_link_failed', google: googleResult }, 500);
@@ -293,7 +321,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   // Hotel-Name für Pass-Body
   const { data: hotel } = await sb
     .from('hotels')
-    .select('name, default_language')
+    .select('name, default_language, brand_color, brand_primary, logo_primary, logo_dark, wallet_pass_bg, hero_image_url')
     .eq('id', stay.hotel_id)
     .maybeSingle();
 
@@ -314,6 +342,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (isReturning && existing?.google_object_id) {
     googleResult = await updatePassObject(passObjectInput);
   } else {
+    // Klasse muss existieren, bevor das Objekt sie referenziert (sonst Google:
+    // „Could not find necessary class"). Idempotent — 409 → already_exists.
+    const classResult = await createPassClass(buildClassInput(hotel, stay.hotel_id, origin));
+    if (!classResult.ok) console.warn('[wallet/create] class ensure failed:', classResult);
     googleResult = await createPassObject(passObjectInput);
   }
 
@@ -334,7 +366,6 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     // Google-Status durchgängig.
   }
 
-  const origin = new URL(request.url).origin;
   const saveLink = signSaveLink(passObjectInput, [origin]);
   if (!saveLink.ok || !saveLink.url) {
     return json({ ok: false, error: 'save_link_failed', google: googleResult }, 500);
