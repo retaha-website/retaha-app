@@ -1,26 +1,197 @@
 ---
-// Sprint H · Group 4c Tag 3 — Stub-Page mit ComingSoonModal
-// Auto-generiert von scripts/generate-coming-soon-stubs.mjs
+// Self-Checkout-Einstellungen (Backoffice).
 //
-// Wenn dieses Feature implementiert wird: diese Datei überschreiben.
-
+// Ein 3-Wege-Status bildet die Konsistenz-Matrix ab und schreibt auf die
+// vorhandene Datenbasis (kein neuer Aus-Wert):
+//   Aus           → features.self_checkout = false        (Master, = Gast-Vorschau-Toggle)
+//   Nur Infos     → features.self_checkout = true, self_checkout_mode = 'info'
+//   Self-Checkout → features.self_checkout = true, self_checkout_mode = 'self'
+// Checkout-Zeit (checkout_time) lebt jetzt hier (eine Quelle der Wahrheit);
+// Check-in-Zeit bleibt unter Allgemein. Gast-Hinweis i18n in self_checkout_note.
+//
+// hotel_settings ist service-role-managed (wie Fruehstuecks-/Service-Zeiten).
 import Layout from '../layouts/Layout.astro';
-import ComingSoonModal from '@retaha/ui/components/admin/ComingSoonModal.astro';
-import { getUser, getUserHotels } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/onboarding/locale');
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const sb = createSupabaseServiceRoleInstance();
+
+// ─── POST ──────────────────────────────────────────────────────────────────
+let saved: { ok: boolean; msg: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+
+  const stateRaw = form.get('sc_state')?.toString() || 'self';
+  const state = ['off', 'info', 'self'].includes(stateRaw) ? stateRaw : 'self';
+  const active = state !== 'off';
+
+  const reTime = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const coRaw = form.get('checkout_time')?.toString().trim() || '';
+  const noteDe = (form.get('note_de')?.toString() ?? '').trim().slice(0, 600);
+  const noteEn = (form.get('note_en')?.toString() ?? '').trim().slice(0, 600);
+
+  const { data: cur, error: selErr } = await sb
+    .from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle();
+
+  if (selErr) {
+    saved = { ok: false, msg: 'DB-Lesefehler — bitte neu laden.' };
+  } else {
+    const features = { ...((cur?.features as Record<string, unknown>) ?? {}), self_checkout: active };
+    const note: Record<string, string> = {};
+    if (noteDe) note.de = noteDe;
+    if (noteEn) note.en = noteEn;
+
+    const updates: Record<string, unknown> = {
+      features,
+      self_checkout_note: note,
+      updated_at: new Date().toISOString(),
+    };
+    // Modus nur bei aktiv schreiben; im Aus-Zustand den Modus unveraendert lassen.
+    if (state === 'info' || state === 'self') updates.self_checkout_mode = state;
+    if (reTime.test(coRaw)) updates.checkout_time = coRaw;
+
+    const { error } = await sb.from('hotel_settings').update(updates).eq('hotel_id', hotel.id);
+    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: 'Gespeichert' };
+  }
+}
+
+// ─── LADEN ─────────────────────────────────────────────────────────────────
+const { data: hs } = await sb
+  .from('hotel_settings')
+  .select('features, self_checkout_mode, self_checkout_note, checkout_time')
+  .eq('hotel_id', hotel.id).maybeSingle();
+
+const features = ((hs?.features as Record<string, unknown>) ?? {});
+const mode = (hs?.self_checkout_mode as string) === 'info' ? 'info' : 'self';
+// Master-Zustand konsistent zum Gast-Vorschau-Toggle (Default an = !== false).
+const scState = features.self_checkout === false ? 'off' : mode;
+const checkoutTime = ((hs?.checkout_time as string) ?? '11:00').toString().substring(0, 5);
+const note = ((hs?.self_checkout_note as Record<string, string>) ?? {});
+const noteDe = note.de ?? '';
+const noteEn = note.en ?? '';
+
+const STATES: { value: string; label: string; sub: string }[] = [
+  { value: 'self', label: 'Self-Checkout', sub: 'Gast checkt in der App selbst aus (zeitbewusstes Fenster)' },
+  { value: 'info', label: 'Nur Infos',     sub: 'Checkout-Zeit & Hinweise anzeigen — kein Auscheck-Button' },
+  { value: 'off',  label: 'Aus',           sub: 'Kein Self-Checkout, keine Infos in der Gäste-App' },
+];
 ---
 
-<Layout title="Self-Checkout" activeTab="backoffice">
-  <ComingSoonModal
-    feature_name="self-checkout"
-    feature_eyebrow="kontaktloser auscheck"
-    feature_description="Gäste checken selbst aus per QR — Rechnung digital, Schlüssel in der Drop-Box."
-    planned_release="Q2 2027"
-  />
+<Layout title="Self-Checkout" activeTab="backoffice" hotelName={hotel.name} hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}>
+
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Self-Checkout</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Gäste-Module</span>
+      <h1 class="settings-hero__title">Self-Checkout<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Digitale Abreise: Modus, Checkout-Zeit und Gast-Hinweise.</p>
+    </section>
+
+    <form method="POST" class="settings-sections">
+
+      <!-- ── MODUS (Master = features.self_checkout) ───────────────────── -->
+      <section class="s-card" id="sc-mode">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Modus</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <p class="s-card__sub">Steuert denselben Schalter wie der Self-Checkout-Toggle in der Gäste-Vorschau.</p>
+
+        <div class="field">
+          <div class="radio-cards radio-cards--stack" role="radiogroup" aria-label="Self-Checkout-Modus">
+            {STATES.map(s => (
+              <label class={`radio-card radio-card--wide ${scState === s.value ? 'is-active' : ''}`}>
+                <input type="radio" name="sc_state" value={s.value} checked={scState === s.value} class="sr-only" />
+                <span class="radio-card__label">{s.label}</span>
+                <span class="radio-card__sub">{s.sub}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <!-- ── CHECKOUT-ZEIT ─────────────────────────────────────────────── -->
+      <section class="s-card" id="sc-time">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Checkout-Zeit</h2>
+          <span class="s-card__num">02</span>
+        </div>
+
+        <div class="field field--row">
+          <label class="field__label" for="checkout-time">Check-out bis</label>
+          <div class="field__input-wrap">
+            <input type="time" id="checkout-time" name="checkout_time" class="s-input" value={checkoutTime} />
+            <span class="field__hint">Steuert das Self-Checkout-Fenster (öffnet am Vorabend, schließt zu dieser Zeit + Kulanz). Die Check-in-Zeit liegt unter <a href="/settings#stay-times">Allgemein</a>.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── GAST-HINWEIS ──────────────────────────────────────────────── -->
+      <section class="s-card" id="sc-note">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Gast-Hinweis</h2>
+          <span class="s-card__num">03</span>
+        </div>
+        <p class="s-card__sub">Erscheint im Checkout-Screen (z.&nbsp;B. Schlüsselrückgabe, Late-Checkout auf Anfrage). Im Modus „Nur Infos" der zentrale Hinweis.</p>
+
+        <div class="field field--row">
+          <label class="field__label" for="note-de">Deutsch</label>
+          <textarea id="note-de" name="note_de" class="s-input s-textarea" rows="2" placeholder="z.B. Schlüsselkarte einfach im Zimmer lassen. Late-Checkout auf Anfrage an der Rezeption.">{noteDe}</textarea>
+        </div>
+        <div class="field field--row">
+          <label class="field__label" for="note-en">English</label>
+          <textarea id="note-en" name="note_en" class="s-input s-textarea" rows="2" placeholder="e.g. Just leave the key card in the room. Late check-out on request at reception.">{noteEn}</textarea>
+        </div>
+      </section>
+
+      <div class="sc-savebar">
+        <button type="submit" class="v9-btn">Speichern</button>
+      </div>
+
+    </form>
+  </div>
+
+  {saved && (
+    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`window.addEventListener('DOMContentLoaded',function(){window.retahaToast&&window.retahaToast(m,t)})`}</script>
+  )}
+
+  <style>
+    .radio-cards--stack { display: flex; flex-direction: column; gap: 10px; }
+    .radio-card--wide {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      text-align: left; padding: 14px 16px; height: auto; width: 100%;
+    }
+    .radio-card__label { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500; color: var(--ink); }
+    .radio-card__sub { font-size: 13px; color: var(--ink-muted); line-height: 1.4; }
+    .s-textarea { resize: vertical; min-height: 52px; font-family: 'Space Grotesk', sans-serif; line-height: 1.5; }
+    .sc-savebar { position: sticky; bottom: 0; padding: 16px 0 0; display: flex; justify-content: flex-end; }
+  </style>
+
+  <script>
+    // Radio-Cards aktiv-Zustand (analog /settings)
+    document.querySelectorAll('.radio-cards').forEach(group => {
+      group.querySelectorAll<HTMLLabelElement>('.radio-card').forEach(card => {
+        const input = card.querySelector('input[type="radio"]') as HTMLInputElement;
+        card.addEventListener('click', () => {
+          group.querySelectorAll('.radio-card').forEach(c => c.classList.remove('is-active'));
+          card.classList.add('is-active');
+          if (input) input.checked = true;
+        });
+      });
+    });
+  </script>
+
 </Layout>

@@ -118,18 +118,15 @@ if (Astro.request.method === 'POST') {
       : { section: 'billing_address', ok: true, msg: '✓ Gespeichert' };
 
   } else if (action === 'stay_times') {
-    // hotel_settings ist service-role-managed (wie Frühstücks-/Service-Zeiten).
+    // Nur Check-in-Zeit (allgemeine Hoteldaten). Die Check-out-Zeit lebt auf der
+    // Self-Checkout-Seite (eine Quelle der Wahrheit). hotel_settings = service-role.
     const reTime = /^([01]\d|2[0-3]):[0-5]\d$/;
     const ci = form.get('checkin_time')?.toString().trim() || '';
-    const co = form.get('checkout_time')?.toString().trim() || '';
-    const updates: Record<string, unknown> = {};
-    if (reTime.test(ci)) updates.checkin_time = ci;
-    if (reTime.test(co)) updates.checkout_time = co;
-    if (Object.keys(updates).length === 0) {
-      saved = { section: 'stay_times', ok: false, msg: 'Bitte gültige Zeiten (HH:MM) angeben.' };
+    if (!reTime.test(ci)) {
+      saved = { section: 'stay_times', ok: false, msg: 'Bitte gültige Zeit (HH:MM) angeben.' };
     } else {
       const { error } = await createSupabaseServiceRoleInstance()
-        .from('hotel_settings').update(updates).eq('hotel_id', hotel.id);
+        .from('hotel_settings').update({ checkin_time: ci }).eq('hotel_id', hotel.id);
       saved = error
         ? { section: 'stay_times', ok: false, msg: error.message }
         : { section: 'stay_times', ok: true, msg: '✓ Gespeichert' };
@@ -160,9 +157,8 @@ const { data: h } = await client.from('hotels').select(`
 
 // Check-in/Check-out-Zeiten liegen in hotel_settings (service-role-managed).
 const { data: hsTimes } = await createSupabaseServiceRoleInstance()
-  .from('hotel_settings').select('checkin_time, checkout_time').eq('hotel_id', hotel.id).maybeSingle();
-const checkinTime  = ((hsTimes as any)?.checkin_time  ?? '15:00').toString().substring(0, 5);
-const checkoutTime = ((hsTimes as any)?.checkout_time ?? '11:00').toString().substring(0, 5);
+  .from('hotel_settings').select('checkin_time').eq('hotel_id', hotel.id).maybeSingle();
+const checkinTime = ((hsTimes as any)?.checkin_time ?? '15:00').toString().substring(0, 5);
 
 const d = (h ?? {}) as Record<string, unknown>;
 function val(key: string, fallback = '') { return (d[key] as string) ?? fallback; }
@@ -318,13 +314,13 @@ function isSelected(key: string, value: string, fallback = '') {
         </form>
       </section>
 
-      <!-- ── CHECK-IN / CHECK-OUT ──────────────────────────────────────── -->
+      <!-- ── CHECK-IN ──────────────────────────────────────────────────── -->
       <section class="s-card" id="stay-times">
         <div class="s-card__head">
-          <h2 class="s-card__title">Check-in / Check-out</h2>
+          <h2 class="s-card__title">Check-in</h2>
           <span class="s-card__num">03</span>
         </div>
-        <p class="s-card__sub">Standard-Zeiten deines Hotels. Die Check-out-Zeit steuert, ab wann der Self-Checkout für Gäste verfügbar ist.</p>
+        <p class="s-card__sub">Standard-Check-in-Zeit deines Hotels. Die Check-out-Zeit verwaltest du unter <a href="/self-checkout">Self-Checkout</a>.</p>
 
         <form method="POST" class="s-card__body">
           <input type="hidden" name="_action" value="stay_times" />
@@ -332,14 +328,6 @@ function isSelected(key: string, value: string, fallback = '') {
           <div class="field field--row">
             <label class="field__label" for="checkin-time">Check-in ab</label>
             <input type="time" id="checkin-time" name="checkin_time" class="s-input" value={checkinTime} />
-          </div>
-
-          <div class="field field--row">
-            <label class="field__label" for="checkout-time">Check-out bis</label>
-            <div class="field__input-wrap">
-              <input type="time" id="checkout-time" name="checkout_time" class="s-input" value={checkoutTime} />
-              <span class="field__hint">Self-Checkout öffnet am Vorabend und richtet sich nach dieser Zeit (+ Kulanz).</span>
-            </div>
           </div>
 
           <div class="s-card__footer">

@@ -7,7 +7,7 @@ const ALLOWED_KEYS = new Set([
   // Lite
   'breakfast', 'service', 'feedback', 'action_cards',
   // Pro
-  'recommendations', 'multi_language', 'nfc_tags', 'pre_stay', 'stay_pushes',
+  'recommendations', 'multi_language', 'nfc_tags', 'pre_stay', 'stay_pushes', 'self_checkout',
   // Premium
   'eve', 'wallet', 'marketing', 'loyalty',
 ]);
