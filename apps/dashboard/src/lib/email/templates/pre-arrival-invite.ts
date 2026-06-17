@@ -47,7 +47,7 @@ export function preArrivalInviteHtml(data: PreArrivalInviteData): string {
 
       <!-- Greeting + Headline -->
       <tr><td style="padding:40px 40px 8px">
-        <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.20em;text-transform:uppercase;color:${accent}">— Vor Ihrer Anreise —</p>
+        <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.20em;text-transform:uppercase;color:${accent}">Vor Ihrer Anreise</p>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.4">${greeting}</p>
         <h1 style="margin:0 0 18px;font-size:30px;font-weight:300;line-height:1.2;color:#1A1A1A;letter-spacing:-0.02em">
           wir freuen uns auf <strong style="font-weight:700">Ihren Aufenthalt</strong>.

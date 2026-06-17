@@ -48,7 +48,7 @@ export function bookingNotificationHtml(data: BookingNotificationData): string {
         ${logoBlock}
       </td></tr>
       <tr><td style="padding:28px 32px 8px">
-        <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:${accent}">— Neue Buchung —</p>
+        <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:${accent}">Neue Buchung</p>
         ${data.recipientFirstName
           ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.4;color:#1A1A1A">Hallo ${escapeHtml(data.recipientFirstName)},</p>`
           : ''}

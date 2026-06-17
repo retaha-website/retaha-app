@@ -592,10 +592,10 @@ das eigene system für status-anzeigen. **keine tabler-icons**, sondern css-shap
 mono uppercase 10px / letter-spacing 0.12em / opacity 0.5
 
 ```html
-<p class="eyebrow">— 07 / funktionen —</p>
+<p class="eyebrow">07 / funktionen</p>
 ```
 
-ersatz für das alte `— text —` em-dash-pattern. em-dashes optional aber empfohlen für stärkere editorial-präsenz.
+**keine deko-striche.** eyebrows sind sauberes mono-uppercase **ohne** flankierende em-dashes (`— text —`). das alte em-dash-ornament ist abgelöst und wurde app- + backoffice-weit entfernt (juni 2026) — es ist ein „ai-generiert"-tell. der `·`-mittelpunkt als trenner bleibt erlaubt (z.b. `cockpit · heute`); em-dashes als label-ornament nicht.
 
 ### tag (5 varianten)
 
@@ -787,7 +787,7 @@ opacity 0.55 + text-decoration: line-through auf primary-text.
 
 ```html
 <header class="page-header">
-  <p class="eyebrow">— 03 / cockpit —</p>
+  <p class="eyebrow">03 / cockpit</p>
   <h1>guten morgen, hannah<span class="pink-dot">.</span></h1>
   <p class="subtitle">heute 14 gäste im haus, 2 neue anfragen warten</p>
 </header>
@@ -1752,7 +1752,7 @@ niemals beides (pagination + load-more) gleichzeitig.
 `src/components/admin/BauhausToggle.astro` + `:has()`-regel in global.css: track-bg bone → weiß, aktiv-strich sage bleibt (war schon waldgruen).
 
 **phase 5 — typografie migrieren**  
-inter → space grotesk. eyebrow-em-dashes optional weglassen (mono uppercase ist genug).
+inter → space grotesk. eyebrow-em-dashes **immer** weglassen (mono uppercase ist genug — siehe 3.4 eyebrow).
 
 **phase 6 — alle 9 backoffice-tabs durchgehen**  
 pro tab: alle direkten farben/fonts checken, anpassen, testen. backwards-kompatibel solange tokens noch beide werte tragen.
