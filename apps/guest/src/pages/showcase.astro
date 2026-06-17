@@ -7,14 +7,12 @@ import { getEnv } from '@retaha/db';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
+  return Astro.redirect(`${import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de'}/admin/login`);
 }
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
+  return Astro.redirect(`${import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de'}/admin/login?error=no_hotel`);
 }
 
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
@@ -41,10 +39,121 @@ function statusOf(s: any): { label: string; class: string } {
   if (Date.parse(s.expires_at) < Date.now()) return { label: 'abgelaufen', class: 'sc-pill--off' };
   return { label: 'aktiv', class: 'sc-pill--on' };
 }
+
+function presetLabel(p: string | undefined): string {
+  if (p === 'pre_arrival')  return 'Anreise';
+  if (p === 'in_house')     return 'Im Hotel';
+  if (p === 'checkout_day') return 'Abreise';
+  if (p === 'checked_out')  return 'Abgereist';
+  return '—';
+}
 ---
 
 <HotelierLayout title="Showcase" activeTab="gast" hotelName={hotel.name}>
-  <div class="sc-page">
+  <div class="sc-page" x-data="showcasePage()" x-cloak>
+
+    <!-- ── Form Modal ──────────────────────────────────────── -->
+    <div x-show="showForm" class="sc-modal-backdrop" @click.self="showForm = false">
+      <div class="sc-form-panel">
+        <div class="sc-form-head">
+          <h2 class="sc-form-title" x-text="editId ? 'Session bearbeiten' : 'Neue Demo-Session'"></h2>
+          <button type="button" class="sc-form-close" @click="showForm = false">✕</button>
+        </div>
+
+        <form @submit.prevent="submitForm()">
+          <!-- Gast -->
+          <p class="sc-form-section">Gast</p>
+          <div class="sc-form-row-2">
+            <label class="sc-form-field">
+              <span class="sc-form-label">Vorname</span>
+              <input class="sc-form-input" type="text" x-model="form.guest_first_name" required>
+            </label>
+            <label class="sc-form-field">
+              <span class="sc-form-label">Nachname</span>
+              <input class="sc-form-input" type="text" x-model="form.guest_last_name">
+            </label>
+          </div>
+          <label class="sc-form-field">
+            <span class="sc-form-label">E-Mail <small>für Wallet-Button</small></span>
+            <input class="sc-form-input" type="email" x-model="form.guest_email" placeholder="gast@beispiel.de">
+          </label>
+          <div class="sc-form-row-2">
+            <label class="sc-form-field">
+              <span class="sc-form-label">Zimmer-Nr.</span>
+              <input class="sc-form-input" type="text" x-model="form.room_number">
+            </label>
+            <label class="sc-form-field">
+              <span class="sc-form-label">Zimmer-Name</span>
+              <input class="sc-form-input" type="text" x-model="form.room_name">
+            </label>
+          </div>
+
+          <!-- Zustand -->
+          <p class="sc-form-section">Zustand</p>
+          <div class="sc-preset-row">
+            <button type="button" class="sc-preset-btn" :class="{ 'sc-preset-btn--on': form.preset === 'pre_arrival' }"   @click="applyPreset('pre_arrival')">Anreise</button>
+            <button type="button" class="sc-preset-btn" :class="{ 'sc-preset-btn--on': form.preset === 'in_house' }"      @click="applyPreset('in_house')">Im Hotel</button>
+            <button type="button" class="sc-preset-btn" :class="{ 'sc-preset-btn--on': form.preset === 'checkout_day' }"  @click="applyPreset('checkout_day')">Abreise</button>
+            <button type="button" class="sc-preset-btn" :class="{ 'sc-preset-btn--on': form.preset === 'checked_out' }"   @click="applyPreset('checked_out')">Abgereist</button>
+          </div>
+          <p class="sc-form-hint">
+            <span x-show="form.preset === 'pre_arrival'">Gast noch nicht angereist. Link gültig — zeigt Anreise-Ansicht.</span>
+            <span x-show="form.preset === 'in_house'">Gast eingecheckt. Alle Module aktiv.</span>
+            <span x-show="form.preset === 'checkout_day'">Abreisetag — Checkout-Kachel + Billing testbar.</span>
+            <span x-show="form.preset === 'checked_out'">Zeigt „Einladung ungültig" — zum Testen dieses Pfads.</span>
+          </p>
+
+          <!-- Termine -->
+          <p class="sc-form-section">Termine</p>
+          <div class="sc-form-row-2">
+            <label class="sc-form-field">
+              <span class="sc-form-label">Anreise</span>
+              <input class="sc-form-input" type="datetime-local" x-model="form.check_in">
+            </label>
+            <label class="sc-form-field">
+              <span class="sc-form-label">Abreise</span>
+              <input class="sc-form-input" type="datetime-local" x-model="form.check_out">
+            </label>
+          </div>
+
+          <!-- Billing -->
+          <p class="sc-form-section">Abrechnung</p>
+          <label class="sc-form-field">
+            <span class="sc-form-label">Offener Betrag (€) — 0&nbsp;=&nbsp;Zustand B (bezahlt) · &gt;0&nbsp;=&nbsp;Zustand C (offen)</span>
+            <input class="sc-form-input sc-form-input--w200" type="number" min="0" step="0.01" x-model="form.balance_euros">
+          </label>
+
+          <!-- Rechnungsposten -->
+          <p class="sc-form-section">Rechnungsposten <small>(optional · nur sichtbar in Zustand C)</small></p>
+          <div class="sc-items-list">
+            <template x-for="(item, i) in form.items" :key="i">
+              <div class="sc-item-row">
+                <input class="sc-form-input sc-item-label-input" type="text" placeholder="Bezeichnung" x-model="item.label">
+                <div class="sc-item-money">
+                  <span class="sc-item-eur">€</span>
+                  <input class="sc-form-input sc-item-amount-input" type="number" min="0" step="0.01" x-model="item.euros">
+                </div>
+                <button type="button" class="sc-item-remove" @click="removeItem(i)" title="Posten entfernen">✕</button>
+              </div>
+            </template>
+          </div>
+          <div class="sc-items-footer">
+            <button type="button" class="sc-btn-ghost sc-btn-sm" @click="addItem()">+ Posten</button>
+            <span class="sc-items-total" x-show="form.items.length > 0">Summe: <strong>€ <span x-text="totalEuros"></span></strong></span>
+          </div>
+
+          <!-- Error + Actions -->
+          <p x-show="error" x-text="error" class="sc-error" style="margin-top:12px"></p>
+          <div class="sc-form-actions">
+            <button type="button" class="sc-btn-ghost" @click="showForm = false" :disabled="busy">Abbrechen</button>
+            <button type="submit" class="sc-btn-primary" :disabled="busy"
+              x-text="busy ? 'Wird gespeichert …' : (editId ? 'Speichern' : 'Session anlegen')"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- ── End Form Modal ──────────────────────────────────── -->
+
     <header class="sc-header">
       <p class="sc-eyebrow">Showcase · Demo-Mode</p>
       <h1 class="sc-title">Zeig retaha vor — ohne echte Buchungen<span class="h-dot">.</span></h1>
@@ -56,17 +165,8 @@ function statusOf(s: any): { label: string; class: string } {
     </header>
 
     {canWrite && (
-      <div class="sc-actions-top" x-data="{ creating: false, error: '' }">
-        <button
-          class="sc-btn-primary"
-          type="button"
-          :disabled="creating"
-          @click="creating = true; fetch('/api/showcase/create', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { error = d.error || 'Fehler'; creating = false; } })"
-          x-text="creating ? 'Wird angelegt …' : '+ Neue Demo-Session'"
-        ></button>
-        <template x-if="error">
-          <p class="sc-error" x-text="error"></p>
-        </template>
+      <div class="sc-actions-top">
+        <button class="sc-btn-primary" type="button" @click="openCreate()">+ Neue Demo-Session</button>
       </div>
     )}
 
@@ -79,16 +179,26 @@ function statusOf(s: any): { label: string; class: string } {
         {rows.map((s: any) => {
           const status = statusOf(s);
           const demoUrl = `${siteOrigin}/g/${s.token}`;
+          const ddJson = JSON.stringify(s.demo_data ?? {});
           return (
             <article class={`sc-card${!s.is_active ? ' sc-card--off' : ''}`} x-data="{ busy: false }">
               <div class="sc-card-head">
                 <span class={`sc-pill ${status.class}`}>{status.label}</span>
-                <span class="sc-card-meta">erstellt {fmtDate(s.created_at)}</span>
+                <span class="sc-card-meta">
+                  {s.demo_data?.preset && <span class="sc-card-preset">{presetLabel(s.demo_data.preset)}</span>}
+                  erstellt {fmtDate(s.created_at)}
+                </span>
               </div>
               <h3 class="sc-card-title">
                 {s.demo_data?.guest_first_name ?? 'Anna'} {s.demo_data?.guest_last_name ?? 'Demo'}
                 <span class="sc-card-sep"> · </span>
                 Zimmer {s.demo_data?.room_number ?? '101'}
+                {s.demo_data?.guest_email && (
+                  <span class="sc-card-sep"> · </span>
+                )}
+                {s.demo_data?.guest_email && (
+                  <span class="sc-card-email">{s.demo_data.guest_email}</span>
+                )}
               </h3>
               <div class="sc-token-row">
                 <code class="sc-token">{s.token}</code>
@@ -98,28 +208,42 @@ function statusOf(s: any): { label: string; class: string } {
                 <div><span class="sc-mlabel">Resets</span><span class="sc-mval">{s.reset_count}</span></div>
                 <div><span class="sc-mlabel">Letzter Reset</span><span class="sc-mval">{s.last_reset_at ? fmtDate(s.last_reset_at) : '—'}</span></div>
               </div>
-              {s.is_active && Date.parse(s.expires_at) >= Date.now() && (
-                <div class="sc-card-actions">
+              <div class="sc-card-actions">
+                {s.is_active && Date.parse(s.expires_at) >= Date.now() && (
                   <a href={demoUrl} target="_blank" rel="noopener" class="sc-btn-ghost">Demo öffnen →</a>
-                  <button class="sc-btn-ghost" type="button" @click={`navigator.clipboard.writeText('${demoUrl}').then(() => alert('URL kopiert'))`}>URL kopieren</button>
-                  {canWrite && (
-                    <>
-                      <button
-                        class="sc-btn-ghost"
-                        type="button"
-                        :disabled="busy"
-                        @click={`if (!confirm('Alle Demo-Daten dieser Session löschen?')) return; busy = true; fetch('/api/showcase/${s.id}/reset', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { alert('Reset erfolgreich'); location.reload(); } else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
-                      >Reset</button>
-                      <button
-                        class="sc-btn-danger"
-                        type="button"
-                        :disabled="busy"
-                        @click={`if (!confirm('Session dauerhaft deaktivieren?')) return; busy = true; fetch('/api/showcase/${s.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
-                      >Deaktivieren</button>
-                    </>
-                  )}
-                </div>
-              )}
+                )}
+                {s.is_active && Date.parse(s.expires_at) >= Date.now() && (
+                  <button class="sc-btn-ghost" type="button"
+                    set:text="URL kopieren"
+                    @click={`navigator.clipboard.writeText('${demoUrl}').then(() => alert('URL kopiert'))`}
+                  ></button>
+                )}
+                {canWrite && s.is_active && (
+                  <button
+                    class="sc-btn-ghost"
+                    type="button"
+                    data-demo={ddJson}
+                    data-id={s.id}
+                    @click="$dispatch('open-edit', { demo: JSON.parse($el.dataset.demo), id: $el.dataset.id })"
+                  >Bearbeiten</button>
+                )}
+                {canWrite && s.is_active && (
+                  <button
+                    class="sc-btn-ghost"
+                    type="button"
+                    :disabled="busy"
+                    @click={`if (!confirm('Alle Demo-Daten dieser Session löschen?')) return; busy = true; fetch('/api/showcase/${s.id}/reset', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { alert('Reset erfolgreich'); location.reload(); } else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                  >Reset</button>
+                )}
+                {canWrite && s.is_active && (
+                  <button
+                    class="sc-btn-danger"
+                    type="button"
+                    :disabled="busy"
+                    @click={`if (!confirm('Session dauerhaft deaktivieren?')) return; busy = true; fetch('/api/showcase/${s.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                  >Deaktivieren</button>
+                )}
+              </div>
             </article>
           );
         })}
@@ -127,7 +251,156 @@ function statusOf(s: any): { label: string; class: string } {
     )}
   </div>
 
+  <script>
+    function showcasePage() {
+      function pad(n) { return String(n).padStart(2, '0'); }
+      function dtLocal(d) {
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+      function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+
+      function defaultForm() {
+        return {
+          guest_first_name: 'Anna',
+          guest_last_name: 'Demo',
+          guest_email: '',
+          room_number: '101',
+          room_name: 'Demo-Suite',
+          preset: 'in_house',
+          check_in: '',
+          check_out: '',
+          balance_euros: '0.00',
+          items: [],
+        };
+      }
+
+      return {
+        showForm: false,
+        editId: null,
+        form: defaultForm(),
+        busy: false,
+        error: '',
+
+        init() {
+          this.$el.addEventListener('open-edit', (e) => {
+            this.openEdit(e.detail.demo, e.detail.id);
+          });
+        },
+
+        openCreate() {
+          this.editId = null;
+          this.form = defaultForm();
+          this.applyPresetDates('in_house');
+          this.showForm = true;
+          this.error = '';
+        },
+
+        openEdit(dd, id) {
+          this.editId = id;
+          this.form = {
+            guest_first_name: dd.guest_first_name ?? 'Anna',
+            guest_last_name:  dd.guest_last_name  ?? 'Demo',
+            guest_email:      dd.guest_email      ?? '',
+            room_number:      dd.room_number      ?? '101',
+            room_name:        dd.room_name        ?? 'Demo-Suite',
+            preset:           dd.preset           ?? 'in_house',
+            check_in:  dd.check_in  ? dtLocal(new Date(dd.check_in))  : '',
+            check_out: dd.check_out ? dtLocal(new Date(dd.check_out)) : '',
+            balance_euros: ((dd.balance_cents ?? 0) / 100).toFixed(2),
+            items: (dd.items ?? []).map(function(i) {
+              return { label: i.label, euros: (i.amount_cents / 100).toFixed(2) };
+            }),
+          };
+          if (!this.form.check_in) this.applyPresetDates(this.form.preset);
+          this.showForm = true;
+          this.error = '';
+        },
+
+        applyPresetDates(preset) {
+          const now = new Date();
+          let ci, co;
+          if (preset === 'pre_arrival') {
+            ci = addDays(now, 3);  ci.setHours(14, 0, 0, 0);
+            co = addDays(ci, 2);   co.setHours(11, 0, 0, 0);
+          } else if (preset === 'in_house') {
+            ci = addDays(now, -1); ci.setHours(14, 0, 0, 0);
+            co = addDays(now,  1); co.setHours(11, 0, 0, 0);
+          } else if (preset === 'checkout_day') {
+            ci = addDays(now, -2); ci.setHours(14, 0, 0, 0);
+            co = new Date(now);    co.setHours(11, 0, 0, 0);
+          } else {
+            ci = addDays(now, -3); ci.setHours(14, 0, 0, 0);
+            co = addDays(now, -1); co.setHours(11, 0, 0, 0);
+          }
+          this.form.check_in  = dtLocal(ci);
+          this.form.check_out = dtLocal(co);
+        },
+
+        applyPreset(preset) {
+          this.form.preset = preset;
+          this.applyPresetDates(preset);
+        },
+
+        addItem() {
+          this.form.items = [...this.form.items, { label: '', euros: '0.00' }];
+        },
+
+        removeItem(i) {
+          this.form.items = this.form.items.filter(function(_, idx) { return idx !== i; });
+        },
+
+        get totalEuros() {
+          return this.form.items.reduce(function(s, i) {
+            return s + (parseFloat(i.euros) || 0);
+          }, 0).toFixed(2);
+        },
+
+        async submitForm() {
+          this.busy = true;
+          this.error = '';
+          try {
+            const demoData = {
+              guest_first_name: this.form.guest_first_name,
+              guest_last_name:  this.form.guest_last_name,
+              guest_email:      this.form.guest_email,
+              room_number:      this.form.room_number,
+              room_name:        this.form.room_name,
+              preset:           this.form.preset,
+              check_in:  this.form.check_in  ? new Date(this.form.check_in).toISOString()  : null,
+              check_out: this.form.check_out ? new Date(this.form.check_out).toISOString() : null,
+              balance_cents: Math.round((parseFloat(this.form.balance_euros) || 0) * 100),
+              currency: 'EUR',
+              items: this.form.items.map(function(i) {
+                return { label: i.label, amount_cents: Math.round((parseFloat(i.euros) || 0) * 100) };
+              }),
+            };
+            const url    = this.editId ? `/api/showcase/${this.editId}/update` : '/api/showcase/create';
+            const method = this.editId ? 'PATCH' : 'POST';
+            const res = await fetch(url, {
+              method,
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ demo_data: demoData }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+              location.reload();
+            } else {
+              this.error = data.error || 'Unbekannter Fehler';
+              this.busy = false;
+            }
+          } catch (_) {
+            this.error = 'Netzwerkfehler';
+            this.busy = false;
+          }
+        },
+      };
+    }
+  </script>
+
   <style>
+    [x-cloak] { display: none !important; }
+
     .sc-page { max-width: 900px; margin: 0 auto; padding: 0 24px 60px; }
     .sc-header { margin: 20px 0 24px; }
     .sc-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--te-pink, #FF4A82); margin: 0 0 6px; }
@@ -135,7 +408,7 @@ function statusOf(s: any): { label: string; class: string } {
     .sc-sub { margin: 0; font-size: 14px; color: var(--ink-soft); max-width: 720px; line-height: 1.5; }
     .sc-sub strong { color: var(--ink); font-weight: 500; }
 
-    .sc-actions-top { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sc-actions-top { margin-bottom: 20px; }
     .sc-btn-primary { padding: 10px 18px; background: var(--ink); color: var(--surface); border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
     .sc-btn-primary:hover:not(:disabled) { background: var(--te-pink, #FF4A82); }
     .sc-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
@@ -152,9 +425,11 @@ function statusOf(s: any): { label: string; class: string } {
     .sc-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
     .sc-pill--on { background: rgba(76,175,80,.1); color: #4CAF50; border: 1px solid rgba(76,175,80,.35); }
     .sc-pill--off { background: var(--surface-raised); color: var(--ink-muted); }
-    .sc-card-meta { font-size: 11px; color: var(--ink-muted); }
+    .sc-card-meta { font-size: 11px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+    .sc-card-preset { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--surface-raised); padding: 2px 6px; color: var(--ink); }
     .sc-card-title { font-size: 18px; font-weight: 300; margin: 0 0 10px; color: var(--ink); }
     .sc-card-sep { color: var(--ink-faint); }
+    .sc-card-email { font-size: 14px; color: var(--ink-muted); }
 
     .sc-token-row { margin-bottom: 12px; padding: 8px 10px; background: var(--surface-raised); border-left: 3px solid var(--border); }
     .sc-token { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); word-break: break-all; }
@@ -167,9 +442,54 @@ function statusOf(s: any): { label: string; class: string } {
 
     .sc-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .sc-btn-ghost { padding: 7px 14px; background: transparent; color: var(--ink-soft); border: 1px solid var(--border); cursor: pointer; font-family: inherit; font-size: 12px; text-decoration: none; }
-    .sc-btn-ghost:hover { color: var(--ink); border-color: var(--ink); }
+    .sc-btn-ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
+    .sc-btn-sm { padding: 5px 10px; font-size: 11px; }
     .sc-btn-danger { padding: 7px 14px; background: transparent; color: var(--te-pink, #FF4A82); border: 1px solid var(--te-pink, #FF4A82); cursor: pointer; font-family: inherit; font-size: 12px; }
     .sc-btn-danger:hover:not(:disabled) { background: rgba(255,74,130, 0.08); }
     .sc-btn-danger:disabled, .sc-btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Form Modal ── */
+    .sc-modal-backdrop { position: fixed; inset: 0; background: rgba(10,10,10,.72); z-index: 200; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 32px 16px; }
+    .sc-form-panel { background: var(--surface); border: 1px solid var(--border); padding: 28px; width: 100%; max-width: 600px; position: relative; }
+    .sc-form-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .sc-form-title { margin: 0; font-size: 20px; font-weight: 300; color: var(--ink); }
+    .sc-form-close { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted); padding: 4px 8px; }
+    .sc-form-close:hover { color: var(--ink); }
+
+    .sc-form-section { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .sc-form-section:first-of-type { margin-top: 0; }
+    .sc-form-section small { text-transform: none; font-size: 10px; }
+
+    .sc-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 500px) { .sc-form-row-2 { grid-template-columns: 1fr; } }
+
+    .sc-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .sc-form-label { font-size: 11px; color: var(--ink-muted); }
+    .sc-form-label small { font-size: 10px; }
+    .sc-form-input { padding: 8px 10px; background: var(--surface-raised, #f5f5f5); border: 1px solid var(--border); font-family: inherit; font-size: 13px; color: var(--ink); width: 100%; box-sizing: border-box; }
+    .sc-form-input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+    .sc-form-input--w200 { max-width: 200px; }
+
+    .sc-preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .sc-preset-btn { padding: 7px 14px; background: transparent; border: 1px solid var(--border); cursor: pointer; font-family: inherit; font-size: 12px; color: var(--ink-soft); transition: background .12s, color .12s; }
+    .sc-preset-btn:hover { border-color: var(--ink); color: var(--ink); }
+    .sc-preset-btn--on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+    .sc-form-hint { font-size: 12px; color: var(--ink-muted); margin: 0 0 4px; min-height: 1.4em; }
+
+    .sc-items-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .sc-item-row { display: flex; gap: 8px; align-items: center; }
+    .sc-item-label-input { flex: 1; }
+    .sc-item-money { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .sc-item-eur { font-size: 12px; color: var(--ink-muted); }
+    .sc-item-amount-input { width: 90px; }
+    .sc-item-remove { background: none; border: none; cursor: pointer; color: var(--ink-muted); font-size: 13px; padding: 0 4px; flex-shrink: 0; }
+    .sc-item-remove:hover { color: var(--te-pink, #FF4A82); }
+
+    .sc-items-footer { display: flex; align-items: center; gap: 16px; margin-top: 4px; }
+    .sc-items-total { font-size: 12px; color: var(--ink-muted); }
+    .sc-items-total strong { color: var(--ink); }
+
+    .sc-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
   </style>
 </HotelierLayout>

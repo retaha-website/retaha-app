@@ -13,6 +13,7 @@
 import { loadStayByToken, telHref } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -28,9 +29,48 @@ import EmailOptInSection from '../../../components/EmailOptInSection.astro';
 const { token } = Astro.params;
 if (!token) return new Response('Token fehlt', { status: 400 });
 
-let ctx: any = await loadStayByToken(token);
+let ctx: any = null;
 let isCompletedStay = false;
 let completedCheckedOutAt: string | null = null;
+let isShowcaseMode = false;
+interface ShowcaseBilling { balanceCents: number; totalCents: number; items: Array<{ label: string; amount_cents: number }>; currency: string; }
+let showcaseBilling: ShowcaseBilling | null = null;
+
+if (isShowcaseToken(token)) {
+  // Showcase-Pfad: Context aus demo_data aufbauen, kein echter Stay nötig
+  const sbSrInit = createSupabaseServiceRoleInstance();
+  const showcaseSession = await findShowcaseSessionByToken(token);
+  if (showcaseSession) {
+    const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
+      sbSrInit.from('hotels').select('id, slug, name, city, default_language, enabled_languages, logo_primary, logo_dark, theme, brand_primary, currency, plan, addons, phone, timezone').eq('id', showcaseSession.hotel_id).single(),
+      sbSrInit.from('hotel_settings').select('features').eq('hotel_id', showcaseSession.hotel_id).maybeSingle(),
+    ]);
+    if (hotelRow) {
+      const dd = (showcaseSession.demo_data ?? {}) as any;
+      const now = new Date();
+      const checkIn  = dd.check_in  ? new Date(dd.check_in)  : new Date(now.getTime() - 2 * 86400000);
+      const checkOut = dd.check_out ? new Date(dd.check_out) : new Date(now.setHours(11, 0, 0, 0));
+      ctx = {
+        stay:     { id: showcaseSession.id, check_in: checkIn.toISOString(), check_out: checkOut.toISOString(), is_active: true },
+        guest:    { id: showcaseSession.id, first_name: dd.guest_first_name ?? 'Anna', last_name: dd.guest_last_name ?? 'Demo', email: dd.guest_email ?? null, language: hotelRow.default_language ?? 'de', visit_count: 1 },
+        room:     { id: showcaseSession.id, room_number: dd.room_number ?? '101', room_name: dd.room_name ?? 'Demo-Suite' },
+        hotel:    hotelRow,
+        settings: settingsRow ?? { features: {} },
+      };
+      isShowcaseMode = true;
+      const items: Array<{ label: string; amount_cents: number }> = dd.items ?? [];
+      showcaseBilling = {
+        balanceCents: dd.balance_cents ?? 0,
+        totalCents:   items.reduce((s, i) => s + (i.amount_cents ?? 0), 0),
+        items,
+        currency: dd.currency ?? (hotelRow as any).currency ?? 'EUR',
+      };
+    }
+  }
+  if (!ctx) return Astro.redirect(`/g/${token}`);
+} else {
+  ctx = await loadStayByToken(token);
+}
 
 if (!ctx) {
   // Ausgecheckter Stay: is_active=false, aber checked_out_at gesetzt — Success-Screen zeigen
@@ -81,7 +121,7 @@ if (!existingSession || existingSession.stay_id !== stay.id) {
     : stay.check_out;
   await setStaySessionCookie(Astro.cookies, {
     stay_id: stay.id, hotel_id: hotel.id,
-    check_out_utc: sessionCheckOut, is_showcase: false,
+    check_out_utc: sessionCheckOut, is_showcase: isShowcaseMode,
   });
 }
 
@@ -139,7 +179,12 @@ let billingError  = false;
 let alreadyCheckedOut = false;
 let checkedOutAtBilling: string | null = null;
 
-if (gateState !== 'not_yet' && !isCompletedStay) {
+if (isShowcaseMode && gateState !== 'not_yet' && showcaseBilling) {
+  balanceCents = showcaseBilling.balanceCents;
+  totalCents   = showcaseBilling.totalCents;
+  billItems    = showcaseBilling.items;
+  billCurrency = showcaseBilling.currency;
+} else if (gateState !== 'not_yet' && !isCompletedStay && !isShowcaseMode) {
   const sbSr = createSupabaseServiceRoleInstance();
   const { data: stayRow, error: stayRowErr } = await sbSr
     .from('stays')

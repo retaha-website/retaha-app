@@ -20,11 +20,26 @@ function generateShowcaseToken(): string {
   return SHOWCASE_TOKEN_PREFIX + randomBytes(16).toString('hex');
 }
 
+export interface DemoItem {
+  label: string;
+  amount_cents: number;
+}
+
+export type ShowcasePreset = 'pre_arrival' | 'in_house' | 'checkout_day' | 'checked_out';
+
 export interface DemoData {
   guest_first_name: string;
   guest_last_name: string;
   room_number: string;
   room_name: string;
+  // Configurator fields
+  guest_email?: string;
+  preset?: ShowcasePreset;
+  check_in?: string;    // ISO datetime
+  check_out?: string;   // ISO datetime
+  balance_cents?: number;
+  currency?: string;
+  items?: DemoItem[];
 }
 
 export interface ShowcaseSession {
@@ -102,8 +117,15 @@ export async function listShowcaseSessions(hotelId: string): Promise<ShowcaseSes
  * Reset: löscht alle Showcase-Bookings + Showcase-Chat-Messages via dedizierte
  * showcase_session_id-Spalte (Migration 20260617).
  */
-export async function resetShowcaseSession(sessionId: string): Promise<{ ok: boolean; deleted: { bookings: number; chat: number } }> {
+export async function resetShowcaseSession(sessionId: string, hotelId?: string): Promise<{ ok: boolean; deleted: { bookings: number; chat: number }; error?: string }> {
   const sb = createSupabaseServiceRoleInstance();
+
+  // Scope to hotel if provided (extra guard)
+  if (hotelId) {
+    const { data: check } = await sb.from('showcase_sessions').select('id').eq('id', sessionId).eq('hotel_id', hotelId).maybeSingle();
+    if (!check) return { ok: false, deleted: { bookings: 0, chat: 0 }, error: 'session_not_found' };
+  }
+
   const [bRes, cRes] = await Promise.all([
     sb.from('bookings').delete().eq('showcase_session_id', sessionId).select('id'),
     sb.from('chat_messages').delete().eq('showcase_session_id', sessionId).select('id'),
@@ -119,7 +141,40 @@ export async function resetShowcaseSession(sessionId: string): Promise<{ ok: boo
   };
 }
 
-export async function deactivateShowcaseSession(sessionId: string): Promise<void> {
+export async function deactivateShowcaseSession(sessionId: string, hotelId?: string): Promise<{ ok?: boolean; error?: string }> {
   const sb = createSupabaseServiceRoleInstance();
-  await sb.from('showcase_sessions').update({ is_active: false }).eq('id', sessionId);
+  let q = sb.from('showcase_sessions').update({ is_active: false }).eq('id', sessionId);
+  if (hotelId) q = (q as any).eq('hotel_id', hotelId);
+  const { error } = await q;
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+export async function updateShowcaseSession(args: {
+  sessionId: string;
+  hotelId: string;
+  demoData: Partial<DemoData>;
+}): Promise<ShowcaseSession | { error: string }> {
+  const sb = createSupabaseServiceRoleInstance();
+
+  const { data: current } = await sb.from('showcase_sessions')
+    .select('demo_data')
+    .eq('id', args.sessionId)
+    .eq('hotel_id', args.hotelId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!current) return { error: 'session_not_found' };
+
+  const merged = { ...(current.demo_data ?? {}), ...args.demoData };
+
+  const { data, error } = await sb.from('showcase_sessions')
+    .update({ demo_data: merged })
+    .eq('id', args.sessionId)
+    .eq('hotel_id', args.hotelId)
+    .select('*')
+    .single();
+
+  if (error || !data) return { error: error?.message || 'update_failed' };
+  return data as ShowcaseSession;
 }

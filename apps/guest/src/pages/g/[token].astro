@@ -60,53 +60,65 @@ if (token && isShowcaseToken(token)) {
       sbSrInit.from('hotel_settings').select('*').eq('hotel_id', showcaseSession.hotel_id).single(),
     ]);
     if (hotelRow) {
-      // Persona-aware demo dates (nur für showcase_ tokens)
-      // URL-Param hat Vorrang; Cookie als Fallback für Back-Navigation innerhalb der App
+      const dd = showcaseSession.demo_data as any;
+      // Preset priority: demo_data.preset → URL-param persona → cookie persona → 'in_house'
       const _urlPersona = new URL(Astro.request.url).searchParams.get('persona');
       const _cookiePersona = Astro.cookies.get('showcase_persona')?.value ?? null;
-      const _persona = _urlPersona ?? _cookiePersona ?? 'in_house';
-      const now = new Date();
-      let _checkIn: Date, _checkOut: Date;
-      if (_persona === 'arrival') {
-        _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() + 3);  _checkIn.setUTCHours(14, 0, 0, 0);
-        _checkOut = new Date(_checkIn); _checkOut.setUTCDate(_checkOut.getUTCDate() + 2); _checkOut.setUTCHours(11, 0, 0, 0);
-      } else if (_persona === 'departure') {
-        _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 2); _checkIn.setUTCHours(14, 0, 0, 0);
-        _checkOut = new Date(now); _checkOut.setUTCHours(23, 59, 59, 0);
-      } else {
-        // in_house: check_in yesterday → always past → stayPersona wird 'in_house'
-        _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 1); _checkIn.setUTCHours(14, 0, 0, 0);
-        _checkOut = new Date(now); _checkOut.setUTCDate(_checkOut.getUTCDate() + 1); _checkOut.setUTCHours(11, 0, 0, 0);
+      const _preset = dd?.preset ?? _urlPersona ?? _cookiePersona ?? 'in_house';
+
+      // 'checked_out' preset → show "Einladung ungültig" page (ctx stays null)
+      if (_preset !== 'checked_out') {
+        const now = new Date();
+        let _checkIn: Date, _checkOut: Date;
+
+        if (dd?.check_in && dd?.check_out) {
+          // Explicit dates stored in configurator take precedence
+          _checkIn  = new Date(dd.check_in);
+          _checkOut = new Date(dd.check_out);
+        } else if (_preset === 'arrival' || _preset === 'pre_arrival') {
+          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() + 3);  _checkIn.setUTCHours(14, 0, 0, 0);
+          _checkOut = new Date(_checkIn); _checkOut.setUTCDate(_checkOut.getUTCDate() + 2); _checkOut.setUTCHours(11, 0, 0, 0);
+        } else if (_preset === 'departure' || _preset === 'checkout_day') {
+          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 2); _checkIn.setUTCHours(14, 0, 0, 0);
+          _checkOut = new Date(now); _checkOut.setUTCHours(23, 59, 59, 0);
+        } else {
+          // in_house: check_in yesterday → stayPersona bleibt 'in_house'
+          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 1); _checkIn.setUTCHours(14, 0, 0, 0);
+          _checkOut = new Date(now); _checkOut.setUTCDate(_checkOut.getUTCDate() + 1); _checkOut.setUTCHours(11, 0, 0, 0);
+        }
+
+        ctx = {
+          stay: {
+            id: showcaseSession.id,
+            check_in: _checkIn.toISOString(),
+            check_out: _checkOut.toISOString(),
+            is_active: true,
+          },
+          guest: {
+            id: showcaseSession.id,
+            first_name: dd?.guest_first_name ?? 'Anna',
+            last_name:  dd?.guest_last_name  ?? 'Demo',
+            email:      dd?.guest_email      ?? null,
+            language:   hotelRow.default_language ?? 'de',
+            visit_count: 1,
+          },
+          room: {
+            id: showcaseSession.id,
+            room_number: dd?.room_number ?? '101',
+            room_name:   dd?.room_name   ?? 'Demo-Suite',
+          },
+          hotel: hotelRow,
+          settings: settingsRow ?? {},
+        };
+
+        // Persist active persona in cookie for back-navigation
+        Astro.cookies.set('showcase_persona', _preset, {
+          path: '/',
+          maxAge: 3600,
+          sameSite: 'lax',
+          httpOnly: true,
+        });
       }
-      ctx = {
-        stay: {
-          id: showcaseSession.id,
-          check_in: _checkIn.toISOString(),
-          check_out: _checkOut.toISOString(),
-          is_active: true,
-        },
-        guest: {
-          id: showcaseSession.id,
-          first_name: showcaseSession.demo_data?.guest_first_name ?? 'Anna',
-          last_name: showcaseSession.demo_data?.guest_last_name ?? 'Demo',
-          language: hotelRow.default_language ?? 'de',
-          visit_count: 1,
-        },
-        room: {
-          id: showcaseSession.id,
-          room_number: showcaseSession.demo_data?.room_number ?? '101',
-          room_name: showcaseSession.demo_data?.room_name ?? 'Demo-Suite',
-        },
-        hotel: hotelRow,
-        settings: settingsRow ?? {},
-      };
-      // Persist persona in cookie so back-navigation within the app keeps the right phase
-      Astro.cookies.set('showcase_persona', _persona, {
-        path: '/',
-        maxAge: 3600,
-        sameSite: 'lax',
-        httpOnly: true,
-      });
     }
   }
 } else {
