@@ -12,21 +12,23 @@ interface Props {
   lang: Lang;
   stayId: string;
   hotelName: string;
+  formality?: 'informal' | 'formal';
 }
 
-const { lang, stayId, hotelName } = Astro.props;
+const { lang, stayId, hotelName, formality = 'informal' } = Astro.props;
+const isFormal = formality === 'formal';
 
 const STRINGS: Record<string, Record<string, string>> = {
   de: {
-    title: 'Wie war dein Aufenthalt?',
-    sub: `Dein Feedback hilft ${hotelName}, besser zu werden.`,
+    title: isFormal ? 'Wie war Ihr Aufenthalt?' : 'Wie war dein Aufenthalt?',
+    sub: isFormal ? `Ihr Feedback hilft ${hotelName}, besser zu werden.` : `Dein Feedback hilft ${hotelName}, besser zu werden.`,
     commentLabel: 'Etwas, das wir wissen sollten? (optional)',
     commentPlaceholder: 'Was hat besonders gefallen oder gefehlt …',
     submit: 'Bewertung senden',
     later: 'Später',
     sending: 'Wird gesendet …',
     thanksTitle: 'Danke!',
-    thanksSub: 'Wir leiten dein Feedback ans Hotel weiter.',
+    thanksSub: isFormal ? 'Wir leiten Ihr Feedback ans Hotel weiter.' : 'Wir leiten dein Feedback ans Hotel weiter.',
     close: 'Schließen',
     starHint: 'Sterne tippen',
     errorPrefix: 'Senden fehlgeschlagen',

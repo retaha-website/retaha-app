@@ -3,7 +3,7 @@
 // + computed Tier/Benefits/Progress aus loyalty_config). Showcase-Tokens: Punkte werden
 // am Display simuliert (kein echter guests-Row). Gate: features.loyalty === true.
 import { loadStayByToken } from '@retaha/db';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
 import { computeTierProgress, nightsBetween, pointsForNights, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier, type LoyaltyReward } from '@retaha/loyalty';
@@ -74,6 +74,10 @@ const pointsPerNight = (cfgRow?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.point
 const activeRewards = ((cfgRow?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards) as LoyaltyReward[])
   .filter(r => r.active !== false && r.title)
   .sort((a, b) => (a.cost_points || 0) - (b.cost_points || 0));
+
+// Anrede (du/Sie) — eine Quelle der Wahrheit; greift echt UND Showcase (über hotelId).
+const { data: hsAddr } = await sbSr.from('hotel_settings').select('guest_address_form').eq('hotel_id', hotelId).maybeSingle();
+const isFormalL = addressFormToFormality((hsAddr as any)?.guest_address_form) === 'formal';
 
 // ── Saldo + History: echt oder Demo-Simulation ──────────────────────────────
 const locale = ({ de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as Record<string, string>)[lk] ?? 'de-DE';
@@ -149,7 +153,7 @@ const hasActivity = lifetime > 0;
 const backHref = `/g/${token}`;
 
 const L = {
-  de: { status: 'Dein Status', points: 'Punkte', benefits: 'Deine Vorteile', history: 'Punkte-Verlauf', empty: 'Noch keine Punkte', emptySub: 'Du sammelst Punkte automatisch bei jedem Aufenthalt.', back: '← zurück', rewards: 'Prämien einlösen', redeem: 'Einlösen', vouchers: 'Deine Gutscheine', validAt: 'Gültig bis', validReception: 'Diesen Code an der Rezeption vorzeigen.', stIssued: 'Offen', stValidated: 'Eingelöst', stExpired: 'Abgelaufen', okMsg: 'Prämie eingelöst', errInsufficient: 'Nicht genug Punkte', errGeneric: 'Etwas ist schiefgelaufen' },
+  de: { status: isFormalL ? 'Ihr Status' : 'Dein Status', points: 'Punkte', benefits: isFormalL ? 'Ihre Vorteile' : 'Deine Vorteile', history: 'Punkte-Verlauf', empty: 'Noch keine Punkte', emptySub: isFormalL ? 'Sie sammeln Punkte automatisch bei jedem Aufenthalt.' : 'Du sammelst Punkte automatisch bei jedem Aufenthalt.', back: '← zurück', rewards: 'Prämien einlösen', redeem: 'Einlösen', vouchers: isFormalL ? 'Ihre Gutscheine' : 'Deine Gutscheine', validAt: 'Gültig bis', validReception: 'Diesen Code an der Rezeption vorzeigen.', stIssued: 'Offen', stValidated: 'Eingelöst', stExpired: 'Abgelaufen', okMsg: 'Prämie eingelöst', errInsufficient: 'Nicht genug Punkte', errGeneric: 'Etwas ist schiefgelaufen' },
   en: { status: 'Your Status', points: 'Points', benefits: 'Your Benefits', history: 'Points History', empty: 'No points yet', emptySub: 'You earn points automatically with every stay.', back: '← back', rewards: 'Redeem Rewards', redeem: 'Redeem', vouchers: 'Your Vouchers', validAt: 'Valid until', validReception: 'Show this code at the reception.', stIssued: 'Open', stValidated: 'Redeemed', stExpired: 'Expired', okMsg: 'Reward redeemed', errInsufficient: 'Not enough points', errGeneric: 'Something went wrong' },
   fr: { status: 'Votre Statut', points: 'Points', benefits: 'Vos Avantages', history: 'Historique', empty: 'Pas encore de points', emptySub: 'Vous gagnez des points à chaque séjour.', back: '← retour', rewards: 'Utiliser les récompenses', redeem: 'Utiliser', vouchers: 'Vos bons', validAt: 'Valable jusqu\'au', validReception: 'Présentez ce code à la réception.', stIssued: 'Ouvert', stValidated: 'Utilisé', stExpired: 'Expiré', okMsg: 'Récompense utilisée', errInsufficient: 'Points insuffisants', errGeneric: 'Une erreur est survenue' },
   es: { status: 'Tu Estado', points: 'Puntos', benefits: 'Tus Ventajas', history: 'Historial', empty: 'Aún sin puntos', emptySub: 'Ganas puntos con cada estancia.', back: '← volver', rewards: 'Canjear recompensas', redeem: 'Canjear', vouchers: 'Tus vales', validAt: 'Válido hasta', validReception: 'Muestra este código en recepción.', stIssued: 'Abierto', stValidated: 'Canjeado', stExpired: 'Caducado', okMsg: 'Recompensa canjeada', errInsufficient: 'Puntos insuficientes', errGeneric: 'Algo salió mal' },

@@ -25,9 +25,11 @@ interface Props {
   conciergeName: string;
   checkIn: string;
   checkOut: string;
+  formality?: 'informal' | 'formal';
 }
 
-const { lang, rooms, startTime, endTime, slotMinutes, accessToken, existingBooking, conciergeName, checkIn, checkOut } = Astro.props;
+const { lang, rooms, startTime, endTime, slotMinutes, accessToken, existingBooking, conciergeName, checkIn, checkOut, formality = 'informal' } = Astro.props;
+const isFormal = formality === 'formal';
 
 // Build slots for time selection
 const [startH, startM] = startTime.substring(0, 5).split(':').map(Number);
@@ -101,13 +103,13 @@ const labelMap = {
     notesPlaceholder: 'Catering-Wünsche, Technik, Sonderausstattung...',
     submitBtn: 'Salon anfragen',
     rebookBtn: 'Andere Reservierung',
-    statusPendingTitle: 'Wir haben deine Anfrage.',
-    statusPendingSub: 'Du hörst gleich von uns.',
+    statusPendingTitle: isFormal ? 'Wir haben Ihre Anfrage.' : 'Wir haben deine Anfrage.',
+    statusPendingSub: isFormal ? 'Sie hören gleich von uns.' : 'Du hörst gleich von uns.',
     statusConfirmedTitle: 'Reservierung bestätigt.',
-    statusConfirmedSub: 'Wir freuen uns auf dich.',
+    statusConfirmedSub: isFormal ? 'Wir freuen uns auf Sie.' : 'Wir freuen uns auf dich.',
     statusCancelledTitle: 'Reservierung abgelehnt.',
-    statusCancelledSub: 'Bitte sprich mit dem Empfang.',
-    yourSelection: 'Deine Auswahl',
+    statusCancelledSub: isFormal ? 'Bitte sprechen Sie mit dem Empfang.' : 'Bitte sprich mit dem Empfang.',
+    yourSelection: isFormal ? 'Ihre Auswahl' : 'Deine Auswahl',
     summaryRoom: 'Salon',
     summaryDate: 'Datum',
     summaryTime: 'Uhrzeit',

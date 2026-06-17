@@ -9,15 +9,17 @@ import type { Lang } from '@retaha/i18n';
 interface Props {
   lang: Lang;
   hotelName: string;
+  formality?: 'informal' | 'formal';
 }
-const { lang, hotelName } = Astro.props;
+const { lang, hotelName, formality = 'informal' } = Astro.props;
+const isFormal = formality === 'formal';
 
 const STRINGS: Record<string, Record<string, string>> = {
   de: {
     title: 'Zum Wallet hinzufügen',
     eyebrow: 'Google Wallet',
-    intro: 'Mit dem Wallet-Pass bekommst du:',
-    bullet1: 'Schnellzugriff zu Eve und deinem Aufenthalt',
+    intro: isFormal ? 'Mit dem Wallet-Pass bekommen Sie:' : 'Mit dem Wallet-Pass bekommst du:',
+    bullet1: isFormal ? 'Schnellzugriff zu Eve und Ihrem Aufenthalt' : 'Schnellzugriff zu Eve und deinem Aufenthalt',
     bullet2: 'Service-Bestätigungen direkt aufs Handy',
     bullet3: `Aktionen und Events von ${hotelName}`,
     consentLabel: `Ja, ich möchte Marketing-Benachrichtigungen von ${hotelName}.`,

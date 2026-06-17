@@ -24,9 +24,11 @@ interface Props {
   conciergeName: string;
   checkIn: string;
   checkOut: string;
+  formality?: 'informal' | 'formal';
 }
 
-const { lang, items, startTime, endTime, accessToken, existingBooking, conciergeName, checkIn, checkOut } = Astro.props;
+const { lang, items, startTime, endTime, accessToken, existingBooking, conciergeName, checkIn, checkOut, formality = 'informal' } = Astro.props;
+const isFormal = formality === 'formal';
 
 // Time slots — every 30 min between start and end
 const [startH, startM] = startTime.substring(0, 5).split(':').map(Number);
@@ -53,10 +55,10 @@ const localizedItems = items.map(item => ({
 const labelMap = {
   de: {
     eyebrow: 'Service',
-    title: 'Was brauchst ',
-    titleAccent: 'du?',
-    subtitle: 'Wir bringen es dir aufs Zimmer.',
-    chooseItem: 'Was möchtest du?',
+    title: isFormal ? 'Was brauchen ' : 'Was brauchst ',
+    titleAccent: isFormal ? 'Sie?' : 'du?',
+    subtitle: isFormal ? 'Wir bringen es Ihnen aufs Zimmer.' : 'Wir bringen es dir aufs Zimmer.',
+    chooseItem: isFormal ? 'Was möchten Sie?' : 'Was möchtest du?',
     timingLabel: 'Wann?',
     timingNow: 'So schnell wie möglich',
     timingScheduled: 'Zu einer bestimmten Zeit',
@@ -65,13 +67,13 @@ const labelMap = {
     notesPlaceholder: 'z.B. extra-saugfähige Handtücher, kohlensäurefreies Wasser ...',
     submitBtn: 'Service anfragen',
     rebookBtn: 'Neue Anfrage',
-    statusPendingTitle: 'Wir haben deine Anfrage.',
-    statusPendingSub: 'Kommt zu dir aufs Zimmer.',
+    statusPendingTitle: isFormal ? 'Wir haben Ihre Anfrage.' : 'Wir haben deine Anfrage.',
+    statusPendingSub: isFormal ? 'Kommt zu Ihnen aufs Zimmer.' : 'Kommt zu dir aufs Zimmer.',
     statusConfirmedTitle: 'Bestätigt.',
-    statusConfirmedSub: 'Wir bringen es dir gleich.',
+    statusConfirmedSub: isFormal ? 'Wir bringen es Ihnen gleich.' : 'Wir bringen es dir gleich.',
     statusCancelledTitle: 'Anfrage abgelehnt.',
-    statusCancelledSub: 'Bitte sprich mit dem Empfang.',
-    yourSelection: 'Deine Auswahl',
+    statusCancelledSub: isFormal ? 'Bitte sprechen Sie mit dem Empfang.' : 'Bitte sprich mit dem Empfang.',
+    yourSelection: isFormal ? 'Ihre Auswahl' : 'Deine Auswahl',
     summaryItem: 'Service',
     summaryTime: 'Wann',
     summaryNote: 'Notiz',
