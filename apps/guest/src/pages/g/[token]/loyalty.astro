@@ -1,11 +1,12 @@
 ---
-// Loyalty-Sheet
-// Zugängig via Status-Tab / direktem Link: /g/[token]/loyalty
-// Feature-Gate: features.loyalty
-
+// Loyalty-Gast-Screen — verdrahtet an echte Daten (loyalty_points + loyalty_transactions
+// + computed Tier/Benefits/Progress aus loyalty_config). Showcase-Tokens: Punkte werden
+// am Display simuliert (kein echter guests-Row). Gate: features.loyalty === true.
 import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
+import { computeTierProgress, nightsBetween, pointsForNights, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier } from '@retaha/loyalty';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -13,132 +14,125 @@ import '@fontsource/jetbrains-mono/400.css';
 const { token } = Astro.params;
 if (!token) return new Response('Token fehlt', { status: 400 });
 
-const ctx = await loadStayByToken(token);
-if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
-
-const { stay, guest, hotel, settings } = ctx;
-
-// Feature-Gate
-const features = (settings?.features ?? {}) as Record<string, boolean>;
-if (features.loyalty === false) {
-  return Astro.redirect(`/g/${token}`);
-}
-
-const lang: Lang = normalizeLang(guest?.language || hotel.default_language);
-
-// Stay-Session sicherstellen
-const existingSession = await getStaySession(Astro.cookies);
-if (!existingSession || existingSession.stay_id !== stay.id) {
-  await setStaySessionCookie(Astro.cookies, {
-    stay_id: stay.id,
-    hotel_id: hotel.id,
-    check_out_utc: stay.check_out,
-    is_showcase: false,
-  });
-}
-
-// Loyalty-Daten laden
 const sbSr = createSupabaseServiceRoleInstance();
-let loyaltyData: {
-  points: number;
-  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
-  tier_progress: number;
-  benefits: string[];
-  earned_history: Array<{ label: string; pts: number; date: string }>;
-} | null = null;
 
-if (guest?.id) {
-  const { data: row } = await sbSr
-    .from('loyalty_points')
-    .select('points, tier, tier_progress, benefits, earned_history')
-    .eq('hotel_id', hotel.id)
-    .eq('guest_id', guest.id)
-    .maybeSingle();
+// ── Context: echter Stay oder Showcase ──────────────────────────────────────
+let hotel: any = null;
+let guest: any = null;
+let hotelId: string | null = null;
+let guestId: string | null = null;
+let settings: any = { features: {} };
+let isShowcase = false;
+let demoData: any = null;
 
-  if (row) {
-    loyaltyData = {
-      points: (row as any).points ?? 0,
-      tier: ((row as any).tier as any) ?? 'bronze',
-      tier_progress: (row as any).tier_progress ?? 0,
-      benefits: ((row as any).benefits as string[]) ?? [],
-      earned_history: ((row as any).earned_history as any[]) ?? [],
-    };
+if (isShowcaseToken(token)) {
+  const sc = await findShowcaseSessionByToken(token);
+  if (!sc) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+  const [{ data: h }, { data: hs }] = await Promise.all([
+    sbSr.from('hotels').select('id, name, default_language').eq('id', sc.hotel_id).maybeSingle(),
+    sbSr.from('hotel_settings').select('features').eq('hotel_id', sc.hotel_id).maybeSingle(),
+  ]);
+  if (!h) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+  isShowcase = true;
+  demoData = (sc.demo_data ?? {}) as any;
+  hotel = h;
+  guest = { first_name: demoData.guest_first_name ?? 'Anna', language: h.default_language };
+  hotelId = h.id;
+  settings = { features: hs?.features ?? {} };
+} else {
+  const ctx = await loadStayByToken(token);
+  if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
+  hotel = ctx.hotel; guest = ctx.guest; settings = ctx.settings;
+  hotelId = ctx.hotel.id; guestId = ctx.guest?.id ?? null;
+  const existing = await getStaySession(Astro.cookies);
+  if (!existing || existing.stay_id !== ctx.stay.id) {
+    await setStaySessionCookie(Astro.cookies, {
+      stay_id: ctx.stay.id, hotel_id: ctx.hotel.id, check_out_utc: ctx.stay.check_out, is_showcase: false,
+    });
   }
 }
 
-const TIER_NEXT_AT: Record<string, number> = {
-  bronze: 250, silver: 500, gold: 1000, platinum: 9999,
-};
+// Feature-Gate (loyalty ist opt-in → nur bei explizit true)
+const features = (settings?.features ?? {}) as Record<string, boolean>;
+if (features.loyalty !== true) return Astro.redirect(`/g/${token}`);
 
-const TIER_LABELS: Record<Lang, Record<string, string>> = {
-  de: { bronze: 'Bronze', silver: 'Silber', gold: 'Gold', platinum: 'Platin' },
-  en: { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum' },
-  fr: { bronze: 'Bronze', silver: 'Argent', gold: 'Or', platinum: 'Platine' },
-  es: { bronze: 'Bronce', silver: 'Plata', gold: 'Oro', platinum: 'Platino' },
-};
+const langRaw = normalizeLang(guest?.language || hotel.default_language);
+type LK = 'de' | 'en' | 'fr' | 'es';
+const lk: LK = (['de', 'en', 'fr', 'es'].includes(langRaw) ? langRaw : 'de') as LK;
+const lang: Lang = langRaw;
 
-const NEXT_TIER_LABELS: Record<Lang, Record<string, string>> = {
-  de: { bronze: 'Silber', silver: 'Gold', gold: 'Platin' },
-  en: { bronze: 'Silver', silver: 'Gold', gold: 'Platinum' },
-  fr: { bronze: 'Argent', silver: 'Or', gold: 'Platine' },
-  es: { bronze: 'Plata', silver: 'Oro', gold: 'Platino' },
-};
+// ── Config ──────────────────────────────────────────────────────────────────
+const { data: cfgRow } = await sbSr.from('loyalty_config')
+  .select('points_per_night, tiers').eq('hotel_id', hotelId).maybeSingle();
+const tiers = (cfgRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[];
+const pointsPerNight = (cfgRow?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.points_per_night) as number;
 
-const tier = loyaltyData?.tier ?? 'bronze';
-const points = loyaltyData?.points ?? 0;
-const nextAt = TIER_NEXT_AT[tier] ?? 500;
-const progressPct = Math.min(100, Math.round((points / nextAt) * 100));
-const tierLabel = TIER_LABELS[lang][tier] ?? tier;
-const nextTierLabel = NEXT_TIER_LABELS[lang][tier] ?? '';
+// ── Saldo + History: echt oder Demo-Simulation ──────────────────────────────
+const locale = ({ de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as Record<string, string>)[lk] ?? 'de-DE';
+const fmtDate = (iso: string) => { try { return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; } };
+const nightWord = (n: number) => lk === 'de' ? (n === 1 ? 'Nacht' : 'Nächte') : (n === 1 ? 'night' : 'nights');
 
+let balance = 0;
+let lifetime = 0;
+let history: Array<{ label: string; pts: number; date: string }> = [];
+
+if (isShowcase) {
+  // Demo: glaubwürdiger Stammgast — mittlere Stufe + Fortschritt, fabrizierte Historie.
+  // Demo-Daten immer aus dem Preset ableiten (gespeicherte Absolut-Daten driften).
+  const { checkIn, checkOut } = resolveDemoCheckDates(demoData?.preset);
+  const nights = nightsBetween(checkIn, checkOut);
+  const stayPts = pointsForNights(nights, pointsPerNight);
+  const sorted = [...tiers].sort((a, b) => a.threshold_points - b.threshold_points);
+  const midIdx = Math.min(1, sorted.length - 1);
+  const base = sorted[midIdx]?.threshold_points ?? 0;
+  const next = sorted[midIdx + 1]?.threshold_points;
+  lifetime = next != null ? base + Math.round((next - base) * 0.55) : base + Math.max(stayPts, 80);
+  balance = lifetime;
+  const today = new Date();
+  const rest = Math.max(0, lifetime - stayPts);
+  history = [
+    { label: `${lk === 'de' ? 'Aktueller Aufenthalt' : 'Current stay'} · ${nights} ${nightWord(nights)}`, pts: stayPts, date: fmtDate(today.toISOString()) },
+    { label: lk === 'de' ? 'Aufenthalt' : 'Stay', pts: Math.round(rest * 0.6), date: fmtDate(new Date(today.getTime() - 40 * 86400000).toISOString()) },
+    { label: lk === 'de' ? 'Aufenthalt' : 'Stay', pts: rest - Math.round(rest * 0.6), date: fmtDate(new Date(today.getTime() - 120 * 86400000).toISOString()) },
+  ].filter(h => h.pts > 0);
+} else if (guestId) {
+  const [{ data: lp }, { data: txs }] = await Promise.all([
+    sbSr.from('loyalty_points').select('points_balance, points_lifetime').eq('hotel_id', hotelId).eq('guest_id', guestId).maybeSingle(),
+    sbSr.from('loyalty_transactions').select('type, points, nights, note, created_at').eq('hotel_id', hotelId).eq('guest_id', guestId).order('created_at', { ascending: false }).limit(20),
+  ]);
+  balance = lp?.points_balance ?? 0;
+  lifetime = lp?.points_lifetime ?? 0;
+  history = ((txs ?? []) as any[]).map(t => ({
+    label: t.type === 'earn'
+      ? (t.nights ? `${lk === 'de' ? 'Aufenthalt' : 'Stay'} · ${t.nights} ${nightWord(t.nights)}` : (lk === 'de' ? 'Aufenthalt' : 'Stay'))
+      : (t.note || (t.type === 'redeem' ? (lk === 'de' ? 'Prämie eingelöst' : 'Reward redeemed') : (lk === 'de' ? 'Anpassung' : 'Adjustment'))),
+    pts: t.points,
+    date: fmtDate(t.created_at),
+  }));
+}
+
+// ── Tier + Progress (computed aus Config) ───────────────────────────────────
+const progress = computeTierProgress(lifetime, tiers);
+const tierName = progress.tier.name;
+const nextTierName = progress.nextTier?.name ?? '';
+const progressPct = progress.progressPct;
+const pointsToNext = progress.pointsToNext;
+const benefitsList = (progress.tier.benefits ?? []).map(b => b.title).filter(Boolean);
+const hasActivity = lifetime > 0;
 const backHref = `/g/${token}`;
 
-type LabelSet = {
-  status: string; points: string; progress: string;
-  benefits: string; history: string; empty: string; emptySub: string;
-  back: string;
-};
+const L = {
+  de: { status: 'Dein Status', points: 'Punkte', benefits: 'Deine Vorteile', history: 'Punkte-Verlauf', empty: 'Noch keine Punkte', emptySub: 'Du sammelst Punkte automatisch bei jedem Aufenthalt.', back: '← zurück' },
+  en: { status: 'Your Status', points: 'Points', benefits: 'Your Benefits', history: 'Points History', empty: 'No points yet', emptySub: 'You earn points automatically with every stay.', back: '← back' },
+  fr: { status: 'Votre Statut', points: 'Points', benefits: 'Vos Avantages', history: 'Historique', empty: 'Pas encore de points', emptySub: 'Vous gagnez des points à chaque séjour.', back: '← retour' },
+  es: { status: 'Tu Estado', points: 'Puntos', benefits: 'Tus Ventajas', history: 'Historial', empty: 'Aún sin puntos', emptySub: 'Ganas puntos con cada estancia.', back: '← volver' },
+}[lk];
 
-const labels: Record<Lang, LabelSet> = {
-  de: {
-    status: 'Dein Status', points: 'Punkte',
-    progress: `Noch ${Math.max(0, nextAt - points)} Punkte bis ${nextTierLabel}`,
-    benefits: 'Deine Vorteile', history: 'Punkte-Verlauf',
-    empty: 'Noch keine Punkte', emptySub: 'Punkte sammelst du automatisch bei jedem Aufenthalt.',
-    back: '← zurück',
-  },
-  en: {
-    status: 'Your Status', points: 'Points',
-    progress: `${Math.max(0, nextAt - points)} more points until ${nextTierLabel}`,
-    benefits: 'Your Benefits', history: 'Points History',
-    empty: 'No points yet', emptySub: 'You earn points automatically with every stay.',
-    back: '← back',
-  },
-  fr: {
-    status: 'Votre Statut', points: 'Points',
-    progress: `Encore ${Math.max(0, nextAt - points)} points jusqu'à ${nextTierLabel}`,
-    benefits: 'Vos Avantages', history: 'Historique des Points',
-    empty: 'Pas encore de points', emptySub: 'Vous gagnez des points automatiquement à chaque séjour.',
-    back: '← retour',
-  },
-  es: {
-    status: 'Tu Estado', points: 'Puntos',
-    progress: `${Math.max(0, nextAt - points)} puntos más hasta ${nextTierLabel}`,
-    benefits: 'Tus Ventajas', history: 'Historial de Puntos',
-    empty: 'Aún sin puntos', emptySub: 'Ganas puntos automáticamente con cada estancia.',
-    back: '← volver',
-  },
-};
-
-const L = labels[lang];
-const defaultBenefits = tier === 'bronze'
-  ? (lang === 'de' ? ['Willkommensgetränk', 'Späteres Check-out auf Anfrage'] : ['Welcome drink', 'Late check-out on request'])
-  : tier === 'silver'
-    ? (lang === 'de' ? ['Frühes Check-in ab 12:00', 'Spätes Check-out bis 13:00', 'Willkommensgetränk'] : ['Early check-in from 12:00', 'Late check-out until 13:00', 'Welcome drink'])
-    : (lang === 'de' ? ['Frühes Check-in ab 10:00', 'Spätes Check-out bis 15:00', 'Zimmer-Upgrade', 'Willkommenspaket'] : ['Early check-in from 10:00', 'Late check-out until 15:00', 'Room upgrade', 'Welcome package']);
-
-const benefitsList = (loyaltyData?.benefits?.length ? loyaltyData.benefits : defaultBenefits) as string[];
-const historyList = loyaltyData?.earned_history ?? [];
+const progressLabel = !nextTierName ? '' :
+  lk === 'de' ? `Noch ${pointsToNext} Punkte bis ${nextTierName}` :
+  lk === 'en' ? `${pointsToNext} more points until ${nextTierName}` :
+  lk === 'fr' ? `Encore ${pointsToNext} points jusqu'à ${nextTierName}` :
+  `${pointsToNext} puntos más hasta ${nextTierName}`;
 ---
 
 <!DOCTYPE html>
@@ -147,7 +141,7 @@ const historyList = loyaltyData?.earned_history ?? [];
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0A0A0A" />
-    <title>{hotel.name} · {tierLabel}</title>
+    <title>{hotel.name} · {tierName}</title>
     <style>
       *, *::before, *::after { box-sizing: border-box; }
       body {
@@ -165,7 +159,6 @@ const historyList = loyaltyData?.earned_history ?? [];
       }
       .back-link:hover { color: #0A0A0A; }
 
-      /* Hero (dark background) */
       .hero {
         background: #0A0A0A; color: #FAFAF8;
         padding: 32px 20px 28px; margin-bottom: 24px;
@@ -179,23 +172,21 @@ const historyList = loyaltyData?.earned_history ?? [];
         font-size: clamp(36px, 9vw, 60px); font-weight: 400; letter-spacing: -0.03em;
         line-height: 1; margin: 0 0 8px;
       }
-      .hero__tier .dot { color: var(--guest-accent); }
+      .hero__tier .dot { color: var(--guest-accent, #FF4A82); }
       .hero__pts {
         font-family: 'JetBrains Mono', monospace;
         font-size: 13px; opacity: 0.6; letter-spacing: 0.08em;
       }
 
-      /* Progress */
       .progress { padding: 0 20px 24px; }
       .progress__bar-wrap {
         height: 6px; background: #E0DDD8; border-radius: 3px; overflow: hidden; margin-bottom: 8px;
       }
-      .progress__bar { height: 100%; background: var(--guest-accent); border-radius: 3px; transition: width 0.5s ease; }
+      .progress__bar { height: 100%; background: var(--guest-accent, #FF4A82); border-radius: 3px; transition: width 0.5s ease; }
       .progress__label {
         font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; letter-spacing: 0.04em;
       }
 
-      /* Section */
       .section { padding: 0 20px 24px; }
       .section__head {
         font-family: 'JetBrains Mono', monospace;
@@ -204,7 +195,6 @@ const historyList = loyaltyData?.earned_history ?? [];
         border-bottom: 1px solid #E0DDD8;
       }
 
-      /* Benefits */
       .benefits { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
       .benefit {
         display: flex; align-items: center; gap: 10px;
@@ -212,7 +202,6 @@ const historyList = loyaltyData?.earned_history ?? [];
       }
       .benefit svg { color: #5C9070; flex-shrink: 0; }
 
-      /* History */
       .history { display: flex; flex-direction: column; }
       .history__item {
         display: flex; justify-content: space-between; align-items: center;
@@ -226,10 +215,10 @@ const historyList = loyaltyData?.earned_history ?? [];
       }
       .history__pts {
         font-family: 'JetBrains Mono', monospace; font-size: 13px;
-        font-weight: 500; color: var(--guest-accent);
+        font-weight: 500; color: var(--guest-accent, #FF4A82);
       }
+      .history__pts--neg { color: #888; }
 
-      /* Empty state */
       .empty {
         background: #F5F5F3; border: 1px solid #E0DDD8; border-radius: 10px;
         padding: 24px; text-align: center; margin: 0 20px;
@@ -250,32 +239,28 @@ const historyList = loyaltyData?.earned_history ?? [];
     <div class="page">
       <a href={backHref} class="back-link">{L.back}</a>
 
-      <!-- Hero -->
       <div class="hero">
         <span class="hero__eyebrow">{L.status}</span>
-        <h1 class="hero__tier">{tierLabel}<span class="dot">.</span></h1>
-        <p class="hero__pts">{points} {L.points}</p>
+        <h1 class="hero__tier">{tierName}<span class="dot">.</span></h1>
+        <p class="hero__pts">{balance} {L.points}</p>
       </div>
 
-      {loyaltyData === null ? (
-        <!-- Kein Loyalty-Eintrag -->
+      {!hasActivity ? (
         <div class="empty">
           <h2 class="empty__title">{L.empty}</h2>
           <p class="empty__sub">{L.emptySub}</p>
         </div>
       ) : (
         <>
-          <!-- Progress Bar -->
-          {tier !== 'platinum' && (
+          {nextTierName && (
             <div class="progress">
               <div class="progress__bar-wrap">
                 <div class="progress__bar" style={`width:${progressPct}%`}></div>
               </div>
-              <p class="progress__label">{L.progress}</p>
+              <p class="progress__label">{progressLabel}</p>
             </div>
           )}
 
-          <!-- Benefits -->
           {benefitsList.length > 0 && (
             <div class="section">
               <div class="section__head">{L.benefits}</div>
@@ -292,18 +277,19 @@ const historyList = loyaltyData?.earned_history ?? [];
             </div>
           )}
 
-          <!-- History -->
-          {historyList.length > 0 && (
+          {history.length > 0 && (
             <div class="section">
               <div class="section__head">{L.history}</div>
               <div class="history">
-                {historyList.slice(0, 10).map((h: any) => (
+                {history.slice(0, 10).map((h) => (
                   <div class="history__item">
                     <div>
                       <span>{h.label}</span>
                       {h.date && <span class="history__item-date">{h.date}</span>}
                     </div>
-                    <span class="history__pts">+{h.pts}</span>
+                    <span class:list={['history__pts', { 'history__pts--neg': h.pts < 0 }]}>
+                      {h.pts > 0 ? `+${h.pts}` : h.pts}
+                    </span>
                   </div>
                 ))}
               </div>

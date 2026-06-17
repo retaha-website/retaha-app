@@ -33,14 +33,14 @@ const {
   heroCards = [], weather, persona = 'in_house',
 } = Astro.props;
 
-type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt';
+type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt' | 'loyalty';
 type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
 
 // Module-Reihenfolge und Sichtbarkeit pro Mode
 const MODULE_ORDER: Record<StayMode, ModuleKey[]> = {
-  pre_arrival:  ['anfahrt', 'breakfast', 'wifi', 'eve', 'places', 'wallet'],
-  in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'checkout', 'wallet'],
-  checking_out: ['checkout', 'eve', 'wallet', 'breakfast', 'places'],
+  pre_arrival:  ['anfahrt', 'breakfast', 'wifi', 'eve', 'places', 'loyalty', 'wallet'],
+  in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'loyalty', 'checkout', 'wallet'],
+  checking_out: ['checkout', 'loyalty', 'eve', 'wallet', 'breakfast', 'places'],
 };
 const theme = (hotel as any).design_identity ?? 'bauhaus';
 const eveName = settings.eve_name || 'Eve';
@@ -150,6 +150,16 @@ const ACTION_POOL: ActionItem[] = [
     sub: 'Abreise vorbereiten',
     handler: `window.location='/g/${token}/checkout'`,
     visible: f.self_checkout !== false,
+  } as any,
+  {
+    key: 'loyalty',
+    num: '08',
+    icon: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    label: 'Treuestatus',
+    sub: persona === 'checking_out' ? 'Punkte gesammelt' : 'Punkte & Vorteile',
+    handler: '',
+    href: `/g/${token}/loyalty?persona=${persona}`,
+    visible: f.loyalty === true,
   } as any,
 ];
 
