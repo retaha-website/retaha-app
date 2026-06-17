@@ -8,6 +8,7 @@
 
 import type { APIRoute } from 'astro';
 import { getStaySession, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isDemoSession } from '../../../lib/showcase/session';
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -27,6 +28,29 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const sbSr = createSupabaseServiceRoleInstance();
 
+  // ── Demo-Checkout (Showcase-Session) ─────────────────────────────────────
+  if (isDemoSession(session)) {
+    const { data: sc } = await sbSr.from('showcase_sessions')
+      .select('id, demo_data')
+      .eq('id', session.stay_id)
+      .maybeSingle();
+
+    if (!sc) return json({ ok: false, error: 'stay_not_found' }, 404);
+
+    const dd = (sc.demo_data ?? {}) as any;
+    if (dd.checked_out_at_sim) {
+      return json({ ok: true, already_done: true });
+    }
+
+    const checkedOutAt = new Date().toISOString();
+    await sbSr.from('showcase_sessions').update({
+      demo_data: { ...dd, checked_out_at_sim: checkedOutAt },
+    }).eq('id', sc.id);
+
+    return json({ ok: true, checked_out_at: checkedOutAt, mews_sync: 'skipped' });
+  }
+
+  // ── Echter Stay ───────────────────────────────────────────────────────────
   // Stay laden + validieren
   const { data: stayRow, error: stayErr } = await sbSr
     .from('stays')

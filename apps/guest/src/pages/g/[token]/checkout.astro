@@ -50,21 +50,29 @@ if (isShowcaseToken(token)) {
       const now = new Date();
       const checkIn  = dd.check_in  ? new Date(dd.check_in)  : new Date(now.getTime() - 2 * 86400000);
       const checkOut = dd.check_out ? new Date(dd.check_out) : new Date(now.setHours(11, 0, 0, 0));
+
       ctx = {
-        stay:     { id: showcaseSession.id, check_in: checkIn.toISOString(), check_out: checkOut.toISOString(), is_active: true },
+        stay:     { id: showcaseSession.id, check_in: checkIn.toISOString(), check_out: checkOut.toISOString(), is_active: !dd.checked_out_at_sim },
         guest:    { id: showcaseSession.id, first_name: dd.guest_first_name ?? 'Anna', last_name: dd.guest_last_name ?? 'Demo', email: dd.guest_email ?? null, language: hotelRow.default_language ?? 'de', visit_count: 1 },
         room:     { id: showcaseSession.id, room_number: dd.room_number ?? '101', room_name: dd.room_name ?? 'Demo-Suite' },
         hotel:    hotelRow,
         settings: settingsRow ?? { features: {} },
       };
-      isShowcaseMode = true;
-      const items: Array<{ label: string; amount_cents: number }> = dd.items ?? [];
-      showcaseBilling = {
-        balanceCents: dd.balance_cents ?? 0,
-        totalCents:   items.reduce((s, i) => s + (i.amount_cents ?? 0), 0),
-        items,
-        currency: dd.currency ?? (hotelRow as any).currency ?? 'EUR',
-      };
+
+      if (dd.checked_out_at_sim) {
+        // Demo bereits ausgecheckt — Success-Screen wie echter isCompletedStay
+        isCompletedStay = true;
+        completedCheckedOutAt = dd.checked_out_at_sim;
+      } else {
+        isShowcaseMode = true;
+        const items: Array<{ label: string; amount_cents: number }> = dd.items ?? [];
+        showcaseBilling = {
+          balanceCents: dd.balance_cents ?? 0,
+          totalCents:   items.reduce((s, i) => s + (i.amount_cents ?? 0), 0),
+          items,
+          currency: dd.currency ?? (hotelRow as any).currency ?? 'EUR',
+        };
+      }
     }
   }
   if (!ctx) return Astro.redirect(`/g/${token}`);

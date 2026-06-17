@@ -40,6 +40,20 @@ export interface DemoData {
   balance_cents?: number;
   currency?: string;
   items?: DemoItem[];
+  // Set by /api/checkout/complete for demo sessions — triggers success screen on reload
+  checked_out_at_sim?: string;
+}
+
+/** Single source of truth: ist ein stays-Row ein Demo-Stay?
+ *  Demo ⟺ mews_reservation_id IS NULL + _retaha_sim in raw_mews_data.
+ *  Für Showcase-Sessions (kein stays-Row) → isDemoSession() verwenden. */
+export function isDemoStay(stay: { mews_reservation_id?: string | null; raw_mews_data?: unknown }): boolean {
+  return !stay.mews_reservation_id && !!(stay.raw_mews_data as any)?._retaha_sim;
+}
+
+/** Single source of truth: is this a demo/showcase session (cookie-based)? */
+export function isDemoSession(session: { is_showcase?: boolean }): boolean {
+  return session.is_showcase === true;
 }
 
 export interface ShowcaseSession {
