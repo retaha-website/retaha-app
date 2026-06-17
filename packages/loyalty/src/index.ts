@@ -187,3 +187,160 @@ export async function awardStayPoints(sb: any, args: {
 
   return { ok: true, awarded: points, nights, tier };
 }
+
+// ── Redemption (DB via übergebenem Service-Role-Client) ─────────────────────
+
+export interface RedeemResult {
+  ok: boolean;
+  error?: string;       // 'loyalty_disabled' | 'reward_unavailable' | 'insufficient_points' | ...
+  voucher_code?: string;
+  reward_title?: string;
+  cost_points?: number;
+  expires_at?: string;
+  balance?: number;     // Saldo NACH der Einlösung
+}
+
+/**
+ * Löst eine Prämie für einen Gast ein.
+ * - Gated auf hotel_settings.features.loyalty === true.
+ * - Reward muss in loyalty_config.rewards existieren und active sein.
+ * - Saldo wird aus dem Ledger gelesen; reicht er nicht → insufficient_points.
+ * - Schreibt loyalty_redemptions (Voucher, status 'issued', Ablauf) + Ledger-
+ *   'redeem' (negativ, mit redemption_id) und rechnet den Saldo neu.
+ * - Voucher-Code kollisionsfrei (unique hotel_id,voucher_code → Retry bei 23505).
+ * Hinweis: kein DB-Transaktions-Wrapper — bei Ledger-Fehler wird die eben
+ * angelegte Redemption wieder entfernt (kein Voucher ohne Abbuchung).
+ */
+export async function redeemReward(sb: any, args: {
+  hotelId: string;
+  guestId: string;
+  rewardId: string;
+  expiresInDays?: number;
+}): Promise<RedeemResult> {
+  const { hotelId, guestId, rewardId } = args;
+  if (!hotelId || !guestId || !rewardId) return { ok: false, error: 'missing_ids' };
+
+  // Feature-Gate
+  const { data: hs } = await sb.from('hotel_settings').select('features').eq('hotel_id', hotelId).maybeSingle();
+  if (((hs?.features ?? {}) as Record<string, unknown>).loyalty !== true) {
+    return { ok: false, error: 'loyalty_disabled' };
+  }
+
+  // Config (Rewards + Tiers); Fallback Defaults
+  const { data: cfg } = await sb.from('loyalty_config')
+    .select('rewards, tiers').eq('hotel_id', hotelId).maybeSingle();
+  const rewards = (cfg?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards) as LoyaltyReward[];
+  const tiers = (cfg?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[];
+  const reward = rewards.find(r => r.id === rewardId && r.active !== false);
+  if (!reward) return { ok: false, error: 'reward_unavailable' };
+  const cost = Math.max(0, Math.round(reward.cost_points || 0));
+
+  // Saldo aus dem Ledger
+  const { data: txs } = await sb.from('loyalty_transactions')
+    .select('points').eq('hotel_id', hotelId).eq('guest_id', guestId);
+  const rows = (txs ?? []) as Array<{ points: number }>;
+  const balance = rows.reduce((s, r) => s + (r.points ?? 0), 0);
+  if (balance < cost) return { ok: false, error: 'insufficient_points', balance };
+
+  const expiresAt = new Date(Date.now() + (args.expiresInDays ?? 90) * 86_400_000).toISOString();
+
+  // Redemption anlegen (Voucher-Kollision → neu würfeln)
+  let redemptionId: string | null = null;
+  let voucherCode = '';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    voucherCode = generateVoucherCode();
+    const { data: red, error: redErr } = await sb.from('loyalty_redemptions').insert({
+      hotel_id: hotelId, guest_id: guestId, reward_id: reward.id, reward_title: reward.title,
+      cost_points: cost, voucher_code: voucherCode, status: 'issued', expires_at: expiresAt,
+    }).select('id').single();
+    if (!redErr && red) { redemptionId = red.id; break; }
+    if ((redErr?.code ?? '') !== '23505') return { ok: false, error: redErr?.message || 'redemption_failed' };
+  }
+  if (!redemptionId) return { ok: false, error: 'voucher_collision' };
+
+  // Ledger-Eintrag 'redeem' (negativ)
+  const { error: txErr } = await sb.from('loyalty_transactions').insert({
+    hotel_id: hotelId, guest_id: guestId, type: 'redeem', points: -cost,
+    reward_id: reward.id, redemption_id: redemptionId, note: reward.title,
+  });
+  if (txErr) {
+    await sb.from('loyalty_redemptions').delete().eq('id', redemptionId); // kein Voucher ohne Abbuchung
+    return { ok: false, error: txErr.message };
+  }
+
+  // Saldo/Tier neu berechnen
+  const { data: txs2 } = await sb.from('loyalty_transactions')
+    .select('points').eq('hotel_id', hotelId).eq('guest_id', guestId);
+  const rows2 = (txs2 ?? []) as Array<{ points: number }>;
+  const newBalance = rows2.reduce((s, r) => s + (r.points ?? 0), 0);
+  const lifetime = rows2.reduce((s, r) => s + (r.points > 0 ? r.points : 0), 0);
+  await sb.from('loyalty_points').upsert({
+    hotel_id: hotelId, guest_id: guestId,
+    points_balance: newBalance, points_lifetime: lifetime, tier: computeTier(lifetime, tiers).key,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'hotel_id,guest_id' });
+
+  return { ok: true, voucher_code: voucherCode, reward_title: reward.title, cost_points: cost, expires_at: expiresAt, balance: newBalance };
+}
+
+export interface VoucherView {
+  voucher_code: string;
+  reward_title: string;
+  cost_points: number;
+  status: 'issued' | 'validated' | 'expired' | 'cancelled';
+  expires_at: string | null;
+  validated_at: string | null;
+  created_at: string;
+  is_expired: boolean;
+}
+
+/** Hotelier-Lookup eines Vouchers (scoped auf hotel_id). */
+export async function lookupVoucher(sb: any, hotelId: string, code: string): Promise<VoucherView | null> {
+  const clean = String(code || '').trim().toUpperCase();
+  if (!hotelId || !clean) return null;
+  const { data } = await sb.from('loyalty_redemptions')
+    .select('voucher_code, reward_title, cost_points, status, expires_at, validated_at, created_at')
+    .eq('hotel_id', hotelId).eq('voucher_code', clean).maybeSingle();
+  if (!data) return null;
+  const isExpired = !!data.expires_at && new Date(data.expires_at).getTime() < Date.now();
+  return { ...data, is_expired: isExpired } as VoucherView;
+}
+
+export interface ValidateResult {
+  ok: boolean;
+  error?: string;       // 'not_found' | 'already_validated' | 'cancelled' | 'expired'
+  status?: string;
+  reward_title?: string;
+  validated_at?: string;
+}
+
+/** Voucher einlösen am Empfang: status 'issued' → 'validated' (einmalig). */
+export async function validateVoucher(sb: any, args: {
+  hotelId: string;
+  code: string;
+  validatedBy?: string | null;
+}): Promise<ValidateResult> {
+  const clean = String(args.code || '').trim().toUpperCase();
+  if (!args.hotelId || !clean) return { ok: false, error: 'not_found' };
+
+  const { data: row } = await sb.from('loyalty_redemptions')
+    .select('id, status, reward_title, expires_at')
+    .eq('hotel_id', args.hotelId).eq('voucher_code', clean).maybeSingle();
+  if (!row) return { ok: false, error: 'not_found' };
+  if (row.status === 'validated') return { ok: false, error: 'already_validated', reward_title: row.reward_title, validated_at: row.validated_at };
+  if (row.status === 'cancelled') return { ok: false, error: 'cancelled', reward_title: row.reward_title };
+  if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) {
+    await sb.from('loyalty_redemptions').update({ status: 'expired' }).eq('id', row.id).eq('status', 'issued');
+    return { ok: false, error: 'expired', reward_title: row.reward_title };
+  }
+
+  const validatedAt = new Date().toISOString();
+  const { data: upd, error } = await sb.from('loyalty_redemptions')
+    .update({ status: 'validated', validated_at: validatedAt, validated_by: args.validatedBy ?? null })
+    .eq('id', row.id).eq('status', 'issued')   // nur wenn noch issued (Race-Schutz)
+    .select('id').maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!upd) return { ok: false, error: 'already_validated', reward_title: row.reward_title };
+
+  return { ok: true, status: 'validated', reward_title: row.reward_title, validated_at: validatedAt };
+}

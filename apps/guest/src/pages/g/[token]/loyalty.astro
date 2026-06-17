@@ -6,7 +6,7 @@ import { loadStayByToken } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { getStaySession, setStaySessionCookie, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
-import { computeTierProgress, nightsBetween, pointsForNights, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier } from '@retaha/loyalty';
+import { computeTierProgress, nightsBetween, pointsForNights, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier, type LoyaltyReward } from '@retaha/loyalty';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -39,6 +39,11 @@ if (isShowcaseToken(token)) {
   guest = { first_name: demoData.guest_first_name ?? 'Anna', language: h.default_language };
   hotelId = h.id;
   settings = { features: hs?.features ?? {} };
+  // Stay-Session (showcase) sicherstellen, damit Redeem auch bei Direkt-Aufruf greift
+  const { checkOut } = resolveDemoCheckDates(demoData?.preset);
+  await setStaySessionCookie(Astro.cookies, {
+    stay_id: sc.id, hotel_id: h.id, check_out_utc: checkOut.toISOString(), is_showcase: true,
+  });
 } else {
   const ctx = await loadStayByToken(token);
   if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
@@ -63,9 +68,12 @@ const lang: Lang = langRaw;
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const { data: cfgRow } = await sbSr.from('loyalty_config')
-  .select('points_per_night, tiers').eq('hotel_id', hotelId).maybeSingle();
+  .select('points_per_night, tiers, rewards').eq('hotel_id', hotelId).maybeSingle();
 const tiers = (cfgRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[];
 const pointsPerNight = (cfgRow?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.points_per_night) as number;
+const activeRewards = ((cfgRow?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards) as LoyaltyReward[])
+  .filter(r => r.active !== false && r.title)
+  .sort((a, b) => (a.cost_points || 0) - (b.cost_points || 0));
 
 // ── Saldo + History: echt oder Demo-Simulation ──────────────────────────────
 const locale = ({ de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' } as Record<string, string>)[lk] ?? 'de-DE';
@@ -111,6 +119,25 @@ if (isShowcase) {
   }));
 }
 
+// ── Aktive Gutscheine (nur echter Gast; Demo-Voucher entstehen client-seitig) ──
+let vouchers: Array<{ voucher_code: string; reward_title: string; status: string; expires_at: string | null }> = [];
+if (!isShowcase && guestId) {
+  const { data: reds } = await sbSr.from('loyalty_redemptions')
+    .select('voucher_code, reward_title, status, expires_at, created_at')
+    .eq('hotel_id', hotelId).eq('guest_id', guestId)
+    .in('status', ['issued', 'validated'])
+    .order('created_at', { ascending: false }).limit(10);
+  vouchers = ((reds ?? []) as any[]).map(v => {
+    const expired = !!v.expires_at && new Date(v.expires_at).getTime() < Date.now();
+    return {
+      voucher_code: v.voucher_code,
+      reward_title: v.reward_title,
+      status: expired && v.status === 'issued' ? 'expired' : v.status,
+      expires_at: v.expires_at,
+    };
+  });
+}
+
 // ── Tier + Progress (computed aus Config) ───────────────────────────────────
 const progress = computeTierProgress(lifetime, tiers);
 const tierName = progress.tier.name;
@@ -122,11 +149,13 @@ const hasActivity = lifetime > 0;
 const backHref = `/g/${token}`;
 
 const L = {
-  de: { status: 'Dein Status', points: 'Punkte', benefits: 'Deine Vorteile', history: 'Punkte-Verlauf', empty: 'Noch keine Punkte', emptySub: 'Du sammelst Punkte automatisch bei jedem Aufenthalt.', back: '← zurück' },
-  en: { status: 'Your Status', points: 'Points', benefits: 'Your Benefits', history: 'Points History', empty: 'No points yet', emptySub: 'You earn points automatically with every stay.', back: '← back' },
-  fr: { status: 'Votre Statut', points: 'Points', benefits: 'Vos Avantages', history: 'Historique', empty: 'Pas encore de points', emptySub: 'Vous gagnez des points à chaque séjour.', back: '← retour' },
-  es: { status: 'Tu Estado', points: 'Puntos', benefits: 'Tus Ventajas', history: 'Historial', empty: 'Aún sin puntos', emptySub: 'Ganas puntos con cada estancia.', back: '← volver' },
+  de: { status: 'Dein Status', points: 'Punkte', benefits: 'Deine Vorteile', history: 'Punkte-Verlauf', empty: 'Noch keine Punkte', emptySub: 'Du sammelst Punkte automatisch bei jedem Aufenthalt.', back: '← zurück', rewards: 'Prämien einlösen', redeem: 'Einlösen', vouchers: 'Deine Gutscheine', validAt: 'Gültig bis', validReception: 'Diesen Code an der Rezeption vorzeigen.', stIssued: 'Offen', stValidated: 'Eingelöst', stExpired: 'Abgelaufen', okMsg: 'Prämie eingelöst', errInsufficient: 'Nicht genug Punkte', errGeneric: 'Etwas ist schiefgelaufen' },
+  en: { status: 'Your Status', points: 'Points', benefits: 'Your Benefits', history: 'Points History', empty: 'No points yet', emptySub: 'You earn points automatically with every stay.', back: '← back', rewards: 'Redeem Rewards', redeem: 'Redeem', vouchers: 'Your Vouchers', validAt: 'Valid until', validReception: 'Show this code at the reception.', stIssued: 'Open', stValidated: 'Redeemed', stExpired: 'Expired', okMsg: 'Reward redeemed', errInsufficient: 'Not enough points', errGeneric: 'Something went wrong' },
+  fr: { status: 'Votre Statut', points: 'Points', benefits: 'Vos Avantages', history: 'Historique', empty: 'Pas encore de points', emptySub: 'Vous gagnez des points à chaque séjour.', back: '← retour', rewards: 'Utiliser les récompenses', redeem: 'Utiliser', vouchers: 'Vos bons', validAt: 'Valable jusqu\'au', validReception: 'Présentez ce code à la réception.', stIssued: 'Ouvert', stValidated: 'Utilisé', stExpired: 'Expiré', okMsg: 'Récompense utilisée', errInsufficient: 'Points insuffisants', errGeneric: 'Une erreur est survenue' },
+  es: { status: 'Tu Estado', points: 'Puntos', benefits: 'Tus Ventajas', history: 'Historial', empty: 'Aún sin puntos', emptySub: 'Ganas puntos con cada estancia.', back: '← volver', rewards: 'Canjear recompensas', redeem: 'Canjear', vouchers: 'Tus vales', validAt: 'Válido hasta', validReception: 'Muestra este código en recepción.', stIssued: 'Abierto', stValidated: 'Canjeado', stExpired: 'Caducado', okMsg: 'Recompensa canjeada', errInsufficient: 'Puntos insuficientes', errGeneric: 'Algo salió mal' },
 }[lk];
+
+const statusLabel = (st: string) => st === 'validated' ? L.stValidated : st === 'expired' ? L.stExpired : L.stIssued;
 
 const progressLabel = !nextTierName ? '' :
   lk === 'de' ? `Noch ${pointsToNext} Punkte bis ${nextTierName}` :
@@ -226,6 +255,56 @@ const progressLabel = !nextTierName ? '' :
       .empty__title { font-size: 16px; font-weight: 400; margin: 0 0 6px; }
       .empty__sub { font-size: 13px; color: #888; margin: 0; line-height: 1.4; }
 
+      /* Rewards */
+      .rewards { display: flex; flex-direction: column; gap: 10px; }
+      .reward {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 14px; background: #fff; border: 1px solid #E0DDD8; border-radius: 10px;
+      }
+      .reward__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .reward__title { font-size: 14px; font-weight: 500; }
+      .reward__desc { font-size: 12px; color: #888; line-height: 1.35; }
+      .reward__btn {
+        flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+        padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+        background: #0A0A0A; color: #FAFAF8; font-family: inherit; min-width: 84px;
+      }
+      .reward__cost { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.7; }
+      .reward__cta { font-size: 13px; font-weight: 500; }
+      .reward__btn:disabled { background: #EDEAE5; color: #B5B0A8; cursor: not-allowed; }
+
+      /* Vouchers */
+      .vouchers { display: flex; flex-direction: column; gap: 10px; }
+      .voucher { border: 1px dashed #0A0A0A; border-radius: 10px; padding: 14px; background: #FFFDF5; }
+      .voucher--validated, .voucher--expired {
+        opacity: 0.55; border-style: solid; border-color: #E0DDD8; background: #F5F5F3;
+      }
+      .voucher__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+      .voucher__reward { font-size: 13px; font-weight: 500; }
+      .voucher__status {
+        flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em;
+        text-transform: uppercase; padding: 3px 7px; border-radius: 999px; background: #0A0A0A; color: #FAFAF8;
+      }
+      .voucher--validated .voucher__status, .voucher--expired .voucher__status { background: #C9C4BC; color: #fff; }
+      .voucher__code {
+        font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 500; letter-spacing: 0.12em;
+        text-align: center; padding: 6px 0;
+      }
+      .voucher__meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #888; text-align: center; }
+      .vouchers__hint { font-size: 11px; color: #AAA; text-align: center; margin: 10px 0 0; }
+
+      /* Redeem-Toast */
+      .redeem-toast {
+        position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+        padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
+        opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+        z-index: 50; max-width: calc(100% - 40px); text-align: center;
+      }
+      .redeem-toast.is-show { opacity: 1; transform: translate(-50%, 0); }
+      .redeem-toast--ok { background: var(--guest-accent, #FF4A82); color: #0A0A0A; }
+      .redeem-toast--err { background: #0A0A0A; color: #FAFAF8; }
+      @media (prefers-reduced-motion: reduce) { .redeem-toast { transition: none; } }
+
       .made-by {
         margin-top: 48px; padding-top: 20px;
         border-top: 1px solid #E0DDD8;
@@ -242,7 +321,7 @@ const progressLabel = !nextTierName ? '' :
       <div class="hero">
         <span class="hero__eyebrow">{L.status}</span>
         <h1 class="hero__tier">{tierName}<span class="dot">.</span></h1>
-        <p class="hero__pts">{balance} {L.points}</p>
+        <p class="hero__pts"><span id="hero-balance">{balance}</span> {L.points}</p>
       </div>
 
       {!hasActivity ? (
@@ -277,6 +356,43 @@ const progressLabel = !nextTierName ? '' :
             </div>
           )}
 
+          {activeRewards.length > 0 && (
+            <div class="section" id="rewards-section" data-balance={balance} data-demo={isShowcase ? '1' : '0'}>
+              <div class="section__head">{L.rewards}</div>
+              <div class="rewards">
+                {activeRewards.map((r) => (
+                  <div class="reward" data-reward-id={r.id} data-cost={r.cost_points}>
+                    <div class="reward__info">
+                      <span class="reward__title">{r.title}</span>
+                      {r.desc && <span class="reward__desc">{r.desc}</span>}
+                    </div>
+                    <button class="reward__btn" type="button" data-redeem disabled={balance < (r.cost_points || 0)}>
+                      <span class="reward__cost">{r.cost_points} P</span>
+                      <span class="reward__cta">{L.redeem}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div class="section" id="vouchers-section" style={vouchers.length ? '' : 'display:none'}>
+            <div class="section__head">{L.vouchers}</div>
+            <div class="vouchers" id="vouchers-list">
+              {vouchers.map((v) => (
+                <div class:list={['voucher', `voucher--${v.status}`]}>
+                  <div class="voucher__top">
+                    <span class="voucher__reward">{v.reward_title}</span>
+                    <span class="voucher__status">{statusLabel(v.status)}</span>
+                  </div>
+                  <div class="voucher__code">{v.voucher_code}</div>
+                  <div class="voucher__meta">{v.status === 'issued' && v.expires_at ? `${L.validAt} ${fmtDate(v.expires_at)}` : ''}</div>
+                </div>
+              ))}
+            </div>
+            <p class="vouchers__hint">{L.validReception}</p>
+          </div>
+
           {history.length > 0 && (
             <div class="section">
               <div class="section__head">{L.history}</div>
@@ -302,5 +418,84 @@ const progressLabel = !nextTierName ? '' :
         powered by <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a>
       </div>
     </div>
+
+    <script is:inline define:vars={{ labels: { okMsg: L.okMsg, errInsufficient: L.errInsufficient, errGeneric: L.errGeneric, validAt: L.validAt, stIssued: L.stIssued }, jsLocale: locale }}>
+      (() => {
+        const section = document.getElementById('rewards-section');
+        if (!section) return;
+        let balance = Number(section.dataset.balance || 0);
+        const vouchersSection = document.getElementById('vouchers-section');
+        const vouchersList = document.getElementById('vouchers-list');
+        const heroBalance = document.getElementById('hero-balance');
+
+        const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(jsLocale, { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; } };
+
+        function refresh() {
+          if (heroBalance) heroBalance.textContent = String(balance);
+          document.querySelectorAll('.reward').forEach((card) => {
+            const cost = Number(card.dataset.cost || 0);
+            const btn = card.querySelector('[data-redeem]');
+            if (btn && btn.dataset.busy !== '1') btn.disabled = balance < cost;
+          });
+        }
+
+        let toastEl = null, toastTimer = null;
+        function toast(msg, type) {
+          if (!toastEl) { toastEl = document.createElement('div'); document.body.appendChild(toastEl); }
+          toastEl.textContent = msg;
+          toastEl.className = 'redeem-toast redeem-toast--' + (type || 'ok') + ' is-show';
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => toastEl && toastEl.classList.remove('is-show'), 3200);
+        }
+
+        function addVoucher(d) {
+          if (!vouchersList) return;
+          const el = document.createElement('div');
+          el.className = 'voucher voucher--issued';
+          el.innerHTML = '<div class="voucher__top"><span class="voucher__reward"></span><span class="voucher__status"></span></div>'
+            + '<div class="voucher__code"></div><div class="voucher__meta"></div>';
+          el.querySelector('.voucher__reward').textContent = d.reward_title || '';
+          el.querySelector('.voucher__status').textContent = labels.stIssued;
+          el.querySelector('.voucher__code').textContent = d.voucher_code || '';
+          el.querySelector('.voucher__meta').textContent = d.expires_at ? (labels.validAt + ' ' + fmtDate(d.expires_at)) : '';
+          vouchersList.prepend(el);
+          if (vouchersSection) vouchersSection.style.display = '';
+        }
+
+        section.addEventListener('click', async (e) => {
+          const btn = e.target.closest('[data-redeem]');
+          if (!btn || btn.disabled || btn.dataset.busy === '1') return;
+          const card = btn.closest('.reward');
+          const rewardId = card && card.dataset.rewardId;
+          const cost = Number((card && card.dataset.cost) || 0);
+          if (!rewardId) return;
+          const cta = btn.querySelector('.reward__cta');
+          const prev = cta ? cta.textContent : '';
+          btn.dataset.busy = '1'; btn.disabled = true;
+          if (cta) cta.textContent = '…';
+          const done = () => { btn.dataset.busy = ''; if (cta) cta.textContent = prev; refresh(); };
+          try {
+            const res = await fetch('/api/loyalty/redeem', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reward_id: rewardId }),
+            });
+            const data = await res.json();
+            if (!data || !data.ok) {
+              toast((data && data.error === 'insufficient_points') ? labels.errInsufficient : labels.errGeneric, 'err');
+              done(); return;
+            }
+            addVoucher(data);
+            balance = (typeof data.balance === 'number') ? data.balance : Math.max(0, balance - cost);
+            toast(labels.okMsg, 'ok');
+            done();
+          } catch (_) {
+            toast(labels.errGeneric, 'err');
+            done();
+          }
+        });
+
+        refresh();
+      })();
+    </script>
   </body>
 </html>
