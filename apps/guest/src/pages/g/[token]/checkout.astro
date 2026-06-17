@@ -13,7 +13,7 @@
 import { loadStayByToken, telHref } from '@retaha/db';
 import { normalizeLang, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
-import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
+import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -47,9 +47,8 @@ if (isShowcaseToken(token)) {
     ]);
     if (hotelRow) {
       const dd = (showcaseSession.demo_data ?? {}) as any;
-      const now = new Date();
-      const checkIn  = dd.check_in  ? new Date(dd.check_in)  : new Date(now.getTime() - 2 * 86400000);
-      const checkOut = dd.check_out ? new Date(dd.check_out) : new Date(now.setHours(11, 0, 0, 0));
+      // Single Source of Truth: Datum aus dem Preset ableiten (konsistent mit [token].astro)
+      const { checkIn, checkOut } = resolveDemoCheckDates(dd.preset);
 
       ctx = {
         stay:     { id: showcaseSession.id, check_in: checkIn.toISOString(), check_out: checkOut.toISOString(), is_active: !dd.checked_out_at_sim },

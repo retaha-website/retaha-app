@@ -193,3 +193,34 @@ export async function updateShowcaseSession(args: {
   if (error || !data) return { error: error?.message || 'update_failed' };
   return data as ShowcaseSession;
 }
+
+/**
+ * Single Source of Truth fuer Demo-Stay-Daten: leitet check_in/check_out aus dem
+ * Preset relativ zu `now` ab. Bewusst KEINE gespeicherten Absolut-Daten — die
+ * driften (relativ gemeinte Zustaende, absolut gespeichert) und uebersteuern den
+ * gewaehlten Preset. Akzeptiert auch die Live-Preview-Aliase arrival/departure.
+ */
+export function resolveDemoCheckDates(
+  preset: string | null | undefined,
+  now: Date = new Date(),
+): { checkIn: Date; checkOut: Date } {
+  const p = preset === 'arrival' ? 'pre_arrival'
+          : preset === 'departure' ? 'checkout_day'
+          : (preset ?? 'in_house');
+  let checkIn: Date, checkOut: Date;
+  if (p === 'pre_arrival') {
+    checkIn  = new Date(now);     checkIn.setUTCDate(checkIn.getUTCDate() + 3);    checkIn.setUTCHours(14, 0, 0, 0);
+    checkOut = new Date(checkIn); checkOut.setUTCDate(checkOut.getUTCDate() + 2);  checkOut.setUTCHours(11, 0, 0, 0);
+  } else if (p === 'checkout_day') {
+    checkIn  = new Date(now); checkIn.setUTCDate(checkIn.getUTCDate() - 2); checkIn.setUTCHours(14, 0, 0, 0);
+    checkOut = new Date(now); checkOut.setUTCHours(23, 59, 59, 0);  // Abreise heute, Checkout noch offen
+  } else if (p === 'checked_out') {
+    checkIn  = new Date(now); checkIn.setUTCDate(checkIn.getUTCDate() - 3); checkIn.setUTCHours(14, 0, 0, 0);
+    checkOut = new Date(now); checkOut.setUTCDate(checkOut.getUTCDate() - 1); checkOut.setUTCHours(11, 0, 0, 0);
+  } else {
+    // in_house
+    checkIn  = new Date(now); checkIn.setUTCDate(checkIn.getUTCDate() - 1); checkIn.setUTCHours(14, 0, 0, 0);
+    checkOut = new Date(now); checkOut.setUTCDate(checkOut.getUTCDate() + 1); checkOut.setUTCHours(11, 0, 0, 0);
+  }
+  return { checkIn, checkOut };
+}

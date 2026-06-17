@@ -41,7 +41,7 @@ import '@retaha/ui-guest/themes/bauhaus';
 import '@retaha/ui-guest/themes/editorial';
 import '@retaha/ui-guest/themes/maison';
 import { resolveTheme } from '@retaha/ui/theme';
-import { isShowcaseToken, findShowcaseSessionByToken, type ShowcaseSession } from '../../lib/showcase/session';
+import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates, type ShowcaseSession } from '../../lib/showcase/session';
 
 const { token } = Astro.params;
 
@@ -61,31 +61,18 @@ if (token && isShowcaseToken(token)) {
     ]);
     if (hotelRow) {
       const dd = showcaseSession.demo_data as any;
-      // Preset priority: demo_data.preset → URL-param persona → cookie persona → 'in_house'
+      // Preset-Priorität: URL-param persona (Live-Preview) → demo_data.preset → cookie → 'in_house'
       const _urlPersona = new URL(Astro.request.url).searchParams.get('persona');
       const _cookiePersona = Astro.cookies.get('showcase_persona')?.value ?? null;
-      const _preset = dd?.preset ?? _urlPersona ?? _cookiePersona ?? 'in_house';
+      // Live-Preview-Persona (URL) hat Vorrang vor dem gespeicherten Preset —
+      // sonst ignoriert der PersonaPicker das gewählte Persona. Dann Preset, dann Cookie.
+      const _preset = _urlPersona ?? dd?.preset ?? _cookiePersona ?? 'in_house';
 
       // 'checked_out' preset → show "Einladung ungültig" page (ctx stays null)
       if (_preset !== 'checked_out') {
-        const now = new Date();
-        let _checkIn: Date, _checkOut: Date;
-
-        if (dd?.check_in && dd?.check_out) {
-          // Explicit dates stored in configurator take precedence
-          _checkIn  = new Date(dd.check_in);
-          _checkOut = new Date(dd.check_out);
-        } else if (_preset === 'arrival' || _preset === 'pre_arrival') {
-          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() + 3);  _checkIn.setUTCHours(14, 0, 0, 0);
-          _checkOut = new Date(_checkIn); _checkOut.setUTCDate(_checkOut.getUTCDate() + 2); _checkOut.setUTCHours(11, 0, 0, 0);
-        } else if (_preset === 'departure' || _preset === 'checkout_day') {
-          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 2); _checkIn.setUTCHours(14, 0, 0, 0);
-          _checkOut = new Date(now); _checkOut.setUTCHours(23, 59, 59, 0);
-        } else {
-          // in_house: check_in yesterday → stayPersona bleibt 'in_house'
-          _checkIn  = new Date(now); _checkIn.setUTCDate(_checkIn.getUTCDate() - 1); _checkIn.setUTCHours(14, 0, 0, 0);
-          _checkOut = new Date(now); _checkOut.setUTCDate(_checkOut.getUTCDate() + 1); _checkOut.setUTCHours(11, 0, 0, 0);
-        }
+        // Single Source of Truth: Datum aus dem Preset relativ zu jetzt ableiten —
+        // keine gespeicherten Absolut-Daten (driften + uebersteuern den Preset).
+        const { checkIn: _checkIn, checkOut: _checkOut } = resolveDemoCheckDates(_preset);
 
         ctx = {
           stay: {

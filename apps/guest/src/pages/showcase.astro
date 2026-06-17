@@ -373,6 +373,11 @@ function presetLabel(p: string | undefined): string {
               items: this.form.items.map(function(i) {
                 return { label: i.label, amount_cents: Math.round((parseFloat(i.euros) || 0) * 100) };
               }),
+              // Abgereist-Marker NUR im 'checked_out'-Preset; sonst explizit null,
+              // damit ein stale Marker aus dem Demo-Checkout beim Merge geleert wird.
+              checked_out_at_sim: this.form.preset === 'checked_out'
+                ? (this.form.check_out ? new Date(this.form.check_out).toISOString() : new Date().toISOString())
+                : null,
             };
             const url    = this.editId ? `/api/showcase/${this.editId}/update` : '/api/showcase/create';
             const method = this.editId ? 'PATCH' : 'POST';
