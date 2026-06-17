@@ -219,9 +219,40 @@ export const UI_STRINGS = {
 
 export type UIKey = keyof typeof UI_STRINGS['de'];
 
+// ── Anrede/Formalität (du/Sie) ───────────────────────────────────────────────
+// Sprachneutrale Achse: 'informal' (de: du, fr: tu, es: tú) / 'formal' (de: Sie,
+// fr: vous, es: usted). guest_address_form ('du'|'sie') wird hierauf gemappt.
+export type Formality = 'informal' | 'formal';
+
+export function addressFormToFormality(form: string | null | undefined): Formality {
+  return form === 'sie' ? 'formal' : 'informal';
+}
+
+// Formelle (Sie-)Varianten als additives Overlay über die UI_STRINGS-Basis
+// (= informelle/du-Form). Nur Keys, die sich unterscheiden. Forward-kompatibel:
+// fr (vous) / es (usted) erhalten hier später eigene Overrides.
+const FORMAL_OVERRIDES: Partial<Record<Lang, Record<string, string>>> = {
+  de: {
+    'concierge.text.default': 'Schön, Sie wieder bei uns zu haben.',
+    'rec.eyebrow': 'Empfehlung für Sie',
+    'places.subtitle': 'in der Nähe Ihres Hotels',
+    'eve.placeholder': 'Fragen Sie {name} etwas …',
+    'eve.confirmation_done': 'Erledigt — der Hotelier bekommt Ihre Anfrage gleich.',
+    'eve.confirmation_cancelled': 'Kein Problem, sagen Sie Bescheid, wenn ich helfen kann.',
+    'eve.error_generic': '{name} ist gerade kurz nicht erreichbar — versuchen Sie es gleich nochmal.',
+    'eve.suggestions_label': 'Fragen Sie mich zum Beispiel',
+  },
+};
+
 // Sprint i18n Phase 9 — t() liest aus UI_STRINGS (DE/EN/FR/ES) +
-// UI_STRINGS_EXTRA (IT/PT/NL/RU/AR/ZH). Fallback-Kette: lang → DE → key.
-export function t(key: UIKey, lang: Lang): string {
+// UI_STRINGS_EXTRA (IT/PT/NL/RU/AR/ZH). Fallback-Kette: formal-Overlay (bei
+// formality='formal') → lang → DE → key. Default 'informal' (= bisheriges
+// Verhalten, kein Bruch für 2-arg-Caller).
+export function t(key: UIKey, lang: Lang, formality: Formality = 'informal'): string {
+  if (formality === 'formal') {
+    const ov = FORMAL_OVERRIDES[lang]?.[key as string];
+    if (ov) return ov;
+  }
   const fromCore = (UI_STRINGS as any)[lang]?.[key];
   if (fromCore) return fromCore as string;
   const fromExtra = (UI_STRINGS_EXTRA as any)[lang]?.[key];

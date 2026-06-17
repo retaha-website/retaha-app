@@ -11,7 +11,7 @@
 //   TODO Mews live: Saldo + Posten aus Mews-API lesen; _retaha_sim-Block entfernen.
 
 import { loadStayByToken, telHref } from '@retaha/db';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken, resolveDemoCheckDates } from '../../../lib/showcase/session';
 import { computeCheckoutGate, type GateState } from '../../../lib/checkout/availability';
@@ -145,8 +145,10 @@ const hotelTz: string = (hotel as any).timezone ?? 'Europe/Berlin';
 
 // Konfigurierte Checkout-Zeit (treibt Verfügbarkeit + Anzeige) + Self-Checkout-Modus.
 const { data: htTimes } = await createSupabaseServiceRoleInstance()
-  .from('hotel_settings').select('checkout_time, self_checkout_mode, self_checkout_note')
+  .from('hotel_settings').select('checkout_time, self_checkout_mode, self_checkout_note, guest_address_form')
   .eq('hotel_id', (hotel as any).id).maybeSingle();
+// Anrede (du/Sie) — eine Quelle der Wahrheit; greift für echte Stays UND Showcase.
+const isFormalCo = addressFormToFormality((htTimes as any)?.guest_address_form) === 'formal';
 const checkoutTimeCfg: string = (htTimes as any)?.checkout_time ?? '11:00:00';
 
 // Modus 'info' → nur Hinweise, kein Auscheck-Button (Master features.self_checkout
@@ -154,7 +156,7 @@ const checkoutTimeCfg: string = (htTimes as any)?.checkout_time ?? '11:00:00';
 const infoMode = (htTimes as any)?.self_checkout_mode === 'info';
 const scNote = ((htTimes as any)?.self_checkout_note ?? {}) as Record<string, string>;
 const INFO_DEFAULT: Record<LK, string> = {
-  de: 'Bitte lass deine Schlüsselkarte im Zimmer. Late-Checkout gerne auf Anfrage an der Rezeption.',
+  de: isFormalCo ? 'Bitte lassen Sie Ihre Schlüsselkarte im Zimmer. Late-Checkout gerne auf Anfrage an der Rezeption.' : 'Bitte lass deine Schlüsselkarte im Zimmer. Late-Checkout gerne auf Anfrage an der Rezeption.',
   en: 'Please leave your key card in the room. Late check-out on request at reception.',
   fr: 'Merci de laisser votre carte-clé dans la chambre. Départ tardif sur demande à la réception.',
   es: 'Por favor, deja la tarjeta-llave en la habitación. Salida tardía bajo petición en recepción.',
@@ -306,16 +308,16 @@ const labels: Record<LK, LabelSet> = {
     piktoValueB: fmtMoney(totalCents),
     billTitle: 'RECHNUNG', chipPaid: 'Beglichen', billTotal: 'Gesamt', billNote: 'Rechnung kommt per E-Mail.',
     keyTile: 'Schlüsselkarte', keyTileSub: 'Einfach im Zimmer lassen.',
-    btnCheckout: 'Jetzt auschecken', hintCheckout: 'Du erhältst eine Bestätigung per E-Mail.',
+    btnCheckout: 'Jetzt auschecken', hintCheckout: isFormalCo ? 'Sie erhalten eine Bestätigung per E-Mail.' : 'Du erhältst eine Bestätigung per E-Mail.',
     // C
     titleC: 'Fast', titleAccentC: `geschafft, ${guestName ?? 'lieber Gast'}.`,
     subC: 'Es gibt noch einen offenen Betrag.',
     piktoLabelC: 'NOCH OFFEN',
-    chipOpen: 'Offen', billOpenTotal: 'Offener Betrag', billNoteOpen: 'Rechnung erhältst du an der Rezeption.',
+    chipOpen: 'Offen', billOpenTotal: 'Offener Betrag', billNoteOpen: isFormalCo ? 'Rechnung erhalten Sie an der Rezeption.' : 'Rechnung erhältst du an der Rezeption.',
     btnCall: 'Rezeption anrufen', hintCall: 'Self-Checkout öffnet nach Begleichung.',
     noPhoneHint: 'Bitte an der Rezeption vorbeikommen.',
     // done
-    doneTitle: 'Ausgecheckt.', doneSub: 'Gute Reise — wir hoffen, dich bald wiederzusehen.',
+    doneTitle: 'Ausgecheckt.', doneSub: isFormalCo ? 'Gute Reise — wir hoffen, Sie bald wiederzusehen.' : 'Gute Reise — wir hoffen, dich bald wiederzusehen.',
     // error
     errorHint: 'Rechnung konnte nicht geladen werden. Bitte an der Rezeption auschecken.',
   },
@@ -418,7 +420,7 @@ const successSubTitle = _coAt
       const suffix = lk === 'de' ? ' Uhr' : '';
       return `${prefix} · ${datePart}, ${timePart}${suffix}`;
     })()
-  : (lk === 'de' ? 'Gute Reise — wir freuen uns, dich bald wiederzusehen.'
+  : (lk === 'de' ? (isFormalCo ? 'Gute Reise — wir freuen uns, Sie bald wiederzusehen.' : 'Gute Reise — wir freuen uns, dich bald wiederzusehen.')
    : lk === 'en' ? 'Safe travels — we look forward to seeing you again.'
    : lk === 'fr' ? 'Bon voyage — au plaisir de vous revoir bientôt.'
    : '¡Buen viaje — esperamos verte de nuevo pronto!');
@@ -456,7 +458,7 @@ const reviewBtnLabel = lk === 'de' ? 'Aufenthalt bewerten'
                      : lk === 'en' ? 'Rate your stay'
                      : lk === 'fr' ? 'Évaluer le séjour'
                      :               'Valorar estancia';
-const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammgast-Vorteile beim nächsten Mal.'
+const pitchText = lk === 'de' ? (isFormalCo ? 'Nehmen Sie uns mit — schnellerer Check-in & Stammgast-Vorteile beim nächsten Mal.' : 'Nimm uns mit — schnellerer Check-in & Stammgast-Vorteile beim nächsten Mal.')
                 : lk === 'en' ? 'Take us with you — faster check-in & returning guest perks next time.'
                 : lk === 'fr' ? 'Emportez-nous — check-in rapide & avantages fidélité au prochain séjour.'
                 :               'Llévanos contigo — check-in rápido y ventajas para clientes habituales.';

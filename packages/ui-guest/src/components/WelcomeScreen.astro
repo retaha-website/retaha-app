@@ -24,6 +24,7 @@ interface Props {
   roomLabel?: string;
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
+  formality?: 'informal' | 'formal';
 }
 
 const {
@@ -31,7 +32,9 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   f, wifiConfigured = false,
   heroCards = [], weather, persona = 'in_house',
+  formality = 'informal',
 } = Astro.props;
+const isFormal = formality === 'formal';
 
 type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet' | 'anfahrt' | 'loyalty';
 type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
@@ -54,7 +57,7 @@ type Lang = 'de' | 'en' | 'fr' | 'es';
 const l = (['de','en','fr','es'].includes(lang) ? lang : 'de') as Lang;
 const MODE_GREETING: Record<StayMode, Record<Lang, { hi: string; sub: string }>> = {
   pre_arrival: {
-    de: { hi: 'Willkommen,', sub: 'Wir freuen uns auf deinen Besuch.' },
+    de: { hi: 'Willkommen,', sub: isFormal ? 'Wir freuen uns auf Ihren Besuch.' : 'Wir freuen uns auf deinen Besuch.' },
     en: { hi: 'Welcome,',    sub: 'We look forward to your stay.' },
     fr: { hi: 'Bienvenue,',  sub: 'Nous avons hâte de vous accueillir.' },
     es: { hi: 'Bienvenido,', sub: 'Esperamos con entusiasmo su visita.' },
@@ -66,7 +69,10 @@ const MODE_GREETING: Record<StayMode, Record<Lang, { hi: string; sub: string }>>
     es: { hi: 'Bienvenido,', sub: welcomeSub },
   },
   checking_out: {
-    de: { hi: 'Schön, dass du da warst,', sub: 'Vielen Dank für deinen Aufenthalt.' },
+    de: {
+      hi:  isFormal ? 'Schön, dass Sie da waren,' : 'Schön, dass du da warst,',
+      sub: isFormal ? 'Vielen Dank für Ihren Aufenthalt.' : 'Vielen Dank für deinen Aufenthalt.',
+    },
     en: { hi: 'Goodbye,',                  sub: 'Thank you for staying with us.' },
     fr: { hi: 'Au revoir,',                sub: 'Merci pour votre séjour.' },
     es: { hi: 'Hasta pronto,',             sub: 'Gracias por su estancia.' },

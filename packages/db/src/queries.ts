@@ -53,6 +53,7 @@ export type StayContext = {
     service_items: any[];
     service_start_time: string | null;
     service_end_time: string | null;
+    guest_address_form: string | null;
   };
 };
 
@@ -99,7 +100,8 @@ export async function loadStayByToken(token: string): Promise<StayContext | null
       breakfast_start_time, breakfast_end_time, breakfast_slot_minutes,
       breakfast_hours,
       breakfast_location_i18n, breakfast_included_i18n,
-      service_items, service_start_time, service_end_time
+      service_items, service_start_time, service_end_time,
+      guest_address_form
     `)
     .eq('hotel_id', (stay.hotel as any).id)
     .maybeSingle();

@@ -1,6 +1,6 @@
 ---
 import { loadStayByToken } from '@retaha/db';
-import { normalizeLang, t, dayPart, type Lang } from '@retaha/i18n';
+import { normalizeLang, t, dayPart, addressFormToFormality, type Lang, type Formality } from '@retaha/i18n';
 import { fetchWeather } from '../../lib/weather';
 import WelcomeScreen from '@retaha/ui-guest/WelcomeScreen';
 import { isModuleAvailable } from '../../lib/plan-modules';
@@ -263,6 +263,9 @@ const hotelEyebrow = pickI18nHelper((settings as any).hotel_eyebrow_i18n, hotelD
 
 const greetingLabel = t('hero.greeting', lang);
 const greetingFallback = t('hero.greetingFallback', lang);
+
+// Anrede (du/Sie) — eine Quelle der Wahrheit: hotel_settings.guest_address_form.
+const formality: Formality = addressFormToFormality((settings as any).guest_address_form);
 const greetingName = guest?.first_name
   ? `${greetingLabel} ${guest.first_name}`
   : greetingFallback;
@@ -447,6 +450,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           lang={lang}
           hotelEnabledLangs={hotelEnabledLangs}
           greetingName={greetingName}
+          formality={formality}
           checkInLabel={checkInLabel}
           checkOutLabel={checkOutLabel}
           nightsCount={nightsCount}
