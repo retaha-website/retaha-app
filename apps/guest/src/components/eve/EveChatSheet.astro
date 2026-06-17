@@ -20,7 +20,7 @@ import EveTypingIndicator from './EveTypingIndicator.astro';
 import EveMessage from './EveMessage.astro';
 import EveActionConfirmCard from './EveActionConfirmCard.astro';
 import EveSuggestionChips from './EveSuggestionChips.astro';
-import { t, type Lang } from '@retaha/i18n';
+import { t, type Lang, type Formality } from '@retaha/i18n';
 import eveAvatarRaw from '../../assets/eve-avatar.svg?raw';
 
 interface Props {
@@ -30,9 +30,11 @@ interface Props {
   accentColor?: string;
   /** Default-Chip-Set. Phase 10 macht das tageszeit-dynamisch. */
   chips?: Array<{ key: string; text: string }>;
+  /** Anrede (du/Sie) — steuert die deutschen Chat-Chrome-Strings. */
+  formality?: Formality;
 }
 
-const { lang, eveName, accentColor = 'var(--theme-accent)', chips } = Astro.props;
+const { lang, eveName, accentColor = 'var(--theme-accent)', chips, formality = 'informal' } = Astro.props;
 
 // Default-Fallback wenn Caller keine Chips übergibt (z.B. Tageszeit unklar).
 // Phase 10: /g/[token].astro übergibt tageszeit-dynamische Chips via getEveSuggestions().
@@ -43,13 +45,13 @@ const defaultChips = chips ?? [
   { key: 'checkout',        text: t('eve.chip_checkout', lang) },
 ];
 
-const placeholder = t('eve.placeholder', lang).replace('{name}', eveName);
+const placeholder = t('eve.placeholder', lang, formality).replace('{name}', eveName);
 const typingLabel = t('eve.typing', lang).replace('{name}', eveName);
 const sendLabel = t('eve.send', lang);
 const closeLabel = t('eve.close', lang);
 const confirmLabel = t('eve.confirm_booking', lang);
 const cancelLabel = t('eve.cancel_booking', lang);
-const suggestionsLabel = t('eve.suggestions_label', lang);
+const suggestionsLabel = t('eve.suggestions_label', lang, formality);
 const conciergeLabel = t('eve.concierge_label', lang);
 ---
 

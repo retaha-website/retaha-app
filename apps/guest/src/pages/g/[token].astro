@@ -274,7 +274,7 @@ const greetingName = guest?.first_name
 let visitText = '';
 if (guest) {
   const visitOrdinals: Record<Lang, string> = {
-    de: `dein ${guest.visit_count}. Besuch`,
+    de: `${formality === 'formal' ? 'Ihr' : 'dein'} ${guest.visit_count}. Besuch`,
     en: `your ${guest.visit_count}${guest.visit_count === 1 ? 'st' : guest.visit_count === 2 ? 'nd' : guest.visit_count === 3 ? 'rd' : 'th'} visit`,
     fr: `votre ${guest.visit_count}${guest.visit_count === 1 ? 'ère' : 'ème'} visite`,
     es: `tu ${guest.visit_count}ª visita`,
@@ -536,7 +536,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       <div class="gate-recommend-card">
         <div class="gate-recommend-card-left">
           <div class="gate-recommend-eyebrow themed-eyebrow-flank">{t('concierge.eyebrow', lang).replace('{name}', settings.eve_name || 'das Team')}</div>
-          <p class="gate-recommend-text">{t('concierge.text.default', lang)}</p>
+          <p class="gate-recommend-text">{t('concierge.text.default', lang, formality)}</p>
         </div>
         {weather && (
           <div class="gate-recommend-weather">
@@ -551,7 +551,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
       <!-- RECOMMENDATION SLIDER -->
       {avail('action_cards') && f.action_cards !== false && recs.length > 0 && (
         <section class="rec-slider-section">
-          <div class="rec-slider-eyebrow themed-eyebrow-flank">{t('rec.eyebrow', lang)}</div>
+          <div class="rec-slider-eyebrow themed-eyebrow-flank">{t('rec.eyebrow', lang, formality)}</div>
           <div class="rec-slider"
                @scroll.passive="recSlideIndex = Math.round($el.scrollLeft / 332)">
             <div class="rec-slider-track">
@@ -766,6 +766,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             lang={lang}
             eveName={settings.eve_name || 'Eve'}
             chips={eveSuggestions}
+            formality={formality}
           />
           <EveFloatingBubble />
         </>
@@ -782,8 +783,16 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
     <ConsentModule stayToken={token} />
 
+    <script is:inline define:vars={{ _formality: formality }}>
+      window.__RT_FORMALITY__ = _formality;
+    </script>
+
     <script>
       import Alpine from 'alpinejs';
+
+      // Anrede (du/Sie) für client-seitige Eve-Chrome-Strings — gespeist aus
+      // guest_address_form (window.__RT_FORMALITY__, is:inline oben gesetzt).
+      const RT_FORMAL = typeof window !== 'undefined' && (window as any).__RT_FORMALITY__ === 'formal';
 
       // @ts-expect-error - Alpine types
       Alpine.data('guestPage', () => ({
@@ -879,7 +888,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
         _friendlyEveError(raw: string): string {
           const s = (raw ?? '').toLowerCase();
           if (s.includes('403') || s.includes('nicht aktiviert') || s.includes('not activated')) {
-            return 'Ich bin gerade leider nicht verfügbar. Bitte wende dich an die Rezeption.';
+            return RT_FORMAL ? 'Ich bin gerade leider nicht verfügbar. Bitte wenden Sie sich an die Rezeption.' : 'Ich bin gerade leider nicht verfügbar. Bitte wende dich an die Rezeption.';
           }
           if (s.includes('429') || s.includes('rate limit') || s.includes('zu viele')) {
             return 'Ich beantworte gerade viele Anfragen — bitte kurz warten und nochmal versuchen.';
@@ -1011,7 +1020,8 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
             });
             const body = await res.json();
             if (body.ok) {
-              this.eveMessages.push({ role: 'assistant', content: 'Erledigt — der Hotelier bekommt deine Anfrage gleich.', html: this._parseMarkdown('Erledigt — der Hotelier bekommt deine Anfrage gleich.') });
+              const _doneMsg = RT_FORMAL ? 'Erledigt — der Hotelier bekommt Ihre Anfrage gleich.' : 'Erledigt — der Hotelier bekommt deine Anfrage gleich.';
+              this.eveMessages.push({ role: 'assistant', content: _doneMsg, html: this._parseMarkdown(_doneMsg) });
               this.evePendingAction = null;
             } else {
               this.eveError = body.error || 'Bestätigung fehlgeschlagen.';
@@ -1052,7 +1062,9 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
           const GREET: Record<string, { time: (h: number) => string; body: (n: string | null, e: string) => string }> = {
             de: {
               time: h => h < 12 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend',
-              body: (n, e) => `${n ? `Schön, dass du hier bist, ${n}. ` : ''}Ich bin ${e}, dein persönlicher Concierge — frag mich nach Empfehlungen, WLAN, Reservierungen oder was auch immer deinen Aufenthalt besser macht.`,
+              body: (n, e) => RT_FORMAL
+                ? `${n ? `Schön, dass Sie hier sind, ${n}. ` : ''}Ich bin ${e}, Ihr persönlicher Concierge — fragen Sie mich nach Empfehlungen, WLAN, Reservierungen oder was auch immer Ihren Aufenthalt besser macht.`
+                : `${n ? `Schön, dass du hier bist, ${n}. ` : ''}Ich bin ${e}, dein persönlicher Concierge — frag mich nach Empfehlungen, WLAN, Reservierungen oder was auch immer deinen Aufenthalt besser macht.`,
             },
             en: {
               time: h => h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening',
@@ -1203,7 +1215,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
               this._showRecToast('Feedback fehlgeschlagen.');
               return;
             }
-            this._showRecToast(rating === 1 ? 'Danke!' : 'Danke für dein Feedback.');
+            this._showRecToast(rating === 1 ? 'Danke!' : (RT_FORMAL ? 'Danke für Ihr Feedback.' : 'Danke für dein Feedback.'));
           } catch (_) {
             (this.eveMessages[idx] as any).feedback = prev;
             this._showRecToast('Netzwerk-Fehler.');
