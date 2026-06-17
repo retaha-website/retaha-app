@@ -3,7 +3,6 @@ import HotelierLayout from '../layouts/HotelierLayout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
-import { getEnv } from '@retaha/db';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) {
@@ -27,7 +26,8 @@ const { data: sessions } = await client
   .order('created_at', { ascending: false });
 
 const rows = (sessions ?? []) as any[];
-const siteOrigin = (getEnv('PUBLIC_SITE_URL') || 'http://localhost:4321').replace(/\/$/, '');
+// Gäste-URLs laufen über Hotel-Subdomain: https://{slug}.retaha.de/g/{token}
+const guestRootDomain = (import.meta.env.PUBLIC_GUEST_ROOT_DOMAIN as string | undefined) || 'retaha.de';
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -178,7 +178,7 @@ function presetLabel(p: string | undefined): string {
       <div class="sc-list">
         {rows.map((s: any) => {
           const status = statusOf(s);
-          const demoUrl = `${siteOrigin}/g/${s.token}`;
+          const demoUrl = `https://${hotel.slug}.${guestRootDomain}/g/${s.token}`;
           const ddJson = JSON.stringify(s.demo_data ?? {});
           return (
             <article class={`sc-card${!s.is_active ? ' sc-card--off' : ''}`} x-data="{ busy: false }">
@@ -251,7 +251,7 @@ function presetLabel(p: string | undefined): string {
     )}
   </div>
 
-  <script>
+  <script is:inline>
     function showcasePage() {
       function pad(n) { return String(n).padStart(2, '0'); }
       function dtLocal(d) {
