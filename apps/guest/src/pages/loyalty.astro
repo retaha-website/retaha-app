@@ -1,13 +1,228 @@
 ---
+// Loyalty — Hotelier-Config (Punkte/Nacht, Status-Stufen, Prämien).
+// Schreibt loyalty_config via /api/loyalty/config. Gate/Sichtbarkeit für Gäste
+// weiterhin über features.loyalty (Gast-Vorschau-Toggle).
 import HotelierLayout from '../layouts/HotelierLayout.astro';
-import ComingSoonModal from '@retaha/ui/components/admin/ComingSoonModal.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { DEFAULT_LOYALTY_CONFIG } from '@retaha/loyalty';
+
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect(`${BACKOFFICE}/admin/login`);
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
+
+// loyalty_config ist RLS-locked → Service-Role, gescoped auf hotel.id.
+const sb = createSupabaseServiceRoleInstance();
+const [{ data: cfgRow }, { data: hsRow }] = await Promise.all([
+  sb.from('loyalty_config').select('points_per_night, tiers, rewards').eq('hotel_id', hotel.id).maybeSingle(),
+  sb.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle(),
+]);
+
+const config = {
+  points_per_night: cfgRow?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.points_per_night,
+  tiers: cfgRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers,
+  rewards: cfgRow?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards,
+};
+const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loyalty === true;
 ---
 
-<HotelierLayout title="Loyalty" activeTab="gast">
-  <ComingSoonModal
-    feature_name="Loyalty-Programm"
-    feature_eyebrow="stamm-gäste belohnen"
-    feature_description="Wer mehrfach kommt sieht andere Preise, kriegt frühere Buchungs-Slots, exklusive Specials."
-    planned_release="Q2 2027"
-  />
+<HotelierLayout title="Loyalty" activeTab="gast" hotelName={hotel.name}>
+  <section class="lc-wrap" x-data={`loyaltyConfig(${JSON.stringify({ config })})`}>
+    <header class="lc-hero">
+      <span class="lc-eyebrow">Loyalty-Programm</span>
+      <h1 class="lc-title">Stammgäste belohnen<span class="dot-pink">.</span></h1>
+      <p class="lc-sub">Punkte pro Nacht, Status-Stufen und Prämien — pro Hotel konfigurierbar.</p>
+    </header>
+
+    {!loyaltyEnabled && (
+      <div class="lc-banner">
+        Für Gäste noch nicht sichtbar — aktiviere <strong>„Loyalty-Programm"</strong> in der
+        <a href="/gast-vorschau">Gast-Vorschau</a>.
+      </div>
+    )}
+
+    <div class="lc-card">
+      <div class="lc-card__head"><span class="lc-card__title">Punkte pro Nacht</span></div>
+      <label class="lc-field">
+        <span class="lc-field__label">Punkte, die ein Gast pro Übernachtung erhält</span>
+        <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="config.points_per_night" />
+      </label>
+    </div>
+
+    <div class="lc-card">
+      <div class="lc-card__head">
+        <span class="lc-card__title">Status-Stufen</span>
+        <button type="button" class="lc-add" @click="addTier()">+ Stufe</button>
+      </div>
+      <p class="lc-hint">Die Stufe wird aus den <strong>jemals verdienten</strong> Punkten (lifetime) bestimmt — sie sinkt beim Einlösen nicht.</p>
+      <template x-for="(tier, ti) in config.tiers" :key="ti">
+        <div class="lc-row">
+          <div class="lc-row__top">
+            <label class="lc-field lc-field--grow">
+              <span class="lc-field__label">Name</span>
+              <input type="text" class="lc-input" x-model="tier.name" placeholder="z.B. Gold" />
+            </label>
+            <label class="lc-field lc-field--num">
+              <span class="lc-field__label">Ab Punkten</span>
+              <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="tier.threshold_points" />
+            </label>
+            <button type="button" class="lc-remove" @click="config.tiers.splice(ti, 1)" aria-label="Stufe entfernen">×</button>
+          </div>
+          <div class="lc-sub-block">
+            <span class="lc-field__label">Vorteile</span>
+            <template x-for="(b, bi) in tier.benefits" :key="bi">
+              <div class="lc-benefit">
+                <input type="text" class="lc-input" x-model="b.title" placeholder="Vorteil" />
+                <input type="text" class="lc-input" x-model="b.desc" placeholder="Beschreibung (optional)" />
+                <button type="button" class="lc-remove" @click="tier.benefits.splice(bi, 1)" aria-label="Vorteil entfernen">×</button>
+              </div>
+            </template>
+            <button type="button" class="lc-add lc-add--sm" @click="tier.benefits.push({ title: '', desc: '' })">+ Vorteil</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="lc-card">
+      <div class="lc-card__head">
+        <span class="lc-card__title">Prämien (einlösbar)</span>
+        <button type="button" class="lc-add" @click="addReward()">+ Prämie</button>
+      </div>
+      <template x-for="(rw, ri) in config.rewards" :key="ri">
+        <div class="lc-row">
+          <div class="lc-row__top">
+            <label class="lc-field lc-field--grow">
+              <span class="lc-field__label">Titel</span>
+              <input type="text" class="lc-input" x-model="rw.title" placeholder="z.B. Zimmer-Upgrade" />
+            </label>
+            <label class="lc-field lc-field--num">
+              <span class="lc-field__label">Kosten</span>
+              <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="rw.cost_points" />
+            </label>
+            <button type="button" class="lc-remove" @click="config.rewards.splice(ri, 1)" aria-label="Prämie entfernen">×</button>
+          </div>
+          <label class="lc-field">
+            <span class="lc-field__label">Beschreibung</span>
+            <input type="text" class="lc-input" x-model="rw.desc" placeholder="Kurzbeschreibung" />
+          </label>
+          <label class="lc-check">
+            <input type="checkbox" x-model="rw.active" />
+            <span>Aktiv — für Gäste sichtbar</span>
+          </label>
+        </div>
+      </template>
+    </div>
+
+    <div class="lc-savebar">
+      <button type="button" class="lc-save" :disabled="saving" @click="save()" x-text="saving ? 'Speichert …' : 'Speichern'"></button>
+    </div>
+  </section>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      (window as any).Alpine.data('loyaltyConfig', (initial: any) => ({
+        config: initial.config,
+        saving: false,
+        addTier() {
+          this.config.tiers.push({ key: 'tier_' + Date.now(), name: '', threshold_points: 0, benefits: [] });
+        },
+        addReward() {
+          this.config.rewards.push({ id: 'reward_' + Date.now(), title: '', desc: '', cost_points: 0, active: true });
+        },
+        async save() {
+          if (this.saving) return;
+          this.saving = true;
+          try {
+            const res = await fetch('/api/loyalty/config', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.config),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Fehler beim Speichern');
+            (window as any).retahaToast?.('Gespeichert');
+          } catch (e: any) {
+            (window as any).retahaToast?.(e?.message || 'Fehler beim Speichern', 'error');
+          } finally {
+            this.saving = false;
+          }
+        },
+      }));
+    });
+  </script>
+
+  <style>
+    .lc-wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 96px; display: flex; flex-direction: column; gap: 20px; }
+    @media (max-width: 768px) { .lc-wrap { padding: 28px 16px 80px; } }
+
+    .lc-hero { margin-bottom: 4px; }
+    .lc-eyebrow {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+      text-transform: uppercase; color: #0A0A0A; background: var(--te-yellow);
+      padding: 5px 10px; display: inline-block; margin-bottom: 16px; font-weight: 500; border-radius: var(--r-sm);
+    }
+    .lc-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(28px, 5vw, 40px); font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; color: var(--ink); }
+    .dot-pink { color: var(--pink); }
+    .lc-sub { font-size: 15px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+
+    .lc-banner {
+      background: var(--te-yellow-soft); border: 1px solid var(--te-yellow);
+      border-radius: var(--r-sm); padding: 12px 14px; font-size: 13px; color: var(--ink); line-height: 1.5;
+    }
+    .lc-banner a { color: var(--ink); text-decoration: underline; }
+
+    .lc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px 24px 22px; }
+    .lc-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .lc-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
+    .lc-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; color: var(--ink-muted); margin: 0 0 14px; }
+
+    .lc-field { display: flex; flex-direction: column; gap: 6px; }
+    .lc-field--grow { flex: 1; min-width: 0; }
+    .lc-field--num { width: 130px; flex-shrink: 0; }
+    .lc-field__label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+    .lc-input {
+      width: 100%; padding: 10px 12px; font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+      color: var(--ink); background: var(--bg, #fff); border: 1px solid var(--border); border-radius: var(--r-sm);
+      transition: border-color 150ms ease;
+    }
+    .lc-input:focus { outline: none; border-color: var(--ink); }
+    .lc-input--num { text-align: right; }
+
+    .lc-row { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .lc-row:last-child { margin-bottom: 0; }
+    .lc-row__top { display: flex; align-items: flex-end; gap: 12px; }
+    .lc-sub-block { display: flex; flex-direction: column; gap: 8px; }
+    .lc-benefit { display: flex; align-items: center; gap: 8px; }
+    .lc-benefit .lc-input { font-size: 13px; padding: 8px 10px; }
+
+    .lc-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; }
+    .lc-check input { width: 18px; height: 18px; accent-color: var(--sage); }
+
+    .lc-add {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+      color: var(--ink); background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 7px 12px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; white-space: nowrap;
+    }
+    .lc-add:hover { border-color: var(--ink); background: var(--te-yellow-soft); }
+    .lc-add--sm { align-self: flex-start; padding: 5px 10px; font-size: 10px; }
+
+    .lc-remove {
+      flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm);
+      color: var(--ink-muted); font-size: 18px; line-height: 1; cursor: pointer; transition: all 150ms ease;
+    }
+    .lc-remove:hover { border-color: var(--pink); color: var(--pink); }
+
+    .lc-savebar { position: sticky; bottom: 0; padding: 16px 0 0; display: flex; justify-content: flex-end; }
+    .lc-save {
+      font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+      color: var(--bg, #fff); background: var(--ink); border: none; border-radius: var(--r-sm);
+      padding: 12px 28px; cursor: pointer; transition: opacity 150ms ease;
+    }
+    .lc-save:hover:not(:disabled) { opacity: 0.9; }
+    .lc-save:disabled { opacity: 0.5; cursor: wait; }
+  </style>
 </HotelierLayout>
