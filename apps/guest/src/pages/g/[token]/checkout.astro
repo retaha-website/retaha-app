@@ -143,10 +143,23 @@ const locale = localeMap[lk];
 // Hotel-TZ — alle Datumsvergleiche in Hotel-Zeitzone
 const hotelTz: string = (hotel as any).timezone ?? 'Europe/Berlin';
 
-// Konfigurierte Checkout-Zeit (treibt Verfügbarkeit + Anzeige); Default 11:00.
+// Konfigurierte Checkout-Zeit (treibt Verfügbarkeit + Anzeige) + Self-Checkout-Modus.
 const { data: htTimes } = await createSupabaseServiceRoleInstance()
-  .from('hotel_settings').select('checkout_time').eq('hotel_id', (hotel as any).id).maybeSingle();
+  .from('hotel_settings').select('checkout_time, self_checkout_mode, self_checkout_note')
+  .eq('hotel_id', (hotel as any).id).maybeSingle();
 const checkoutTimeCfg: string = (htTimes as any)?.checkout_time ?? '11:00:00';
+
+// Modus 'info' → nur Hinweise, kein Auscheck-Button (Master features.self_checkout
+// ist hier ohnehin aktiv, sonst hätte der Gate oben weitergeleitet).
+const infoMode = (htTimes as any)?.self_checkout_mode === 'info';
+const scNote = ((htTimes as any)?.self_checkout_note ?? {}) as Record<string, string>;
+const INFO_DEFAULT: Record<LK, string> = {
+  de: 'Bitte lass deine Schlüsselkarte im Zimmer. Late-Checkout gerne auf Anfrage an der Rezeption.',
+  en: 'Please leave your key card in the room. Late check-out on request at reception.',
+  fr: 'Merci de laisser votre carte-clé dans la chambre. Départ tardif sur demande à la réception.',
+  es: 'Por favor, deja la tarjeta-llave en la habitación. Salida tardía bajo petición en recepción.',
+};
+const infoNote = (scNote[lk] || scNote.en || scNote.de || INFO_DEFAULT[lk]).trim();
 
 // Datum-Strings in Hotel-TZ (Kalenderblatt / nightsRemaining / Showcase-Gate)
 const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: hotelTz });
@@ -831,6 +844,50 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
 
           <PostStaySheet lang={lk} stayId={stay.id} hotelName={(hotel as any).name} />
         </div>
+      ) : infoMode ? (
+        /* ══ NUR-INFO-MODUS — Checkout-Zeit & Hinweise, kein Auscheck-Button ══ */
+        <>
+          <div class="hero g-hero-dot">
+            <span class="eyebrow">{L.eyebrow}</span>
+            <h1 class="title">
+              {lk === 'de' ? 'Deine' : lk === 'en' ? 'Your' : lk === 'fr' ? 'Votre' : 'Tu'}{' '}
+              <span class="accent">{lk === 'de' ? 'Abreise' : lk === 'en' ? 'departure' : lk === 'fr' ? 'départ' : 'salida'}</span>{guestName ? `, ${guestName}.` : '.'}
+            </h1>
+            <p class="subtitle">{L.subB}</p>
+          </div>
+
+          <div class="vis">
+            <div class="vis-pikto">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <div class="vis-label">Check-out</div>
+            <div class="vis-value">{checkoutTime}{lk === 'de' ? ' Uhr' : ''}</div>
+            <p class="vis-hint">{infoNote}</p>
+          </div>
+
+          {/* Schlüsselkarte-Tile (reine Info) */}
+          <div class="tile">
+            <div class="tile-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2 11 12"/><path d="M16 7 l3 3"/>
+              </svg>
+            </div>
+            <div>
+              <div class="tile-label">{L.keyTile}</div>
+              <p class="tile-sub">{L.keyTileSub}</p>
+            </div>
+          </div>
+
+          <div class="cta">
+            <a href={backHref} class="btn-primary" data-astro-reload>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              {L.backBtn}
+            </a>
+          </div>
+        </>
       ) : gateState === 'not_yet' ? (
         /* ══ ZUSTAND A — Noch nicht ══════════════════════════════ */
         <>
