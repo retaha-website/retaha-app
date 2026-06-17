@@ -30,6 +30,12 @@ export const menuSections: MenuSection[] = [
         icon: icon('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'),
       },
       {
+        label: 'Loyalty',
+        sub: 'Punkte · Stufen · Prämien',
+        href: '/loyalty',
+        icon: icon('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'),
+      },
+      {
         label: 'Hero-Karten',
         sub: 'Action-Cards · Swipe',
         href: '/action-cards',

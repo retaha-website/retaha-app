@@ -13,6 +13,10 @@ export interface MenuSection {
 const icon = (path: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
+// Loyalty-Config lebt in der Gäste-App (HotelierLayout) — Cross-Domain-Link wie der
+// "gast-ansicht"-Tab. Gleiche Subdomain-Auth (*.retaha.de) → Session greift.
+const GUEST_APP = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+
 export const menuSections: MenuSection[] = [
   {
     title: 'Übersicht',
@@ -86,6 +90,12 @@ export const menuSections: MenuSection[] = [
         sub: 'Apple & Google Wallet',
         href: '/wallet-keys',
         icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
+      },
+      {
+        label: 'Loyalty',
+        sub: 'Punkte · Stufen · Prämien',
+        href: `${GUEST_APP}/loyalty`,
+        icon: icon('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'),
       },
       {
         label: 'Hero-Slider',
