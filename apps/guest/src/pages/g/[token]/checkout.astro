@@ -806,6 +806,8 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
             </button>
           </div>
 
+          <div id="wallet-err" class="flash flash--err" hidden></div>
+
           <EmailOptInSection lang={langRaw} hotelName={(hotel as any).name} />
 
           <PostStaySheet lang={lk} stayId={stay.id} hotelName={(hotel as any).name} />
@@ -1040,21 +1042,32 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
 
       // ── Wallet-Button (Zustand D) ──────────────────────────────────────────
       const walletBtn = document.getElementById('wallet-btn');
+      const walletErr = document.getElementById('wallet-err');
       if (walletBtn) {
         walletBtn.addEventListener('click', async () => {
           walletBtn.disabled = true;
+          if (walletErr) walletErr.hidden = true;
           try {
             const res  = await fetch('/api/g/wallet/create', {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ marketing_consent: false }),
             });
             const data = await res.json().catch(() => ({}));
             if (data.ok && data.save_link_url) {
               window.location.href = data.save_link_url;
-            } else {
-              walletBtn.disabled = false;
+              return;
             }
-          } catch {
+            throw new Error(
+              data.error === 'wallet_not_configured' ? 'Wallet ist auf diesem System noch nicht aktiviert.'
+              : data.error === 'guest_email_missing' ? 'Für diese Demo-Session ist keine E-Mail hinterlegt.'
+              : (data.error || 'Wallet-Pass konnte nicht erstellt werden.')
+            );
+          } catch (err) {
+            if (walletErr) {
+              walletErr.textContent = err instanceof Error ? err.message : 'Fehler — bitte nochmal versuchen.';
+              walletErr.hidden = false;
+            }
             walletBtn.disabled = false;
           }
         });

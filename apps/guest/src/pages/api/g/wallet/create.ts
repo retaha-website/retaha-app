@@ -61,9 +61,17 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const session = await getStaySession(cookies);
   if (!session) return json({ ok: false, error: 'no_stay_session' }, 401);
 
-  let body: { marketing_consent?: boolean };
-  try { body = await request.json(); }
-  catch { return json({ ok: false, error: 'invalid_json' }, 400); }
+  // Body ist optional — ein leerer POST-Body ist gültig (Consent default = false).
+  // Nur echtes Malformed-JSON ergibt einen 400, jetzt mit Log-Zeile, damit
+  // künftige Fälle in den Runtime-Logs sichtbar sind (nicht stilles 400).
+  let body: { marketing_consent?: boolean } = {};
+  try {
+    const raw = (await request.text()).trim();
+    if (raw) body = JSON.parse(raw);
+  } catch {
+    console.warn('[wallet/create] invalid JSON body');
+    return json({ ok: false, error: 'invalid_json' }, 400);
+  }
 
   const marketingConsent = body.marketing_consent === true;
 
