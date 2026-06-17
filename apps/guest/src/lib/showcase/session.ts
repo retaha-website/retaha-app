@@ -140,9 +140,10 @@ export async function resetShowcaseSession(sessionId: string, hotelId?: string):
     if (!check) return { ok: false, deleted: { bookings: 0, chat: 0 }, error: 'session_not_found' };
   }
 
-  const [bRes, cRes] = await Promise.all([
+  const [bRes, cRes, wRes] = await Promise.all([
     sb.from('bookings').delete().eq('showcase_session_id', sessionId).select('id'),
     sb.from('chat_messages').delete().eq('showcase_session_id', sessionId).select('id'),
+    sb.from('wallet_passes').delete().eq('showcase_session_id', sessionId).select('id'),
   ]);
   const { data: latest } = await sb.from('showcase_sessions').select('reset_count').eq('id', sessionId).single();
   await sb.from('showcase_sessions').update({
@@ -151,7 +152,7 @@ export async function resetShowcaseSession(sessionId: string, hotelId?: string):
   }).eq('id', sessionId);
   return {
     ok: true,
-    deleted: { bookings: bRes.data?.length ?? 0, chat: cRes.data?.length ?? 0 },
+    deleted: { bookings: bRes.data?.length ?? 0, chat: cRes.data?.length ?? 0, wallet_passes: wRes.data?.length ?? 0 },
   };
 }
 

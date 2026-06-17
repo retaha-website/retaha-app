@@ -28,6 +28,7 @@ import {
 } from '@retaha/wallet';
 import { isWalletConfigured, getWalletConfig, buildPassObjectId } from '@retaha/wallet';
 import { triggerDripsForEvent } from '@retaha/marketing';
+import { isDemoSession } from '../../../../lib/showcase/session';
 
 const MARKETING_CONSENT_POLICY_VERSION = '2026-06-01';
 
@@ -68,6 +69,119 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const sb = createSupabaseServiceRoleInstance();
 
+  // ── Showcase-Pfad (Demo-Session) ──────────────────────────────────────────
+  if (isDemoSession(session)) {
+    const { data: sc } = await sb
+      .from('showcase_sessions')
+      .select('id, hotel_id, demo_data')
+      .eq('id', session.stay_id)
+      .maybeSingle();
+    if (!sc) return json({ ok: false, error: 'stay_not_found' }, 404);
+
+    const dd = (sc.demo_data ?? {}) as any;
+    const guestEmail: string | null = dd.guest_email ?? null;
+    if (!guestEmail) return json({ ok: false, error: 'guest_email_missing' }, 400);
+
+    const guestFirstName: string | null = dd.guest_first_name ?? null;
+    const guestLastName: string | null = dd.guest_last_name ?? null;
+
+    // Pass-Lookup: scoped auf showcase_session_id (1 Pass pro Demo-Session)
+    const { data: existing } = await sb
+      .from('wallet_passes')
+      .select('id, google_object_id, visit_count, first_visit_at, state')
+      .eq('showcase_session_id', sc.id)
+      .maybeSingle();
+
+    const now = new Date();
+    const cfg = getWalletConfig()!;
+    let walletPassId: string;
+    let visitCount: number;
+    let firstVisitAt: Date;
+    let isReturning = false;
+
+    if (existing) {
+      walletPassId = existing.id;
+      visitCount = (existing.visit_count ?? 1) + 1;
+      firstVisitAt = new Date(existing.first_visit_at);
+      isReturning = true;
+      await sb.from('wallet_passes').update({
+        visit_count: visitCount,
+        last_visit_at: now.toISOString(),
+        guest_first_name: guestFirstName,
+        guest_last_name: guestLastName,
+      }).eq('id', walletPassId);
+    } else {
+      const { data: inserted, error: insErr } = await sb.from('wallet_passes').insert({
+        hotel_id: sc.hotel_id,
+        showcase_session_id: sc.id,
+        guest_email: guestEmail,
+        guest_first_name: guestFirstName,
+        guest_last_name: guestLastName,
+        google_object_id: null,
+        google_class_id: null,
+        marketing_consent_given: false,
+        visit_count: 1,
+        first_visit_at: now.toISOString(),
+        last_visit_at: now.toISOString(),
+        state: 'active',
+      }).select('id').single();
+      if (insErr || !inserted) {
+        console.error('[wallet/create] showcase insert failed:', insErr);
+        return json({ ok: false, error: insErr?.message || 'insert_failed' }, 500);
+      }
+      walletPassId = inserted.id;
+      visitCount = 1;
+      firstVisitAt = now;
+    }
+
+    const { data: hotel } = await sb
+      .from('hotels')
+      .select('name, default_language')
+      .eq('id', sc.hotel_id)
+      .maybeSingle();
+
+    const passObjectInput: PassObjectInput = {
+      walletPassUuid: walletPassId,
+      hotelId: sc.hotel_id,
+      hotelName: hotel?.name || 'Hotel',
+      guestFirstName,
+      guestLastName,
+      visitCount,
+      firstVisitAt,
+      lastVisitAt: now,
+      defaultLang: hotel?.default_language || 'de',
+    };
+
+    let googleResult;
+    if (isReturning && existing?.google_object_id) {
+      googleResult = await updatePassObject(passObjectInput);
+    } else {
+      googleResult = await createPassObject(passObjectInput);
+    }
+
+    if (googleResult.ok && !existing?.google_object_id) {
+      const objectId = buildPassObjectId(cfg.issuerId, walletPassId);
+      await sb.from('wallet_passes').update({
+        google_object_id: objectId,
+        google_class_id: googleResult.classId,
+      }).eq('id', walletPassId);
+    }
+
+    const origin = new URL(request.url).origin;
+    const saveLink = signSaveLink(passObjectInput, [origin]);
+    if (!saveLink.ok || !saveLink.url) {
+      return json({ ok: false, error: 'save_link_failed', google: googleResult }, 500);
+    }
+
+    return json({
+      ok: true,
+      save_link_url: saveLink.url,
+      pass_state: { wallet_pass_id: walletPassId, visit_count: visitCount, is_returning: isReturning },
+      google: googleResult,
+    });
+  }
+
+  // ── Echter Stay ───────────────────────────────────────────────────────────
   // Stay + Guest laden
   const { data: stay, error: stayErr } = await sb
     .from('stays')
