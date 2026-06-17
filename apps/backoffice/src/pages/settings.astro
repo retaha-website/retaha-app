@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -117,6 +117,24 @@ if (Astro.request.method === 'POST') {
       ? { section: 'billing_address', ok: false, msg: error.message }
       : { section: 'billing_address', ok: true, msg: '✓ Gespeichert' };
 
+  } else if (action === 'stay_times') {
+    // hotel_settings ist service-role-managed (wie Frühstücks-/Service-Zeiten).
+    const reTime = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const ci = form.get('checkin_time')?.toString().trim() || '';
+    const co = form.get('checkout_time')?.toString().trim() || '';
+    const updates: Record<string, unknown> = {};
+    if (reTime.test(ci)) updates.checkin_time = ci;
+    if (reTime.test(co)) updates.checkout_time = co;
+    if (Object.keys(updates).length === 0) {
+      saved = { section: 'stay_times', ok: false, msg: 'Bitte gültige Zeiten (HH:MM) angeben.' };
+    } else {
+      const { error } = await createSupabaseServiceRoleInstance()
+        .from('hotel_settings').update(updates).eq('hotel_id', hotel.id);
+      saved = error
+        ? { section: 'stay_times', ok: false, msg: error.message }
+        : { section: 'stay_times', ok: true, msg: '✓ Gespeichert' };
+    }
+
   } else if (action === 'team_security') {
     // mfa_required_for_team is now persisted immediately via toggle API — only save session_timeout_hours here
     const session_timeout_hours = parseInt(form.get('session_timeout_hours')?.toString() || '4') || 4;
@@ -139,6 +157,12 @@ const { data: h } = await client.from('hotels').select(`
   billing_street, billing_zip, billing_city, billing_country,
   mfa_required_for_team, session_timeout_hours
 `).eq('id', hotel.id).maybeSingle();
+
+// Check-in/Check-out-Zeiten liegen in hotel_settings (service-role-managed).
+const { data: hsTimes } = await createSupabaseServiceRoleInstance()
+  .from('hotel_settings').select('checkin_time, checkout_time').eq('hotel_id', hotel.id).maybeSingle();
+const checkinTime  = ((hsTimes as any)?.checkin_time  ?? '15:00').toString().substring(0, 5);
+const checkoutTime = ((hsTimes as any)?.checkout_time ?? '11:00').toString().substring(0, 5);
 
 const d = (h ?? {}) as Record<string, unknown>;
 function val(key: string, fallback = '') { return (d[key] as string) ?? fallback; }
@@ -294,11 +318,41 @@ function isSelected(key: string, value: string, fallback = '') {
         </form>
       </section>
 
+      <!-- ── CHECK-IN / CHECK-OUT ──────────────────────────────────────── -->
+      <section class="s-card" id="stay-times">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Check-in / Check-out</h2>
+          <span class="s-card__num">03</span>
+        </div>
+        <p class="s-card__sub">Standard-Zeiten deines Hotels. Die Check-out-Zeit steuert, ab wann der Self-Checkout für Gäste verfügbar ist.</p>
+
+        <form method="POST" class="s-card__body">
+          <input type="hidden" name="_action" value="stay_times" />
+
+          <div class="field field--row">
+            <label class="field__label" for="checkin-time">Check-in ab</label>
+            <input type="time" id="checkin-time" name="checkin_time" class="s-input" value={checkinTime} />
+          </div>
+
+          <div class="field field--row">
+            <label class="field__label" for="checkout-time">Check-out bis</label>
+            <div class="field__input-wrap">
+              <input type="time" id="checkout-time" name="checkout_time" class="s-input" value={checkoutTime} />
+              <span class="field__hint">Self-Checkout öffnet am Vorabend und richtet sich nach dieser Zeit (+ Kulanz).</span>
+            </div>
+          </div>
+
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Speichern</button>
+          </div>
+        </form>
+      </section>
+
       <!-- ── SECTION 3: GESCHÄFTSDATEN ─────────────────────────────────── -->
       <section class="s-card" id="business-data">
         <div class="s-card__head">
           <h2 class="s-card__title">Geschäftsdaten</h2>
-          <span class="s-card__num">03</span>
+          <span class="s-card__num">04</span>
         </div>
 
         <form method="POST" class="s-card__body">
@@ -350,7 +404,7 @@ function isSelected(key: string, value: string, fallback = '') {
       <section class="s-card" id="billing-address">
         <div class="s-card__head">
           <h2 class="s-card__title">Rechnungsadresse</h2>
-          <span class="s-card__num">04</span>
+          <span class="s-card__num">05</span>
         </div>
         <p class="s-card__sub">Für das retaha-Abo</p>
 
@@ -415,7 +469,7 @@ function isSelected(key: string, value: string, fallback = '') {
       <section class="s-card" id="team-security">
         <div class="s-card__head">
           <h2 class="s-card__title">Team-Sicherheit</h2>
-          <span class="s-card__num">05</span>
+          <span class="s-card__num">06</span>
         </div>
 
         <div class="s-warning-row">
