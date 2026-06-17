@@ -217,9 +217,9 @@ if (savedParam === 'pick_added' && !message) {
     </section>
 
     {message && (
-      <div id="s-flash-banner" class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
-        {message.text}
-      </div>
+      <script is:inline define:vars={{ m: message.text, t: message.type === 'success' ? 'success' : 'error' }}>
+        window.addEventListener('DOMContentLoaded', function () { window.retahaToast && window.retahaToast(m, t); });
+      </script>
     )}
     {savedParam && (
       <script is:inline>
@@ -227,14 +227,6 @@ if (savedParam === 'pick_added' && !message) {
           var url = new URL(location.href);
           url.searchParams.delete('saved');
           history.replaceState(null, '', url.pathname + (url.search || ''));
-          var banner = document.getElementById('s-flash-banner');
-          if (banner) {
-            setTimeout(function () {
-              banner.style.transition = 'opacity .4s ease';
-              banner.style.opacity = '0';
-              setTimeout(function () { banner.remove(); }, 420);
-            }, 4000);
-          }
         })();
       </script>
     )}

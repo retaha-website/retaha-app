@@ -68,7 +68,6 @@ const initEyebrow = eyebrowText || '';
     <button id="welcomeSaveBtn" class="v9-btn" type="button">
       Speichern
     </button>
-    <span id="welcomeSaveStatus" class="ws-save-status" aria-live="polite"></span>
   </div>
 </section>
 
@@ -146,12 +145,6 @@ const initEyebrow = eyebrowText || '';
     margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
     display: flex; align-items: center; gap: 12px;
   }
-  .ws-save-status {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
-  }
-  .ws-save-status[data-state="saved"] { color: #5C9070; }
-  .ws-save-status[data-state="error"] { color: #C0392B; }
-  .ws-save-status[data-state="loading"] { color: var(--ink-muted); }
 </style>
 
 <script>
@@ -162,7 +155,6 @@ const initEyebrow = eyebrowText || '';
   const counter    = document.getElementById('welcomeCount')     as HTMLElement;
   const cards      = document.querySelectorAll<HTMLButtonElement>('.ansprache-card');
   const saveBtn    = document.getElementById('welcomeSaveBtn')   as HTMLButtonElement;
-  const statusEl   = document.getElementById('welcomeSaveStatus') as HTMLElement;
 
   type Baseline = { welcomeText: string; eyebrowText: string; formality: 'du' | 'sie' };
   let baseline: Baseline = JSON.parse(section?.dataset.baseline ?? '{}') as Baseline;
@@ -170,15 +162,9 @@ const initEyebrow = eyebrowText || '';
 
   updateState({ welcomeText: textarea.value, formality: currentFormality });
 
-  function setStatus(state: 'saved' | 'error' | 'loading' | '', msg: string) {
-    statusEl.dataset.state = state;
-    statusEl.textContent   = msg;
-  }
-
   textarea?.addEventListener('input', () => {
     if (counter) counter.textContent = `${textarea.value.length} / 120`;
     updateState({ welcomeText: textarea.value });
-    setStatus('', '');
   });
 
   cards.forEach(card => {
@@ -192,7 +178,6 @@ const initEyebrow = eyebrowText || '';
       card.setAttribute('aria-checked', 'true');
       currentFormality = value;
       updateState({ formality: value });
-      setStatus('', '');
     });
   });
 
@@ -200,7 +185,8 @@ const initEyebrow = eyebrowText || '';
     if (saveBtn.dataset.loading) return;
     saveBtn.dataset.loading = 'true';
     saveBtn.disabled = true;
-    setStatus('loading', 'Übersetze in alle Sprachen …');
+    const saveBtnLabel = saveBtn.textContent;
+    saveBtn.textContent = 'Übersetze in alle Sprachen …';
 
     try {
       const res = await fetch('/api/hotel/save-welcome', {
@@ -216,15 +202,15 @@ const initEyebrow = eyebrowText || '';
       if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
 
       baseline = { ...baseline, welcomeText: textarea.value, formality: currentFormality };
-      setStatus('saved', 'Gespeichert');
-      setTimeout(() => setStatus('', ''), 3000);
+      (window as any).retahaToast?.('Gespeichert');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[welcome-section] save error', msg);
-      setStatus('error', `Fehler: ${msg}`);
+      (window as any).retahaToast?.(`Fehler: ${msg}`, 'error');
     } finally {
       delete saveBtn.dataset.loading;
       saveBtn.disabled = false;
+      saveBtn.textContent = saveBtnLabel;
     }
   });
 </script>

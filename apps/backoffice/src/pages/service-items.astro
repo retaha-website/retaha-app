@@ -168,10 +168,6 @@ input:-webkit-autofill:focus {
 .si-edit-form__title { font-size: 13px; font-weight: 600; color: var(--ink); font-family: 'Space Grotesk', sans-serif; }
 .si-edit-form__actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
 /* ── /Items ────────────────────────────────────────────────────────────────── */
-
-.bp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14); white-space: nowrap; pointer-events: none; }
-.bp-toast--ok  { background: #0A0A0A; color: white; }
-.bp-toast--err { background: #8C2128; color: white; }
 </style>
 
 <div class="settings-page">
@@ -253,8 +249,6 @@ input:-webkit-autofill:focus {
           </div>
         </div>
         <div class="s-card__footer">
-          <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-          <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
           <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
         </div>
       </div>
@@ -372,8 +366,6 @@ input:-webkit-autofill:focus {
     <div class="s-card__footer" x-show="editingItem === null" style="gap:12px">
       <button type="button" @click="openAdd()" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
     </div>
-
-    <div x-show="toast" x-cloak :class="'bp-toast bp-toast--' + toastKind" x-text="toast"></div>
   </section>
 
 </div><!-- /.settings-page -->
@@ -459,12 +451,17 @@ input:-webkit-autofill:focus {
               body: JSON.stringify({ section: 'hours', service_hours: this.hours }),
             });
             var d = await res.json();
-            if (!d.ok) { this.error = d.error || 'Fehler'; return; }
-            this.success = true;
+            if (!d.ok) {
+              this.error = d.error || 'Fehler';
+              (window as any).retahaToast?.(this.error, 'error');
+              return;
+            }
+            this.success = false;
             this._origStr = JSON.stringify(this.hours);
-            this._timer = setTimeout(function () { this.success = false; }.bind(this), 3000);
+            (window as any).retahaToast?.('Gespeichert');
           } catch (err) {
             this.error = 'Netzwerk-Fehler';
+            (window as any).retahaToast?.(this.error, 'error');
           } finally {
             this.saving = false;
           }
@@ -485,9 +482,6 @@ input:-webkit-autofill:focus {
         editingKey: null,
 
         saving: false,
-        toast: '',
-        toastKind: 'ok',
-        _toastTimer: null,
         serviceIcons: SERVICE_ICONS,
 
         iconHtml: function (key) {
@@ -554,7 +548,7 @@ input:-webkit-autofill:focus {
             });
             var d = await res.json();
             if (d.ok) {
-              this.showToast('✓ ' + payload.length + ' Item' + (payload.length !== 1 ? 's' : '') + ' gespeichert', 'ok');
+              this.showToast(payload.length + ' Item' + (payload.length !== 1 ? 's' : '') + ' gespeichert', 'ok');
             } else {
               this.showToast(d.error || 'Fehler beim Speichern', 'err');
             }
@@ -566,10 +560,7 @@ input:-webkit-autofill:focus {
         },
 
         showToast: function (msg, kind) {
-          this.toast = msg;
-          this.toastKind = kind;
-          if (this._toastTimer) clearTimeout(this._toastTimer);
-          this._toastTimer = setTimeout(function () { this.toast = ''; }.bind(this), 3000);
+          (window as any).retahaToast?.(msg, kind === 'err' || kind === 'error' ? 'error' : 'success');
         },
       };
     });

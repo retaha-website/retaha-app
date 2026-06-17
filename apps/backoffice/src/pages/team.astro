@@ -138,16 +138,6 @@ const canRemove     = hasPermission(myRole, 'team.remove');
 .tm-field:last-child { margin-bottom: 0; }
 .tm-field-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
 .tm-hint { font-size: 12px; color: var(--ink-muted); margin: 10px 0 0; font-style: italic; }
-
-/* ── Toast ────────────────────────────────────────────────────────────────── */
-.bp-toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px);
-  font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14);
-  white-space: nowrap; pointer-events: none;
-}
-.bp-toast--ok  { background: #0A0A0A; color: white; }
-.bp-toast--err { background: #8C2128; color: white; }
 </style>
 
 <div
@@ -314,9 +304,6 @@ const canRemove     = hasPermission(myRole, 'team.remove');
     </div>
   )}
 
-  <!-- Toast -->
-  <div x-show="toast" x-cloak :class="`bp-toast bp-toast--${toastKind}`" x-text="toast"></div>
-
 </div>{/* .settings-page */}
 
 <script>
@@ -331,13 +318,9 @@ const canRemove     = hasPermission(myRole, 'team.remove');
     inviteRole: 'staff' as 'manager' | 'staff',
     inviteError: '',
     isSending: false,
-    toast: '' as string,
-    toastKind: 'ok' as 'ok' | 'err',
 
     showToast(msg: string, kind: 'ok' | 'err' = 'ok') {
-      this.toast = msg;
-      this.toastKind = kind;
-      setTimeout(() => { this.toast = ''; }, 3500);
+      (window as any).retahaToast?.(msg, kind === 'err' ? 'error' : 'success');
     },
 
     async sendInvite() {

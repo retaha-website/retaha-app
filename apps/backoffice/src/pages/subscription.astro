@@ -98,10 +98,8 @@ const hasEveAddon  = currentAddons.includes('eve');
     x-data="{
       interval: 'monthly',
       loading: '',
-      checkoutError: '',
       async checkout(plan) {
         this.loading = plan;
-        this.checkoutError = '';
         try {
           const res = await fetch('/api/stripe/checkout', {
             method: 'POST',
@@ -112,13 +110,12 @@ const hasEveAddon  = currentAddons.includes('eve');
           if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
           window.location.href = data.url;
         } catch(e) {
-          this.checkoutError = e.message;
+          window.retahaToast?.(e.message, 'error');
           this.loading = '';
         }
       },
       async checkoutAddon(addon) {
         this.loading = addon;
-        this.checkoutError = '';
         try {
           const res = await fetch('/api/stripe/checkout', {
             method: 'POST',
@@ -129,7 +126,7 @@ const hasEveAddon  = currentAddons.includes('eve');
           if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
           window.location.href = data.url;
         } catch(e) {
-          this.checkoutError = e.message;
+          window.retahaToast?.(e.message, 'error');
           this.loading = '';
         }
       }
@@ -196,17 +193,6 @@ const hasEveAddon  = currentAddons.includes('eve');
             >
               Jährlich <span class="sub-discount-badge">−20 %</span>
             </button>
-          </div>
-
-          <!-- Checkout-Fehler -->
-          <div
-            x-show="checkoutError !== ''"
-            style="display:none"
-            class="s-flash s-flash--err"
-            role="alert"
-          >
-            <span x-text="checkoutError"></span>
-            <button type="button" @click="checkoutError = ''" class="sub-flash-close" aria-label="Schließen">×</button>
           </div>
 
           <!-- Plans Grid -->
@@ -392,13 +378,6 @@ const hasEveAddon  = currentAddons.includes('eve');
     font-size: 8px; font-weight: 500; letter-spacing: 0.06em;
     color: #2e7d4f; background: #edf7f0;
     padding: 1px 5px; border-radius: 4px;
-  }
-
-  /* ── Flash close button ──────────────────────────────────────────────────── */
-  .sub-flash-close {
-    background: none; border: none; cursor: pointer;
-    font-size: 16px; color: inherit; line-height: 1;
-    padding: 0; flex-shrink: 0; margin-left: auto;
   }
 
   /* ── Plans Grid ──────────────────────────────────────────────────────────── */

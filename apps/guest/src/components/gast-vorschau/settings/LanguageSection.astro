@@ -83,7 +83,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
     >
       SPEICHERN
     </button>
-    <span id="langSaveStatus" class="lang-save-status" aria-live="polite"></span>
   </div>
 </section>
 
@@ -230,11 +229,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
     margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
     display: flex; align-items: center; gap: 12px;
   }
-  .lang-save-status {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
-  }
-  .lang-save-status[data-state="saved"] { color: #5C9070; }
-  .lang-save-status[data-state="error"] { color: #C0392B; }
 </style>
 
 <script>
@@ -256,7 +250,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
   const grid      = document.getElementById('langGrid');
   const pills     = grid?.querySelectorAll<HTMLLabelElement>('.lang-pill');
   const saveBtn   = document.getElementById('langSaveBtn')   as HTMLButtonElement;
-  const statusEl  = document.getElementById('langSaveStatus') as HTMLElement;
   const limitMsg  = document.getElementById('langLimitMsg')  as HTMLElement;
   const counter   = document.getElementById('langCounter')   as HTMLElement;
   const ddWrap    = document.getElementById('defaultDdWrap') as HTMLElement;
@@ -279,11 +272,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
     if (currentLangs.length !== baseline.langs.length) return true;
     const a = [...currentLangs].sort(), b = [...baseline.langs].sort();
     return a.some((l, i) => l !== b[i]);
-  }
-
-  function setStatus(state: 'saved' | 'error' | '', msg: string) {
-    statusEl.dataset.state = state;
-    statusEl.textContent = msg;
   }
 
   function showLimit(show: boolean) { limitMsg.hidden = !show; }
@@ -382,7 +370,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
     ddBtnName.textContent = lang.label;
     updateDefaultPills(code);
     updateState({ defaultLanguage: code });
-    setStatus('', '');
     updateSaveBtn();
   }
 
@@ -415,7 +402,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
       updateState({ activeLanguages: newActive });
       updateCapState(newActive);
       updateCounter(newActive.length);
-      setStatus('', '');
       updateSaveBtn();
     });
   });
@@ -426,7 +412,6 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
     if (saveBtn.dataset.loading) return;
     saveBtn.dataset.loading = 'true';
     saveBtn.disabled = true;
-    setStatus('', '');
 
     try {
       const res = await fetch('/api/hotel/update-languages', {
@@ -437,8 +422,7 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       baseline = { langs: [...currentLangs], defaultLang: currentDefault };
-      setStatus('saved', 'Gespeichert');
-      setTimeout(() => setStatus('', ''), 3000);
+      (window as any).retahaToast?.('Gespeichert');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[lang-section] save error', msg);
@@ -446,7 +430,7 @@ const defLang   = LANGUAGES.find(l => l.code === defaultLanguage) ?? LANGUAGES[0
         || msg.includes('violates check constraint')
         || msg.includes('Maximal 6');
       if (isLimit) showLimit(true);
-      else setStatus('error', `Fehler: ${msg}`);
+      else (window as any).retahaToast?.(`Fehler: ${msg}`, 'error');
       saveBtn.disabled = false;
     } finally {
       delete saveBtn.dataset.loading;

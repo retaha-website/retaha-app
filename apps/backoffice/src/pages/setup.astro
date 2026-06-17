@@ -214,8 +214,6 @@ const initial = {
         </button>
       </div>
     </section>
-
-    <div x-show="toast" x-cloak :class="`wizard-toast wizard-toast--${toastKind}`" x-text="toast"></div>
   </div>
 
   <script>
@@ -227,7 +225,6 @@ const initial = {
       street: init.street, zip: init.zip, city: init.city, country: init.country,
       isSaving: false,
       step2Error: '', step3Status: '', step3Ok: false,
-      toast: '', toastKind: 'success' as 'success' | 'error',
 
       next() { if (this.step < 5) this.step++; },
       prev() { if (this.step > 1) this.step--; },
@@ -248,8 +245,7 @@ const initial = {
       },
 
       showToast(msg: string, kind: 'success' | 'error' = 'success') {
-        this.toast = msg; this.toastKind = kind;
-        setTimeout(() => { this.toast = ''; }, 3000);
+        (window as any).retahaToast?.(msg, kind === 'error' ? 'error' : 'success');
       },
 
       async saveStep2() {
@@ -397,9 +393,5 @@ const initial = {
       color: var(--theme-text-primary);
       border-left: 3px solid var(--theme-success);
     }
-
-    .wizard-toast { position: fixed; top: 16px; right: 16px; padding: 10px 16px; color: var(--theme-bg-primary); font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
-    .wizard-toast--success { background: var(--theme-success); }
-    .wizard-toast--error { background: var(--theme-accent); }
   </style>
 </Layout>

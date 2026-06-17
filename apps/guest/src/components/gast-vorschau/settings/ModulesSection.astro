@@ -92,9 +92,6 @@ const groups = ALL_GROUPS
     </div>
   ))}
 
-  <div class="mod-save-row">
-    <span id="modSaveStatus" class="mod-save-status" aria-live="polite"></span>
-  </div>
 </section>
 
 <style>
@@ -149,32 +146,11 @@ const groups = ALL_GROUPS
     background: var(--sage); box-shadow: 0 0 0 3px rgba(92,144,112,0.25);
     animation: led-pulse 2s ease-in-out infinite;
   }
-
-  .mod-save-row {
-    margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
-    min-height: 20px;
-  }
-  .mod-save-status {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
-  }
-  .mod-save-status[data-state="saved"] { color: #5C9070; }
-  .mod-save-status[data-state="error"] { color: #C0392B; }
 </style>
 
 <script>
   import { updateState, getState } from '../../../lib/gast-vorschau/state';
   type ModuleKey = keyof ReturnType<typeof getState>['modules'];
-
-  const statusEl = document.getElementById('modSaveStatus') as HTMLElement | null;
-  let statusTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function setStatus(state: 'saved' | 'error' | '', msg: string) {
-    if (!statusEl) return;
-    statusEl.dataset.state = state;
-    statusEl.textContent = msg;
-    if (statusTimer) clearTimeout(statusTimer);
-    if (state === 'saved') statusTimer = setTimeout(() => setStatus('', ''), 2500);
-  }
 
   const domModules: Partial<ReturnType<typeof getState>['modules']> = {};
   document.querySelectorAll<HTMLButtonElement>('.module-toggle').forEach(btn => {
@@ -195,7 +171,6 @@ const groups = ALL_GROUPS
       btn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
       updateState({ modules: { ...getState().modules, [key]: newVal } });
       btn.dataset.loading = 'true';
-      setStatus('', '');
 
       try {
         const res = await fetch('/api/hotel/save-modules', {
@@ -205,12 +180,12 @@ const groups = ALL_GROUPS
         });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-        setStatus('saved', '✓ Gespeichert');
+        (window as any).retahaToast?.('Gespeichert');
       } catch {
         btn.classList.toggle('is-on', wasOn);
         btn.setAttribute('aria-pressed', wasOn ? 'true' : 'false');
         updateState({ modules: { ...getState().modules, [key]: wasOn } });
-        setStatus('error', 'Fehler — bitte neu laden');
+        (window as any).retahaToast?.('Fehler — bitte neu laden', 'error');
       } finally {
         delete btn.dataset.loading;
       }

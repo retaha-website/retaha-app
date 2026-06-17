@@ -28,6 +28,7 @@ import '@retaha/ui/styles/components/status-markers.css';
 import Header from '../components/header/Header.astro';
 import Footer from '../components/footer/Footer.astro';
 import ConfirmModal from '../components/shared/ConfirmModal.astro';
+import Toast from '@retaha/ui/components/shared/Toast.astro';
 import { getUserProfileForLayout } from '../lib/auth/get-user-profile';
 
 interface Props {
@@ -92,6 +93,7 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
     </main>
     <Footer />
     <ConfirmModal />
+    <Toast />
 
     <script>
       // Theme-Toggle
@@ -130,10 +132,12 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
             if (!data.ok) {
               this.checked = prev;
               this.error = data.error || 'Fehler beim Speichern';
+              (window as any).retahaToast?.(this.error, 'error');
             }
           } catch {
             this.checked = prev;
             this.error = 'Netzwerk-Fehler';
+            (window as any).retahaToast?.(this.error, 'error');
           } finally {
             this.saving = false;
           }
@@ -190,13 +194,15 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
             const d = await res.json();
             if (!d.ok) {
               this.error = d.error || 'Fehler beim Speichern';
+              (window as any).retahaToast?.(this.error, 'error');
             } else {
               this.original = { ...(this.data as Record<string, string>) };
-              this.success = true;
-              this._timer = setTimeout(() => { this.success = false; }, 2500);
+              this.success = false;
+              (window as any).retahaToast?.('Gespeichert');
             }
           } catch {
             this.error = 'Netzwerk-Fehler';
+            (window as any).retahaToast?.(this.error, 'error');
           } finally {
             this.saving = false;
           }

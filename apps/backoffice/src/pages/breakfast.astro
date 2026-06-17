@@ -250,9 +250,6 @@ textarea.s-input { resize: none; min-height: 72px; }
 .bp-modal-foot { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--surface); border-radius: 0 0 var(--r, 8px) var(--r, 8px); }
 
 /* toast */
-.bp-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 12px 24px; border-radius: var(--r, 8px); font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.14); white-space: nowrap; pointer-events: none; }
-.bp-toast--ok { background: #0A0A0A; color: white; }
-.bp-toast--err { background: #8C2128; color: white; }
 
 @media (max-width: 834px) { .bp-modal { max-height: 92vh; } .bp-modal-grid-3 { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 600px) { .bp-allergen-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -273,9 +270,9 @@ textarea.s-input { resize: none; min-height: 72px; }
   </section>
 
   {message && (
-    <div class={`s-flash ${message.type === 'success' ? 's-flash--ok' : 's-flash--err'}`}>
-      {message.text}
-    </div>
+    <script is:inline define:vars={{ m: message.text, t: message.type === 'success' ? 'success' : 'error' }}>
+      window.addEventListener('DOMContentLoaded', function () { window.retahaToast && window.retahaToast(m, t); });
+    </script>
   )}
 
   <div class="settings-sections">
@@ -356,8 +353,6 @@ textarea.s-input { resize: none; min-height: 72px; }
             <p class="field__hint" style="margin-top:8px">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
           </div>
           <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
             <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
           </div>
         </div>
@@ -378,8 +373,6 @@ textarea.s-input { resize: none; min-height: 72px; }
             </div>
           </div>
           <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
             <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
           </div>
         </div>
@@ -402,8 +395,6 @@ textarea.s-input { resize: none; min-height: 72px; }
             </div>
           </div>
           <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
             <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
           </div>
         </div>
@@ -432,8 +423,6 @@ textarea.s-input { resize: none; min-height: 72px; }
             </div>
           </div>
           <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
             <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
           </div>
         </div>
@@ -476,8 +465,6 @@ textarea.s-input { resize: none; min-height: 72px; }
             </div>
           </div>
           <div class="s-card__footer">
-            <span x-show="error" x-cloak class="s-flash s-flash--err" style="margin:0;padding:8px 12px" x-text="error"></span>
-            <span x-show="success" x-cloak class="s-flash s-flash--ok" style="margin:0;padding:8px 12px">✓ Gespeichert</span>
             <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
           </div>
         </div>
@@ -695,8 +682,6 @@ textarea.s-input { resize: none; min-height: 72px; }
     </div><!-- .bp-modal -->
   </div><!-- .bp-modal-bd -->
 
-  <!-- Toast -->
-  <div x-show="toast" x-cloak :class="'bp-toast bp-toast--' + toastKind" x-text="toast"></div>
 
 </div><!-- .settings-page -->
 
@@ -766,10 +751,9 @@ textarea.s-input { resize: none; min-height: 72px; }
               }),
             });
             const d = await res.json();
-            if (!d.ok) { this.error = d.error || 'Fehler'; return; }
-            this.success = true;
+            if (!d.ok) { this.error = d.error || 'Fehler'; window.retahaToast?.(this.error, 'error'); return; }
             this._origStr = JSON.stringify({ hours: this.hours, slotMinutes: this.slotMinutes });
-            this._timer = setTimeout(() => { this.success = false; }, 3000);
+            window.retahaToast?.('Gespeichert');
           } catch (err) {
             this.error = 'Netzwerk-Fehler';
           } finally {
@@ -787,8 +771,6 @@ textarea.s-input { resize: none; min-height: 72px; }
       modalItem: {},
       modalSaving: false,
       modalError: '',
-      toast: '',
-      toastKind: 'ok',
       _toastTimer: null,
 
       // Drag & Drop state
@@ -979,10 +961,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       },
 
       showToast(msg, kind) {
-        this.toast = msg;
-        this.toastKind = kind || 'ok';
-        if (this._toastTimer) clearTimeout(this._toastTimer);
-        this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
+        window.retahaToast?.(msg, kind === 'err' || kind === 'error' ? 'error' : 'success');
       },
     }));
   });
