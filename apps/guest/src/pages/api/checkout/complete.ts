@@ -9,6 +9,7 @@
 import type { APIRoute } from 'astro';
 import { getStaySession, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isDemoSession } from '../../../lib/showcase/session';
+import { awardStayPoints } from '@retaha/loyalty';
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -54,7 +55,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   // Stay laden + validieren
   const { data: stayRow, error: stayErr } = await sbSr
     .from('stays')
-    .select('id, hotel_id, check_out, checked_out_at, is_active')
+    .select('id, hotel_id, guest_id, check_in, check_out, checked_out_at, is_active')
     .eq('id', session.stay_id)
     .maybeSingle();
 
@@ -92,6 +93,22 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   if (updateErr) {
     return json({ ok: false, error: updateErr.message }, 500);
+  }
+
+  // ── Loyalty: Punkte pro Nacht gutschreiben (best-effort, idempotent) ──────
+  // Gated auf features.loyalty (in awardStayPoints), blockiert den Checkout nie.
+  // Demo-/Showcase-Sessions haben keinen echten guests-Row → deren Earning wird
+  // am Anzeige-Zeitpunkt simuliert (Phase 3), daher hier nur der echte Stay-Pfad.
+  try {
+    await awardStayPoints(sbSr, {
+      hotelId: (stayRow as any).hotel_id,
+      guestId: (stayRow as any).guest_id,
+      stayId: session.stay_id,
+      checkIn: (stayRow as any).check_in,
+      checkOut: (stayRow as any).check_out,
+    });
+  } catch (e) {
+    console.warn('[checkout/complete] loyalty award failed (non-fatal):', (e as Error).message);
   }
 
   // Mews-Sync: TRY/CATCH — Fehler blockiert Gast nicht
