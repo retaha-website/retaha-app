@@ -16,7 +16,8 @@ function avail(key: string): boolean {
   return isModuleAvailable({ plan: hotelPlan, addons: hotelAddons }, key);
 }
 
-const ALL_GROUPS = [
+type ModRow = { key: string; label: string; sub: string; hint?: string };
+const ALL_GROUPS: { label: string; modules: ModRow[] }[] = [
   {
     label: 'Gäste-Services',
     modules: [
@@ -36,7 +37,8 @@ const ALL_GROUPS = [
     label: 'Wallet & CRM',
     modules: [
       { key: 'wallet',    label: 'Wallet-Pass',       sub: 'Apple & Google Wallet' },
-      { key: 'marketing', label: 'Marketing',          sub: 'Drips + Kampagnen' },
+      { key: 'marketing', label: 'Newsletter / E-Mail-Opt-in', sub: 'Gast-Einwilligung (E-Mail)',
+        hint: 'Hier willigt der Gast ein, später E-Mail-Kampagnen zu erhalten. Versand erfolgt im Backoffice.' },
       { key: 'loyalty',   label: 'Loyalty-Program',   sub: 'Punkte, Stufen, Belohnungen' },
     ],
   },
@@ -73,6 +75,7 @@ const groups = ALL_GROUPS
             <div class="module-row__info">
               <span class="module-row__label">{mod.label}</span>
               <span class="module-row__sub">{mod.sub}</span>
+              {mod.hint && <span class="module-row__hint">{mod.hint}</span>}
             </div>
             <button
               class:list={['module-toggle', { 'is-on': isOn(mod.key) }]}
@@ -123,6 +126,7 @@ const groups = ALL_GROUPS
   .module-row__info { display: flex; flex-direction: column; gap: 2px; }
   .module-row__label { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
   .module-row__sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em; }
+  .module-row__hint { font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.45; color: var(--ink-faint); letter-spacing: 0.02em; margin-top: 4px; max-width: 320px; }
   .module-toggle {
     display: inline-flex; align-items: center; gap: 7px;
     padding: 6px 12px; border: 1px solid var(--border);

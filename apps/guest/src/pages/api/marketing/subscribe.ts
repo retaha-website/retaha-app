@@ -44,6 +44,20 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const ipHash = await sha256hex(pepper + clientIp);
 
   const sb = createSupabaseServiceRoleInstance();
+
+  // DSGVO-Zweckbindung: kein E-Mail-Consent einsammeln, wenn der Marketing-Kanal
+  // für dieses Hotel deaktiviert ist (features.marketing=false). Default an, damit
+  // ungesetzte/neue Hotels wie bisher sammeln. Defense-in-Depth zum UI-Gate —
+  // eine gecachte/veraltete Seite darf nicht doch subscriben.
+  const { data: hotelSettings } = await sb
+    .from('hotel_settings')
+    .select('features')
+    .eq('hotel_id', session.hotel_id)
+    .maybeSingle();
+  if (((hotelSettings?.features ?? {}) as Record<string, boolean>).marketing === false) {
+    return json({ ok: false, error: 'marketing_disabled' }, 403);
+  }
+
   const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
 
   const { count: ipCount } = await sb

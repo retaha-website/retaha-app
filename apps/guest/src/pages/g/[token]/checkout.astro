@@ -817,7 +817,13 @@ const pitchText = lk === 'de' ? 'Nimm uns mit — schnellerer Check-in & Stammga
 
           <div id="wallet-err" class="flash flash--err" hidden></div>
 
-          <EmailOptInSection lang={langRaw} hotelName={(hotel as any).name} />
+          {/* Newsletter-/E-Mail-Opt-in nur wenn der E-Mail-Marketing-Kanal aktiv ist
+              (features.marketing, Default an = !== false). DSGVO-Zweckbindung: kein
+              Consent einsammeln für einen Kanal, den das Hotel nicht betreibt.
+              Wallet-Push-Consent ist ein separater Kanal (features.wallet, WalletAddSheet). */}
+          {features.marketing !== false && (
+            <EmailOptInSection lang={langRaw} hotelName={(hotel as any).name} />
+          )}
 
           <PostStaySheet lang={lk} stayId={stay.id} hotelName={(hotel as any).name} />
         </div>
