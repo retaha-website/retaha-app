@@ -1,0 +1,82 @@
+---
+// Gast-App 404 — ruhige, hilfreiche Sprache statt kaltem „Not Found".
+// Häufigster realer Fall: abgelaufener/ungültiger Zugangslink (Stay vorbei) oder
+// falsche Hotel-Subdomain — daher der Hinweis auf einen neuen Zugang übers Hotel.
+// Standalone (keine Auth/DB) → rendert immer; auto-serviert für unbekannte Routen.
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+Astro.response.status = 404;
+Astro.response.headers.set('Cache-Control', 'no-store');
+
+// Ausweg je Kontext: app.retaha.de (kein Hotelkontext) → retaha.de;
+// Hotel-Subdomain → der „Zurück"-Weg ist das Hotel selbst (kein SaaS-Link).
+const host = (Astro.request.headers.get('host') ?? '').toLowerCase();
+const isHotelSubdomain = host.endsWith('.retaha.de') && !host.startsWith('app.');
+---
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FBFAF7" />
+    <title>Seite nicht verfügbar · retaha</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; background: #FBFAF7; color: #0F0F0D;
+        font-family: 'Inter Tight', system-ui, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px; -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 440px; width: 100%; text-align: center; }
+      .eyebrow {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em;
+        text-transform: uppercase; color: #A8A8A0; margin: 0 0 22px;
+      }
+      .title {
+        font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+        font-size: clamp(26px, 6.5vw, 34px); letter-spacing: -0.02em; line-height: 1.12;
+        margin: 0 0 16px; color: #0F0F0D;
+      }
+      .title .dot { color: #FF4A82; }
+      .body { font-size: 15px; line-height: 1.55; color: #6B6B63; margin: 0 auto; max-width: 380px; }
+      .body--mute { font-size: 13px; color: #A8A8A0; margin-top: 10px; }
+      .cta {
+        display: inline-flex; align-items: center; gap: 8px; margin-top: 28px;
+        text-decoration: none; font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+        font-size: 14px; color: #0F0F0D; background: transparent;
+        border: 1.5px solid #C8C4BB; border-radius: 12px; padding: 12px 22px;
+        transition: border-color 0.14s ease;
+      }
+      .cta:hover { border-color: #0F0F0D; }
+      .made {
+        margin-top: 44px; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 0.06em; color: #C7C3BB;
+      }
+      .made a { color: #A8A8A0; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <p class="eyebrow">404 · nicht gefunden</p>
+      <h1 class="title">Diese Seite ist nicht<br />mehr verfügbar<span class="dot">.</span></h1>
+      <p class="body">
+        Möglicherweise ist dein Zugangslink abgelaufen. Wende dich an dein Hotel
+        für einen neuen Zugang.
+      </p>
+      <p class="body body--mute">
+        This page is no longer available — please ask your hotel for a new access link.
+      </p>
+
+      {!isHotelSubdomain && (
+        <a class="cta" href="https://retaha.de">Zu retaha.de</a>
+      )}
+
+      <p class="made">powered by <a href="https://retaha.de" target="_blank" rel="noopener">retaha</a></p>
+    </main>
+  </body>
+</html>
