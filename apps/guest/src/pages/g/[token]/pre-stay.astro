@@ -4,7 +4,7 @@
 // Feature-Gate: features.pre_stay
 
 import { loadStayByToken } from '@retaha/db';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/jetbrains-mono/400.css';
@@ -16,6 +16,7 @@ const ctx = await loadStayByToken(token);
 if (!ctx) return new Response('Aufenthalt nicht gefunden', { status: 404 });
 
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 
 // Feature-Gate
 const features = (settings?.features ?? {}) as Record<string, boolean>;
@@ -53,13 +54,13 @@ const labels: Record<Lang, {
   de: {
     eyebrow: `In ${daysUntil} ${daysUntil === 1 ? 'Tag' : 'Tagen'}`,
     greeting: `Hallo${guestName ? `, ${guestName}` : ''}`,
-    sub: `Wir freuen uns auf dich am ${arrivalLabel}.`,
-    prepTitle: 'Was dich erwartet',
+    sub: isFormal ? `Wir freuen uns auf Sie am ${arrivalLabel}.` : `Wir freuen uns auf dich am ${arrivalLabel}.`,
+    prepTitle: isFormal ? 'Was Sie erwartet' : 'Was dich erwartet',
     wifiCard: 'WLAN inklusive', wifiSub: 'Im ganzen Haus kostenlos — schon beim Einzug verfügbar',
     brkCard: `Frühstück ${breakfastStart}–${breakfastEnd}`, brkSub: 'In der App reservierbar',
     serviceCard: 'Service auf Abruf', serviceSub: 'Handtücher, Wasser, Zimmerservice',
     walletTeaser: 'Bereit für die Anreise?',
-    walletSub: 'Hol dir schon jetzt deinen digitalen Willkommenspass.',
+    walletSub: isFormal ? 'Holen Sie sich schon jetzt Ihren digitalen Willkommenspass.' : 'Hol dir schon jetzt deinen digitalen Willkommenspass.',
     walletBtn: 'Zur Google Wallet hinzufügen',
     back: '← Zurück zur App',
     daysUnit: (n) => n === 1 ? 'Tag' : 'Tage',

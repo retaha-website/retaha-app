@@ -2,7 +2,7 @@
 // Wünsche vorab — Bestätigung
 
 import { loadGuestCtx } from '../../../../lib/showcase/guest-ctx';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
@@ -14,6 +14,7 @@ const ctxResult = await loadGuestCtx(token);
 if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
 const { ctx } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 const features = (settings as any)?.features ?? {};
 if (features.special_requests === false) return Astro.redirect(`/g/${token}`);
 
@@ -24,7 +25,7 @@ const guestName = guest?.first_name ?? null;
 type Labels = { title: string; sub: string; cta: string };
 const n = guestName;
 const labels: Record<Lang, Labels> = {
-  de: { title: n ? `Notiert, ${n}.` : 'Notiert.', sub: 'Wir bereiten alles vor, so gut es geht. Wir freuen uns auf dich!', cta: 'Fertig' },
+  de: { title: n ? `Notiert, ${n}.` : 'Notiert.', sub: isFormal ? 'Wir bereiten alles vor, so gut es geht. Wir freuen uns auf Sie!' : 'Wir bereiten alles vor, so gut es geht. Wir freuen uns auf dich!', cta: 'Fertig' },
   en: { title: n ? `Noted, ${n}.` : 'Noted.', sub: "We'll do our best to make it happen. Looking forward to your arrival!", cta: 'Done' },
   fr: { title: n ? `Noté, ${n}.` : 'Noté.', sub: 'Nous ferons de notre mieux. Nous avons hâte de vous accueillir !', cta: 'Terminer' },
   es: { title: n ? `Anotado, ${n}.` : 'Anotado.', sub: 'Haremos todo lo posible. ¡Esperamos su llegada!', cta: 'Listo' },

@@ -2,7 +2,7 @@
 // Wünsche vorab — Gast teilt Präferenzen vor Ankunft
 
 import { loadGuestCtx } from '../../../../lib/showcase/guest-ctx';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
@@ -16,6 +16,7 @@ const ctxResult = await loadGuestCtx(token);
 if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
 const { ctx, isShowcase } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 const features = (settings as any)?.features ?? {};
 if (features.special_requests === false) return Astro.redirect(`/g/${token}`);
 
@@ -49,7 +50,7 @@ type Labels = {
 
 const labels: Record<Lang, Labels> = {
   de: {
-    title: 'Wünsche vorab', sub: 'Was macht deinen Aufenthalt schöner? Wir versuchen, es möglich zu machen.',
+    title: 'Wünsche vorab', sub: isFormal ? 'Was macht Ihren Aufenthalt schöner? Wir versuchen, es möglich zu machen.' : 'Was macht deinen Aufenthalt schöner? Wir versuchen, es möglich zu machen.',
     chips: { quiet_room: 'Ruhiges Zimmer', high_floor: 'Hohe Etage', extra_pillow: 'Extra Kissen', late_arrival: 'Späte Anreise', crib: 'Babybett', accessible: 'Barrierefrei', vegetarian: 'Vegetarisch', occasion: 'Anlass', allergies: 'Allergien' },
     allergyLabel: 'Allergien & Unverträglichkeiten', allergyPlaceholder: 'z. B. Nüsse, Laktose …',
     occasionLabel: 'Welcher Anlass?', occasionOptions: [{ slug: 'Geburtstag', label: 'Geburtstag' }, { slug: 'Jahrestag', label: 'Jahrestag' }, { slug: 'Honeymoon', label: 'Honeymoon' }],

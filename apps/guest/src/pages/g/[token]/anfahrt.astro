@@ -2,7 +2,7 @@
 // Anfahrt & Check-in — Info-Karte (Anreise-Phase)
 
 import { loadGuestCtx } from '../../../lib/showcase/guest-ctx';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { telHref } from '@retaha/db';
 import '@fontsource/space-grotesk/400.css';
@@ -16,6 +16,7 @@ const ctxResult = await loadGuestCtx(token);
 if (!ctxResult) return Astro.redirect(`/g/${token ?? ''}`);
 const { ctx, isShowcase } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 
 const session = await getStaySession(Astro.cookies);
 if (!session || session.stay_id !== stay.id) {
@@ -54,7 +55,7 @@ type Labels = {
   checkinFrom: string;
 };
 const labels: Record<Lang, Labels> = {
-  de: { title: 'Anfahrt & Check-in', sub: 'So findest du uns.', routeBtn: 'Route öffnen', rowCheckin: 'Check-in', rowParken: 'Parken', rowKontakt: 'Kontakt', checkinFrom: 'ab' },
+  de: { title: 'Anfahrt & Check-in', sub: isFormal ? 'So finden Sie uns.' : 'So findest du uns.', routeBtn: 'Route öffnen', rowCheckin: 'Check-in', rowParken: 'Parken', rowKontakt: 'Kontakt', checkinFrom: 'ab' },
   en: { title: 'Directions & Check-in', sub: 'How to find us.', routeBtn: 'Open route', rowCheckin: 'Check-in', rowParken: 'Parking', rowKontakt: 'Contact', checkinFrom: 'from' },
   fr: { title: 'Accès & Check-in', sub: 'Comment nous trouver.', routeBtn: 'Ouvrir l\'itinéraire', rowCheckin: 'Check-in', rowParken: 'Parking', rowKontakt: 'Contact', checkinFrom: 'à partir de' },
   es: { title: 'Cómo llegar & Check-in', sub: 'Así nos encuentras.', routeBtn: 'Abrir ruta', rowCheckin: 'Check-in', rowParken: 'Aparcamiento', rowKontakt: 'Contacto', checkinFrom: 'desde las' },

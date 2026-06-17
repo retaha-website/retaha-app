@@ -1,6 +1,6 @@
 ---
 import { loadStayByToken, loadBookingsForStay, loadActiveBreakfastItems } from '@retaha/db';
-import { normalizeLang, pickI18n, asLanguageCode, type Lang } from '@retaha/i18n';
+import { normalizeLang, pickI18n, asLanguageCode, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showcase/session';
 import '@fontsource/space-grotesk/400.css';
@@ -66,6 +66,7 @@ if (isShowcaseToken(token)) {
 if (!ctx) return Astro.redirect(`/g/${token}`);
 
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 
 // Sprach-Resolution
 const lang: Lang = normalizeLang(
@@ -212,17 +213,17 @@ const labels = {
     notesPlaceholder: 'Z.B. glutenfrei, Geburtstag, …',
     submit: 'Tisch reservieren', submitting: 'Wird reserviert…',
     errorPrefix: 'Fehler',
-    pendingTitle: 'Wir haben deine Anfrage.', pendingSub: `${conciergeName} meldet sich gleich mit der Bestätigung.`,
-    confirmedTitle: 'Reservierung bestätigt.', confirmedSub: 'Wir freuen uns auf dich.',
-    cancelledTitle: 'Reservierung abgelehnt.', cancelledSub: 'Bitte sprich mit dem Empfang.',
+    pendingTitle: isFormal ? 'Wir haben Ihre Anfrage.' : 'Wir haben deine Anfrage.', pendingSub: `${conciergeName} meldet sich gleich mit der Bestätigung.`,
+    confirmedTitle: 'Reservierung bestätigt.', confirmedSub: isFormal ? 'Wir freuen uns auf Sie.' : 'Wir freuen uns auf dich.',
+    cancelledTitle: 'Reservierung abgelehnt.', cancelledSub: isFormal ? 'Bitte sprechen Sie mit dem Empfang.' : 'Bitte sprich mit dem Empfang.',
     bookingDate: 'Tag', bookingTime: 'Uhrzeit', bookingPeople: 'Personen', bookingTable: 'Tisch', bookingDelivery: 'Lieferart',
     cancelBtn: 'Zurücknehmen', rebookBtn: 'Neuen Tisch reservieren',
     noFutureDates: `Täglich ${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
     infoTimeLabel: 'Wann', infoTimeValue: `${startTime.substring(0,5)} – ${endTime.substring(0,5)}`,
-    infoLocationLabel: 'Ort', infoIncludedLabel: 'Was dich erwartet',
+    infoLocationLabel: 'Ort', infoIncludedLabel: isFormal ? 'Was Sie erwartet' : 'Was dich erwartet',
     menuTabReservation: 'Reservieren', menuTabInfo: 'Frühstück', menuTabMenu: 'Karte',
     menuFilterTitle: 'Allergene anzeigen',
-    menuFilterHint: 'Wähle deine Allergene aus — Speisen mit diesen Zutaten werden markiert.',
+    menuFilterHint: isFormal ? 'Wählen Sie Ihre Allergene aus — Speisen mit diesen Zutaten werden markiert.' : 'Wähle deine Allergene aus — Speisen mit diesen Zutaten werden markiert.',
     menuFilterHideShow: 'Filter zurücksetzen',
     menuWarningPrefix: 'Enthält',
     menuFlagVegetarian: 'vegetarisch', menuFlagVegan: 'vegan', menuFlagOrganic: 'bio',

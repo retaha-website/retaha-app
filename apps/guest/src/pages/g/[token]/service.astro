@@ -1,7 +1,7 @@
 ---
 import { loadGuestCtx } from '../../../lib/showcase/guest-ctx';
 import { loadBookingsForStay } from '@retaha/db';
-import { normalizeLang, type Lang } from '@retaha/i18n';
+import { normalizeLang, addressFormToFormality, type Lang } from '@retaha/i18n';
 import { setStaySessionCookie, getStaySession, computeBrandPalette } from '@retaha/auth';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/700.css';
@@ -19,6 +19,7 @@ const ctxResult = await loadGuestCtx(token);
 if (!ctxResult) return Astro.redirect(`/g/${token}`);
 const { ctx, isShowcase } = ctxResult;
 const { stay, guest, hotel, settings } = ctx;
+const isFormal = addressFormToFormality((settings as any)?.guest_address_form) === 'formal';
 
 // Feature guard
 const f            = (settings as any)?.features ?? {};
@@ -82,10 +83,10 @@ const labelMap = {
   de: {
     pageTitle: `${(hotel as any).name} · Service`,
     eyebrow: 'Service',
-    title: 'Was brauchst ',
-    titleAccent: 'du?',
-    subtitle: 'Wir bringen es dir aufs Zimmer.',
-    chooseItem: 'Was möchtest du?',
+    title: isFormal ? 'Was brauchen ' : 'Was brauchst ',
+    titleAccent: isFormal ? 'Sie?' : 'du?',
+    subtitle: isFormal ? 'Wir bringen es Ihnen aufs Zimmer.' : 'Wir bringen es dir aufs Zimmer.',
+    chooseItem: isFormal ? 'Was möchten Sie?' : 'Was möchtest du?',
     timingLabel: 'Wann?',
     timingNow: 'So schnell wie möglich',
     timingScheduled: 'Zu einer bestimmten Zeit',
@@ -94,13 +95,13 @@ const labelMap = {
     notesPlaceholder: 'z.B. extra-saugfähige Handtücher, kohlensäurefreies Wasser …',
     submitBtn: 'Service anfragen',
     rebookBtn: 'Neue Anfrage',
-    statusPendingTitle: 'Wir haben deine Anfrage.',
-    statusPendingSub: 'Kommt zu dir aufs Zimmer.',
+    statusPendingTitle: isFormal ? 'Wir haben Ihre Anfrage.' : 'Wir haben deine Anfrage.',
+    statusPendingSub: isFormal ? 'Kommt zu Ihnen aufs Zimmer.' : 'Kommt zu dir aufs Zimmer.',
     statusConfirmedTitle: 'Bestätigt.',
-    statusConfirmedSub: 'Wir bringen es dir gleich.',
+    statusConfirmedSub: isFormal ? 'Wir bringen es Ihnen gleich.' : 'Wir bringen es dir gleich.',
     statusCancelledTitle: 'Anfrage abgelehnt.',
-    statusCancelledSub: 'Bitte sprich mit dem Empfang.',
-    yourSelection: 'Deine Auswahl',
+    statusCancelledSub: isFormal ? 'Bitte sprechen Sie mit dem Empfang.' : 'Bitte sprich mit dem Empfang.',
+    yourSelection: isFormal ? 'Ihre Auswahl' : 'Deine Auswahl',
     summaryItem: 'Service', summaryTime: 'Wann', summaryNote: 'Notiz',
   },
   en: {
