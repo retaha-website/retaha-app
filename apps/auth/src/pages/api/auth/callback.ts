@@ -20,7 +20,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
 import { setSessionCookie } from '@retaha/auth';
-import { sanitizeReturnTo } from '../../../lib/redirect-whitelist';
+import { resolveLanding } from '../../../lib/landing';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   let accessToken = '';
@@ -54,8 +54,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // Token ist valide → Cross-Subdomain-Session-Cookie setzen
   setSessionCookie(cookies, accessToken);
 
-  const safeReturnTo = sanitizeReturnTo(returnTo);
-  return json({ ok: true, redirect: safeReturnTo }, 200);
+  // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
+  const landing = await resolveLanding(accessToken, returnTo);
+  return json({ ok: true, redirect: landing }, 200);
 };
 
 function json(body: any, status: number): Response {

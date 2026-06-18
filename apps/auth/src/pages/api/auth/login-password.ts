@@ -26,7 +26,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
 import { setSessionCookie } from '@retaha/auth';
-import { sanitizeReturnTo } from '../../../lib/redirect-whitelist';
+import { resolveLanding } from '../../../lib/landing';
 import { rateLimit } from '../../../lib/rate-limit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -93,17 +93,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   setSessionCookie(cookies, data.session.access_token);
 
-  const safeReturnTo = sanitizeReturnTo(returnTo);
+  // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
+  const landing = await resolveLanding(data.session.access_token, returnTo);
 
   if (isJson) {
-    return new Response(JSON.stringify({ ok: true, redirect: safeReturnTo }), {
+    return new Response(JSON.stringify({ ok: true, redirect: landing }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   }
   return new Response(null, {
     status: 302,
-    headers: { Location: safeReturnTo },
+    headers: { Location: landing },
   });
 };
 

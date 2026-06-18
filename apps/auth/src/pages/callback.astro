@@ -21,6 +21,7 @@
 
 import AuthLayout from '../layouts/AuthLayout.astro';
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
+import { resolveLanding } from '../lib/landing';
 import { setSessionCookie } from '@retaha/auth';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
@@ -51,7 +52,9 @@ if (code) {
   }
 
   setSessionCookie(Astro.cookies, data.session.access_token);
-  return Astro.redirect(returnTo, 302);
+  // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
+  const landing = await resolveLanding(data.session.access_token, returnTo);
+  return Astro.redirect(landing, 302);
 }
 
 // Implicit-Flow (Hash-Fragment): Bootstrap-JS extrahiert Token im Browser.
