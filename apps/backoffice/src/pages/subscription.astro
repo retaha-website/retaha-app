@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getUser, getUserHotels } from '@retaha/auth';
+import { getUser, getUserHotels, getUserRole, hasPermission } from '@retaha/auth';
 import { calculateTrialStatus } from '../lib/trial-status';
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -9,6 +9,12 @@ if (!user) return Astro.redirect('/admin/login');
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+// Billing ist Owner-only (Matrix: manager = „kein Billing").
+const billingRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!billingRole || !hasPermission(billingRole, 'hotel.billing')) {
+  return Astro.redirect('/uebersicht?error=billing_owner_only');
+}
 
 const currentPlan: string = (hotel as any).plan ?? 'lite';
 const currentAddons: string[] = (hotel as any).addons ?? [];

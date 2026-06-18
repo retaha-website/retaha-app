@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getUser, getUserHotels } from '@retaha/auth';
+import { getUser, getUserHotels, requirePermission } from '@retaha/auth';
 import {
   getStripe,
   getPriceId,
@@ -25,6 +25,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
   if (!hotel) return json({ error: 'Kein Hotel gefunden' }, 401);
+
+  // Billing ist Owner-only (Matrix: manager = „kein Billing").
+  const gate = await requirePermission(cookies, request, hotel.id, 'hotel.billing');
+  if (gate instanceof Response) return gate;
 
   let body: { plan?: unknown; addon?: unknown; interval?: unknown };
   try {

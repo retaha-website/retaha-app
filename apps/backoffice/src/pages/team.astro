@@ -26,6 +26,11 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!myRole) return Astro.redirect('/admin/login?error=no_membership');
 
+// Team-Verwaltung ist Owner-only (Matrix: manager/staff = „kein Team").
+if (!hasPermission(myRole, 'team.read')) {
+  return Astro.redirect('/uebersicht?error=team_owner_only');
+}
+
 const admin = createSupabaseServiceRoleInstance();
 
 // Team laden — alle hotel_users für dieses Hotel + matching user_profiles + auth-emails
