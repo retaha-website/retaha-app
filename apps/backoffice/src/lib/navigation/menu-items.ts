@@ -98,10 +98,39 @@ export const menuSections: MenuSection[] = [
         icon: icon('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'),
       },
       {
-        label: 'Hero-Slider',
-        sub: 'Swipeable Karten-Feed',
-        href: '/gast-vorschau',
-        icon: icon('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'),
+        label: 'Hero-Karten',
+        sub: 'Action-Cards · Swipe',
+        href: `${GUEST_APP}/action-cards`,
+        icon: icon('<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
+      },
+      {
+        label: 'Branding',
+        sub: 'Logo · Farben · Theme',
+        href: `${GUEST_APP}/branding`,
+        icon: icon('<circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M2 12a10 10 0 0 0 10 10"/><path d="m8 12 2 2 4-4"/>'),
+      },
+      {
+        label: 'Konferenz',
+        sub: 'Räume · Buchungen',
+        href: `${GUEST_APP}/conference`,
+        icon: icon('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3L12 7 8 3"/>'),
+      },
+    ],
+  },
+  {
+    title: 'Stay-Pushes & Tools',
+    items: [
+      {
+        label: 'Stay-Pushes',
+        sub: 'Automatische Nachrichten',
+        href: `${GUEST_APP}/stay-pushes`,
+        icon: icon('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
+      },
+      {
+        label: 'NFC-Tags',
+        sub: 'Karten · Schlüssel',
+        href: `${GUEST_APP}/nfc-tags`,
+        icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
       },
     ],
   },
