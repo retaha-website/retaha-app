@@ -49,15 +49,15 @@ function presetLabel(p: string | undefined): string {
 }
 ---
 
-<HotelierLayout title="Showcase" activeTab="gast" hotelName={hotel.name}>
+<HotelierLayout title="Test-Gast" activeTab="gast" hotelName={hotel.name}>
   <div class="sc-page" x-data="showcasePage()" x-cloak>
 
-    <!-- ── Form Modal ──────────────────────────────────────── -->
-    <div x-show="showForm" class="sc-modal-backdrop" @click.self="showForm = false">
-      <div class="sc-form-panel">
+    <!-- ── Form Modal (Anlegen + Bearbeiten) ─────────────────── -->
+    <div x-show="showForm" class="sc-modal-backdrop" @click.self="showForm = false" x-cloak>
+      <div class="settings-section sc-form-panel">
         <div class="sc-form-head">
-          <h2 class="sc-form-title" x-text="editId ? 'Session bearbeiten' : 'Neue Demo-Session'"></h2>
-          <button type="button" class="sc-form-close" @click="showForm = false">✕</button>
+          <h2 class="settings-section__title" x-text="editId ? 'Demo-Konto bearbeiten' : 'Neues Demo-Konto'"></h2>
+          <button type="button" class="sc-form-close" @click="showForm = false" aria-label="Schließen">✕</button>
         </div>
 
         <form @submit.prevent="submitForm()">
@@ -138,16 +138,16 @@ function presetLabel(p: string | undefined): string {
             </template>
           </div>
           <div class="sc-items-footer">
-            <button type="button" class="sc-btn-ghost sc-btn-sm" @click="addItem()">+ Posten</button>
+            <button type="button" class="sc-mini-btn" @click="addItem()">+ Posten</button>
             <span class="sc-items-total" x-show="form.items.length > 0">Summe: <strong>€ <span x-text="totalEuros"></span></strong></span>
           </div>
 
           <!-- Error + Actions -->
           <p x-show="error" x-text="error" class="sc-error" style="margin-top:12px"></p>
           <div class="sc-form-actions">
-            <button type="button" class="sc-btn-ghost" @click="showForm = false" :disabled="busy">Abbrechen</button>
-            <button type="submit" class="sc-btn-primary" :disabled="busy"
-              x-text="busy ? 'Wird gespeichert …' : (editId ? 'Speichern' : 'Session anlegen')"></button>
+            <button type="button" class="v9-btn v9-btn--ghost" @click="showForm = false" :disabled="busy">Abbrechen</button>
+            <button type="submit" class="v9-btn" :disabled="busy" :data-loading="busy ? 'true' : null"
+              x-text="editId ? 'Speichern' : 'Demo-Konto anlegen'"></button>
           </div>
         </form>
       </div>
@@ -155,24 +155,25 @@ function presetLabel(p: string | undefined): string {
     <!-- ── End Form Modal ──────────────────────────────────── -->
 
     <header class="sc-header">
-      <p class="sc-eyebrow">Showcase · Demo-Mode</p>
+      <p class="sc-eyebrow">Test-Gast · Demo-Konten</p>
       <h1 class="sc-title">Zeig retaha vor — ohne echte Buchungen<span class="h-dot">.</span></h1>
       <p class="sc-sub">
-        Eine Showcase-Session verhält sich wie ein echter Stay (Eve, Frühstücks-Bestellung,
+        Ein Demo-Konto verhält sich wie ein echter Stay (Eve, Frühstücks-Bestellung,
         Service-Anfragen), aber alles bleibt isoliert: <strong>nichts geht an Mews, keine
-        Email-Notifications, keine Push-Nachrichten</strong>. Reset wischt alle Demo-Daten.
+        Email-Notifications, keine Push-Nachrichten</strong>. Reset wischt die Demo-Daten,
+        Löschen entfernt das Konto samt allem.
       </p>
     </header>
 
     {canWrite && (
       <div class="sc-actions-top">
-        <button class="sc-btn-primary" type="button" @click="openCreate()">+ Neue Demo-Session</button>
+        <button class="v9-btn" type="button" @click="openCreate()">+ Neues Demo-Konto</button>
       </div>
     )}
 
     {rows.length === 0 ? (
       <div class="sc-empty">
-        <p>Noch keine Demo-Sessions. Lege eine an um retaha als Showcase zu nutzen.</p>
+        <p>Noch keine Demo-Konten. Lege eines an, um retaha als Test-Gast vorzuführen.</p>
       </div>
     ) : (
       <div class="sc-list">
@@ -180,8 +181,9 @@ function presetLabel(p: string | undefined): string {
           const status = statusOf(s);
           const demoUrl = `https://${hotel.slug}.${guestRootDomain}/g/${s.token}`;
           const ddJson = JSON.stringify(s.demo_data ?? {});
+          const live = s.is_active && Date.parse(s.expires_at) >= Date.now();
           return (
-            <article class={`sc-card${!s.is_active ? ' sc-card--off' : ''}`} x-data="{ busy: false }">
+            <article class={`settings-section sc-card${!s.is_active ? ' sc-card--off' : ''}`} x-data="{ busy: false }">
               <div class="sc-card-head">
                 <span class={`sc-pill ${status.class}`}>{status.label}</span>
                 <span class="sc-card-meta">
@@ -209,18 +211,17 @@ function presetLabel(p: string | undefined): string {
                 <div><span class="sc-mlabel">Letzter Reset</span><span class="sc-mval">{s.last_reset_at ? fmtDate(s.last_reset_at) : '—'}</span></div>
               </div>
               <div class="sc-card-actions">
-                {s.is_active && Date.parse(s.expires_at) >= Date.now() && (
-                  <a href={demoUrl} target="_blank" rel="noopener" class="sc-btn-ghost">Demo öffnen →</a>
+                {live && (
+                  <a href={demoUrl} target="_blank" rel="noopener" class="v9-btn v9-btn--ghost">Demo öffnen →</a>
                 )}
-                {s.is_active && Date.parse(s.expires_at) >= Date.now() && (
-                  <button class="sc-btn-ghost" type="button"
-                    set:text="URL kopieren"
-                    @click={`navigator.clipboard.writeText('${demoUrl}').then(() => alert('URL kopiert'))`}
-                  ></button>
+                {live && (
+                  <button class="v9-btn v9-btn--ghost" type="button"
+                    @click={`navigator.clipboard.writeText('${demoUrl}').then(() => window.retahaToast && window.retahaToast('URL kopiert'))`}
+                  >URL kopieren</button>
                 )}
                 {canWrite && s.is_active && (
                   <button
-                    class="sc-btn-ghost"
+                    class="v9-btn v9-btn--ghost"
                     type="button"
                     data-demo={ddJson}
                     data-id={s.id}
@@ -229,19 +230,21 @@ function presetLabel(p: string | undefined): string {
                 )}
                 {canWrite && s.is_active && (
                   <button
-                    class="sc-btn-ghost"
+                    class="v9-btn v9-btn--ghost"
                     type="button"
                     :disabled="busy"
-                    @click={`if (!confirm('Alle Demo-Daten dieser Session löschen?')) return; busy = true; fetch('/api/showcase/${s.id}/reset', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { alert('Reset erfolgreich'); location.reload(); } else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                    :data-loading="busy ? 'true' : null"
+                    @click={`if (!confirm('Alle Demo-Daten dieses Kontos zurücksetzen?')) return; busy = true; fetch('/api/showcase/${s.id}/reset', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) { sessionStorage.setItem('sc_flash', 'Zurückgesetzt'); location.reload(); } else { busy = false; window.retahaToast && window.retahaToast('Fehler: ' + (d.error || 'unbekannt'), 'error'); } }).catch(() => { busy = false; window.retahaToast && window.retahaToast('Netzwerkfehler', 'error'); })`}
                   >Reset</button>
                 )}
-                {canWrite && s.is_active && (
+                {canWrite && (
                   <button
-                    class="sc-btn-danger"
+                    class="v9-btn v9-btn--ghost sc-danger"
                     type="button"
                     :disabled="busy"
-                    @click={`if (!confirm('Session dauerhaft deaktivieren?')) return; busy = true; fetch('/api/showcase/${s.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
-                  >Deaktivieren</button>
+                    :data-loading="busy ? 'true' : null"
+                    @click={`if (!confirm('Dieses Demo-Konto dauerhaft löschen? Alle zugehörigen Demo-Daten (Buchungen, Chat, Wallet-Pässe) werden mitentfernt.')) return; busy = true; fetch('/api/showcase/${s.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) { sessionStorage.setItem('sc_flash', 'Demo-Konto gelöscht'); location.reload(); } else { busy = false; window.retahaToast && window.retahaToast('Fehler: ' + (d.error || 'unbekannt'), 'error'); } }).catch(() => { busy = false; window.retahaToast && window.retahaToast('Netzwerkfehler', 'error'); })`}
+                  >Löschen</button>
                 )}
               </div>
             </article>
@@ -285,6 +288,9 @@ function presetLabel(p: string | undefined): string {
           this.$el.addEventListener('open-edit', (e) => {
             this.openEdit(e.detail.demo, e.detail.id);
           });
+          // Flash-Toast nach Reload (location.reload würde eine sofortige Toast verschlucken).
+          const flash = sessionStorage.getItem('sc_flash');
+          if (flash) { sessionStorage.removeItem('sc_flash'); if (window.retahaToast) window.retahaToast(flash); }
         },
 
         openCreate() {
@@ -389,6 +395,7 @@ function presetLabel(p: string | undefined): string {
             });
             const data = await res.json();
             if (data.ok) {
+              sessionStorage.setItem('sc_flash', this.editId ? 'Gespeichert' : 'Demo-Konto angelegt');
               location.reload();
             } else {
               this.error = data.error || 'Unbekannter Fehler';
@@ -414,51 +421,53 @@ function presetLabel(p: string | undefined): string {
     .sc-sub strong { color: var(--ink); font-weight: 500; }
 
     .sc-actions-top { margin-bottom: 20px; }
-    .sc-btn-primary { padding: 10px 18px; background: var(--ink); color: var(--surface); border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
-    .sc-btn-primary:hover:not(:disabled) { background: var(--te-pink, #FF4A82); }
-    .sc-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── V9-Karte (settings-section, wie Gast-Vorschau) ── */
+    .settings-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 22px 24px;
+    }
+    .sc-card { transition: border-color .15s; }
+    .sc-card:hover { border-color: var(--ink-muted); }
+    .sc-card--off { opacity: .55; }
+    .settings-section__title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); margin: 0; }
+
+    /* ── V9-Button: Danger-Variante (Löschen) — extending v9-btn, kein neuer Button ── */
+    .sc-danger { color: var(--burgund, #8C2128); border-color: color-mix(in srgb, var(--burgund, #8C2128) 28%, transparent); }
+    .sc-danger:hover:not(:disabled):not([data-loading]) { background: var(--burgund-soft, rgba(140,33,40,0.08)); border-color: var(--burgund, #8C2128); color: var(--burgund, #8C2128); }
+
     .sc-error { color: var(--te-pink, #FF4A82); font-size: 13px; margin: 0; }
 
-    .sc-empty { padding: 48px 24px; background: var(--surface); border: 1px dashed var(--border); text-align: center; color: var(--ink-muted); font-style: italic; }
+    .sc-empty { padding: 48px 24px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r); text-align: center; color: var(--ink-muted); font-style: italic; }
     .sc-empty p { margin: 0; }
 
     .sc-list { display: flex; flex-direction: column; gap: 12px; }
-    .sc-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; transition: border-color .15s; }
-    .sc-card:hover { border-color: var(--ink); }
-    .sc-card--off { opacity: .55; }
     .sc-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
-    .sc-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .sc-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; border-radius: var(--r-sm); }
     .sc-pill--on { background: rgba(76,175,80,.1); color: #4CAF50; border: 1px solid rgba(76,175,80,.35); }
     .sc-pill--off { background: var(--surface-raised); color: var(--ink-muted); }
     .sc-card-meta { font-size: 11px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
-    .sc-card-preset { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--surface-raised); padding: 2px 6px; color: var(--ink); }
+    .sc-card-preset { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--surface-raised); padding: 2px 6px; color: var(--ink); border-radius: var(--r-sm); }
     .sc-card-title { font-size: 18px; font-weight: 300; margin: 0 0 10px; color: var(--ink); }
     .sc-card-sep { color: var(--ink-faint); }
     .sc-card-email { font-size: 14px; color: var(--ink-muted); }
 
-    .sc-token-row { margin-bottom: 12px; padding: 8px 10px; background: var(--surface-raised); border-left: 3px solid var(--border); }
+    .sc-token-row { margin-bottom: 12px; padding: 8px 10px; background: var(--bg-deep); border-left: 3px solid var(--border); border-radius: var(--r-sm); }
     .sc-token { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); word-break: break-all; }
 
-    .sc-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .sc-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 14px; }
     @media (max-width: 600px) { .sc-meta-grid { grid-template-columns: 1fr; } }
     .sc-meta-grid > div { display: flex; flex-direction: column; gap: 2px; }
-    .sc-mlabel { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+    .sc-mlabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
     .sc-mval { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
 
     .sc-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .sc-btn-ghost { padding: 7px 14px; background: transparent; color: var(--ink-soft); border: 1px solid var(--border); cursor: pointer; font-family: inherit; font-size: 12px; text-decoration: none; }
-    .sc-btn-ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
-    .sc-btn-sm { padding: 5px 10px; font-size: 11px; }
-    .sc-btn-danger { padding: 7px 14px; background: transparent; color: var(--te-pink, #FF4A82); border: 1px solid var(--te-pink, #FF4A82); cursor: pointer; font-family: inherit; font-size: 12px; }
-    .sc-btn-danger:hover:not(:disabled) { background: rgba(255,74,130, 0.08); }
-    .sc-btn-danger:disabled, .sc-btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Form Modal ── */
     .sc-modal-backdrop { position: fixed; inset: 0; background: rgba(10,10,10,.72); z-index: 200; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 32px 16px; }
-    .sc-form-panel { background: var(--surface); border: 1px solid var(--border); padding: 28px; width: 100%; max-width: 600px; position: relative; }
+    .sc-form-panel { width: 100%; max-width: 600px; position: relative; }
     .sc-form-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .sc-form-title { margin: 0; font-size: 20px; font-weight: 300; color: var(--ink); }
-    .sc-form-close { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted); padding: 4px 8px; }
+    .sc-form-close { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted); padding: 4px 8px; line-height: 1; }
     .sc-form-close:hover { color: var(--ink); }
 
     .sc-form-section { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
@@ -469,16 +478,17 @@ function presetLabel(p: string | undefined): string {
     @media (max-width: 500px) { .sc-form-row-2 { grid-template-columns: 1fr; } }
 
     .sc-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-    .sc-form-label { font-size: 11px; color: var(--ink-muted); }
-    .sc-form-label small { font-size: 10px; }
-    .sc-form-input { padding: 8px 10px; background: var(--surface-raised, #f5f5f5); border: 1px solid var(--border); font-family: inherit; font-size: 13px; color: var(--ink); width: 100%; box-sizing: border-box; }
-    .sc-form-input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+    .sc-form-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+    .sc-form-label small { text-transform: none; letter-spacing: 0; font-size: 10px; }
+    .sc-form-input { padding: 9px 12px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--r-sm); font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink); width: 100%; box-sizing: border-box; transition: border-color 200ms ease; }
+    .sc-form-input:focus { outline: none; border-color: var(--ink); }
     .sc-form-input--w200 { max-width: 200px; }
 
     .sc-preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-    .sc-preset-btn { padding: 7px 14px; background: transparent; border: 1px solid var(--border); cursor: pointer; font-family: inherit; font-size: 12px; color: var(--ink-soft); transition: background .12s, color .12s; }
-    .sc-preset-btn:hover { border-color: var(--ink); color: var(--ink); }
-    .sc-preset-btn--on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+    /* V9-Farbrolle: gewählt = Gelb (nicht Ink). Ink bleibt der Speichern-Button. */
+    .sc-preset-btn { padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-soft); transition: all 150ms ease; }
+    .sc-preset-btn:not(.sc-preset-btn--on):hover { background: var(--te-yellow-soft); color: var(--ink); border-color: var(--te-yellow-soft); }
+    .sc-preset-btn--on { background: var(--te-yellow); color: var(--ink); border-color: var(--te-yellow); }
 
     .sc-form-hint { font-size: 12px; color: var(--ink-muted); margin: 0 0 4px; min-height: 1.4em; }
 
@@ -492,6 +502,8 @@ function presetLabel(p: string | undefined): string {
     .sc-item-remove:hover { color: var(--te-pink, #FF4A82); }
 
     .sc-items-footer { display: flex; align-items: center; gap: 16px; margin-top: 4px; }
+    .sc-mini-btn { padding: 6px 12px; background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-soft); }
+    .sc-mini-btn:hover { color: var(--ink); border-color: var(--ink-muted); }
     .sc-items-total { font-size: 12px; color: var(--ink-muted); }
     .sc-items-total strong { color: var(--ink); }
 

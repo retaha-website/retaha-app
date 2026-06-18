@@ -156,11 +156,27 @@ export async function resetShowcaseSession(sessionId: string, hotelId?: string):
   };
 }
 
-export async function deactivateShowcaseSession(sessionId: string, hotelId?: string): Promise<{ ok?: boolean; error?: string }> {
+/**
+ * Hard-Delete: entfernt die showcase_sessions-Zeile dauerhaft. Die FK-Referenzen
+ * bookings.showcase_session_id, chat_messages.showcase_session_id und
+ * wallet_passes.showcase_session_id sind ON DELETE CASCADE → die abhängigen
+ * Demo-Daten werden automatisch mitgelöscht (kein manuelles Aufräumen nötig,
+ * kein Orphan-Risiko, kein FK-Crash). Hotel-skopiert: löscht nur Sessions des
+ * eigenen Hotels.
+ */
+export async function deleteShowcaseSession(sessionId: string, hotelId: string): Promise<{ ok?: boolean; error?: string }> {
   const sb = createSupabaseServiceRoleInstance();
-  let q = sb.from('showcase_sessions').update({ is_active: false }).eq('id', sessionId);
-  if (hotelId) q = (q as any).eq('hotel_id', hotelId);
-  const { error } = await q;
+
+  // Scope-Guard: Session muss zum Hotel des eingeloggten Hoteliers gehören.
+  const { data: check } = await sb.from('showcase_sessions')
+    .select('id').eq('id', sessionId).eq('hotel_id', hotelId).maybeSingle();
+  if (!check) return { error: 'session_not_found' };
+
+  // Row löschen → ON DELETE CASCADE räumt bookings/chat_messages/wallet_passes.
+  const { error } = await sb.from('showcase_sessions')
+    .delete()
+    .eq('id', sessionId)
+    .eq('hotel_id', hotelId);
   if (error) return { error: error.message };
   return { ok: true };
 }
