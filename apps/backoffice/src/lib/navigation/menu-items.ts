@@ -112,7 +112,7 @@ export const menuSections: MenuSection[] = [
       {
         label: 'Konferenz',
         sub: 'Räume · Buchungen',
-        href: `${GUEST_APP}/conference`,
+        href: '/conference',
         icon: icon('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3L12 7 8 3"/>'),
       },
     ],
