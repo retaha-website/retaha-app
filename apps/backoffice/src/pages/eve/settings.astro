@@ -4,11 +4,10 @@ import EveSubNav from '../../components/admin/EveSubNav.astro';
 import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
-const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
-
 interface TuningRule {
   trigger: string;
   instruction?: string;
+  force_model?: 'haiku' | 'sonnet';
 }
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -26,7 +25,17 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('_action')?.toString();
 
-  if (action === 'save_persona') {
+  if (action === 'toggle_enabled') {
+    const enabled = form.get('eve_enabled')?.toString() === 'true';
+    const { error } = await client
+      .from('hotel_settings')
+      .update({ eve_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq('hotel_id', hotel.id);
+    if (error) message = { type: 'error', text: `Umschalten fehlgeschlagen: ${error.message}` };
+    else message = { type: 'success', text: enabled ? 'Eve ist jetzt für deine Gäste aktiv.' : 'Eve ist deaktiviert.' };
+  }
+
+  else if (action === 'save_persona') {
     const name = form.get('eve_name')?.toString().trim();
     const tonality = form.get('eve_tonality')?.toString();
     const customPersona = form.get('eve_custom_persona')?.toString().trim() || null;
@@ -66,10 +75,12 @@ if (Astro.request.method === 'POST') {
     if (action === 'tuning_rule_add') {
       const trigger = form.get('trigger')?.toString().trim();
       const instruction = form.get('instruction')?.toString().trim() || undefined;
+      const forceModelRaw = form.get('force_model')?.toString();
+      const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (!trigger || !instruction) {
         message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
       } else {
-        newRules.push({ trigger, instruction });
+        newRules.push({ trigger, instruction, ...(force_model && { force_model }) });
       }
     }
     else if (action === 'tuning_rule_delete') {
@@ -86,12 +97,14 @@ if (Astro.request.method === 'POST') {
       const idx = indexStr ? parseInt(indexStr, 10) : -1;
       const trigger = form.get('trigger')?.toString().trim();
       const instruction = form.get('instruction')?.toString().trim() || undefined;
+      const forceModelRaw = form.get('force_model')?.toString();
+      const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (idx < 0 || idx >= currentRules.length) {
         message = { type: 'error', text: 'Ungültiger Index.' };
       } else if (!trigger || !instruction) {
         message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
       } else {
-        newRules[idx] = { trigger, instruction };
+        newRules[idx] = { trigger, instruction, ...(force_model && { force_model }) };
       }
     }
 
@@ -162,10 +175,16 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
         </div>
 
         <div class="s-card__body">
-          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <p class="field__hint">{eveEnabled ? 'Eve ist aktiv und im Gast-Frontend sichtbar.' : 'Eve ist deaktiviert — der Concierge-Tile bleibt im Gast-Frontend ausgeblendet.'}</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <ModStatusLed on={eveEnabled} />
-            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+            <form method="POST" style="margin:0">
+              <input type="hidden" name="_action" value="toggle_enabled" />
+              <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
+              <button type="submit" class={`v9-btn${eveEnabled ? ' v9-btn--ghost' : ''}`}>
+                {eveEnabled ? 'Deaktivieren' : 'Aktivieren'}
+              </button>
+            </form>
           </div>
         </div>
       </section>
@@ -290,6 +309,17 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                 class="s-input s-textarea"
               ></textarea>
             </div>
+            <div class="field field--row">
+              <label class="field__label" for="rule-force-model">Modell für diese Regel</label>
+              <div class="field__input-wrap">
+                <select id="rule-force-model" name="force_model" class="s-input">
+                  <option value="">Auto (Router entscheidet)</option>
+                  <option value="sonnet">Sonnet — für besonders sorgfältige Antworten</option>
+                  <option value="haiku">Haiku — für schnelle, einfache Antworten</option>
+                </select>
+                <span class="field__hint">Optional. Überschreibt die automatische Modellwahl für Anfragen, die diese Regel treffen.</span>
+              </div>
+            </div>
           </div>
           <div class="s-card__footer">
             <button type="submit" class="v9-btn">+ Regel hinzufügen</button>
@@ -308,6 +338,9 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                   <div class="ev-item__content">
                     <p class="ev-rule-trigger">{rule.trigger}</p>
                     <p class="ev-item__a">{rule.instruction}</p>
+                    {rule.force_model && (
+                      <p class="ev-rule-model"><span class="ev-model-badge">{rule.force_model}</span>Modell-Override</p>
+                    )}
                   </div>
                   <div class="ev-item__actions">
                     <button
@@ -333,6 +366,16 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                     <div class="field field--row">
                       <label class="field__label">Instruction</label>
                       <textarea name="instruction" required rows="3" class="s-input s-textarea">{rule.instruction}</textarea>
+                    </div>
+                    <div class="field field--row">
+                      <label class="field__label">Modell</label>
+                      <div class="field__input-wrap">
+                        <select name="force_model" class="s-input">
+                          <option value="" selected={!rule.force_model}>Auto</option>
+                          <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
+                          <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
@@ -379,6 +422,17 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
     color: var(--ink); background: var(--bg-deep);
     border: 1px solid var(--border); border-radius: var(--r-sm);
     padding: 2px 8px; display: inline-block; margin-bottom: 6px;
+  }
+  .ev-rule-model {
+    font-size: 11px; color: var(--ink-muted);
+    margin: 8px 0 0; display: flex; align-items: center; gap: 6px;
+  }
+  .ev-model-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--te-pink, #FF4A82);
+    background: color-mix(in srgb, var(--te-pink, #FF4A82) 12%, transparent);
+    padding: 1px 7px; border-radius: var(--r-sm);
   }
   /* Shared list + item styles */
   .ev-list {

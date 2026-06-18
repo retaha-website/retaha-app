@@ -32,29 +32,6 @@ export const menuSections: MenuSection[] = [
     ],
   },
   {
-    title: 'Eve KI',
-    items: [
-      {
-        label: 'Knowledge Base',
-        sub: 'Hotel-Wissen · FAQ',
-        href: '/eve/knowledge',
-        icon: icon('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'),
-      },
-      {
-        label: 'Eve Einstellungen',
-        sub: 'Ton · Verhalten',
-        href: '/eve/settings',
-        icon: icon('<circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>'),
-      },
-      {
-        label: 'Eve Feedback',
-        sub: 'Bewertungen · Logs',
-        href: '/eve/feedback',
-        icon: icon('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'),
-      },
-    ],
-  },
-  {
     title: 'Konto',
     items: [
       {
