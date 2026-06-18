@@ -4,9 +4,12 @@
 //
 // Stammdaten (Vor-/Nachname) → user_profiles via RLS-Client (auth.uid()=user_id).
 // E-Mail/Passwort → Supabase Auth updateUser (kein eigenes Passwort-Handling).
-// Rolle → hotel_users.role (read-only). 2FA: Folge-Task.
+// Rolle → hotel_users.role (read-only). 2FA → konsolidiert in der Sicherheit-Karte
+// (TwoFactorSection) — Custom-TOTP via user_mfa, früher unter /sicherheit.
 import Layout from '../layouts/Layout.astro';
-import { getUser, createSupabaseServerInstance } from '@retaha/auth';
+import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
+import TwoFactorSection from '../components/profil/TwoFactorSection.astro';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -72,7 +75,7 @@ if (Astro.request.method === 'POST') {
 // Aktuelle Daten (nach evtl. POST neu gelesen).
 const [{ data: profile }, { data: hotelUser }] = await Promise.all([
   client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle(),
-  client.from('hotel_users').select('role').eq('user_id', user.id).maybeSingle(),
+  client.from('hotel_users').select('role, hotel_id').eq('user_id', user.id).maybeSingle(),
 ]);
 
 const firstName    = profile?.first_name ?? '';
@@ -80,6 +83,16 @@ const lastName     = profile?.last_name ?? '';
 const currentEmail = user.email ?? '';
 const role         = (hotelUser?.role ?? 'staff') as string;
 const roleLabel    = ROLE_LABELS[role] ?? role;
+
+// 2FA-Status (user_mfa ist Service-Role-verwaltet, RLS sperrt User-Lesezugriff) +
+// Hotel-Pflicht-Policy. isRequired hält den künftigen Pflicht-Redirect (?required=true).
+const service = createSupabaseServiceRoleInstance();
+const mfaStatus = await getUserMfaStatus(service, user.id);
+const hotelPolicy = hotelUser?.hotel_id ? await getHotelMfaPolicy(service, hotelUser.hotel_id) : null;
+const mfaEnabled        = mfaStatus?.enabled ?? false;
+const mfaRequired       = hotelPolicy?.required ?? false;
+const recoveryRemaining = mfaStatus?.recoveryCodesRemaining ?? 0;
+const isRequired        = Astro.url.searchParams.get('required') === 'true';
 ---
 
 <Layout title="Mein Profil" activeTab="backoffice">
@@ -201,12 +214,28 @@ const roleLabel    = ROLE_LABELS[role] ?? role;
             <span class="field__label">Rolle</span>
             <div class="pr-readonly"><span>{roleLabel}</span></div>
           </div>
-          <p class="field__hint" style="margin-top:4px">Zwei-Faktor-Authentifizierung folgt in Kürze. Abmelden über das Menü oben rechts.</p>
+          <p class="field__hint" style="margin-top:4px">Abmelden über das Menü oben rechts.</p>
         </div>
       </section>
 
+      <!-- 05 Sicherheit · 2FA -->
+      <TwoFactorSection
+        mfaEnabled={mfaEnabled}
+        mfaRequired={mfaRequired}
+        recoveryRemaining={recoveryRemaining}
+        isRequired={isRequired}
+      />
+
     </div>
   </div>
+
+  <!-- Flash nach client-seitigem Reload (z.B. 2FA deaktiviert). -->
+  <script is:inline>
+    window.addEventListener('DOMContentLoaded', function () {
+      var f = sessionStorage.getItem('pr_flash');
+      if (f) { sessionStorage.removeItem('pr_flash'); window.retahaToast && window.retahaToast(f, 'success'); }
+    });
+  </script>
 </Layout>
 
 <style>

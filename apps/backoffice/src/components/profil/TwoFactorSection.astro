@@ -1,0 +1,376 @@
+---
+// 2FA-Sicherheits-Sektion für „Mein Profil" — konsolidiert die früher verstreute
+// 2FA-Verwaltung (Wizard /sicherheit + Stub /account/sicherheit) an EINEN Ort.
+// Custom-TOTP (@retaha/auth/mfa, user_mfa-Tabelle), NICHT Supabase Auth MFA.
+//   - Inaktiv → 4-Step-Enroll-Wizard (1:1 aus sicherheit.astro verlagert; gleiche
+//     /api/mfa/setup-start + /api/mfa/setup-verify-Verdrahtung, unverändert).
+//   - Aktiv → Status + Deaktivieren (Re-Auth via aktuellem TOTP → /api/mfa/unenroll).
+//   - Hotel-Pflicht (mfa_required_for_team): Deaktivieren blockiert.
+// isRequired (?required=true) bleibt erhalten für den künftigen Pflicht-Redirect
+// (RBAC) — Ziel wird dann diese Profil-Seite (role-agnostic).
+import TrianglePulse from '@retaha/ui/components/TrianglePulse.astro';
+
+interface Props {
+  mfaEnabled: boolean;
+  mfaRequired: boolean;
+  recoveryRemaining: number;
+  isRequired?: boolean;
+}
+const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false } = Astro.props;
+---
+
+<section class="s-card" id="security">
+  <div class="s-card__head">
+    <h2 class="s-card__title">Sicherheit · 2FA</h2>
+    <span class="s-card__num">05</span>
+  </div>
+  <div class="s-card__body">
+
+    {isRequired && !mfaEnabled && (
+      <div class="sec-enforcement">
+        <strong>Pflicht-Setup:</strong> Dein Hotel-Owner hat 2FA für das Team aktiviert. Bitte richte sie jetzt ein.
+      </div>
+    )}
+
+    {mfaEnabled ? (
+      <div x-data="{ code: '', busy: false }">
+        <div class="sec-active-row">
+          <span class="sec-active-badge">✓ 2FA aktiv</span>
+          <span class="sec-active-meta">{recoveryRemaining} {recoveryRemaining === 1 ? 'Recovery-Code' : 'Recovery-Codes'} übrig</span>
+        </div>
+        <p class="field__hint" style="margin: 6px 0 18px">
+          Dein retaha-Konto ist mit Zwei-Faktor-Authentifizierung geschützt.
+        </p>
+
+        {mfaRequired ? (
+          <div class="sec-enforcement">
+            <strong>Verpflichtend:</strong> 2FA ist für dein Team Pflicht — sie kann nicht deaktiviert werden.
+          </div>
+        ) : (
+          <div class="sec-disable">
+            <label class="field__label" for="disable-code">Zum Deaktivieren den aktuellen 6-stelligen Code eingeben</label>
+            <div class="sec-disable-row">
+              <input
+                type="text" id="disable-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+                class="s-input sec-disable-input" placeholder="000000"
+                x-model="code"
+                x-on:input="code = code.replace(/\D/g, '').slice(0, 6)"
+                x-bind:disabled="busy"
+              />
+              <button
+                type="button" class="v9-btn v9-btn--ghost sec-danger"
+                x-bind:disabled="busy || code.length !== 6"
+                x-bind:data-loading="busy ? 'true' : null"
+                x-on:click="
+                  busy = true;
+                  fetch('/api/mfa/unenroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) })
+                    .then(r => r.json()).then(d => {
+                      if (d.ok) { sessionStorage.setItem('pr_flash', '2FA deaktiviert'); location.reload(); }
+                      else { busy = false; window.retahaToast && window.retahaToast(d.message || 'Code ungültig.', 'error'); }
+                    }).catch(() => { busy = false; window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); })
+                "
+              >2FA deaktivieren</button>
+            </div>
+            <p class="field__hint" style="margin-top:8px">Sicherheitskritisch — daher mit Re-Authentifizierung über deinen Authenticator.</p>
+          </div>
+        )}
+      </div>
+    ) : (
+      <div x-data={`{
+        step: 1,
+        code: ['', '', '', '', '', ''],
+        secretRevealed: false,
+        confirmedSaved: false,
+        qrDataUrl: null,
+        secretForManualEntry: null,
+        isStarting: false,
+        recoveryCodes: [],
+        isVerifying: false,
+        errorMessage: '',
+
+        isComplete() { return this.code.every(d => d !== ''); },
+
+        onCodeInput(index, event) {
+          const value = event.target.value.replace(/\\D/g, '').slice(-1);
+          this.code[index] = value;
+          this.errorMessage = '';
+          if (value && index < 5) { this.$refs['input' + (index + 1)]?.focus(); }
+        },
+        onCodeKeydown(index, event) {
+          if (event.key === 'Backspace' && !this.code[index] && index > 0) {
+            this.code[index - 1] = '';
+            this.$refs['input' + (index - 1)]?.focus();
+          }
+        },
+
+        async advance() {
+          if (this.step === 1) {
+            await this.startSetup();
+            if (!this.qrDataUrl) return;
+            this.step = 2;
+          } else if (this.step === 2) {
+            this.step = 3;
+            setTimeout(() => this.$refs.input0?.focus(), 200);
+          } else if (this.step === 3) {
+            await this.verifySetup();
+          }
+        },
+        back() { if (this.step > 1) { this.step--; this.errorMessage = ''; } },
+
+        async startSetup() {
+          this.isStarting = true; this.errorMessage = '';
+          try {
+            const res = await fetch('/api/mfa/setup-start', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.ok) { this.qrDataUrl = data.qr_data_url; this.secretForManualEntry = data.secret_for_manual_entry; }
+            else { this.errorMessage = data.message || 'Setup konnte nicht gestartet werden.'; }
+          } catch { this.errorMessage = 'Netzwerk-Fehler.'; }
+          finally { this.isStarting = false; }
+        },
+
+        async verifySetup() {
+          if (!this.isComplete()) return;
+          this.isVerifying = true; this.errorMessage = '';
+          try {
+            const res = await fetch('/api/mfa/setup-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: this.code.join('') }) });
+            const data = await res.json();
+            if (res.ok && data.ok) { this.recoveryCodes = data.recovery_codes; this.step = 4; }
+            else { this.errorMessage = data.message || 'Code ungültig. Bitte erneut versuchen.'; this.code = ['', '', '', '', '', '']; setTimeout(() => this.$refs.input0?.focus(), 100); }
+          } catch { this.errorMessage = 'Netzwerk-Fehler.'; }
+          finally { this.isVerifying = false; }
+        },
+
+        async copyRecoveryCodes() {
+          try { await navigator.clipboard.writeText(this.recoveryCodes.join('\\n')); window.retahaToast && window.retahaToast('Codes kopiert.'); }
+          catch { window.retahaToast && window.retahaToast('Kopieren fehlgeschlagen — bitte manuell auswählen.', 'error'); }
+        },
+        printRecoveryCodes() { window.print(); }
+      }`}>
+
+        <!-- Step indicator -->
+        <nav class="sec-step-indicator" aria-label="Setup-Fortschritt">
+          {[
+            { num: '01', title: 'Vorbereiten' },
+            { num: '02', title: 'QR-Code scannen' },
+            { num: '03', title: 'Code verifizieren' },
+            { num: '04', title: 'Recovery-Codes' },
+          ].map((cell, i) => (
+            <div class="sec-step-cell" x-bind:class={`{ 'is-active': step === ${i + 1}, 'is-complete': step > ${i + 1}, 'is-not-yet': step < ${i + 1} }`}>
+              <p class="sec-step-cell__label"><span class="sec-step-cell__num">{cell.num}</span>SCHRITT</p>
+              <p class="sec-step-cell__title">{cell.title}</p>
+            </div>
+          ))}
+        </nav>
+
+        <div x-show="errorMessage" x-cloak class="sec-error" x-text="errorMessage"></div>
+
+        <!-- STEP 1 -->
+        <div class="sec-panel" x-show="step === 1">
+          <p class="field__hint" style="margin-bottom:20px;">
+            Bevor wir starten — bereite eine <strong>Authenticator-App</strong> auf deinem Smartphone vor. Falls du noch keine hast, kein Problem:
+          </p>
+          <div class="sec-checklist">
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">01</span>
+              <div class="sec-checklist-item__content">
+                <h4>Authenticator-App installieren</h4>
+                <p>Empfohlen: <a href="https://apps.apple.com/de/app/google-authenticator/id388497605" target="_blank" rel="noopener">Google Authenticator</a>, <a href="https://1password.com" target="_blank" rel="noopener">1Password</a> oder der iCloud-Schlüsselbund.</p>
+              </div>
+            </div>
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">02</span>
+              <div class="sec-checklist-item__content">
+                <h4>Smartphone bereithalten</h4>
+                <p>Du brauchst es für den QR-Code-Scan im nächsten Schritt.</p>
+              </div>
+            </div>
+            <div class="sec-checklist-item">
+              <span class="sec-checklist-item__num">03</span>
+              <div class="sec-checklist-item__content">
+                <h4>Recovery-Codes notieren</h4>
+                <p>Am Ende bekommst du 8 Backup-Codes für den Notfall — falls du dein Phone verlierst. Halte einen Drucker oder Stift bereit.</p>
+              </div>
+            </div>
+          </div>
+          <div class="sec-actions">
+            <button class="v9-btn" x-on:click="advance()" x-bind:disabled="isStarting">
+              <span x-show="!isStarting">Ich bin bereit</span>
+              <span x-show="isStarting" x-cloak>Wird vorbereitet …</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="sec-panel" x-show="step === 2" x-cloak>
+          <p class="field__hint" style="margin-bottom:20px;">
+            Öffne deine Authenticator-App und tippe auf <strong>„+ Hinzufügen"</strong>. Scanne dann den QR-Code mit der Kamera.
+          </p>
+          <div class="sec-qr-display">
+            <div class="sec-qr-code"><img x-bind:src="qrDataUrl" alt="QR-Code für Authenticator-App-Setup" x-show="qrDataUrl" /></div>
+            <div class="sec-qr-info">
+              <h4>retaha · 2FA Setup</h4>
+              <p>Falls dein Phone den QR-Code nicht scannen kann, kannst du den Setup-Schlüssel auch manuell eintippen:</p>
+              <button class="sec-secret-toggle" type="button" x-on:click="secretRevealed = !secretRevealed">
+                <span x-text="secretRevealed ? '← Schlüssel verbergen' : '→ Schlüssel anzeigen'"></span>
+              </button>
+              <div x-show="secretRevealed" x-cloak class="sec-secret-value" x-text="secretForManualEntry"></div>
+            </div>
+          </div>
+          <div class="sec-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
+            <button class="v9-btn" x-on:click="advance()">Weiter zur Verifizierung</button>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="sec-panel" x-show="step === 3" x-cloak>
+          <p class="field__hint" style="margin-bottom:20px;">
+            Deine App zeigt jetzt einen <strong>6-stelligen Code</strong> der alle 30 Sekunden neu generiert wird. Gib den aktuellen Code hier ein:
+          </p>
+          <div class="sec-code-group">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <input
+                type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1"
+                class="sec-code-input s-input"
+                x-bind:class={`{ 'is-filled': code[${index}] !== '' }`}
+                x-ref={`input${index}`}
+                x-bind:value={`code[${index}]`}
+                x-on:input={`onCodeInput(${index}, $event)`}
+                x-on:keydown={`onCodeKeydown(${index}, $event)`}
+                x-bind:disabled="isVerifying"
+                aria-label={`Ziffer ${index + 1} von 6`}
+              />
+            ))}
+          </div>
+          <div class="sec-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
+            <button class="v9-btn" x-bind:disabled="!isComplete() || isVerifying" x-on:click="verifySetup()">
+              <span x-show="!isVerifying">Code prüfen</span>
+              <span x-show="isVerifying" x-cloak>Wird geprüft …</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div class="sec-panel" x-show="step === 4" x-cloak>
+          <div class="sec-complete-indicator">
+            <TrianglePulse variant="sage" motion="once" label="Setup erfolgreich abgeschlossen" />
+            <span class="sec-complete-label">Erfolgreich aktiviert</span>
+          </div>
+          <p class="field__hint" style="text-align:center;margin-bottom:20px;">
+            2FA ist jetzt aktiv. Hier sind deine <strong>8 Recovery-Codes</strong> — bewahre sie sicher auf. Jeder Code funktioniert nur einmal und ersetzt deine Authenticator-App im Notfall.
+          </p>
+          <div class="sec-recovery-grid">
+            <template x-for="rcode in recoveryCodes" x-bind:key="rcode">
+              <span class="sec-recovery-code" x-text="rcode"></span>
+            </template>
+          </div>
+          <div class="sec-recovery-actions">
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="copyRecoveryCodes()">Codes kopieren</button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="printRecoveryCodes()">Drucken</button>
+          </div>
+          <div class="sec-recovery-warning">
+            <strong>Wichtig:</strong> Diese Codes werden dir NICHT erneut angezeigt. Bewahre sie an einem sicheren Ort auf — z.B. im Passwort-Manager oder gedruckt im Safe.
+          </div>
+          <div class="sec-recovery-checkbox">
+            <input type="checkbox" id="confirm-saved" x-model="confirmedSaved" />
+            <label for="confirm-saved">Ich habe meine Recovery-Codes sicher gespeichert.</label>
+          </div>
+          <div class="sec-actions">
+            <a class="v9-btn"
+               x-bind:class="confirmedSaved ? '' : 'is-disabled'"
+               x-bind:href="confirmedSaved ? '/profil' : '#'"
+               style="flex:1;text-decoration:none;justify-content:center;">fertig</a>
+          </div>
+        </div>
+
+      </div>
+    )}
+
+  </div>
+</section>
+
+<style>
+  [x-cloak] { display: none !important; }
+  .v9-btn.is-disabled { opacity: 0.4; pointer-events: none; }
+
+  /* ── Aktiv-Status + Deaktivieren ── */
+  .sec-active-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .sec-active-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #5C9070;
+    background: rgba(92,144,112,0.10); border: 1px solid rgba(92,144,112,0.35);
+    padding: 4px 10px; border-radius: 99px;
+  }
+  .sec-active-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); }
+  .sec-disable { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px; }
+  .sec-disable-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .sec-disable-input { max-width: 140px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; text-align: center; }
+  .sec-danger { color: var(--burgund, #8C2128); border-color: color-mix(in srgb, var(--burgund, #8C2128) 28%, transparent); }
+  .sec-danger:hover:not(:disabled):not([data-loading]) { background: var(--burgund-soft, rgba(140,33,40,0.08)); border-color: var(--burgund, #8C2128); color: var(--burgund, #8C2128); }
+
+  /* ── Step indicator (aus sicherheit.astro) ── */
+  .sec-step-indicator { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 32px; }
+  .sec-step-cell { padding-top: 12px; border-top: 2px solid var(--border); transition: border-color 400ms ease; }
+  .sec-step-cell.is-active { border-top-color: var(--accent); }
+  .sec-step-cell.is-complete { border-top-color: #5C9070; }
+  .sec-step-cell__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 4px; }
+  .sec-step-cell.is-active .sec-step-cell__label, .sec-step-cell.is-complete .sec-step-cell__label { color: var(--ink); }
+  .sec-step-cell__title { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .sec-step-cell.is-not-yet .sec-step-cell__title { color: var(--ink-muted); opacity: 0.5; }
+  .sec-step-cell__num { display: inline-block; color: var(--accent); font-family: 'JetBrains Mono', monospace; margin-right: 8px; }
+  .sec-step-cell.is-complete .sec-step-cell__num { color: #5C9070; }
+  .sec-step-cell.is-not-yet .sec-step-cell__num { color: var(--ink-muted); opacity: 0.4; }
+
+  .sec-error { padding: 12px 16px; background: rgba(140, 33, 40, 0.06); border-left: 3px solid #8C2128; border-radius: var(--r-sm, 4px); margin-bottom: 24px; font-size: 13px; color: var(--ink); }
+  .sec-error::before { content: "▲ "; color: #8C2128; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+
+  .sec-panel { animation: secPanelEnter 400ms ease; }
+  @keyframes secPanelEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .sec-panel { animation: none; } }
+
+  .sec-enforcement { padding: 14px 16px; background: rgba(192, 106, 60, 0.06); border-left: 3px solid var(--accent); border-radius: var(--r-sm, 4px); margin-bottom: 24px; font-size: 13px; color: var(--ink); }
+
+  .sec-checklist { display: flex; flex-direction: column; gap: 10px; }
+  .sec-checklist-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r, 8px); }
+  .sec-checklist-item__num { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--accent); flex-shrink: 0; padding-top: 2px; }
+  .sec-checklist-item__content h4 { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+  .sec-checklist-item__content p { font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
+  .sec-checklist-item__content a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(192, 106, 60, 0.3); }
+  .sec-checklist-item__content a:hover { border-bottom-color: var(--accent); }
+
+  .sec-qr-display { display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 24px; }
+  @media (min-width: 640px) { .sec-qr-display { grid-template-columns: auto 1fr; align-items: center; } }
+  .sec-qr-code { width: 192px; height: 192px; background: white; border: 1px solid var(--border); border-radius: var(--r, 8px); padding: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sec-qr-code img { width: 100%; height: 100%; }
+  .sec-qr-info h4 { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 10px; }
+  .sec-qr-info p { font-size: 12px; color: var(--ink-muted); line-height: 1.55; margin-bottom: 14px; }
+  .sec-secret-toggle { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border); padding: 7px 12px; border-radius: var(--r-sm, 4px); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); cursor: pointer; transition: border-color 180ms ease, color 180ms ease; }
+  .sec-secret-toggle:hover { border-color: var(--ink); color: var(--ink); }
+  .sec-secret-value { margin-top: 10px; padding: 10px 12px; background: var(--bg-deep, #F0EDE6); border-radius: var(--r-sm, 4px); font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); letter-spacing: 0.1em; word-break: break-all; }
+
+  .sec-code-group { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; max-width: 360px; }
+  .sec-code-input { width: 100%; aspect-ratio: 1; max-height: 54px; border: 1.5px solid var(--border); border-radius: var(--r-sm, 4px); background: white; font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500; text-align: center; color: var(--ink); transition: border-color 200ms ease, box-shadow 200ms ease; }
+  .sec-code-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(192, 106, 60, 0.15); }
+  .sec-code-input.is-filled { border-color: var(--ink-muted); }
+
+  .sec-complete-indicator { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px 0; margin-bottom: 8px; }
+  .sec-complete-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #5C9070; }
+  .sec-recovery-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r, 8px); margin-bottom: 20px; }
+  .sec-recovery-code { font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: var(--ink); padding: 8px 10px; background: white; border: 1px solid var(--border); border-radius: var(--r-sm, 4px); text-align: center; }
+  .sec-recovery-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .sec-recovery-warning { padding: 14px 16px; background: rgba(140, 33, 40, 0.05); border-left: 3px solid #8C2128; border-radius: var(--r-sm, 4px); margin-bottom: 24px; font-size: 13px; color: var(--ink); }
+  .sec-recovery-warning::before { content: "▲ "; color: #8C2128; font-family: 'JetBrains Mono', monospace; font-weight: bold; }
+  .sec-recovery-warning strong { color: var(--ink); font-weight: 500; }
+  .sec-recovery-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 24px; cursor: pointer; }
+  .sec-recovery-checkbox input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .sec-recovery-checkbox label { font-size: 13px; color: var(--ink); cursor: pointer; line-height: 1.5; }
+
+  .sec-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+
+  @media print {
+    body * { visibility: hidden; }
+    .sec-recovery-grid, .sec-recovery-grid * { visibility: visible; }
+    .sec-recovery-grid { position: absolute; top: 0; left: 0; background: white; border: 1px solid black; }
+  }
+</style>
