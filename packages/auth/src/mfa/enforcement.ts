@@ -106,17 +106,20 @@ export async function setHotelMfaRequired(
 }
 
 /**
- * Entscheidet: muss dieser User in der aktuellen Session zu /mfa weitergeleitet werden?
+ * Entscheidet: muss dieser User in der aktuellen Session zu /mfa (Challenge)?
  *
  * Bedingung:
- *   user.user_mfa.enabled = true UND mfa_verified Cookie nicht gesetzt
+ *   user.user_mfa.enabled = true UND kein gültiger MFA-Session-Marker.
+ *
+ * `markerValid` kommt aus verifyMfaMarker(cookies, userId) (signiert + user-gebunden,
+ * siehe session-marker.ts) — NICHT mehr der alte client-vergleichbare 'true'-Cookie.
  */
 export function shouldRedirectToMfa(
   userStatus: UserMfaStatus | null,
-  mfaVerifiedCookie: string | undefined,
+  markerValid: boolean,
 ): boolean {
   if (!userStatus?.enabled) return false;
-  return mfaVerifiedCookie !== 'true';
+  return !markerValid;
 }
 
 /**

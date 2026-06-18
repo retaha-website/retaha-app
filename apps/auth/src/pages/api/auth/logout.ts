@@ -9,9 +9,11 @@
 
 import type { APIRoute } from 'astro';
 import { clearSessionCookie } from '@retaha/auth';
+import { clearMfaMarkerCookie } from '@retaha/auth/mfa';
 
 const handler: APIRoute = async ({ cookies }) => {
   clearSessionCookie(cookies);
+  clearMfaMarkerCookie(cookies);
   return new Response(null, {
     status: 302,
     headers: { Location: '/logout' },

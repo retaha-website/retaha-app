@@ -25,6 +25,7 @@ import {
   parseUaFamily,
   parseDevice,
   getHotelMfaPolicy,
+  clearMfaMarkerCookie,
 } from '@retaha/auth/mfa';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -122,6 +123,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     console.error('[mfa-unenroll] update error:', updateErr);
     return bad('server-error', '2FA konnte nicht deaktiviert werden.');
   }
+
+  // MFA-Session-Marker invalidieren (konsistent zum Disable).
+  clearMfaMarkerCookie(cookies);
 
   await logMfaEvent(service, {
     userId: user.id,

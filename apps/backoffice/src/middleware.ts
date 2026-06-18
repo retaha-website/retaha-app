@@ -7,8 +7,9 @@
  *   3. SURFACE-GATE: nur owner/manager dürfen ins Backoffice. staff (oder jede
  *      Rolle ohne BO-Zugriff) wird zum Dashboard umgeleitet — auch bei direkt
  *      eingetippter URL. UI-Ausblenden ist Kosmetik; DIES ist die Durchsetzung.
- *   4. 2FA-FORCE-SETUP: hat der Owner mfa_required_for_team gesetzt und der User
- *      hat noch kein MFA → Redirect auf /profil?required=true (Setup erzwingen).
+ *   4. 2FA-ENFORCEMENT: (a) Force-Setup — Hotel-Pflicht + kein Faktor →
+ *      /profil?required=true. (b) Login-Challenge — Faktor aktiv + kein gültiger
+ *      signierter MFA-Marker → /mfa (auth-App). Präzedenz exklusiv (enabled vs. nicht).
  *
  * Fail closed: unbekannte/fehlende Rolle bzw. Token-Fehler → geringste Rechte
  * (Login bzw. Dashboard), nie Backoffice.
@@ -29,7 +30,14 @@ import {
   isRole,
   type Role,
 } from '@retaha/auth';
-import { getUserMfaStatus, getHotelMfaPolicy, shouldForceSetup } from '@retaha/auth/mfa';
+import {
+  getUserMfaStatus,
+  getHotelMfaPolicy,
+  shouldForceSetup,
+  shouldRedirectToMfa,
+  isMfaMarkerConfigured,
+  verifyMfaMarker,
+} from '@retaha/auth/mfa';
 
 const PUBLIC_PATTERNS = [
   /^\/api\/webhooks\//,
@@ -43,23 +51,21 @@ const PUBLIC_PATTERNS = [
   /^\/api\/marketing\/track\//,
 ];
 
-// Vom 2FA-Force-Setup-Redirect ausgenommen — sonst Redirect-Loop bzw. der User
-// muss Setup/Logout erreichen können. /profil ist das Redirect-Ziel selbst.
-const MFA_EXEMPT_PATTERNS = [
-  /^\/profil/,
-  /^\/api\//,
-  /^\/admin\/auth\//,
-  /^\/admin\/login$/,
-];
+// MFA-Redirects nie auf API-/Auth-Routen (APIs haben eigene Gates; Logout muss
+// durchgehen). Force-Setup nimmt zusätzlich /profil aus (= sein Redirect-Ziel);
+// die Login-Challenge gilt AUCH auf /profil (sie geht aufs auth-Subdomain → kein Loop).
+function isApiOrAuthPath(pathname: string): boolean {
+  return pathname.startsWith('/api/')
+    || pathname.startsWith('/admin/auth/')
+    || pathname === '/admin/login';
+}
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATTERNS.some(re => re.test(pathname));
 }
-function isMfaExempt(pathname: string): boolean {
-  return MFA_EXEMPT_PATTERNS.some(re => re.test(pathname));
-}
 
 const DASHBOARD_URL = import.meta.env.DASHBOARD_URL ?? 'https://dashboard.retaha.de';
+const AUTH_APP_URL = import.meta.env.AUTH_APP_URL ?? 'https://auth.retaha.de';
 
 function jsonForbidden(): Response {
   return new Response(JSON.stringify({ ok: false, error: 'surface_forbidden' }), {
@@ -107,8 +113,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return Response.redirect(DASHBOARD_URL, 302);
   }
 
-  // 2FA-FORCE-SETUP — Hotel-Pflicht + User ohne MFA → Setup erzwingen.
-  if (roles.length > 0 && !isMfaExempt(url.pathname)) {
+  // ── 2FA-Enforcement (Force-Setup + Login-Challenge) ──
+  // Präzedenz: kein Faktor + Hotel-Pflicht → Setup (/profil?required=true);
+  //            Faktor aktiv + kein gültiger Marker → Challenge (/mfa).
+  // (enabled vs. nicht-enabled → exklusiv, kein Doppel-Redirect.)
+  if (roles.length > 0 && !isApiOrAuthPath(url.pathname)) {
     const hotelId = memberships[0]?.hotel_id as string | undefined;
     if (hotelId) {
       const service = createSupabaseServiceRoleInstance();
@@ -116,8 +125,20 @@ export const onRequest = defineMiddleware(async (context, next) => {
         getUserMfaStatus(service, user.id),
         getHotelMfaPolicy(service, hotelId),
       ]);
-      if (shouldForceSetup(mfaStatus, policy)) {
+
+      // Force-Setup — /profil ausnehmen (= Redirect-Ziel, sonst Loop).
+      if (!url.pathname.startsWith('/profil') && shouldForceSetup(mfaStatus, policy)) {
         return Response.redirect(new URL('/profil?required=true', url.origin).toString(), 302);
+      }
+
+      // Login-Challenge — signierter Marker fehlt/ungültig → /mfa (auth-App).
+      // Gated auf das Secret (fail-open: ohne Secret Feature aus).
+      if (
+        isMfaMarkerConfigured() &&
+        shouldRedirectToMfa(mfaStatus, verifyMfaMarker(cookies, user.id))
+      ) {
+        const mfaUrl = `${AUTH_APP_URL}/mfa?return_to=${encodeURIComponent(url.toString())}`;
+        return Response.redirect(mfaUrl, 302);
       }
     }
   }

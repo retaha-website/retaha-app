@@ -14,6 +14,7 @@
  */
 
 import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { isMfaMarkerConfigured, verifyMfaMarker, setMfaMarkerCookie } from '@retaha/auth/mfa';
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
 import Logo from '@retaha/ui/components/brand/Logo.astro';
 import '@retaha/ui/styles/themes.css';
@@ -31,18 +32,22 @@ if (!userRes?.user) {
   return Astro.redirect('/login');
 }
 
-// MFA-Verified-Cookie schon da? -> direkt return_to / dashboard
-const mfaVerified = Astro.cookies.get('mfa_verified')?.value === 'true';
 const url = new URL(Astro.request.url);
 const rawReturnTo = url.searchParams.get('return_to');
 const errorParam = url.searchParams.get('error') ?? '';
 const returnTo = sanitizeReturnTo(rawReturnTo);
 
-if (mfaVerified) {
+// Feature nicht konfiguriert (kein MFA_MARKER_SECRET)? -> keine Challenge, direkt weiter.
+if (!isMfaMarkerConfigured()) {
   return Astro.redirect(returnTo);
 }
 
-// User-MFA-Status pruefen — wenn nicht enabled, keine MFA-Pflicht
+// Gültiger, signierter Marker schon da? -> Challenge in dieser Session bestanden.
+if (verifyMfaMarker(Astro.cookies, userRes.user.id)) {
+  return Astro.redirect(returnTo);
+}
+
+// User-MFA-Status pruefen.
 const service = createSupabaseServiceRoleInstance();
 const { data: mfa } = await service
   .from('user_mfa')
@@ -51,7 +56,9 @@ const { data: mfa } = await service
   .maybeSingle();
 
 if (!mfa?.enabled) {
-  // Kein MFA eingerichtet -> direkt weiter
+  // Kein MFA eingerichtet -> Marker setzen (Pass-through, sonst wirft der
+  // Marker-Gate auf den Flächen endlos hierher zurück) + weiter.
+  setMfaMarkerCookie(Astro.cookies, userRes.user.id);
   return Astro.redirect(returnTo);
 }
 

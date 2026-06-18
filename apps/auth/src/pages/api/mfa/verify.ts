@@ -28,12 +28,10 @@ import {
   logMfaEvent,
   parseUaFamily,
   parseDevice,
+  setMfaMarkerCookie,
 } from '@retaha/auth/mfa';
 import { sanitizeReturnTo } from '../../../lib/redirect-whitelist';
 import { rateLimit } from '../../../lib/rate-limit';
-
-const MFA_VERIFIED_COOKIE = 'mfa_verified';
-const MFA_VERIFIED_TTL_SECONDS = 12 * 60 * 60; // 12h
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   let code = '';
@@ -112,14 +110,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return bad(isJson, 'invalid-code', 'code ungueltig. bitte erneut versuchen.');
   }
 
-  // 4. Success: Cookie setzen + Audit
-  cookies.set(MFA_VERIFIED_COOKIE, 'true', {
-    path: '/',
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: MFA_VERIFIED_TTL_SECONDS,
-  });
+  // 4. Success: signierten, cross-subdomain MFA-Session-Marker setzen + Audit
+  setMfaMarkerCookie(cookies, user.id);
 
   await logMfaEvent(service, {
     userId: user.id,

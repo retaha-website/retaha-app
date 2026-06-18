@@ -42,3 +42,11 @@ export {
   type UserMfaStatus,
   type HotelMfaPolicy,
 } from './enforcement.ts';
+
+export {
+  MFA_MARKER_COOKIE,
+  isMfaMarkerConfigured,
+  setMfaMarkerCookie,
+  clearMfaMarkerCookie,
+  verifyMfaMarker,
+} from './session-marker.ts';

@@ -21,6 +21,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
 import { setSessionCookie } from '@retaha/auth';
 import { resolveLanding } from '../../../lib/landing';
+import { applyLoginMfaMarker } from '../../../lib/mfa-gate';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   let accessToken = '';
@@ -53,6 +54,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   // Token ist valide → Cross-Subdomain-Session-Cookie setzen
   setSessionCookie(cookies, accessToken);
+
+  // Magic-Link: Marker bei non-MFA + (require_on_magic_link=false) setzen;
+  // sonst greift der Flächen-Gate → /mfa.
+  await applyLoginMfaMarker(cookies, accessToken, true);
 
   // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
   const landing = await resolveLanding(accessToken, returnTo);
