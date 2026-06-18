@@ -28,6 +28,7 @@ interface EligibleStay {
   check_in: string;
   check_out: string;
   guest_first_name: string | null;
+  guest_last_name: string | null;
   guest_email: string;
 }
 
@@ -83,7 +84,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
       .from('stays')
       .select(`
         id, hotel_id, check_in, check_out, pre_arrival_sent_at,
-        guests(first_name, email)
+        guests(first_name, last_name, email)
       `)
       .eq('hotel_id', hotelId)
       .eq('is_active', true)
@@ -108,6 +109,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
           check_in: s.check_in,
           check_out: s.check_out,
           guest_first_name: g?.first_name ?? null,
+          guest_last_name: g?.last_name ?? null,
           guest_email: g?.email ?? null,
         };
       })
@@ -142,6 +144,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
           hotelLogoUrl: (hotel as any).logo_primary ?? (hotel as any).logo_dark ?? null,
           hotelAccentColor: settings?.accent_color ?? null,
           guestFirstName: s.guest_first_name,
+          guestLastName: s.guest_last_name,
           checkInLabel: formatLongGermanDate(s.check_in),
           checkOutLabel: formatLongGermanDate(s.check_out),
           pairUrl,

@@ -7,6 +7,7 @@ export interface PreArrivalInviteData {
   hotelLogoUrl?: string | null;
   hotelAccentColor?: string | null;
   guestFirstName: string | null;
+  guestLastName?: string | null;  // bei Sie wird Vor- + Nachname begruesst
   checkInLabel: string;  // pre-formatted "Mittwoch, 12. Juni 2026"
   checkOutLabel: string;
   pairUrl: string;       // https://retaha.de/api/pair?token=<jwt>
@@ -24,8 +25,11 @@ export function preArrivalInviteSubject(data: PreArrivalInviteData): string {
 export function preArrivalInviteHtml(data: PreArrivalInviteData): string {
   const accent = data.hotelAccentColor ?? ACCENT_FALLBACK;
   const formal = data.addressForm !== 'du';
+  const greetName = (formal && data.guestFirstName && data.guestLastName)
+    ? `${data.guestFirstName} ${data.guestLastName}`
+    : data.guestFirstName;
   const greeting = data.guestFirstName
-    ? `Hallo ${escapeHtml(data.guestFirstName)},`
+    ? `Hallo ${escapeHtml(greetName!)},`
     : (formal ? `Schön, dass Sie kommen,` : `Schön, dass du kommst,`);
   const logoBlock = data.hotelLogoUrl
     ? `<img src="${escapeHtml(data.hotelLogoUrl)}" alt="${escapeHtml(data.hotelName)}" height="44" style="max-height:44px;display:block;border:0" />`
