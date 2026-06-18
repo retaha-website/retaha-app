@@ -1,5 +1,5 @@
 ---
-import HotelierLayout from '../../layouts/HotelierLayout.astro';
+import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
@@ -10,16 +10,11 @@ import {
 } from '@retaha/marketing';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!myRole || !hasPermission(myRole, 'content.read')) return new Response('Forbidden', { status: 403 });
 
@@ -37,7 +32,7 @@ function pickI18n(jsonb: any): string {
 }
 ---
 
-<HotelierLayout title="Stay-Pushes" activeTab="gast" hotelName={hotel.name}>
+<Layout title="Stay-Pushes" activeTab="backoffice">
   <div class="sp-page">
     <header class="sp-header">
       <p class="sp-eyebrow">Wallet · Stay-Pushes</p>
@@ -75,7 +70,7 @@ function pickI18n(jsonb: any): string {
   </div>
 
   <style>
-    .sp-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .sp-page { --surface-raised: var(--bg-deep); max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
     .sp-header { margin: 20px 0 28px; }
     .sp-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--te-pink, #FF4A82); margin: 0 0 6px; }
     .sp-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
@@ -98,4 +93,4 @@ function pickI18n(jsonb: any): string {
     .sp-footnote strong { color: var(--ink); }
     .sp-footnote code { background: var(--surface); padding: 1px 5px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); }
   </style>
-</HotelierLayout>
+</Layout>

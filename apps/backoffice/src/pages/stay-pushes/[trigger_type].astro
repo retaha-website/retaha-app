@@ -1,5 +1,5 @@
 ---
-import HotelierLayout from '../../layouts/HotelierLayout.astro';
+import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
@@ -9,16 +9,11 @@ import {
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!myRole || !hasPermission(myRole, 'content.write')) return new Response('Forbidden', { status: 403 });
 
@@ -77,7 +72,7 @@ const DEMO_VARS = {
 };
 ---
 
-<HotelierLayout title={`Stay-Push · ${STAY_PUSH_TRIGGER_LABELS[triggerType]}`} activeTab="gast" hotelName={hotel.name}>
+<Layout title={`Stay-Push · ${STAY_PUSH_TRIGGER_LABELS[triggerType]}`} activeTab="backoffice">
   <div class="se-page">
     <div class="se-breadcrumb"><a href="/stay-pushes">← Alle Stay-Pushes</a></div>
 
@@ -246,7 +241,7 @@ const DEMO_VARS = {
   </script>
 
   <style>
-    .se-page { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+    .se-page { --surface-raised: var(--bg-deep); max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
     .se-breadcrumb { margin: 16px 0 8px; }
     .se-breadcrumb a { font-size: 13px; color: var(--ink-muted); text-decoration: none; }
     .se-breadcrumb a:hover { color: var(--te-pink, #FF4A82); }
@@ -304,4 +299,4 @@ const DEMO_VARS = {
     .se-mockup-body { font-size: 12px; line-height: 1.5; color: var(--ink-soft); white-space: pre-wrap; }
     .se-mockup-note { color: rgba(255,255,255,.4); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; padding-top: 10px; }
   </style>
-</HotelierLayout>
+</Layout>
