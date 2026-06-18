@@ -203,6 +203,10 @@ const initEyebrow = eyebrowText || '';
 
       baseline = { ...baseline, welcomeText: textarea.value, formality: currentFormality };
       (window as any).retahaToast?.('Gespeichert');
+      // Vorschau neu laden, damit Anrede (du/Sie) + Texte sofort sichtbar sind
+      // (cross-origin: src-Neuzuweisung ist erlaubt, contentWindow.reload() nicht).
+      const pv = document.getElementById('guestPreview') as HTMLIFrameElement | null;
+      if (pv) pv.src = pv.src;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[welcome-section] save error', msg);

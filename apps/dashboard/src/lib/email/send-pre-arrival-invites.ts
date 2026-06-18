@@ -67,7 +67,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
 
     const { data: settings } = await sb
       .from('hotel_settings')
-      .select('accent_color')
+      .select('accent_color, guest_address_form')
       .eq('hotel_id', hotelId)
       .maybeSingle();
 
@@ -145,6 +145,7 @@ export async function sendPreArrivalInvitesForHotel(hotelId: string): Promise<{
           checkInLabel: formatLongGermanDate(s.check_in),
           checkOutLabel: formatLongGermanDate(s.check_out),
           pairUrl,
+          addressForm: (settings?.guest_address_form === 'du' ? 'du' : 'sie'),
         };
 
         const result = await routeEmail({
