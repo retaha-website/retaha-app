@@ -2,6 +2,7 @@ import type { AstroCookies } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
 import { getSessionToken } from './cross-subdomain-cookie';
+import { isRole, type Role } from './permissions';
 
 /**
  * Creates a Supabase server client mit der aktuellen Session.
@@ -92,4 +93,34 @@ export async function getUserHotels(cookies: AstroCookies, request: Request) {
     role: row.role,
     hotel: row.hotel as any,
   }));
+}
+
+/**
+ * Liefert die Rollen des eingeloggten Users (über alle Hotel-Memberships) für
+ * Surface-Gating + Login-Landing. Bewusst OHNE accepted_at-Filter — gleiche
+ * Quelle wie getUserHotels (Hotel-Auswahl) — damit das grobe Flächen-Gate nicht
+ * an der accepted_at-Mechanik hängt (Owner-Self-Insert hat accepted_at evtl. NULL).
+ * Die feinen requirePermission/getUserRole-Gates filtern accepted_at weiterhin.
+ *
+ * Returns null = nicht authentifiziert / Token ungültig (→ Login).
+ * Returns { userId, roles: [] } = authentifiziert, aber keine Hotel-Membership.
+ */
+export async function getUserRoles(
+  cookies: AstroCookies,
+  request: Request,
+): Promise<{ userId: string; roles: Role[] } | null> {
+  const user = await getUser(cookies, request);
+  if (!user) return null;
+
+  const client = createSupabaseServerInstance(cookies, request);
+  const { data, error } = await client
+    .from('hotel_users')
+    .select('role')
+    .eq('user_id', user.id);
+
+  if (error) return null;
+  const roles = (data ?? [])
+    .map((row: { role: unknown }) => row.role)
+    .filter(isRole);
+  return { userId: user.id, roles };
 }

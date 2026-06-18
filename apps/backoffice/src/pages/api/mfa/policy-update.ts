@@ -15,7 +15,7 @@ import type { APIRoute } from 'astro';
 import {
   createSupabaseServerInstance,
   createSupabaseServiceRoleInstance,
-  getUserHotels,
+  requirePermission,
 } from '@retaha/auth';
 import { logMfaEvent, parseUaFamily, parseDevice } from '@retaha/auth/mfa';
 
@@ -91,17 +91,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (!hotelId) {
       return bad('missing-hotel', 'hotel-id erforderlich');
     }
-    // Owner-Check via getUserHotels (gibt Hotels zurueck wo User Owner ist)
-    const hotels = await getUserHotels(supabase, user.id);
-    const isOwner = hotels.some(
-      (h: { id: string; role?: string }) => h.id === hotelId && h.role === 'owner',
-    );
-    if (!isOwner) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'not-owner', message: 'nur owner duerfen team-pflicht setzen' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
+    // Owner-Gate über zentrale Permission-Map (hotel.security = Owner-only).
+    const gate = await requirePermission(cookies, request, hotelId, 'hotel.security');
+    if (gate instanceof Response) return gate;
 
     await service
       .from('hotels')

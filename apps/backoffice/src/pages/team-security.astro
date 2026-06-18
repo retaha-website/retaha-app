@@ -17,6 +17,8 @@ import {
   getUser,
   getUserHotels,
   createSupabaseServiceRoleInstance,
+  hasPermission,
+  type Role,
 } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
 import Layout from '../layouts/Layout.astro';
@@ -26,8 +28,9 @@ import TrianglePulse from '@retaha/ui/components/TrianglePulse.astro';
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
 
+// Owner-Gate über zentrale Permission-Map (hotel.security = Owner-only).
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
-const ownerEntry = hotels?.find(h => h.role === 'owner');
+const ownerEntry = hotels?.find(h => hasPermission(h.role as Role, 'hotel.security'));
 if (!ownerEntry) {
   // Nicht-Owner -> zu eigenem Sicherheits-Setup (Mein Profil → Sicherheit)
   return Astro.redirect('/profil#security');

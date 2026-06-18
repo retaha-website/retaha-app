@@ -10,6 +10,7 @@ export {
   createSupabaseServiceRoleInstance,
   getUser,
   getUserHotels,
+  getUserRoles,
 } from './server';
 
 // Permissions (Sprint Functional) — alle exports
