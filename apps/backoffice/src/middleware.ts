@@ -22,6 +22,7 @@ import { defineMiddleware } from 'astro:middleware';
 import {
   getSessionToken,
   buildLoginRedirect,
+  getUser,
   createSupabaseServerInstance,
   createSupabaseServiceRoleInstance,
   anyRoleCanAccessSurface,
@@ -79,12 +80,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return Response.redirect(buildLoginRedirect(url), 302);
   }
 
-  // Rollen + Hotel über RLS-self-read (nur eigene Zeilen). PostgREST validiert
-  // dabei das JWT — ungültiges/abgelaufenes Token → error → zurück zum Login.
+  // Identität explizit validieren (JWT). Ungültig/abgelaufen → zurück zum Login.
+  const user = await getUser(cookies, request);
+  if (!user) {
+    return Response.redirect(buildLoginRedirect(url), 302);
+  }
+
+  // Eigene Memberships — auf user_id gefiltert (NICHT auf RLS-self-read verlassen:
+  // die Owner-Read-Policy würde sonst das ganze Team zurückgeben).
   const client = createSupabaseServerInstance(cookies, request);
   const { data: rows, error } = await client
     .from('hotel_users')
-    .select('user_id, role, hotel_id');
+    .select('role, hotel_id')
+    .eq('user_id', user.id);
 
   if (error) {
     return Response.redirect(buildLoginRedirect(url), 302);
@@ -101,12 +109,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // 2FA-FORCE-SETUP — Hotel-Pflicht + User ohne MFA → Setup erzwingen.
   if (roles.length > 0 && !isMfaExempt(url.pathname)) {
-    const userId = memberships[0].user_id as string;
-    const hotelId = memberships[0].hotel_id as string;
-    if (userId && hotelId) {
+    const hotelId = memberships[0]?.hotel_id as string | undefined;
+    if (hotelId) {
       const service = createSupabaseServiceRoleInstance();
       const [mfaStatus, policy] = await Promise.all([
-        getUserMfaStatus(service, userId),
+        getUserMfaStatus(service, user.id),
         getHotelMfaPolicy(service, hotelId),
       ]);
       if (shouldForceSetup(mfaStatus, policy)) {

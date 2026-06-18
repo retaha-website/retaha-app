@@ -33,7 +33,15 @@ async function fetchRoles(accessToken: string): Promise<string[]> {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
 
-  const { data, error } = await client.from('hotel_users').select('role');
+  // Auf eigene user_id filtern — NICHT auf RLS-self-read verlassen (die
+  // Owner-Read-Policy würde sonst das ganze Team zurückgeben).
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await client
+    .from('hotel_users')
+    .select('role')
+    .eq('user_id', user.id);
   if (error || !data) return [];
   return data.map((r: { role: unknown }) => r.role).filter(isRole);
 }
