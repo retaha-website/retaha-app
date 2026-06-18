@@ -184,10 +184,13 @@ const initEyebrow = eyebrowText || '';
 
   saveBtn?.addEventListener('click', async () => {
     if (saveBtn.dataset.loading) return;
+    // Lief eine Auto-Übersetzung? Nur wenn sich der Willkommenstext geändert hat;
+    // reine du/Sie-Umschaltung übersetzt nichts neu.
+    const textChanged = textarea.value.trim() !== (baseline.welcomeText ?? '').trim();
+    // Lade-Zustand wie LanguageSection: dataset.loading + disabled (v9-btn[data-loading]
+    // = opacity/cursor:wait). KEIN Button-Text-Wechsel.
     saveBtn.dataset.loading = 'true';
     saveBtn.disabled = true;
-    const saveBtnLabel = saveBtn.textContent;
-    saveBtn.textContent = 'Übersetze in alle Sprachen …';
 
     try {
       const res = await fetch('/api/hotel/save-welcome', {
@@ -203,7 +206,7 @@ const initEyebrow = eyebrowText || '';
       if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
 
       baseline = { ...baseline, welcomeText: textarea.value, formality: currentFormality };
-      (window as any).retahaToast?.('Gespeichert');
+      (window as any).retahaToast?.(textChanged ? 'Gespeichert — in alle Sprachen übersetzt' : 'Gespeichert');
       // Vorschau neu laden, damit Anrede (du/Sie) + Texte sofort sichtbar sind
       // (cross-origin: src-Neuzuweisung ist erlaubt, contentWindow.reload() nicht).
       const pv = document.getElementById('guestPreview') as HTMLIFrameElement | null;
@@ -215,7 +218,6 @@ const initEyebrow = eyebrowText || '';
     } finally {
       delete saveBtn.dataset.loading;
       saveBtn.disabled = false;
-      saveBtn.textContent = saveBtnLabel;
     }
   });
 </script>
