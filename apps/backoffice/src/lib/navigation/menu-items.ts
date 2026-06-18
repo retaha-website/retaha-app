@@ -129,7 +129,7 @@ export const menuSections: MenuSection[] = [
       {
         label: 'NFC-Tags',
         sub: 'Karten · Schlüssel',
-        href: `${GUEST_APP}/nfc-tags`,
+        href: '/nfc-tags',
         icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
       },
     ],

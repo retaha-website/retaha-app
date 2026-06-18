@@ -1,28 +1,23 @@
 ---
-import HotelierLayout from '../layouts/HotelierLayout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import Layout from '../layouts/Layout.astro';
+import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
 import { getEnv } from '@retaha/db';
 import QRCode from 'qrcode';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!myRole || !hasPermission(myRole, 'settings.read')) return new Response('Forbidden', { status: 403 });
 const canWrite = hasPermission(myRole, 'settings.write');
 
-const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const client = createSupabaseServiceRoleInstance();
 const { data: tagRows } = await client
   .from('nfc_tags')
   .select('id, label, target_type, target_value, is_active, scan_count, last_scanned_at, created_at')
@@ -70,7 +65,7 @@ function fmtDate(iso: string | null): string {
 }
 ---
 
-<HotelierLayout title="NFC-Tags" activeTab="gast" hotelName={hotel.name}>
+<Layout title="NFC-Tags" activeTab="backoffice">
   <div class="nf-page" x-data="nfcTagsAdmin()">
     <header class="nf-header">
       <p class="nf-eyebrow">NFC-Tags · Holzkarten</p>
@@ -202,7 +197,7 @@ function fmtDate(iso: string | null): string {
                     class="nf-btn-danger nf-btn-small"
                     type="button"
                     :disabled="busy"
-                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
                   >Löschen</button>
                 )}
               </div>
@@ -246,7 +241,7 @@ function fmtDate(iso: string | null): string {
           if (this.form.target_type === 'guest_stay') payload.target_value = { stay_id: this.form.stay_id?.trim() };
           this.form.busy = true;
           try {
-            const res = await fetch('/api/nfc-tags/create', {
+            const res = await fetch('/api/admin/nfc-tags/create', {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -263,7 +258,7 @@ function fmtDate(iso: string | null): string {
           if (this.bulkForm.to < this.bulkForm.from) { this.bulkForm.error = 'Bis muss größer als Von sein.'; return; }
           this.bulkForm.busy = true;
           try {
-            const res = await fetch('/api/nfc-tags/create', {
+            const res = await fetch('/api/admin/nfc-tags/create', {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ bulk: { mode: 'room_range', from: this.bulkForm.from, to: this.bulkForm.to, label_prefix: this.bulkForm.prefix } }),
@@ -278,7 +273,7 @@ function fmtDate(iso: string | null): string {
   </script>
 
   <style>
-    .nf-page { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+    .nf-page { --surface-raised: var(--bg-deep); max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
     .nf-header { margin: 20px 0 24px; }
     .nf-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--te-pink, #FF4A82); margin: 0 0 6px; }
     .nf-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
@@ -345,4 +340,4 @@ function fmtDate(iso: string | null): string {
     .nf-qr-help { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; line-height: 1.5; }
     .nf-qr-url { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 6px 10px; background: var(--surface-raised); color: var(--ink); word-break: break-all; display: inline-block; }
   </style>
-</HotelierLayout>
+</Layout>
