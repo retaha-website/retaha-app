@@ -1,8 +1,9 @@
 ---
 import HotelierLayout from '../layouts/HotelierLayout.astro';
 import { getUser, getUserHotels } from '@retaha/auth';
-import { MODULE_REGISTRY, TIER_LABELS, type ModuleDefinition } from '../lib/modules-registry';
+import { MODULE_REGISTRY, TIER_LABELS, CATEGORY_ORDER, CATEGORY_LABELS, MODULE_CATEGORY, type ModuleDefinition, type ModuleTier } from '../lib/modules-registry';
 import { isModuleAvailable } from '../lib/plan-modules';
+import ModuleRow from '../components/features/ModuleRow.astro';
 
 const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
 const d = import.meta.env.DASHBOARD_URL ?? 'https://dashboard.retaha.de';
@@ -27,18 +28,34 @@ const PLAN_LABEL: Record<string, string> = {
   lite: 'Lite', pro: 'Pro', premium: 'Premium', enterprise: 'Enterprise',
 };
 
-const TIER_CSS: Record<string, string> = {
-  lite:       'background:transparent; color:var(--ink); border-color:var(--ink)',
-  pro:        'background:var(--sage); color:#fff; border-color:var(--sage)',
-  premium:    'background:var(--burgund); color:#fff; border-color:var(--burgund)',
-  enterprise: 'background:var(--ink); color:var(--bg); border-color:var(--ink)',
-};
-
 function configHref(mod: ModuleDefinition): string | null {
   if (mod.linkedRoute) return mod.linkedRoute;
   if (mod.backofficeRoute) return `${b}${mod.backofficeRoute}`;
   if (mod.dashboardRoute) return `${d}${mod.dashboardRoute}`;
   return null;
+}
+
+const upgradeHref = `${b}/admin/subscription`;
+const decorated = MODULE_REGISTRY.map(mod => ({
+  mod,
+  included: avail(mod),
+  status: mod.comingSoon ? 'coming-soon' : 'normal',
+  href: configHref(mod),
+}));
+
+// Zwei Gruppierungs-Achsen aus bestehenden Metadaten: Paket (tier) + Kategorie.
+const TIER_ORDER: ModuleTier[] = ['lite', 'pro', 'premium', 'enterprise'];
+const tierSections = TIER_ORDER
+  .map(t => ({ label: TIER_LABELS[t], mods: decorated.filter(x => x.mod.tier === t) }))
+  .filter(s => s.mods.length > 0);
+const catSections = CATEGORY_ORDER
+  .map(c => ({ label: CATEGORY_LABELS[c], mods: decorated.filter(x => (MODULE_CATEGORY[x.mod.key] ?? 'betrieb') === c) }))
+  .filter(s => s.mods.length > 0);
+
+// Status-Flags je Sektion → Alpine blendet leere Sektionen (alle Zeilen vom
+// Status-Tab gefiltert) aus, damit kein leerer Sektions-Header stehen bleibt.
+function sectionFlags(mods: typeof decorated): string {
+  return JSON.stringify(mods.map(x => ({ s: x.status, i: x.included })));
 }
 ---
 
@@ -61,98 +78,70 @@ function configHref(mod: ModuleDefinition): string | null {
     <div
       x-data={`{
         filter: 'alle',
+        groupBy: 'paket',
         isVisible(status, included) {
           if (this.filter === 'alle') return true;
           if (this.filter === 'enthalten') return included && status !== 'coming-soon';
           if (this.filter === 'upgrade') return !included && status !== 'coming-soon';
           if (this.filter === 'bald') return status === 'coming-soon';
           return true;
-        }
+        },
+        sectionVisible(mods) { return mods.some(m => this.isVisible(m.s, m.i)); }
       }`}
     >
-      <div class="features-tabs" role="tablist">
-        {[
-          { key: 'alle',      label: 'Alle' },
-          { key: 'enthalten', label: `Enthalten (${includedCount})` },
-          { key: 'upgrade',   label: `Upgrade (${upgradeCount})` },
-          { key: 'bald',      label: 'Bald verfügbar' },
-        ].map(tab => (
-          <button
-            type="button"
-            role="tab"
-            class="features-tab"
-            :class={`filter === '${tab.key}' ? 'features-tab--active' : ''`}
-            @click={`filter = '${tab.key}'`}
-          >
-            {tab.label}
-          </button>
+      <div class="features-controls">
+        <div class="features-groupby" role="group" aria-label="Gruppieren nach">
+          <span class="features-groupby__label">Gruppieren</span>
+          <button type="button" class="features-seg" :class="groupBy === 'paket' ? 'features-seg--on' : ''" @click="groupBy = 'paket'">Paket</button>
+          <button type="button" class="features-seg" :class="groupBy === 'kategorie' ? 'features-seg--on' : ''" @click="groupBy = 'kategorie'">Kategorie</button>
+        </div>
+
+        <div class="features-tabs" role="tablist">
+          {[
+            { key: 'alle',      label: 'Alle' },
+            { key: 'enthalten', label: `Enthalten (${includedCount})` },
+            { key: 'upgrade',   label: `Upgrade (${upgradeCount})` },
+            { key: 'bald',      label: 'Bald verfügbar' },
+          ].map(tab => (
+            <button
+              type="button"
+              role="tab"
+              class="features-tab"
+              :class={`filter === '${tab.key}' ? 'features-tab--active' : ''`}
+              @click={`filter = '${tab.key}'`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <!-- PAKET-Gruppierung (Default) — Sektion = Paket, daher kein Tier-Badge pro Zeile -->
+      <div x-show="groupBy === 'paket'" x-cloak>
+        {tierSections.map(sec => (
+          <section class="mod-group" x-show={`sectionVisible(${sectionFlags(sec.mods)})`} x-cloak>
+            <div class="mod-group__label">{sec.label}</div>
+            <div class="mod-list">
+              {sec.mods.map(x => (
+                <ModuleRow mod={x.mod} included={x.included} status={x.status} href={x.href} upgradeHref={upgradeHref} showTier={false} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
 
-      <div class="features-grid">
-        {MODULE_REGISTRY.map(mod => {
-          const included = avail(mod);
-          const tierCss  = TIER_CSS[mod.tier] ?? TIER_CSS.lite;
-          const href      = configHref(mod);
-
-          return (
-            <div
-              class={[
-                'fcard',
-                included        ? 'fcard--included' : '',
-                !included && !mod.comingSoon ? 'fcard--upgrade' : '',
-                mod.comingSoon  ? 'fcard--soon'    : '',
-                mod.required    ? 'fcard--required' : '',
-              ].filter(Boolean).join(' ')}
-              x-show={`isVisible('${mod.comingSoon ? 'coming-soon' : 'normal'}', ${included})`}
-              x-cloak
-            >
-              <div class="fcard__head">
-                <span class="fcard__tier" style={tierCss}>
-                  {TIER_LABELS[mod.tier]}
-                </span>
-                {mod.required ? (
-                  <span class="fcard__badge fcard__badge--required">Pflicht</span>
-                ) : mod.comingSoon ? (
-                  <span class="fcard__badge fcard__badge--soon">Bald</span>
-                ) : mod.beta ? (
-                  <span class="fcard__badge fcard__badge--beta">Beta</span>
-                ) : included ? (
-                  <span class="fcard__badge fcard__badge--included">✓ Enthalten</span>
-                ) : (
-                  <span class="fcard__badge fcard__badge--upgrade">🔒 Upgrade</span>
-                )}
-              </div>
-
-              <div class="fcard__identity">
-                <span class="fcard__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                       stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                    <Fragment set:html={mod.icon} />
-                  </svg>
-                </span>
-                <span class="fcard__name">{mod.label}</span>
-              </div>
-
-              <p class="fcard__desc">{mod.desc}</p>
-
-              <div class="fcard__meta">
-                {mod.requiresHardware && (
-                  <span class="fcard__meta-badge fcard__meta-badge--hw">Hardware nötig</span>
-                )}
-                {mod.addonPrice && !included && (
-                  <span class="fcard__meta-badge fcard__meta-badge--addon">+ {mod.addonPrice} Add-On</span>
-                )}
-                {href && !mod.comingSoon && included && (
-                  <a href={href} class="fcard__meta-badge fcard__meta-badge--config">Konfigurieren →</a>
-                )}
-                {!included && !mod.comingSoon && !mod.addonPrice && (
-                  <a href={`${b}/admin/subscription`} class="fcard__meta-badge fcard__meta-badge--upgrade-cta">Plan upgraden →</a>
-                )}
-              </div>
+      <!-- KATEGORIE-Gruppierung — Tier-Badge pro Zeile (Paket ist dann Nebeninfo) -->
+      <div x-show="groupBy === 'kategorie'" x-cloak>
+        {catSections.map(sec => (
+          <section class="mod-group" x-show={`sectionVisible(${sectionFlags(sec.mods)})`} x-cloak>
+            <div class="mod-group__label">{sec.label}</div>
+            <div class="mod-list">
+              {sec.mods.map(x => (
+                <ModuleRow mod={x.mod} included={x.included} status={x.status} href={x.href} upgradeHref={upgradeHref} showTier={true} />
+              ))}
             </div>
-          );
-        })}
+          </section>
+        ))}
       </div>
     </div>
 
@@ -233,11 +222,27 @@ function configHref(mod: ModuleDefinition): string | null {
     text-underline-offset: 2px;
   }
 
-  .features-tabs {
-    display: flex; gap: 6px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
+  .features-controls {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 12px 24px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); margin-bottom: 20px;
   }
+  .features-groupby { display: flex; align-items: center; gap: 6px; padding-bottom: 11px; }
+  .features-groupby__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-muted); margin-right: 4px;
+  }
+  /* V9-Farbrolle: aktives Segment = Gelb (gewählt), inaktiv = Ghost. */
+  .features-seg {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: transparent; color: var(--ink-soft); cursor: pointer; transition: all 150ms ease;
+  }
+  .features-seg:not(.features-seg--on):hover { background: var(--te-yellow-soft); color: var(--ink); border-color: var(--te-yellow-soft); }
+  .features-seg--on { background: var(--te-yellow); color: var(--ink); border-color: var(--te-yellow); }
+
+  .features-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
   .features-tab {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
@@ -252,77 +257,18 @@ function configHref(mod: ModuleDefinition): string | null {
   .features-tab--active { color: var(--ink); border-bottom-color: var(--ink); }
   [x-cloak] { display: none !important; }
 
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 32px;
+  /* ── Gruppierte kompakte Liste (statt 3-Spalten-Karten) ── */
+  .mod-group { margin-bottom: 22px; }
+  .mod-group:last-child { margin-bottom: 4px; }
+  .mod-group__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft);
+    margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
   }
-  @media (max-width: 900px)  { .features-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px)  { .features-grid { grid-template-columns: 1fr; } }
-
-  .fcard {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    padding: 18px;
-    display: flex; flex-direction: column; gap: 10px;
-    transition: border-color 150ms, box-shadow 150ms;
+  .mod-list {
+    border: 1px solid var(--border); border-radius: var(--r);
+    background: var(--surface); overflow: hidden;
   }
-  .fcard:hover:not(.fcard--soon) { border-color: var(--border-medium); box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-  .fcard--included { border-color: var(--sage); }
-  .fcard--upgrade { opacity: 0.7; }
-  .fcard--soon { opacity: 0.5; cursor: default; }
-  .fcard--required { background: var(--bg-deep); }
-
-  .fcard__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .fcard__tier {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
-    padding: 2px 7px; border-radius: 99px; border: 1px solid;
-  }
-  .fcard__badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 99px;
-  }
-  .fcard__badge--required  { background: var(--sage-soft);    color: var(--sage-strong); border: 1px solid var(--sage); }
-  .fcard__badge--soon      { background: var(--te-yellow-soft); color: var(--ink);       border: 1px solid var(--te-yellow); }
-  .fcard__badge--beta      { background: #FFF8E6; color: #8C6700;                        border: 1px solid #F7D97A; }
-  .fcard__badge--included  { background: var(--sage-soft);    color: var(--sage-strong); border: 1px solid var(--sage); }
-  .fcard__badge--upgrade   { background: var(--bg-deep);      color: var(--ink-muted);   border: 1px solid var(--border); }
-
-  .fcard__identity { display: flex; align-items: center; gap: 10px; }
-  .fcard__icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: var(--bg-deep);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--ink-soft); flex-shrink: 0;
-  }
-  .fcard--included .fcard__icon { background: var(--te-yellow-soft); color: var(--ink); }
-  .fcard__name { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.2; }
-  .fcard--soon .fcard__name { color: var(--ink-muted); }
-
-  .fcard__desc {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; line-height: 1.5;
-    color: var(--ink-muted); letter-spacing: 0.01em; margin: 0; flex: 1;
-  }
-
-  .fcard__meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-  .fcard__meta-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
-    padding: 3px 8px; border-radius: 99px;
-    text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
-    transition: all 120ms;
-  }
-  .fcard__meta-badge--hw          { background: #FFF3E0; color: #8C5000;         border: 1px solid #F5CFA0; }
-  .fcard__meta-badge--addon       { background: var(--te-yellow); color: var(--ink); border: 1px solid var(--te-yellow); }
-  .fcard__meta-badge--config      { background: var(--bg-deep); color: var(--ink-muted); border: 1px solid var(--border); }
-  .fcard__meta-badge--config:hover { background: var(--ink); color: var(--bg); }
-  .fcard__meta-badge--upgrade-cta { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
-  .fcard__meta-badge--upgrade-cta:hover { background: var(--te-yellow); color: var(--ink); border-color: var(--te-yellow); }
 
   .features-footer {
     display: flex; align-items: center; justify-content: space-between; gap: 24px;

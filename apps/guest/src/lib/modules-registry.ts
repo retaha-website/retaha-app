@@ -265,3 +265,30 @@ export const TIER_COLORS: Record<ModuleTier, string> = {
   premium: '#7C3AED',
   enterprise: '#1F1812',
 };
+
+// ── Kategorien (Features-Seite: „Gruppieren nach Kategorie") ──────────────────
+// Erweitert die Gast-Vorschau-Modulgruppen (ModulesSection ALL_GROUPS kennt nur
+// die live-toggle­baren Module) auf ALLE Module. Reine Anzeige-Gruppierung, keine
+// DB. Zuordnung pro Modul hier zentral anpassbar.
+export const CATEGORY_ORDER = ['guest_service', 'kulinarik', 'wallet_crm', 'inhalte', 'betrieb'] as const;
+export type ModuleCategory = typeof CATEGORY_ORDER[number];
+
+export const CATEGORY_LABELS: Record<ModuleCategory, string> = {
+  guest_service: 'Gäste-Service',
+  kulinarik:     'Kulinarik',
+  wallet_crm:    'Wallet & CRM',
+  inhalte:       'Inhalte',
+  betrieb:       'Betrieb & Enterprise',
+};
+
+export const MODULE_CATEGORY: Record<string, ModuleCategory> = {
+  welcome: 'guest_service', wifi: 'guest_service', service: 'guest_service',
+  feedback: 'guest_service', self_checkout: 'guest_service', recommendations: 'guest_service',
+  multi_language: 'guest_service', eve: 'guest_service', spa: 'guest_service', whatsapp: 'guest_service',
+  breakfast: 'kulinarik', restaurant: 'kulinarik',
+  pre_stay: 'wallet_crm', stay_pushes: 'wallet_crm', wallet: 'wallet_crm', marketing: 'wallet_crm',
+  loyalty: 'wallet_crm', best_price: 'wallet_crm', referrals: 'wallet_crm',
+  action_cards: 'inhalte', microsite: 'inhalte',
+  showcase: 'betrieb', nfc_tags: 'betrieb', multi_property: 'betrieb', white_label: 'betrieb',
+  api_access: 'betrieb', custom_email_domain: 'betrieb',
+};
