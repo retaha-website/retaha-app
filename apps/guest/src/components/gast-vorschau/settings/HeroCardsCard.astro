@@ -9,6 +9,7 @@ interface Props {
   defaultLanguage?: string;
 }
 const { hotelId, defaultLanguage = 'de' } = Astro.props;
+const BACKOFFICE_URL = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 const { data: cards } = await client
@@ -61,7 +62,7 @@ const list = ((cards ?? []) as any[]).map((c) => {
     <p class="hero-empty">Noch keine Hero-Karten.</p>
   )}
 
-  <a href="/action-cards" class="brand-summary__link">→ Hero Karten bearbeiten</a>
+  <a href={`${BACKOFFICE_URL}/admin/action-cards`} class="brand-summary__link">→ Hero Karten bearbeiten</a>
 </section>
 
 <style>

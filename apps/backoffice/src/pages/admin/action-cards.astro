@@ -1,19 +1,13 @@
 ---
-import HotelierLayout from '../layouts/HotelierLayout.astro';
+import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
@@ -73,7 +67,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
 };
 ---
 
-<HotelierLayout title="Action-Cards" activeTab="gast" hotelName={hotel.name}>
+<Layout title="Action-Cards" activeTab="backoffice">
   <div
     x-data={`actionCardsEditor(${JSON.stringify({
       hotelId: hotel.id,
@@ -281,7 +275,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
   </div>
 
   <script>
-    import { resizeImage } from '../lib/storage/client-resize';
+    import { resizeImage } from '../../lib/storage/client-resize';
 
     function emptyEditor() {
       return {
@@ -536,4 +530,4 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     .ac-image-actions { display: flex; flex-direction: column; gap: 8px; }
 
   </style>
-</HotelierLayout>
+</Layout>
