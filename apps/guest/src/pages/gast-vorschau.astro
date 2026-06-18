@@ -23,7 +23,7 @@ const [
   { data: hotelLang, error: hotelLangError },
   { data: hotelSettings },
 ] = await Promise.all([
-  sb.from('hotels').select('default_language, enabled_languages, plan, addons').eq('id', hotel.id).maybeSingle(),
+  sb.from('hotels').select('default_language, enabled_languages, plan, addons, design_identity, theme').eq('id', hotel.id).maybeSingle(),
   sb.from('hotel_settings')
     .select('welcome_message_i18n, welcome_message_de, hotel_eyebrow_i18n, hotel_eyebrow_de, guest_address_form, features')
     .eq('hotel_id', hotel.id)
@@ -49,6 +49,16 @@ const formality   = ((hotelSettings?.guest_address_form ?? 'du') === 'sie' ? 'si
 const featuresRaw = (hotelSettings?.features ?? {}) as Record<string, unknown>;
 const hotelPlan: string    = (hotelLang as any)?.plan   ?? 'lite';
 const hotelAddons: string[] = (hotelLang as any)?.addons ?? [];
+
+// Design-Identity (Layout-Theme): primär design_identity, Legacy-Fallback theme.
+// Interne Werte bauhaus|editorial|maison (g/[token] liest dasselbe Feld).
+const IDENTITY_REMAP: Record<string, string> = {
+  classic: 'bauhaus', bauhaus_manufaktur: 'bauhaus', premium_anthrazit: 'maison', warmes_burgund: 'editorial',
+};
+const rawIdentity = ((hotelLang as any)?.design_identity ?? (hotelLang as any)?.theme ?? null) as string | null;
+const remappedIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : null;
+const designIdentity = (remappedIdentity && ['bauhaus', 'editorial', 'maison'].includes(remappedIdentity))
+  ? remappedIdentity : 'bauhaus';
 ---
 
 <HotelierLayout
@@ -204,6 +214,7 @@ const hotelAddons: string[] = (hotelLang as any)?.addons ?? [];
         hotelId={hotel.id}
         enabledLanguages={hotelEnabledLangs}
         defaultLanguage={hotelDefaultLang}
+        designIdentity={designIdentity}
         welcomeText={welcomeText}
         eyebrowText={eyebrowText}
         formality={formality}

@@ -1,0 +1,189 @@
+---
+// Design-Theme-Picker (Gast-Vorschau) — wählt das Layout-Theme der Willkommens-
+// Seite. Schreibt hotels.design_identity (interne Werte bauhaus|editorial|maison;
+// g/[token] liest dasselbe Feld). Live-Preview reflektiert nach dem Speichern.
+//
+// Bauhaus-only: Editorial + Maison sind bewusst ausgeblendet (analog der
+// SHOW_ALL_IDENTITIES-Flagge der BO-ThemeSection). Sobald freigegeben →
+// SHOW_ALL_THEMES = true, dann erscheinen sie ohne weiteren Umbau.
+
+interface Props {
+  designIdentity?: string;
+}
+const { designIdentity = 'bauhaus' } = Astro.props;
+
+const ALL_THEMES = [
+  { value: 'bauhaus',   label: 'Bauhaus',   desc: 'Anti-Luxus · Selbstbewusst', meta: 'Space Grotesk · Pink-Punkt' },
+  { value: 'editorial', label: 'Editorial', desc: 'Magazinhaft · Storytelling',  meta: 'Cormorant Garamond · Olive' },
+  { value: 'maison',    label: 'Maison',    desc: 'Klassisch · Opulent',         meta: 'Bodoni Moda · Gold-Rauten' },
+] as const;
+
+const SHOW_ALL_THEMES = false;
+const THEMES = SHOW_ALL_THEMES ? ALL_THEMES : ALL_THEMES.filter(t => t.value === 'bauhaus');
+
+const active = THEMES.some(t => t.value === designIdentity) ? designIdentity : 'bauhaus';
+---
+
+<section
+  class="settings-section"
+  id="themeSection"
+  data-baseline={JSON.stringify({ designIdentity: active })}
+>
+  <div class="settings-section__head">
+    <span class="settings-section__title">Design-Theme</span>
+  </div>
+
+  <p class="ts-hint">Bestimmt das Layout der Willkommens-Seite. Wirkt sofort in der Vorschau.</p>
+
+  <div class="ts-cards" role="radiogroup" aria-label="Design-Theme wählen">
+    {THEMES.map(t => (
+      <button
+        class={`ts-card ts-card--${t.value}${t.value === active ? ' is-active' : ''}`}
+        data-value={t.value}
+        role="radio"
+        aria-checked={t.value === active ? 'true' : 'false'}
+        type="button"
+      >
+        <span class={`ts-card__hint ts-card__hint--${t.value}`}>
+          {t.value === 'bauhaus' && <><span class="ts-mono">B</span><span class="ts-dot"></span></>}
+          {t.value === 'editorial' && <span class="ts-serif">Ed</span>}
+          {t.value === 'maison' && <><span class="ts-caps">M</span><span class="ts-rhombus"></span></>}
+        </span>
+        <span class="ts-card__body">
+          <span class="ts-card__title">{t.label}</span>
+          <span class="ts-card__desc">{t.desc}</span>
+          <span class="ts-card__meta">{t.meta}</span>
+        </span>
+        <span class="ts-card__check" aria-hidden="true">✓</span>
+      </button>
+    ))}
+  </div>
+
+  <div class="ws-save-row">
+    <button id="themeSaveBtn" class="v9-btn" type="button">Speichern</button>
+  </div>
+</section>
+
+<style>
+  .settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 24px 28px;
+  }
+  .settings-section__head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .settings-section__title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 20px;
+    letter-spacing: -0.01em; color: var(--ink); font-weight: 500;
+  }
+  .ts-hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--ink-muted); letter-spacing: 0.04em; margin: 0 0 16px;
+  }
+
+  /* ── Theme-Karten ────────────────────────────────────────────── */
+  .ts-cards { display: flex; flex-direction: column; gap: 10px; }
+  .ts-card {
+    display: flex; align-items: center; gap: 0;
+    width: 100%; text-align: left; padding: 0; cursor: pointer;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--r-sm); overflow: hidden;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    -webkit-appearance: none; appearance: none;
+    position: relative;
+  }
+  .ts-card:not(.is-active):hover { border-color: var(--ink-muted); }
+  /* V9-Farbrolle: gewählt = Gelb (nicht Ink). Ink bleibt der Speichern-Button. */
+  .ts-card.is-active {
+    border-color: var(--te-yellow);
+    box-shadow: 0 0 0 2px var(--te-yellow-soft);
+    background: var(--te-yellow-soft);
+  }
+
+  .ts-card__hint {
+    width: 64px; align-self: stretch; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px 8px;
+  }
+  .ts-card__hint--bauhaus  { background: #F5F5F3; }
+  .ts-card__hint--editorial { background: #FAF7F0; }
+  .ts-card__hint--maison   { background: #1A1410; }
+  .ts-mono { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; color: #0A0A0A; line-height: 1; letter-spacing: -0.03em; }
+  .ts-dot { width: 7px; height: 7px; background: #FF4A82; border-radius: 50%; }
+  .ts-serif { font-family: Georgia, serif; font-style: italic; font-size: 14px; color: #2B2A28; border-bottom: 1px solid #4A5C2A; padding-bottom: 2px; }
+  .ts-caps { font-family: Georgia, serif; font-size: 11px; letter-spacing: 0.12em; color: #E8D9B5; }
+  .ts-rhombus { width: 6px; height: 6px; background: #C9A36A; transform: rotate(45deg); }
+
+  .ts-card__body { flex: 1; min-width: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .ts-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .ts-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-soft); letter-spacing: 0.02em; }
+  .ts-card__meta { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+
+  .ts-card__check {
+    flex-shrink: 0; width: 40px; text-align: center;
+    color: var(--ink); font-size: 13px; opacity: 0;
+    transition: opacity 150ms ease;
+  }
+  .ts-card.is-active .ts-card__check { opacity: 1; }
+
+  .ws-save-row {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+</style>
+
+<script>
+  const section  = document.getElementById('themeSection');
+  const cards     = document.querySelectorAll<HTMLButtonElement>('.ts-card');
+  const saveBtn   = document.getElementById('themeSaveBtn') as HTMLButtonElement | null;
+
+  type Baseline = { designIdentity: string };
+  let baseline: Baseline = JSON.parse(section?.dataset.baseline ?? '{}') as Baseline;
+  let current = baseline.designIdentity ?? 'bauhaus';
+
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const value = card.dataset.value as string;
+      cards.forEach(c => {
+        c.classList.remove('is-active');
+        c.setAttribute('aria-checked', 'false');
+      });
+      card.classList.add('is-active');
+      card.setAttribute('aria-checked', 'true');
+      current = value;
+    });
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    if (saveBtn.dataset.loading) return;
+    saveBtn.dataset.loading = 'true';
+    saveBtn.disabled = true;
+    const label = saveBtn.textContent;
+    saveBtn.textContent = 'Speichere …';
+
+    try {
+      const res = await fetch('/api/hotel/save-identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ design_identity: current }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+      baseline = { ...baseline, designIdentity: current };
+      (window as any).retahaToast?.('Theme gespeichert');
+      // Vorschau neu laden, damit das Layout-Theme sofort sichtbar ist
+      // (cross-origin: src-Neuzuweisung ist erlaubt, contentWindow.reload() nicht).
+      const pv = document.getElementById('guestPreview') as HTMLIFrameElement | null;
+      if (pv) pv.src = pv.src;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[theme-section] save error', msg);
+      (window as any).retahaToast?.(`Fehler: ${msg}`, 'error');
+    } finally {
+      delete saveBtn.dataset.loading;
+      saveBtn.disabled = false;
+      saveBtn.textContent = label;
+    }
+  });
+</script>
