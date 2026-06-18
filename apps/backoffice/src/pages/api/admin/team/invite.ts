@@ -9,11 +9,10 @@
 //   2. Magic-Link an die Email via Supabase Auth signInWithOtp({ shouldCreateUser: true })
 //      → Supabase legt den User automatisch an wenn neu, schickt Login-Link
 //   3. hotel_users-Insert mit accepted_at=NULL (pending)
-//      → Beim Klick auf Magic-Link loggt sich der User ein; ein separater
-//        Callback /api/admin/team/accept (kommt als Folge) setzt accepted_at
-//      → Pragmatic-MVP: wir setzen accepted_at=NOW() schon beim ersten
-//        erfolgreichen getUser() in /admin (lazy-accept). Phase-3-Closing-
-//        Note: dedizierter Accept-Endpoint ist Backlog.
+//      → Beim Klick auf den Magic-Link landet der User in auth/callback, wird
+//        eingeloggt und seine offenen Invites werden dort per Lazy-Accept
+//        akzeptiert (finalizeLoginSession, Service-Role, user_id + accepted_at
+//        IS NULL). Kein separater Accept-Endpoint nötig.
 
 import type { APIRoute } from 'astro';
 import {
@@ -55,13 +54,18 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const { data: existingUser } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const found = existingUser?.users?.find(u => u.email?.toLowerCase() === email);
 
-  // Magic-Link triggern (signInWithOtp creates user if not exists)
+  // Magic-Link triggern (signInWithOtp creates user if not exists).
+  // emailRedirectTo MUSS auf den Auth-App-Callback zeigen — nur dort wird der
+  // Token getauscht, die Cross-Subdomain-Session gesetzt und rollenrichtig
+  // gelandet (staff → Dashboard). Vorher: backoffice/admin = Route ohne
+  // Token-Handler → der Eingeladene wurde nie eingeloggt.
+  const authAppUrl = import.meta.env.AUTH_APP_URL ?? 'https://auth.retaha.de';
   const userClient = createSupabaseServerInstance(cookies, request);
   const { error: otpErr } = await userClient.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: `${new URL(request.url).origin}/admin`,
+      emailRedirectTo: `${authAppUrl}/callback`,
     },
   });
   if (otpErr) {

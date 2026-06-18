@@ -91,6 +91,20 @@ export async function finalizeLoginSession(
 
   let hours = 0;
   if (service) {
+    // Lazy-Accept: der just-authentifizierte User nimmt seine offenen Invites an.
+    // Service-Role ZWINGEND — hotel_users-RLS ist owner-only, ein staff/manager
+    // kann sein eigenes accepted_at nicht setzen. Scoped auf user_id + accepted_at
+    // IS NULL (idempotent; Owner-Zeilen sind via P4-Trigger längst akzeptiert).
+    try {
+      await service
+        .from('hotel_users')
+        .update({ accepted_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('accepted_at', null);
+    } catch {
+      // fail-safe: blockiert den Login nicht
+    }
+
     try {
       hours = await getSessionTimeoutHours(service, userId);
     } catch {
