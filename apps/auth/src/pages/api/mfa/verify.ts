@@ -21,7 +21,14 @@
  */
 
 import type { APIRoute } from 'astro';
-import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import {
+  createSupabaseServerInstance,
+  createSupabaseServiceRoleInstance,
+  getSessionToken,
+  getSessionTimeoutHours,
+  decodeJwtExp,
+  resolveMarkerTtl,
+} from '@retaha/auth';
 import {
   decryptSecret,
   verifyToken,
@@ -110,8 +117,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return bad(isJson, 'invalid-code', 'code ungueltig. bitte erneut versuchen.');
   }
 
-  // 4. Success: signierten, cross-subdomain MFA-Session-Marker setzen + Audit
-  setMfaMarkerCookie(cookies, user.id);
+  // 4. Success: signierten, cross-subdomain MFA-Session-Marker setzen + Audit.
+  // TTL = min(12h, session_timeout_hours, Session-Rest) — überlebt die Session nie.
+  const timeoutHours = await getSessionTimeoutHours(service, user.id);
+  const markerTtl = resolveMarkerTtl(timeoutHours, decodeJwtExp(getSessionToken(cookies)));
+  setMfaMarkerCookie(cookies, user.id, markerTtl);
 
   await logMfaEvent(service, {
     userId: user.id,

@@ -1,45 +1,50 @@
 /**
- * Login-MFA-Gate — entscheidet nach erfolgreichem Login, ob für diese Session
- * der MFA-Marker direkt gesetzt wird (kein Challenge nötig) und setzt ihn ggf.
+ * Login-Session-Finalisierung — setzt nach erfolgreicher Auth den Session-Cookie
+ * (Timeout-bewusst) UND den MFA-Marker konsistent.
  *
- *   - Feature aus (kein MFA_MARKER_SECRET) → no-op.
+ * Session-Cookie-maxAge = session_timeout_hours, zur Laufzeit auf die JWT-exp
+ * gedeckelt (ohne Refresh kann die Session den JWT nicht überleben → keine
+ * stille Verlängerung). 0 = kein Timeout (7d-Default, ebenfalls gedeckelt).
+ *
+ * MFA-Marker:
+ *   - Feature aus (kein MFA_MARKER_SECRET) → kein Marker.
  *   - User ohne MFA → Marker setzen (kein Challenge; vermeidet Flächen-Bounce).
- *   - Magic-Link + require_on_magic_link=false → Marker setzen (Magic-Link genügt
- *     als Faktor).
- *   - sonst (MFA aktiv, Challenge nötig) → NICHTS setzen → der Marker-Gate auf
- *     backoffice/dashboard wirft den User auf /mfa.
+ *   - Magic-Link + require_on_magic_link=false → Marker setzen (Magic-Link genügt).
+ *   - sonst (MFA aktiv, Challenge nötig) → KEIN Marker → Flächen-Gate → /mfa.
+ *   - Marker-TTL = min(12h, Timeout, Session-Rest) → überlebt die Session nie.
  *
- * Fail-open: jeder Fehler → nichts setzen, aber Login NICHT blockieren.
+ * Alles fail-safe: jeder Fehler → bisheriges Default-Verhalten, Login bricht nie.
  */
 
 import type { AstroCookies } from 'astro';
-import { createClient } from '@supabase/supabase-js';
-import { getEnv } from '@retaha/db';
-import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  setSessionCookie,
+  createSupabaseServiceRoleInstance,
+  getSessionTimeoutHours,
+  decodeJwtExp,
+  resolveSessionCookieMaxAge,
+  resolveMarkerTtl,
+} from '@retaha/auth';
 import { isMfaMarkerConfigured, setMfaMarkerCookie } from '@retaha/auth/mfa';
 
-export async function applyLoginMfaMarker(
+interface LoginCtx {
+  service: SupabaseClient;
+  userId: string;
+  hours: number;
+  jwtExp?: number;
+}
+
+async function applyLoginMfaMarker(
   cookies: AstroCookies,
-  accessToken: string,
   isMagicLink: boolean,
+  ctx: LoginCtx,
 ): Promise<void> {
   if (!isMfaMarkerConfigured()) return;
-
-  const url = getEnv('PUBLIC_SUPABASE_URL');
-  const anon = getEnv('PUBLIC_SUPABASE_ANON_KEY');
-  if (!url || !anon) return;
-
-  let userId: string | undefined;
-  try {
-    const { data } = await createClient(url, anon).auth.getUser(accessToken);
-    userId = data?.user?.id;
-  } catch {
-    return;
-  }
+  const { service, userId, hours, jwtExp } = ctx;
   if (!userId) return;
 
   try {
-    const service = createSupabaseServiceRoleInstance();
     const { data: mfa } = await service
       .from('user_mfa')
       .select('enabled, require_on_magic_link')
@@ -48,17 +53,58 @@ export async function applyLoginMfaMarker(
 
     const enabled = !!mfa?.enabled;
     const requireOnMagicLink = !!mfa?.require_on_magic_link;
+    const ttl = resolveMarkerTtl(hours, jwtExp);
 
     if (!enabled) {
-      setMfaMarkerCookie(cookies, userId);
+      setMfaMarkerCookie(cookies, userId, ttl);
       return;
     }
     if (isMagicLink && !requireOnMagicLink) {
-      setMfaMarkerCookie(cookies, userId);
+      setMfaMarkerCookie(cookies, userId, ttl);
       return;
     }
     // sonst: MFA aktiv + Challenge nötig → Marker NICHT setzen.
   } catch {
     // fail-open
+  }
+}
+
+/**
+ * Setzt Session-Cookie (Timeout-bewusst) + MFA-Marker. Ersetzt den direkten
+ * setSessionCookie-Aufruf in den Login-Pfaden.
+ */
+export async function finalizeLoginSession(
+  cookies: AstroCookies,
+  accessToken: string,
+  userId: string,
+  isMagicLink: boolean,
+): Promise<void> {
+  const jwtExp = decodeJwtExp(accessToken);
+
+  // Service-Role kann werfen (fehlende Env) — Login darf NIE daran brechen.
+  let service: SupabaseClient | null = null;
+  try {
+    service = createSupabaseServiceRoleInstance();
+  } catch {
+    service = null;
+  }
+
+  let hours = 0;
+  if (service) {
+    try {
+      hours = await getSessionTimeoutHours(service, userId);
+    } catch {
+      hours = 0; // fail-safe: kein Timeout
+    }
+  }
+
+  // Cookie immer setzen (auch im Fallback — maxAge = min(7d, JWT-Rest) ist
+  // mindestens so eng wie bisher, nie länger).
+  setSessionCookie(cookies, accessToken, {
+    maxAgeSeconds: resolveSessionCookieMaxAge(hours, jwtExp),
+  });
+
+  if (service) {
+    await applyLoginMfaMarker(cookies, isMagicLink, { service, userId, hours, jwtExp });
   }
 }

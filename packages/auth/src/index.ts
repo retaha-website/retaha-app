@@ -18,6 +18,16 @@ export * from './permissions';
 
 export * from './require-permission';
 
+// Session-Timeout-Auflösung (macht hotels.session_timeout_hours real)
+export {
+  SESSION_TIMEOUT_OPTIONS,
+  clampTimeoutHours,
+  getSessionTimeoutHours,
+  decodeJwtExp,
+  resolveSessionCookieMaxAge,
+  resolveMarkerTtl,
+} from './session-timeout';
+
 // Stay-Session (JWT-Cookie für Gast-Frontend via /g/[token])
 export * from './stay-session';
 

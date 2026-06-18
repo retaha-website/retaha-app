@@ -19,9 +19,8 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
-import { setSessionCookie } from '@retaha/auth';
 import { resolveLanding } from '../../../lib/landing';
-import { applyLoginMfaMarker } from '../../../lib/mfa-gate';
+import { finalizeLoginSession } from '../../../lib/mfa-gate';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   let accessToken = '';
@@ -52,12 +51,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ ok: false, error: error?.message ?? 'invalid-token' }, 401);
   }
 
-  // Token ist valide → Cross-Subdomain-Session-Cookie setzen
-  setSessionCookie(cookies, accessToken);
-
-  // Magic-Link: Marker bei non-MFA + (require_on_magic_link=false) setzen;
-  // sonst greift der Flächen-Gate → /mfa.
-  await applyLoginMfaMarker(cookies, accessToken, true);
+  // Session-Cookie (Timeout-bewusst) + MFA-Marker. Magic-Link: Marker bei
+  // non-MFA + require_on_magic_link=false; sonst Flächen-Gate → /mfa.
+  await finalizeLoginSession(cookies, accessToken, data.user.id, true);
 
   // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
   const landing = await resolveLanding(accessToken, returnTo);

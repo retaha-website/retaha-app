@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance, clampTimeoutHours } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -133,8 +133,9 @@ if (Astro.request.method === 'POST') {
     }
 
   } else if (action === 'team_security') {
-    // mfa_required_for_team is now persisted immediately via toggle API — only save session_timeout_hours here
-    const session_timeout_hours = parseInt(form.get('session_timeout_hours')?.toString() || '4') || 4;
+    // mfa_required_for_team is now persisted immediately via toggle API — only save session_timeout_hours here.
+    // Serverseitig auf die erlaubten Stufen (0/1/2/4/8/24) clampen — kein 0,01h-Footgun.
+    const session_timeout_hours = clampTimeoutHours(form.get('session_timeout_hours')?.toString());
     const { error } = await client.from('hotels')
       .update({ session_timeout_hours })
       .eq('id', hotel.id);

@@ -22,8 +22,7 @@
 import AuthLayout from '../layouts/AuthLayout.astro';
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
 import { resolveLanding } from '../lib/landing';
-import { applyLoginMfaMarker } from '../lib/mfa-gate';
-import { setSessionCookie } from '@retaha/auth';
+import { finalizeLoginSession } from '../lib/mfa-gate';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
 
@@ -52,10 +51,9 @@ if (code) {
     return Astro.redirect(`/error?reason=${encodeURIComponent(error?.message ?? 'invalid-code')}`, 302);
   }
 
-  setSessionCookie(Astro.cookies, data.session.access_token);
-  // Magic-Link (PKCE): Marker bei non-MFA + require_on_magic_link=false setzen;
-  // sonst greift der Flächen-Gate → /mfa.
-  await applyLoginMfaMarker(Astro.cookies, data.session.access_token, true);
+  // Session-Cookie (Timeout-bewusst) + MFA-Marker. Magic-Link (PKCE): Marker bei
+  // non-MFA + require_on_magic_link=false; sonst Flächen-Gate → /mfa.
+  await finalizeLoginSession(Astro.cookies, data.session.access_token, data.session.user.id, true);
   // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
   const landing = await resolveLanding(data.session.access_token, returnTo);
   return Astro.redirect(landing, 302);

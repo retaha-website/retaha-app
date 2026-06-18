@@ -25,9 +25,8 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
-import { setSessionCookie } from '@retaha/auth';
 import { resolveLanding } from '../../../lib/landing';
-import { applyLoginMfaMarker } from '../../../lib/mfa-gate';
+import { finalizeLoginSession } from '../../../lib/mfa-gate';
 import { rateLimit } from '../../../lib/rate-limit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -92,11 +91,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     );
   }
 
-  setSessionCookie(cookies, data.session.access_token);
-
-  // Passwort-Login: MFA-Marker nur für non-MFA-User setzen; bei aktivem MFA
-  // KEIN Marker → der Flächen-Gate wirft auf /mfa (Challenge).
-  await applyLoginMfaMarker(cookies, data.session.access_token, false);
+  // Session-Cookie (Timeout-bewusst) + MFA-Marker. Passwort-Login (kein Magic-Link):
+  // bei aktivem MFA KEIN Marker → der Flächen-Gate wirft auf /mfa (Challenge).
+  await finalizeLoginSession(cookies, data.session.access_token, data.user.id, false);
 
   // RBAC-Landing: owner/manager → Backoffice, staff → Dashboard.
   const landing = await resolveLanding(data.session.access_token, returnTo);

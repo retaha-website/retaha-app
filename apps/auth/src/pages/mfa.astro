@@ -13,7 +13,14 @@
  *   - Link "zurueck zur anmeldung" -> /logout
  */
 
-import { createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import {
+  createSupabaseServerInstance,
+  createSupabaseServiceRoleInstance,
+  getSessionToken,
+  getSessionTimeoutHours,
+  decodeJwtExp,
+  resolveMarkerTtl,
+} from '@retaha/auth';
 import { isMfaMarkerConfigured, verifyMfaMarker, setMfaMarkerCookie } from '@retaha/auth/mfa';
 import { sanitizeReturnTo } from '../lib/redirect-whitelist';
 import Logo from '@retaha/ui/components/brand/Logo.astro';
@@ -58,7 +65,10 @@ const { data: mfa } = await service
 if (!mfa?.enabled) {
   // Kein MFA eingerichtet -> Marker setzen (Pass-through, sonst wirft der
   // Marker-Gate auf den Flächen endlos hierher zurück) + weiter.
-  setMfaMarkerCookie(Astro.cookies, userRes.user.id);
+  // TTL = min(12h, session_timeout_hours, Session-Rest).
+  const timeoutHours = await getSessionTimeoutHours(service, userRes.user.id);
+  const markerTtl = resolveMarkerTtl(timeoutHours, decodeJwtExp(getSessionToken(Astro.cookies)));
+  setMfaMarkerCookie(Astro.cookies, userRes.user.id, markerTtl);
   return Astro.redirect(returnTo);
 }
 

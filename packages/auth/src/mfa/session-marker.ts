@@ -56,17 +56,26 @@ function buildToken(userId: string, secret: string, ttlSeconds = TTL_SECONDS): s
   return `${payload}.${sign(payload, secret)}`;
 }
 
-/** Setzt den signierten Marker (no-op wenn Feature nicht konfiguriert). */
-export function setMfaMarkerCookie(cookies: AstroCookies, userId: string): void {
+/**
+ * Setzt den signierten Marker (no-op wenn Feature nicht konfiguriert).
+ * ttlSeconds steuert Cookie-maxAge UND Token-exp konsistent; defensiv auf 12h
+ * gedeckelt (Marker nie > 12h). Caller liefert i.d.R. resolveMarkerTtl(...).
+ */
+export function setMfaMarkerCookie(
+  cookies: AstroCookies,
+  userId: string,
+  ttlSeconds: number = TTL_SECONDS,
+): void {
   const secret = getSecret();
   if (!secret || !userId) return;
-  cookies.set(MFA_MARKER_COOKIE, buildToken(userId, secret), {
+  const ttl = ttlSeconds > 0 ? Math.min(ttlSeconds, TTL_SECONDS) : TTL_SECONDS;
+  cookies.set(MFA_MARKER_COOKIE, buildToken(userId, secret, ttl), {
     domain: resolveCookieDomain(),
     path: '/',
     httpOnly: true,
     secure: isProductionEnv(),
     sameSite: 'lax',
-    maxAge: TTL_SECONDS,
+    maxAge: ttl,
   });
 }
 
