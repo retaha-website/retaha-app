@@ -266,8 +266,13 @@ const greetingFallback = t('hero.greetingFallback', lang);
 
 // Anrede (du/Sie) — eine Quelle der Wahrheit: hotel_settings.guest_address_form.
 const formality: Formality = addressFormToFormality((settings as any).guest_address_form);
-const greetingName = guest?.first_name
-  ? `${greetingLabel} ${guest.first_name}`
+// Bei Sie ist der reine Vorname unhöflich → Vor- + Nachname (kein Anrede/Geschlecht
+// in der DB, daher kein „Frau/Herr"). Bei du: Vorname wie gehabt.
+const greetingDisplayName = (formality === 'formal' && guest?.last_name)
+  ? `${guest.first_name} ${guest.last_name}`
+  : guest?.first_name;
+const greetingName = greetingDisplayName
+  ? `${greetingLabel} ${greetingDisplayName}`
   : greetingFallback;
 
 // Visit-Ordinals nur wenn guest existiert (sonst kein Besuch-Counter)
@@ -761,7 +766,7 @@ const stayPersona: 'pre_arrival' | 'in_house' | 'checking_out' =
 
       {avail('eve') && f.eve !== false && (
         <>
-          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang, guestName: guest?.first_name ?? null, eveName: settings.eve_name || 'Eve' })};window.__RETAHA_META__ = ${JSON.stringify({ isShowcase })};`} />
+          <script is:inline set:html={`window.__EVE_INITIAL__ = ${JSON.stringify({ messages: initialEveMessages, lang, guestName: greetingDisplayName ?? null, eveName: settings.eve_name || 'Eve' })};window.__RETAHA_META__ = ${JSON.stringify({ isShowcase })};`} />
           <EveChatSheet
             lang={lang}
             eveName={settings.eve_name || 'Eve'}

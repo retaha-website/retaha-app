@@ -21,6 +21,7 @@ interface Props {
   weather?: { temp: number; emoji: string } | null;
   persona?: 'pre_arrival' | 'in_house' | 'checking_out';
   greeting?: { hi: string; sub: string };
+  formality?: 'informal' | 'formal';
 }
 
 const {
@@ -28,10 +29,14 @@ const {
   hotelEnabledLangs, checkInLabel, checkOutLabel,
   heroCards = [], f, actions, weather, persona = 'in_house',
   greeting = { hi: 'Hallo,', sub: '' },
+  formality = 'informal',
 } = Astro.props;
 
 const showHeroSlider = f.action_cards !== false && heroCards.length > 0;
-const name = guest?.first_name ?? hotel.name;
+// Bei Sie: Vor- + Nachname (höflicher); bei du: Vorname.
+const name = ((formality === 'formal' && guest?.last_name)
+  ? `${guest.first_name} ${guest.last_name}`
+  : guest?.first_name) ?? hotel.name;
 ---
 
 <!-- HEADER -->
