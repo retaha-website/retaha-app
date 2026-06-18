@@ -5,6 +5,7 @@ import { MODULE_REGISTRY, TIER_LABELS, type ModuleDefinition } from '../lib/modu
 import { isModuleAvailable } from '../lib/plan-modules';
 
 const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+const d = import.meta.env.DASHBOARD_URL ?? 'https://dashboard.retaha.de';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect(`${b}/admin/login`);
@@ -36,6 +37,7 @@ const TIER_CSS: Record<string, string> = {
 function configHref(mod: ModuleDefinition): string | null {
   if (mod.linkedRoute) return mod.linkedRoute;
   if (mod.backofficeRoute) return `${b}${mod.backofficeRoute}`;
+  if (mod.dashboardRoute) return `${d}${mod.dashboardRoute}`;
   return null;
 }
 ---

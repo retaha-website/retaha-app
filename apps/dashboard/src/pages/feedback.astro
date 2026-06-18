@@ -1,24 +1,13 @@
 ---
-import HotelierLayout from '../layouts/HotelierLayout.astro';
+import AppLayout from '../layouts/AppLayout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
-import { getUserRole, hasPermission } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user) return Astro.redirect('/admin/login');
+
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
-
-const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
-if (!myRole || !hasPermission(myRole, 'operations.read')) {
-  return new Response('Forbidden', { status: 403 });
-}
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const url = new URL(Astro.request.url);
 const filterParam = url.searchParams.get('filter') || 'all';
@@ -69,7 +58,7 @@ function fmtStayRange(checkIn: string, checkOut: string) {
 }
 ---
 
-<HotelierLayout title="Gäste-Bewertungen" activeTab="gast" hotelName={hotel.name}>
+<AppLayout title="Gäste-Bewertungen" hotel={hotel} user={{ email: user.email ?? '' }}>
   <div class="fb-page">
     <header class="fb-header">
       <p class="fb-eyebrow themed-eyebrow-flank">Aufenthalt · Bewertungen</p>
@@ -154,7 +143,19 @@ function fmtStayRange(checkIn: string, checkOut: string) {
   </div>
 
   <style>
-    .fb-page { max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
+    .fb-page {
+      /* Dashboard-Token-Mapping (Guest-Theme-Tokens existieren hier nicht) */
+      --surface: #fff;
+      --border: #e8e8e8;
+      --bg-deep: #f5f5f5;
+      --ink: #1A1A1A;
+      --ink-soft: rgba(26, 26, 26, 0.65);
+      --ink-muted: rgba(26, 26, 26, 0.5);
+      --ink-faint: rgba(26, 26, 26, 0.25);
+      --te-pink: #FF4A82;
+      --theme-accent: #FF4A82;
+      max-width: 960px; margin: 0 auto; padding: 0 24px 60px;
+    }
     .fb-header { margin: 20px 0 24px; }
     .fb-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent, var(--te-pink)); margin: 0 0 6px; }
     .fb-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; letter-spacing: -0.01em; }
@@ -197,4 +198,4 @@ function fmtStayRange(checkIn: string, checkOut: string) {
     .fb-comment { margin: 0; padding: 8px 12px; background: var(--bg-deep); border-left: 3px solid var(--border); font-size: 14px; line-height: 1.5; color: var(--ink); font-style: italic; }
     .fb-comment--empty { color: var(--ink-muted); font-style: italic; background: transparent; border-left-color: transparent; padding-left: 0; }
   </style>
-</HotelierLayout>
+</AppLayout>

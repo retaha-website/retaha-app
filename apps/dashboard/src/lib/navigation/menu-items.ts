@@ -14,10 +14,6 @@ export interface MenuSection {
 const icon = (path: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
-// Feedback-Anfragen-Config lebt in der Gäste-App (HotelierLayout) — Cross-Domain-Link.
-// Gleiche Subdomain-Auth (*.retaha.de) → Session greift.
-const GUEST_APP = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
-
 export const menuSections: MenuSection[] = [
   {
     title: 'Operations',
@@ -43,7 +39,7 @@ export const menuSections: MenuSection[] = [
       {
         label: 'Feedback-Anfragen',
         sub: 'Bewertungen · Reviews',
-        href: `${GUEST_APP}/feedback`,
+        href: '/app/feedback',
         icon: icon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
       },
     ],
