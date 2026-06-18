@@ -1,5 +1,5 @@
 ---
-import HotelierLayout from '../layouts/HotelierLayout.astro';
+import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { getBranding } from '@retaha/auth';
 import LogoSection    from '../components/branding/LogoSection.astro';
@@ -11,17 +11,11 @@ import DemoQrCard from '@retaha/ui/components/shared/DemoQrCard.astro';
 import { getOrCreateShowcaseUrl } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
-if (!user) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login`);
-}
+if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/admin/login?error=no_hotel`);
-}
+if (!hotel) return Astro.redirect('/onboarding/locale');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
@@ -73,14 +67,13 @@ if (Astro.request.method === 'POST') {
 
 const branding = await getBranding(Astro.cookies, Astro.request);
 if (!branding) {
-  const b = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
-  return Astro.redirect(`${b}/uebersicht`);
+  return Astro.redirect('/uebersicht');
 }
 
 const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 ---
 
-<HotelierLayout title="Branding" activeTab="gast" hotelName={hotel.name} hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}>
+<Layout title="Branding" activeTab="backoffice">
 
   <div class="branding-page">
 
@@ -132,7 +125,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
     </div>
   </div>
 
-</HotelierLayout>
+</Layout>
 
 <style>
   .branding-page {

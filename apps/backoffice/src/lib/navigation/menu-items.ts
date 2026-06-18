@@ -106,7 +106,7 @@ export const menuSections: MenuSection[] = [
       {
         label: 'Branding',
         sub: 'Logo · Farben · Theme',
-        href: `${GUEST_APP}/branding`,
+        href: '/branding',
         icon: icon('<circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M2 12a10 10 0 0 0 10 10"/><path d="m8 12 2 2 4-4"/>'),
       },
       {
