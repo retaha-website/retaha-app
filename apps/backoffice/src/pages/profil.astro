@@ -1,0 +1,221 @@
+---
+// Mein Profil — kanonische Account-Seite (app-übergreifend, auth-sensibel → nur
+// hier im BO, Guest/Dashboard verlinken per Cross-Link). V9, /breakfast-Kopf.
+//
+// Stammdaten (Vor-/Nachname) → user_profiles via RLS-Client (auth.uid()=user_id).
+// E-Mail/Passwort → Supabase Auth updateUser (kein eigenes Passwort-Handling).
+// Rolle → hotel_users.role (read-only). 2FA: Folge-Task.
+import Layout from '../layouts/Layout.astro';
+import { getUser, createSupabaseServerInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+
+// Spiegelt @retaha/auth ROLE_LABELS (owner|manager|staff).
+const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+
+let message: { type: 'success' | 'error'; text: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('_action')?.toString();
+
+  if (action === 'save_profile') {
+    const first = (form.get('first_name')?.toString() ?? '').trim();
+    const last  = (form.get('last_name')?.toString() ?? '').trim();
+    if (!first || !last) {
+      message = { type: 'error', text: 'Vor- und Nachname dürfen nicht leer sein.' };
+    } else {
+      // RLS-scoped: der Client trägt die Session, auth.uid() === user.id greift.
+      const { error } = await client.from('user_profiles').upsert(
+        { user_id: user.id, first_name: first, last_name: last, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' },
+      );
+      message = error
+        ? { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` }
+        : { type: 'success', text: 'Gespeichert.' };
+    }
+  }
+
+  else if (action === 'change_email') {
+    const newEmail = (form.get('email')?.toString() ?? '').trim();
+    if (!newEmail || !newEmail.includes('@')) {
+      message = { type: 'error', text: 'Bitte eine gültige E-Mail-Adresse eingeben.' };
+    } else if (newEmail === user.email) {
+      message = { type: 'error', text: 'Das ist bereits deine aktuelle E-Mail.' };
+    } else {
+      const { error } = await client.auth.updateUser({ email: newEmail });
+      message = error
+        ? { type: 'error', text: `E-Mail-Änderung fehlgeschlagen: ${error.message}` }
+        : { type: 'success', text: 'Bestätigungs-Mail an die neue Adresse gesendet — aktiv erst nach Bestätigung.' };
+    }
+  }
+
+  else if (action === 'change_password') {
+    const pw  = form.get('password')?.toString() ?? '';
+    const pw2 = form.get('password_confirm')?.toString() ?? '';
+    if (pw.length < 8) {
+      message = { type: 'error', text: 'Passwort muss mindestens 8 Zeichen haben.' };
+    } else if (pw !== pw2) {
+      message = { type: 'error', text: 'Die Passwörter stimmen nicht überein.' };
+    } else {
+      const { error } = await client.auth.updateUser({ password: pw });
+      message = error
+        ? { type: 'error', text: `Passwort-Änderung fehlgeschlagen: ${error.message}` }
+        : { type: 'success', text: 'Passwort geändert.' };
+    }
+  }
+}
+
+// Aktuelle Daten (nach evtl. POST neu gelesen).
+const [{ data: profile }, { data: hotelUser }] = await Promise.all([
+  client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle(),
+  client.from('hotel_users').select('role').eq('user_id', user.id).maybeSingle(),
+]);
+
+const firstName    = profile?.first_name ?? '';
+const lastName     = profile?.last_name ?? '';
+const currentEmail = user.email ?? '';
+const role         = (hotelUser?.role ?? 'staff') as string;
+const roleLabel    = ROLE_LABELS[role] ?? role;
+---
+
+<Layout title="Mein Profil" activeTab="backoffice">
+  <div class="settings-page">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Mein Profil</span>
+    </nav>
+
+    <section class="settings-hero">
+      <span class="settings-hero__eyebrow">Konto</span>
+      <h1 class="settings-hero__title">Mein Profil<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Name, E-Mail und Passwort — dein persönliches Konto bei retaha.</p>
+    </section>
+
+    {message && (
+      <script is:inline define:vars={{ m: message.text, t: message.type === 'success' ? 'success' : 'error' }}>
+        window.addEventListener('DOMContentLoaded', function () { window.retahaToast && window.retahaToast(m, t); });
+      </script>
+    )}
+
+    <div class="settings-sections">
+
+      <!-- 01 Stammdaten -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Stammdaten</h2>
+          <span class="s-card__num">01</span>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="save_profile" />
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="first_name">Vorname</label>
+              <div class="field__input-wrap">
+                <input type="text" id="first_name" name="first_name" value={firstName} required maxlength="60" autocomplete="given-name" class="s-input" />
+              </div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="last_name">Nachname</label>
+              <div class="field__input-wrap">
+                <input type="text" id="last_name" name="last_name" value={lastName} required maxlength="60" autocomplete="family-name" class="s-input" />
+                <span class="field__hint">Wird für die persönliche Ansprache in E-Mails genutzt.</span>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 02 E-Mail -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">E-Mail</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="change_email" />
+          <div class="s-card__body">
+            <div class="field field--row">
+              <span class="field__label">Aktuell</span>
+              <div class="pr-readonly"><span>{currentEmail}</span></div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label" for="email">Neue E-Mail</label>
+              <div class="field__input-wrap">
+                <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
+                <span class="field__hint">Bestätigungs-Mail geht an die neue Adresse; aktiv erst nach Bestätigung.</span>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">E-Mail ändern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 03 Passwort -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Passwort</h2>
+          <span class="s-card__num">03</span>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="change_password" />
+          <div class="s-card__body">
+            <div class="field field--row">
+              <label class="field__label" for="password">Neues Passwort</label>
+              <div class="field__input-wrap">
+                <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" />
+                <span class="field__hint">Mindestens 8 Zeichen.</span>
+              </div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label" for="password_confirm">Wiederholen</label>
+              <div class="field__input-wrap">
+                <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" />
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Passwort ändern</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 04 Konto -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Konto</h2>
+          <span class="s-card__num">04</span>
+        </div>
+        <div class="s-card__body">
+          <div class="field field--row">
+            <span class="field__label">Rolle</span>
+            <div class="pr-readonly"><span>{roleLabel}</span></div>
+          </div>
+          <p class="field__hint" style="margin-top:4px">Zwei-Faktor-Authentifizierung folgt in Kürze. Abmelden über das Menü oben rechts.</p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  /* Read-only-Feld im V9-Stil (analog eve/settings ev-readonly-field). */
+  .pr-readonly {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink);
+  }
+  .v9-btn { min-height: 44px; }
+</style>
