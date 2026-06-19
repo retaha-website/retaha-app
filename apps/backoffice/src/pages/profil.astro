@@ -1,12 +1,13 @@
 ---
-// Mein Profil — V9-Kachelraster (Zustand zuerst, Bearbeiten auf Abruf).
-// Struktur an Apples „Persönliche Daten" angelehnt, Haut bleibt V9 (laut,
-// teenage-engineering). REINE Präsentation: Speicher-Logik unverändert
-// (user_profiles-Upsert RLS-scoped; Supabase-Auth updateUser für E-Mail/Passwort),
-// nur in die fokussierten Editoren verschoben. Rolle read-only. 2FA → eigene
-// Sektion (TwoFactorSection, #security-Anker — überall verlinkt).
+// Mein Profil — kanonische Account-Seite (app-übergreifend, auth-sensibel → nur
+// hier im BO, Guest/Dashboard verlinken per Cross-Link). V9, /breakfast-Kopf.
+//
+// Stammdaten (Vor-/Nachname) → user_profiles via RLS-Client (auth.uid()=user_id).
+// E-Mail/Passwort → Supabase Auth updateUser (kein eigenes Passwort-Handling).
+// Rolle → hotel_users.role (read-only). 2FA → konsolidiert in der Sicherheit-Karte
+// (TwoFactorSection) — Custom-TOTP via user_mfa, früher unter /sicherheit.
 import Layout from '../layouts/Layout.astro';
-import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance, ROLE_LABELS } from '@retaha/auth';
+import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
 import TwoFactorSection from '../components/profil/TwoFactorSection.astro';
 
@@ -15,13 +16,14 @@ if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
+// Spiegelt @retaha/auth ROLE_LABELS (owner|manager|staff).
+const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+
 let message: { type: 'success' | 'error'; text: string } | null = null;
-let attemptedAction: string | undefined;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('_action')?.toString();
-  attemptedAction = action;
 
   if (action === 'save_profile') {
     const first = (form.get('first_name')?.toString() ?? '').trim();
@@ -80,8 +82,7 @@ const firstName    = profile?.first_name ?? '';
 const lastName     = profile?.last_name ?? '';
 const currentEmail = user.email ?? '';
 const role         = (hotelUser?.role ?? 'staff') as string;
-const roleLabel    = (ROLE_LABELS as Record<string, string>)[role] ?? role;
-const fullName     = [firstName, lastName].filter(Boolean).join(' ');
+const roleLabel    = ROLE_LABELS[role] ?? role;
 
 // 2FA-Status (user_mfa ist Service-Role-verwaltet, RLS sperrt User-Lesezugriff) +
 // Hotel-Pflicht-Policy. isRequired hält den künftigen Pflicht-Redirect (?required=true).
@@ -92,14 +93,6 @@ const mfaEnabled        = mfaStatus?.enabled ?? false;
 const mfaRequired       = hotelPolicy?.required ?? false;
 const recoveryRemaining = mfaStatus?.recoveryCodesRemaining ?? 0;
 const isRequired        = Astro.url.searchParams.get('required') === 'true';
-
-// Bei Validierungsfehler öffnet der betroffene Editor nach dem Reload wieder.
-const errorTile = message?.type === 'error'
-  ? (attemptedAction === 'save_profile' ? 'name'
-    : attemptedAction === 'change_email' ? 'email'
-    : attemptedAction === 'change_password' ? 'password'
-    : null)
-  : null;
 ---
 
 <Layout title="Mein Profil" activeTab="backoffice">
@@ -125,136 +118,111 @@ const errorTile = message?.type === 'error'
 
     <div class="settings-sections">
 
-      <!-- 2×2-Kachelraster: Zustand zuerst, ein Editor zur Zeit -->
-      <div class="pr-grid" x-data={`{ open: ${JSON.stringify(errorTile)} }`}>
-
-        <!-- 01 NAME -->
-        <div class="pr-tile pr-tile--editable" x-bind:class="{ 'is-open': open === 'name' }">
-          <button
-            type="button" class="pr-tile__face"
-            x-show="open !== 'name'"
-            x-bind:aria-expanded="(open === 'name').toString()"
-            aria-controls="pr-ed-name"
-            x-on:click="open = 'name'; $nextTick(() => document.getElementById('first_name')?.focus())"
-          >
-            <span class="pr-tile__corner">
-              <svg class="pr-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              <span class="pr-tile__index">01</span>
-            </span>
-            <span class="pr-tile__label">Name</span>
-            <span class={`pr-tile__value${fullName ? '' : ' pr-tile__value--empty'}`}>{fullName || 'Noch nicht hinterlegt'}</span>
-          </button>
-
-          <div class="pr-tile__editor" id="pr-ed-name" x-show="open === 'name'" x-cloak>
-            <span class="pr-tile__label">Name bearbeiten</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="save_profile" />
-              <div class="pr-field">
-                <label class="pr-field__label" for="first_name">Vorname</label>
-                <input type="text" id="first_name" name="first_name" value={firstName} required maxlength="60" autocomplete="given-name" class="s-input" />
-              </div>
-              <div class="pr-field">
-                <label class="pr-field__label" for="last_name">Nachname</label>
-                <input type="text" id="last_name" name="last_name" value={lastName} required maxlength="60" autocomplete="family-name" class="s-input" />
-                <span class="field__hint">Wird für die persönliche Ansprache in E-Mails genutzt.</span>
-              </div>
-              <div class="pr-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
-                <button type="submit" class="v9-btn">Speichern</button>
-              </div>
-            </form>
-          </div>
+      <!-- 01 Stammdaten -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Stammdaten</h2>
+          <span class="s-card__num">01</span>
         </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="save_profile" />
+          <div class="s-card__body">
+            <div class="pr-grid2">
+              <div class="field">
+                <label class="field__label field__label--req" for="first_name">Vorname</label>
+                <div class="field__input-wrap">
+                  <input type="text" id="first_name" name="first_name" value={firstName} required maxlength="60" autocomplete="given-name" class="s-input" />
+                </div>
+              </div>
+              <div class="field">
+                <label class="field__label field__label--req" for="last_name">Nachname</label>
+                <div class="field__input-wrap">
+                  <input type="text" id="last_name" name="last_name" value={lastName} required maxlength="60" autocomplete="family-name" class="s-input" />
+                  <span class="field__hint">Wird für die persönliche Ansprache in E-Mails genutzt.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Speichern</button>
+          </div>
+        </form>
+      </section>
 
-        <!-- 02 E-MAIL -->
-        <div class="pr-tile pr-tile--editable" x-bind:class="{ 'is-open': open === 'email' }">
-          <button
-            type="button" class="pr-tile__face"
-            x-show="open !== 'email'"
-            x-bind:aria-expanded="(open === 'email').toString()"
-            aria-controls="pr-ed-email"
-            x-on:click="open = 'email'; $nextTick(() => document.getElementById('email')?.focus())"
-          >
-            <span class="pr-tile__corner">
-              <svg class="pr-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              <span class="pr-tile__index">02</span>
-            </span>
-            <span class="pr-tile__label">E-Mail</span>
-            <span class="pr-tile__value">{currentEmail}</span>
-          </button>
-
-          <div class="pr-tile__editor" id="pr-ed-email" x-show="open === 'email'" x-cloak>
-            <span class="pr-tile__label">E-Mail ändern</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="change_email" />
-              <div class="pr-field">
-                <span class="pr-field__label">Aktuell</span>
+      <!-- 02 E-Mail -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">E-Mail</h2>
+          <span class="s-card__num">02</span>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="change_email" />
+          <div class="s-card__body">
+            <div class="pr-grid2">
+              <div class="field">
+                <span class="field__label">Aktuell</span>
                 <div class="pr-readonly"><span>{currentEmail}</span></div>
               </div>
-              <div class="pr-field">
-                <label class="pr-field__label" for="email">Neue E-Mail</label>
-                <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
-                <span class="field__hint">Bestätigungs-Mail geht an die neue Adresse; aktiv erst nach Bestätigung.</span>
+              <div class="field">
+                <label class="field__label" for="email">Neue E-Mail</label>
+                <div class="field__input-wrap">
+                  <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
+                  <span class="field__hint">Bestätigungs-Mail geht an die neue Adresse; aktiv erst nach Bestätigung.</span>
+                </div>
               </div>
-              <div class="pr-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
-                <button type="submit" class="v9-btn">E-Mail ändern</button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-
-        <!-- 03 PASSWORT -->
-        <div class="pr-tile pr-tile--editable" x-bind:class="{ 'is-open': open === 'password' }">
-          <button
-            type="button" class="pr-tile__face"
-            x-show="open !== 'password'"
-            x-bind:aria-expanded="(open === 'password').toString()"
-            aria-controls="pr-ed-password"
-            x-on:click="open = 'password'; $nextTick(() => document.getElementById('password')?.focus())"
-          >
-            <span class="pr-tile__corner">
-              <svg class="pr-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              <span class="pr-tile__index">03</span>
-            </span>
-            <span class="pr-tile__label">Passwort</span>
-            <span class="pr-tile__value pr-tile__value--mask">••••••••</span>
-          </button>
-
-          <div class="pr-tile__editor" id="pr-ed-password" x-show="open === 'password'" x-cloak>
-            <span class="pr-tile__label">Passwort ändern</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="change_password" />
-              <div class="pr-field">
-                <label class="pr-field__label" for="password">Neues Passwort</label>
-                <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" />
-                <span class="field__hint">Mindestens 8 Zeichen.</span>
-              </div>
-              <div class="pr-field">
-                <label class="pr-field__label" for="password_confirm">Wiederholen</label>
-                <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" />
-              </div>
-              <div class="pr-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
-                <button type="submit" class="v9-btn">Passwort ändern</button>
-              </div>
-            </form>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">E-Mail ändern</button>
           </div>
-        </div>
+        </form>
+      </section>
 
-        <!-- 04 ROLLE (read-only) -->
-        <div class="pr-tile pr-tile--readonly">
-          <div class="pr-tile__face pr-tile__face--static">
-            <span class="pr-tile__corner">
-              <span class="pr-tile__index">04</span>
-            </span>
-            <span class="pr-tile__label">Rolle</span>
-            <span class="pr-tile__value">{roleLabel}</span>
-            <span class="pr-tile__hint">vom Hotel zugewiesen</span>
+      <!-- 03 Passwort -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Passwort</h2>
+          <span class="s-card__num">03</span>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="_action" value="change_password" />
+          <div class="s-card__body">
+            <div class="pr-grid2">
+              <div class="field">
+                <label class="field__label" for="password">Neues Passwort</label>
+                <div class="field__input-wrap">
+                  <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" />
+                  <span class="field__hint">Mindestens 8 Zeichen.</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field__label" for="password_confirm">Wiederholen</label>
+                <div class="field__input-wrap">
+                  <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+          <div class="s-card__footer">
+            <button type="submit" class="v9-btn">Passwort ändern</button>
+          </div>
+        </form>
+      </section>
 
-      </div>
+      <!-- 04 Konto -->
+      <section class="s-card">
+        <div class="s-card__head">
+          <h2 class="s-card__title">Konto</h2>
+          <span class="s-card__num">04</span>
+        </div>
+        <div class="s-card__body">
+          <div class="field">
+            <span class="field__label">Rolle</span>
+            <div class="pr-readonly pr-readonly--compact"><span>{roleLabel}</span></div>
+          </div>
+          <p class="field__hint" style="margin-top:4px">Abmelden über das Menü oben rechts.</p>
+        </div>
+      </section>
 
       <!-- 05 Sicherheit · 2FA -->
       <TwoFactorSection
@@ -277,91 +245,27 @@ const errorTile = message?.type === 'error'
 </Layout>
 
 <style>
-  [x-cloak] { display: none !important; }
+  /* Feld-Layout: zwei Felder pro Zeile (Desktop), label-on-top. Mobile 1 Spalte.
+     Reines Layout — V9-Tokens/Labels unverändert. */
+  .pr-grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 20px;
+    align-items: start;
+  }
+  @media (max-width: 600px) { .pr-grid2 { grid-template-columns: 1fr; } }
+  /* In der label-on-top-Anordnung sitzt das Label oben (kein --row-Offset). */
+  .pr-grid2 .field__label { padding-top: 0; }
 
-  /* ── Kachelraster: Desktop 2 Spalten · Mobile 1 ── */
-  .pr-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 18px; align-items: start;
-  }
-  @media (max-width: 768px) { .pr-grid { grid-template-columns: 1fr; } }
-
-  .pr-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    overflow: hidden;
-    transition: border-color 150ms ease;
-  }
-  .pr-tile.is-open { border-color: var(--te-yellow); }
-
-  /* Read-State (Klickziel bei editierbaren Kacheln) */
-  .pr-tile__face {
-    position: relative; display: flex; flex-direction: column; gap: 8px;
-    width: 100%; text-align: left;
-    padding: 24px 24px 26px;
-    background: transparent; border: none; font: inherit; color: inherit;
-    transition: background 150ms ease;
-  }
-  button.pr-tile__face { cursor: pointer; }
-  .pr-tile--editable:hover { border-color: var(--te-yellow); }
-  .pr-tile--editable:hover .pr-tile__face { background: var(--te-yellow-soft); }
-  .pr-tile--editable:hover .pr-tile__edit { color: var(--ink); }
-  .pr-tile__face:focus-visible {
-    outline: none; background: var(--te-yellow-soft);
-    box-shadow: inset 0 0 0 2px var(--te-yellow);
-  }
-
-  .pr-tile__corner {
-    position: absolute; top: 20px; right: 22px;
-    display: inline-flex; align-items: center; gap: 9px;
-  }
-  .pr-tile__edit { width: 15px; height: 15px; color: var(--ink-faint); transition: color 150ms ease; }
-  .pr-tile__index {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.2em; color: var(--ink-muted);
-  }
-
-  .pr-tile__label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-muted);
-  }
-  .pr-tile__value {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px; font-weight: 500; letter-spacing: -0.01em;
-    color: var(--ink); word-break: break-word; padding-right: 56px;
-  }
-  .pr-tile__value--empty { color: var(--ink-muted); font-weight: 400; }
-  .pr-tile__value--mask { letter-spacing: 0.18em; }
-  .pr-tile__hint {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.06em; color: var(--ink-faint); margin-top: 2px;
-  }
-  .pr-tile__face--static { cursor: default; }
-
-  /* Editor (Inline-Aufklappen) */
-  .pr-tile__editor {
-    display: flex; flex-direction: column; gap: 16px;
-    padding: 22px 24px 24px;
-  }
-  .pr-field { display: flex; flex-direction: column; gap: 6px; }
-  .pr-field__label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.08em; font-weight: 500; color: var(--ink);
-  }
-  .pr-editor__actions {
-    display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;
-  }
-
-  /* Read-only-Feld (E-Mail „Aktuell") im V9-Stil */
+  /* Read-only-Feld im V9-Stil (analog eve/settings ev-readonly-field). */
   .pr-readonly {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
     background: var(--bg-deep); border: 1px solid var(--border);
     border-radius: var(--r-sm); padding: 10px 14px;
     font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink);
-    word-break: break-word;
   }
+  /* Rolle: kompakt statt voll-breit leer (steht allein in der Zeile). */
+  .pr-readonly--compact { width: fit-content; min-width: 120px; }
 
   .v9-btn { min-height: 44px; }
 </style>
