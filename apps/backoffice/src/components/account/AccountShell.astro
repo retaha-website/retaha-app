@@ -37,7 +37,10 @@ const sub = subtitle ?? bt('hub.subtitle', lang);
         <span class="acct__avatar-cam" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </span>
-        <input type="file" accept="image/*" class="sr-only acct__avatar-input" aria-label={bt('hub.avatar.upload', lang)} />
+        <input type="file" accept="image/*" class="sr-only acct__avatar-input" aria-label={bt('hub.avatar.upload', lang)}
+          data-msg-success={bt('hub.upload.success', lang)}
+          data-msg-fail={bt('hub.upload.fail', lang)}
+          data-msg-error={bt('hub.upload.error', lang)} />
       </label>
       <div class="acct__user-meta">
         <span class="acct__user-name">{displayName}</span>
@@ -174,17 +177,18 @@ const sub = subtitle ?? bt('hub.subtitle', lang);
     input.addEventListener('change', async () => {
       const file = input.files?.[0];
       if (!file) return;
+      const ds = input.dataset;
       const toast = (window as any).retahaToast as ((m: string, t?: string) => void) | undefined;
       const fd = new FormData();
       fd.append('file', file);
       try {
         const res = await fetch('/api/account/avatar', { method: 'POST', body: fd });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Upload fehlgeschlagen');
-        toast?.('Profilfoto aktualisiert');
+        if (!res.ok) throw new Error(data.error || ds.msgFail || 'Upload fehlgeschlagen');
+        toast?.(ds.msgSuccess || 'Profilfoto aktualisiert');
         setTimeout(() => window.location.reload(), 500);
       } catch (err) {
-        toast?.(err instanceof Error ? err.message : 'Fehler beim Upload', 'error');
+        toast?.(err instanceof Error ? err.message : (ds.msgError || 'Fehler beim Upload'), 'error');
         input.value = '';
       }
     });
