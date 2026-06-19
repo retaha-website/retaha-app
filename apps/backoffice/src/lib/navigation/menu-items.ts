@@ -150,9 +150,9 @@ export const menuSections: MenuSection[] = [
         icon: icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
       },
       {
-        label: 'Team-Security',
-        sub: '2FA · MFA-Pflicht',
-        href: '/team-security',
+        label: 'Sicherheit & 2FA',
+        sub: '2FA · MFA-Pflicht · Session',
+        href: '/profil/sicherheit',
         icon: icon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
       },
     ],
@@ -200,17 +200,6 @@ export const menuSections: MenuSection[] = [
         sub: 'Automatisierter Check-out',
         href: '/self-checkout',
         icon: icon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
-      },
-    ],
-  },
-  {
-    title: 'Sicherheit',
-    items: [
-      {
-        label: 'Audit-Log',
-        sub: 'Aktivitäten · Zugriffe',
-        href: '/team-security',
-        icon: icon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>'),
       },
     ],
   },

@@ -1,15 +1,17 @@
 ---
-// Shared floating Toast — Single Source of Truth fuer Save-/Aktions-Bestaetigungen.
+// Shared floating Toast — Single Source of Truth für Save-/Aktions-Bestätigungen.
+// Zentrale Komponente; von allen Apps via window.retahaToast(...) genutzt — nicht duplizieren.
 //
-// Trigger (ueberall):  window.retahaToast(message, type?)
-//   type: 'success' (default) | 'error'
-//   success = v9-Gelb (--te-yellow) + Ink-Text/-Icon (Check)  → z.B. "Gespeichert"
-//   error   = Pink (--pink) + weisser Text/-Icon (Alert)
-// Auch via Event:  document.dispatchEvent(new CustomEvent('retaha:toast', { detail: { message, type } }))
+// Trigger (überall):  window.retahaToast(message, type?, opts?)
+//   message: string (Haupttext, bzw. Subtext wenn opts.title gesetzt)
+//   type:    'success' (default) | 'error'
+//   opts:    { title?, action?: { label, href?, onClick? }, persist?, duration? }
+//   Event-API:  document.dispatchEvent(new CustomEvent('retaha:toast', { detail: { message, type, ...opts } }))
 //
-// Position: fixed unten rechts, z-index ueber Content, Mobile-Safe-Areas.
-// Verhalten: Auto-Dismiss nach 3.5s + X-Button (aria-label="Schliessen"). Stapelbar.
-// A11y: Container role="status" aria-live="polite" (kein Fokus-Diebstahl).
+// Success = Sage (#5C9070) + Check, Auto-Dismiss ~5s mit Progress-Bar (Hover pausiert Bar + Timer).
+// Error   = Pink (--pink) + pulsierendes Dreieck, KEIN Auto-Dismiss, immer Action ("Erneut versuchen →").
+// Position: fixed unten rechts, gestapelt (max. 3 sichtbar, sonst „+N weitere").
+// A11y: Container role="status" aria-live="polite". Auto-Dismiss + X-Button (aria-label="Schließen").
 ---
 
 <div id="retaha-toast-root" class="retaha-toast-root" role="status" aria-live="polite"></div>
@@ -22,44 +24,81 @@
     z-index: 9999;
     display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
     pointer-events: none;
+    max-width: min(380px, calc(100vw - 32px));
   }
   .retaha-toast {
-    pointer-events: auto;
-    display: inline-flex; align-items: center; gap: 10px;
-    padding: 11px 10px 11px 15px;
-    border-radius: var(--r-sm, 12px);
+    pointer-events: auto; position: relative; overflow: hidden;
+    display: flex; align-items: flex-start; gap: 11px;
+    padding: 13px 12px 14px 15px;
+    border-radius: var(--r-sm, 10px);
     font-family: 'Space Grotesk', system-ui, sans-serif;
-    font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.16);
-    max-width: min(360px, calc(100vw - 32px));
+    color: #FFFFFF;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    width: 320px; max-width: 100%;
     opacity: 0; transform: translateY(10px);
     transition: opacity 200ms ease, transform 200ms ease;
   }
-  .retaha-toast.is-in { opacity: 1; transform: translateY(0); }
-  .retaha-toast--success { background: var(--te-yellow, #FFE600); color: #0A0A0A; }
-  .retaha-toast--error   { background: var(--pink, #FF4A82); color: #FFFFFF; }
-  .retaha-toast__icon { flex-shrink: 0; display: inline-flex; }
-  .retaha-toast__msg  { line-height: 1.35; }
+  .retaha-toast.is-in  { opacity: 1; transform: translateY(0); }
+  .retaha-toast.is-out { opacity: 0; transform: translateY(10px); }
+  .retaha-toast--success { background: #5C9070; }
+  .retaha-toast--error   { background: var(--pink, #FF4A82); }
+
+  .retaha-toast__icon { flex-shrink: 0; display: inline-flex; margin-top: 1px; }
+  .retaha-toast__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .retaha-toast__title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+  .retaha-toast__msg   { font-size: 12.5px; font-weight: 400; line-height: 1.4; color: rgba(255,255,255,0.92); word-break: break-word; }
+  .retaha-toast__action {
+    align-self: flex-start; margin-top: 8px;
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,0.18); color: #FFFFFF;
+    border: none; border-radius: 7px; padding: 6px 11px;
+    font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+    text-decoration: none; transition: background 150ms ease;
+  }
+  .retaha-toast__action:hover { background: rgba(255,255,255,0.30); }
   .retaha-toast__close {
-    flex-shrink: 0; width: 22px; height: 22px; margin-left: 2px;
+    flex-shrink: 0; width: 22px; height: 22px; margin: -2px -2px 0 0;
     display: inline-flex; align-items: center; justify-content: center;
     background: transparent; border: none; cursor: pointer;
-    color: currentColor; opacity: 0.65; border-radius: 6px;
-    font-size: 17px; line-height: 1;
+    color: currentColor; opacity: 0.7; border-radius: 6px; font-size: 17px; line-height: 1;
   }
   .retaha-toast__close:hover { opacity: 1; }
   .retaha-toast__close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+  .retaha-toast__bar {
+    position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+    background: rgba(255,255,255,0.55); transform-origin: left center; transform: scaleX(1);
+  }
+  .retaha-toast__bar.run { animation: retahaToastBar var(--toast-dur, 5000ms) linear forwards; }
+  .retaha-toast.is-paused .retaha-toast__bar { animation-play-state: paused; }
+  @keyframes retahaToastBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  .retaha-toast__tri { animation: retahaTriPulse 1.4s ease-in-out infinite; transform-origin: center; }
+  @keyframes retahaTriPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.82); } }
+
+  .retaha-toast-more {
+    pointer-events: auto; align-self: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+    color: var(--ink-muted, rgba(10,10,10,0.5));
+    background: var(--surface, #FFFFFF); border: 1px solid var(--border, rgba(10,10,10,0.1));
+    border-radius: 99px; padding: 4px 12px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .retaha-toast { transition: opacity 140ms ease; transform: none; }
-    .retaha-toast.is-in { transform: none; }
+    .retaha-toast.is-in, .retaha-toast.is-out { transform: none; }
+    .retaha-toast__tri { animation: none; }
+    .retaha-toast__bar.run { animation: none; }
   }
 </style>
 
 <script is:inline>
   (function () {
     if (window.retahaToast) return;
+    var MAX_VISIBLE = 3;
     var CHECK = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>';
-    var ALERT = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 14h.01"/></svg>';
+    var TRI = '<svg class="retaha-toast__tri" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3 L18 17 H2 Z" stroke-linejoin="round"/><line x1="10" y1="8.5" x2="10" y2="12" stroke-linecap="round"/><circle cx="10" cy="14.6" r="0.6" fill="currentColor"/></svg>';
+
     function ensureRoot() {
       var r = document.getElementById('retaha-toast-root');
       if (!r) {
@@ -72,41 +111,112 @@
       }
       return r;
     }
-    window.retahaToast = function (message, type) {
+
+    // Max. 3 sichtbar; ältere ausblenden + „+N weitere"-Chip oben anzeigen.
+    function refreshOverflow(root) {
+      var toasts = Array.prototype.slice.call(root.querySelectorAll('.retaha-toast'));
+      var hidden = toasts.length - MAX_VISIBLE;
+      toasts.forEach(function (t, i) { t.style.display = (i < hidden) ? 'none' : ''; });
+      var more = root.querySelector('.retaha-toast-more');
+      if (hidden > 0) {
+        if (!more) { more = document.createElement('div'); more.className = 'retaha-toast-more'; }
+        root.insertBefore(more, root.firstChild);
+        more.textContent = '+' + hidden + ' weitere';
+      } else if (more) {
+        more.remove();
+      }
+    }
+
+    window.retahaToast = function (message, type, opts) {
       try {
-        if (!message) return;
+        opts = opts || {};
+        if (!message && !opts.title) return;
         type = type === 'error' ? 'error' : 'success';
         var root = ensureRoot();
+
         var el = document.createElement('div');
         el.className = 'retaha-toast retaha-toast--' + type;
+
         var icon = document.createElement('span');
         icon.className = 'retaha-toast__icon';
         icon.setAttribute('aria-hidden', 'true');
-        icon.innerHTML = type === 'error' ? ALERT : CHECK;
-        var msg = document.createElement('span');
-        msg.className = 'retaha-toast__msg';
-        msg.textContent = String(message);
+        icon.innerHTML = type === 'error' ? TRI : CHECK;
+        el.appendChild(icon);
+
+        var body = document.createElement('div');
+        body.className = 'retaha-toast__body';
+        var titleEl = document.createElement('span');
+        titleEl.className = 'retaha-toast__title';
+        titleEl.textContent = opts.title ? String(opts.title) : String(message);
+        body.appendChild(titleEl);
+        if (opts.title && message) {
+          var msgEl = document.createElement('span');
+          msgEl.className = 'retaha-toast__msg';
+          msgEl.textContent = String(message);
+          body.appendChild(msgEl);
+        }
+
+        var persist = (opts.persist != null) ? !!opts.persist : (type === 'error');
+        var action = opts.action;
+        if (!action && type === 'error') {
+          action = { label: 'Erneut versuchen', onClick: function () { window.location.assign(window.location.pathname + window.location.search); } };
+        }
+        if (action) {
+          var aEl;
+          if (action.href) { aEl = document.createElement('a'); aEl.href = action.href; }
+          else { aEl = document.createElement('button'); aEl.type = 'button'; }
+          aEl.className = 'retaha-toast__action';
+          aEl.innerHTML = '<span></span> <span aria-hidden="true">→</span>';
+          aEl.firstChild.textContent = action.label || 'Erneut versuchen';
+          if (action.onClick) aEl.addEventListener('click', action.onClick);
+          body.appendChild(aEl);
+        }
+        el.appendChild(body);
+
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'retaha-toast__close';
         close.setAttribute('aria-label', 'Schließen');
         close.innerHTML = '×';
-        el.appendChild(icon); el.appendChild(msg); el.appendChild(close);
+        el.appendChild(close);
+
+        var bar = null;
+        if (!persist) {
+          var dur = opts.duration || 5000;
+          el.style.setProperty('--toast-dur', dur + 'ms');
+          bar = document.createElement('span');
+          bar.className = 'retaha-toast__bar';
+          el.appendChild(bar);
+        }
+
         root.appendChild(el);
+        refreshOverflow(root);
         requestAnimationFrame(function () { el.classList.add('is-in'); });
-        var timer;
+
+        var dismissed = false;
         function dismiss() {
-          if (timer) { clearTimeout(timer); timer = null; }
-          el.classList.remove('is-in');
-          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 240);
+          if (dismissed) return; dismissed = true;
+          el.classList.remove('is-in'); el.classList.add('is-out');
+          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); refreshOverflow(root); }, 240);
         }
         close.addEventListener('click', dismiss);
-        timer = setTimeout(dismiss, 3500);
+
+        if (bar) {
+          requestAnimationFrame(function () { bar.classList.add('run'); });
+          bar.addEventListener('animationend', dismiss);
+          el.addEventListener('mouseenter', function () { el.classList.add('is-paused'); });
+          el.addEventListener('mouseleave', function () { el.classList.remove('is-paused'); });
+          // Fallback bei reduzierter Bewegung (Bar-Animation deaktiviert → kein animationend).
+          var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (reduced) setTimeout(dismiss, opts.duration || 5000);
+        }
+        return dismiss;
       } catch (_) {}
     };
+
     document.addEventListener('retaha:toast', function (e) {
       var d = (e && e.detail) || {};
-      window.retahaToast(d.message, d.type);
+      window.retahaToast(d.message, d.type, d);
     });
   })();
 </script>

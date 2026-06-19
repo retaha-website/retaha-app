@@ -15,8 +15,9 @@ interface Props {
   mfaRequired: boolean;
   recoveryRemaining: number;
   isRequired?: boolean;
+  magicLinkEnabled?: boolean;
 }
-const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false } = Astro.props;
+const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLinkEnabled = false } = Astro.props;
 ---
 
 <section class="s-card" id="security">
@@ -33,14 +34,36 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false } = Astro
     )}
 
     {mfaEnabled ? (
-      <div x-data="{ code: '', busy: false }">
+      <div x-data={`{
+        code: '', busy: false,
+        magicLink: ${magicLinkEnabled}, mlBusy: false,
+        toggleMagicLink(ev) {
+          const val = ev.target.checked;
+          this.magicLink = val; this.mlBusy = true;
+          fetch('/api/mfa/policy/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setting: 'magic_link', value: val }) })
+            .then(r => r.json()).then(d => {
+              if (d.ok) { window.retahaToast && window.retahaToast('Gespeichert'); }
+              else { this.magicLink = !val; window.retahaToast && window.retahaToast(d.message || 'Änderung fehlgeschlagen.', 'error'); }
+            }).catch(() => { this.magicLink = !val; window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); })
+            .finally(() => { this.mlBusy = false; });
+        }
+      }`}>
         <div class="sec-active-row">
           <span class="sec-active-badge">✓ 2FA aktiv</span>
           <span class="sec-active-meta">{recoveryRemaining} {recoveryRemaining === 1 ? 'Recovery-Code' : 'Recovery-Codes'} übrig</span>
         </div>
-        <p class="field__hint" style="margin: 6px 0 18px">
+        <p class="field__hint" style="margin: 6px 0 16px">
           Dein retaha-Konto ist mit Zwei-Faktor-Authentifizierung geschützt.
         </p>
+
+        <div class="sec-magiclink">
+          <label class="toggle-row">
+            <input type="checkbox" class="sr-only" x-bind:checked="magicLink" x-bind:disabled="mlBusy" x-on:change="toggleMagicLink($event)" />
+            <span class="bt-visual" x-bind:class="{ 'is-checked': magicLink }"><span class="bt-knob"></span></span>
+            <span class="toggle-label">2FA auch beim Magic-Link-Login verlangen</span>
+          </label>
+          <p class="field__hint" style="margin-top:6px">Auch bei Anmeldung per E-Mail-Link nach dem 6-stelligen Code fragen — maximale Sicherheit.</p>
+        </div>
 
         {mfaRequired ? (
           <div class="sec-enforcement">
@@ -303,6 +326,7 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false } = Astro
     padding: 4px 10px; border-radius: 99px;
   }
   .sec-active-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); }
+  .sec-magiclink { border-top: 1px solid var(--border); padding-top: 16px; margin: 4px 0 16px; }
   .sec-disable { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px; }
   .sec-disable-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
   .sec-disable-input { max-width: 140px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; text-align: center; }
