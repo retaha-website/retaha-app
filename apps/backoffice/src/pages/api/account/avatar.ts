@@ -3,13 +3,17 @@
  *
  * Profilfoto hochladen/ersetzen oder entfernen. User-Level (kein Hotel).
  * Speicherung: branding-assets-Bucket unter avatars/{user_id}/ (public, Upload
- * via Service-Role). URL landet in auth.users.user_metadata.avatar_url —
- * KEINE Tabellen-/RLS-Migration nötig.
+ * via Service-Role). URL in auth.users.user_metadata.avatar_url — KEINE
+ * Tabellen-/RLS-Migration.
+ *
+ * Metadaten-Update via Admin-API (Service-Role): der Server-Client hat nur den
+ * Token als Header, aber KEINE Auth-Session → client.auth.updateUser() würde
+ * „Auth session missing!" werfen. admin.updateUserById umgeht das.
  *
  * Body (multipart): file (Bild) ODER delete=true.
  */
 import type { APIRoute } from 'astro';
-import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUser, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const BUCKET = 'branding-assets';
@@ -26,11 +30,14 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   try { form = await request.formData(); }
   catch { return json({ error: 'Ungültige Eingabe' }, 400); }
 
-  const client = createSupabaseServerInstance(cookies, request);
+  const service = createSupabaseServiceRoleInstance();
+  const existingMeta = (user.user_metadata ?? {}) as Record<string, unknown>;
 
   // ── Entfernen ──
   if (form.get('delete') === 'true') {
-    const { error } = await client.auth.updateUser({ data: { avatar_url: null } });
+    const { error } = await service.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...existingMeta, avatar_url: null },
+    });
     if (error) return json({ error: error.message }, 500);
     return json({ url: null }, 200);
   }
@@ -44,7 +51,6 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const ext = (file.name.split('.').pop()?.toLowerCase() || 'png').replace(/[^a-z0-9]/g, '') || 'png';
   const path = `avatars/${user.id}/avatar-${Date.now()}.${ext}`;
 
-  const service = createSupabaseServiceRoleInstance();
   const { error: upErr } = await service.storage
     .from(BUCKET)
     .upload(path, file, { cacheControl: '31536000', upsert: true, contentType: file.type });
@@ -52,7 +58,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const { data: { publicUrl } } = service.storage.from(BUCKET).getPublicUrl(path);
 
-  const { error: updErr } = await client.auth.updateUser({ data: { avatar_url: publicUrl } });
+  const { error: updErr } = await service.auth.admin.updateUserById(user.id, {
+    user_metadata: { ...existingMeta, avatar_url: publicUrl },
+  });
   if (updErr) return json({ error: updErr.message }, 500);
 
   return json({ url: publicUrl }, 200);
