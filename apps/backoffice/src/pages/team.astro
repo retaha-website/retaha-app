@@ -87,7 +87,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
         <p class="acct__section-desc">Mitarbeiter dieses Hotels — Rollen, Einladungen, Zugriff.</p>
       </div>
 
-      <div x-data={`teamPage({ canInvite: ${canInvite}, canChangeRole: ${canChangeRole}, canRemove: ${canRemove}, myUserId: ${JSON.stringify(user.id)} })`}>
+      <div x-data="teamPage()">
 
         <div class="settings-sections">
 
@@ -145,7 +145,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
             </div>
             {canInvite && (
               <div class="s-card__footer">
-                <button type="button" @click="openInvite = true" class="v9-btn v9-btn--primary">
+                <button type="button" id="tm-invite-open" class="v9-btn v9-btn--primary">
                   + Mitarbeiter einladen
                 </button>
               </div>
@@ -194,25 +194,25 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 
         </div>{/* .settings-sections */}
 
-        <!-- Invite-Modal -->
+        <!-- Invite-Modal — reines Vanilla-JS (Alpine-unabhängig, siehe Script unten) -->
         {canInvite && (
-          <div x-show="openInvite" x-cloak class="bp-modal-bd" @click.self="openInvite = false">
-            <div class="bp-modal" role="dialog" aria-modal="true" @click.stop>
+          <div id="tm-invite-modal" class="bp-modal-bd">
+            <div class="bp-modal" role="dialog" aria-modal="true">
               <div class="bp-modal-head">
                 <h3 class="bp-modal-title">Mitarbeiter einladen</h3>
-                <button type="button" @click="openInvite = false" class="bp-modal-x" aria-label="Schließen">✕</button>
+                <button type="button" class="bp-modal-x tm-invite-close" aria-label="Schließen">✕</button>
               </div>
               <div class="bp-modal-body">
-                <div x-show="inviteError" x-cloak style="margin-bottom:12px">
-                  <p class="s-flash s-flash--err" x-text="inviteError" style="margin:0"></p>
+                <div id="tm-invite-error" class="tm-invite-error" hidden style="margin-bottom:12px">
+                  <p class="s-flash s-flash--err" style="margin:0"></p>
                 </div>
                 <label class="tm-field">
                   <span class="tm-field-label">E-Mail</span>
-                  <input type="email" x-model="inviteEmail" placeholder="kollege@hotel.de" class="s-input" />
+                  <input type="email" id="tm-invite-email" placeholder="kollege@hotel.de" class="s-input" />
                 </label>
                 <label class="tm-field">
                   <span class="tm-field-label">Rolle</span>
-                  <select x-model="inviteRole" class="s-select">
+                  <select id="tm-invite-role" class="s-select">
                     <option value="manager">Manager (Inhalte + Settings + Operations)</option>
                     <option value="staff">Front-Desk (nur Operations)</option>
                   </select>
@@ -223,11 +223,8 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                 </p>
               </div>
               <div class="bp-modal-foot">
-                <button type="button" @click="openInvite = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
-                <button type="button" @click="sendInvite()" :disabled="isSending" class="v9-btn v9-btn--primary">
-                  <span x-show="!isSending">Einladung senden</span>
-                  <span x-show="isSending" x-cloak>Sende …</span>
-                </button>
+                <button type="button" class="v9-btn v9-btn--ghost tm-invite-close">Abbrechen</button>
+                <button type="button" id="tm-invite-send" class="v9-btn v9-btn--primary">Einladung senden</button>
               </div>
             </div>
           </div>
@@ -279,9 +276,10 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 .bp-modal-bd {
   position: fixed; inset: 0; z-index: 900;
   background: rgba(10,10,10,0.45);
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   padding: 20px; box-sizing: border-box;
 }
+.bp-modal-bd.is-open { display: flex; }
 .bp-modal {
   background: var(--surface, #FAFAF8); border: 1px solid var(--border);
   border-radius: var(--r, 8px); width: 100%; max-width: 480px;
@@ -320,45 +318,9 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
   // x-data findet die Komponente nicht → Buttons tot. (Muster wie nfc-tags.)
   document.addEventListener('alpine:init', () => {
   // @ts-expect-error - Alpine global (vom Layout gesetzt)
-  window.Alpine.data('teamPage', (init: any) => ({
-    canInvite: init.canInvite,
-    canChangeRole: init.canChangeRole,
-    canRemove: init.canRemove,
-    myUserId: init.myUserId,
-    openInvite: false,
-    inviteEmail: '',
-    inviteRole: 'staff' as 'manager' | 'staff',
-    inviteError: '',
-    isSending: false,
-
+  window.Alpine.data('teamPage', () => ({
     showToast(msg: string, kind: 'ok' | 'err' = 'ok') {
       (window as any).retahaToast?.(msg, kind === 'err' ? 'error' : 'success');
-    },
-
-    async sendInvite() {
-      this.inviteError = '';
-      const email = this.inviteEmail.trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        this.inviteError = 'Bitte eine gültige E-Mail eingeben.';
-        return;
-      }
-      this.isSending = true;
-      try {
-        const res = await fetch('/api/admin/team/invite', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, role: this.inviteRole }),
-        });
-        const data = await res.json();
-        if (!data.ok) { this.inviteError = data.message || data.error || 'Fehler.'; return; }
-        this.openInvite = false;
-        this.inviteEmail = '';
-        this.showToast(`${email} eingeladen — Magic-Link versendet.`);
-        setTimeout(() => window.location.reload(), 600);
-      } catch (err: any) {
-        this.inviteError = 'Netzwerk-Fehler: ' + (err.message ?? err);
-      } finally {
-        this.isSending = false;
-      }
     },
 
     async changeRole(ev: Event) {
@@ -402,4 +364,53 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
     },
   }));
   });
+</script>
+
+<script>
+  // Invite-Modal: reines Vanilla-JS — bewusst UNABHÄNGIG von Alpine (Open/Close +
+  // Submit funktionieren auch, falls Alpine auf der Seite nicht initialisiert).
+  // Endpoint /api/admin/team/invite bleibt unverändert.
+  (() => {
+    const openBtn = document.getElementById('tm-invite-open');
+    const modal = document.getElementById('tm-invite-modal');
+    if (!openBtn || !modal) return;
+    const emailInput = document.getElementById('tm-invite-email') as HTMLInputElement | null;
+    const roleSelect = document.getElementById('tm-invite-role') as HTMLSelectElement | null;
+    const sendBtn = document.getElementById('tm-invite-send') as HTMLButtonElement | null;
+    const errorBox = document.getElementById('tm-invite-error');
+    const errorMsg = errorBox ? errorBox.querySelector('p') : null;
+
+    const showError = (msg: string) => {
+      if (errorBox && errorMsg) { errorMsg.textContent = msg; errorBox.hidden = false; }
+    };
+    const open = () => { modal.classList.add('is-open'); setTimeout(() => emailInput?.focus(), 50); };
+    const close = () => { modal.classList.remove('is-open'); if (errorBox) errorBox.hidden = true; };
+
+    openBtn.addEventListener('click', open);
+    modal.querySelectorAll('.tm-invite-close').forEach((b) => b.addEventListener('click', close));
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('is-open')) close(); });
+
+    sendBtn?.addEventListener('click', async () => {
+      const email = (emailInput?.value || '').trim();
+      const role = roleSelect?.value || 'staff';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('Bitte eine gültige E-Mail eingeben.'); return; }
+      sendBtn.disabled = true;
+      const orig = sendBtn.textContent;
+      sendBtn.textContent = 'Sende …';
+      try {
+        const res = await fetch('/api/admin/team/invite', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role }),
+        });
+        const data = await res.json();
+        if (!data.ok) { showError(data.message || data.error || 'Einladung fehlgeschlagen.'); sendBtn.disabled = false; sendBtn.textContent = orig; return; }
+        (window as any).retahaToast?.(`${email} eingeladen — Magic-Link versendet.`);
+        setTimeout(() => window.location.reload(), 600);
+      } catch {
+        showError('Netzwerk-Fehler.');
+        sendBtn.disabled = false; sendBtn.textContent = orig;
+      }
+    });
+  })();
 </script>
