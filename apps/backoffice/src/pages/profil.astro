@@ -7,6 +7,8 @@
 import Layout from '../layouts/Layout.astro';
 import AccountShell from '../components/account/AccountShell.astro';
 import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { createClient } from '@supabase/supabase-js';
+import { getEnv } from '@retaha/db';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -59,19 +61,52 @@ if (Astro.request.method === 'POST') {
   }
 
   else if (action === 'change_password') {
+    const current = form.get('current_password')?.toString() ?? '';
     const pw  = form.get('password')?.toString() ?? '';
     const pw2 = form.get('password_confirm')?.toString() ?? '';
-    if (pw.length < 8) {
-      message = { type: 'error', text: 'Passwort muss mindestens 8 Zeichen haben.' };
+    if (!current) {
+      message = { type: 'error', text: 'Bitte zuerst dein aktuelles Passwort eingeben.' };
+    } else if (pw.length < 8) {
+      message = { type: 'error', text: 'Neues Passwort muss mindestens 8 Zeichen haben.' };
     } else if (pw !== pw2) {
       message = { type: 'error', text: 'Die Passwörter stimmen nicht überein.' };
     } else {
+      // Aktuelles Passwort verifizieren (Re-Auth) über einen frischen Anon-Client
+      // — signInWithPassword berührt die laufende Session nicht.
+      const url = getEnv('PUBLIC_SUPABASE_URL');
+      const anon = getEnv('PUBLIC_SUPABASE_ANON_KEY');
+      const check = (url && anon)
+        ? await createClient(url, anon).auth.signInWithPassword({ email: user.email, password: current })
+        : { error: { message: 'config' } } as { error: { message: string } };
+      if (check.error) {
+        message = { type: 'error', text: 'Aktuelles Passwort ist falsch.' };
+      } else {
+        const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
+          user.id, { password: pw },
+        );
+        message = error
+          ? { type: 'error', text: `Passwort-Änderung fehlgeschlagen: ${error.message}` }
+          : { type: 'success', text: 'Passwort geändert.' };
+      }
+    }
+  }
+
+  else if (action === 'save_secondary_email') {
+    const remove = form.get('remove') === 'true';
+    const sec = (form.get('secondary_email')?.toString() ?? '').trim();
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+    if (!remove && (!sec || !sec.includes('@'))) {
+      message = { type: 'error', text: 'Bitte eine gültige sekundäre E-Mail eingeben.' };
+    } else if (!remove && sec.toLowerCase() === (user.email ?? '').toLowerCase()) {
+      message = { type: 'error', text: 'Sekundäre E-Mail muss sich von der primären unterscheiden.' };
+    } else {
       const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
-        user.id, { password: pw },
+        user.id, { user_metadata: { ...meta, secondary_email: remove ? null : sec } },
       );
       message = error
-        ? { type: 'error', text: `Passwort-Änderung fehlgeschlagen: ${error.message}` }
-        : { type: 'success', text: 'Passwort geändert.' };
+        ? { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` }
+        : { type: 'success', text: remove ? 'Sekundäre E-Mail entfernt.' : 'Sekundäre E-Mail gespeichert.' };
+      if (!error) (user.user_metadata as Record<string, unknown>).secondary_email = remove ? null : sec;
     }
   }
 }
@@ -89,11 +124,12 @@ const roleLabel    = ROLE_LABELS[role] ?? role;
 const fullName     = [firstName, lastName].filter(Boolean).join(' ');
 const initials     = (firstName.charAt(0) || currentEmail.charAt(0)).toUpperCase();
 const avatarUrl    = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
+const secondaryEmail = ((user.user_metadata as Record<string, unknown> | undefined)?.secondary_email as string | undefined) ?? null;
 
 // Bei Validierungsfehler öffnet der betroffene Editor nach dem Reload wieder.
 const errorTile = message?.type === 'error'
   ? (attemptedAction === 'save_profile' ? 'name'
-    : attemptedAction === 'change_email' ? 'email'
+    : (attemptedAction === 'change_email' || attemptedAction === 'save_secondary_email') ? 'email'
     : attemptedAction === 'change_password' ? 'password'
     : null)
   : null;
@@ -114,7 +150,7 @@ const errorTile = message?.type === 'error'
         <p class="acct__section-desc">Dein persönliches retaha-Konto — Name, E-Mail, Passwort.</p>
       </div>
 
-      <div class="acct-tiles" x-data={`{ open: ${JSON.stringify(errorTile)} }`}>
+      <div class="acct-tiles" x-data={`{ open: ${JSON.stringify(errorTile)}, pwCurrent: '' }`}>
 
         <!-- NAME -->
         <div class="acct-tile acct-tile--editable" x-bind:class="{ 'is-open': open === 'name' }">
@@ -193,6 +229,25 @@ const errorTile = message?.type === 'error'
                 <button type="submit" class="v9-btn">E-Mail ändern</button>
               </div>
             </form>
+
+            <div class="acct-divider"></div>
+
+            <form method="POST">
+              <input type="hidden" name="_action" value="save_secondary_email" />
+              <div class="field">
+                <label class="field__label" for="secondary_email">Sekundäre E-Mail{secondaryEmail ? ' · gesetzt' : ''}</label>
+                <div class="field__input-wrap">
+                  <input type="email" id="secondary_email" name="secondary_email" value={secondaryEmail ?? ''} placeholder="backup@beispiel.de" autocomplete="email" class="s-input" />
+                </div>
+                <span class="field__hint">Optionale Backup-Adresse für dein Konto.</span>
+              </div>
+              <div class="acct-editor__actions">
+                {secondaryEmail && (
+                  <button type="submit" name="remove" value="true" class="v9-btn v9-btn--ghost">Entfernen</button>
+                )}
+                <button type="submit" class="v9-btn">{secondaryEmail ? 'Aktualisieren' : 'Sekundäre Mail hinzufügen'}</button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -202,7 +257,7 @@ const errorTile = message?.type === 'error'
             type="button" class="acct-tile__face"
             x-show="open !== 'password'"
             x-bind:aria-expanded="(open === 'password').toString()" aria-controls="ed-password"
-            x-on:click="open = 'password'; $nextTick(() => document.getElementById('password')?.focus())"
+            x-on:click="open = 'password'; pwCurrent = ''; $nextTick(() => document.getElementById('current_password')?.focus())"
           >
             <span class="acct-tile__corner">
               <svg class="acct-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -214,24 +269,31 @@ const errorTile = message?.type === 'error'
             <span class="acct-tile__label">Passwort ändern</span>
             <form method="POST">
               <input type="hidden" name="_action" value="change_password" />
+              <div class="field">
+                <label class="field__label field__label--req" for="current_password">Aktuelles Passwort</label>
+                <div class="field__input-wrap">
+                  <input type="password" id="current_password" name="current_password" autocomplete="current-password" class="s-input" x-model="pwCurrent" />
+                </div>
+                <span class="field__hint">Sicherheits-Check: zuerst dein aktuelles Passwort bestätigen.</span>
+              </div>
               <div class="acct-row2">
                 <div class="field">
                   <label class="field__label" for="password">Neues Passwort</label>
                   <div class="field__input-wrap">
-                    <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" />
+                    <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
                   </div>
                 </div>
                 <div class="field">
                   <label class="field__label" for="password_confirm">Wiederholen</label>
                   <div class="field__input-wrap">
-                    <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" />
+                    <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
                   </div>
                 </div>
               </div>
-              <span class="field__hint">Mindestens 8 Zeichen.</span>
+              <span class="field__hint">Neues Passwort: mindestens 8 Zeichen.</span>
               <div class="acct-editor__actions">
                 <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
-                <button type="submit" class="v9-btn">Passwort ändern</button>
+                <button type="submit" class="v9-btn" x-bind:disabled="!pwCurrent">Passwort ändern</button>
               </div>
             </form>
           </div>
@@ -253,9 +315,8 @@ const errorTile = message?.type === 'error'
 </Layout>
 
 <style>
-  /* ── Konto-Kacheln (Zustand-zuerst, alle gleich groß) ── */
-  .acct-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
-  @media (max-width: 560px) { .acct-tiles { grid-template-columns: 1fr; } }
+  /* ── Konto-Kacheln (Zustand-zuerst, einspaltig + schmal) ── */
+  .acct-tiles { display: grid; grid-template-columns: 1fr; gap: 14px; }
 
   .acct-tile {
     background: var(--surface); border: 1px solid var(--border);
@@ -264,9 +325,8 @@ const errorTile = message?.type === 'error'
   .acct-tile.is-open { border-color: var(--te-yellow); }
 
   .acct-tile__face {
-    position: relative; display: flex; flex-direction: column; gap: 12px;
-    width: 100%; min-height: 150px; box-sizing: border-box;
-    text-align: left; padding: 34px 32px 36px;
+    position: relative; display: flex; flex-direction: column; gap: 7px;
+    width: 100%; text-align: left; padding: 18px 24px 20px;
     background: transparent; border: none; font: inherit; color: inherit;
     transition: background 150ms ease;
   }
@@ -280,7 +340,7 @@ const errorTile = message?.type === 'error'
   }
   .acct-tile__face--static { cursor: default; }
 
-  .acct-tile__corner { position: absolute; top: 30px; right: 30px; display: inline-flex; align-items: center; gap: 8px; }
+  .acct-tile__corner { position: absolute; top: 18px; right: 22px; display: inline-flex; align-items: center; gap: 8px; }
   .acct-tile__edit { width: 15px; height: 15px; color: var(--ink-faint); transition: color 150ms ease; }
   .acct-tile__label {
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -302,8 +362,9 @@ const errorTile = message?.type === 'error'
   .acct-tile__editor { display: flex; flex-direction: column; gap: 20px; padding: 32px 32px 34px; }
   .acct-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
   @media (max-width: 560px) { .acct-row2 { grid-template-columns: 1fr; } }
-  .acct-row2 .field__label { padding-top: 0; }
+  .acct-tile__editor .field__label { padding-top: 0; }
   .acct-editor__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2px; }
+  .acct-divider { height: 1px; background: var(--border); margin: 2px 0; }
 
   /* Read-only-Feld im V9-Stil (E-Mail „Aktuell") */
   .pr-readonly {
