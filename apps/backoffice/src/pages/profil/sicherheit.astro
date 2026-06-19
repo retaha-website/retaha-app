@@ -1,11 +1,11 @@
 ---
-// retaha Account — Sicherheit /profil/sicherheit. Eigene Seite (nur 2FA/
-// Sicherheitsoptionen), gleiche Hub-Shell wie /profil. Pflicht-Redirect-Ziel
-// (?required=true). Custom-TOTP via TwoFactorSection (user_mfa).
+// retaha Account — Sicherheit /profil/sicherheit. Hub-Shell wie /profil.
+// Persönliche 2FA (TwoFactorSection) + Team-Sicherheit (owner-only, aus
+// Hotel-Daten hierher verschoben). Pflicht-Redirect-Ziel (?required=true).
 import Layout from '../../layouts/Layout.astro';
 import AccountShell from '../../components/account/AccountShell.astro';
 import TwoFactorSection from '../../components/profil/TwoFactorSection.astro';
-import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance, clampTimeoutHours } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -14,22 +14,42 @@ if (!user || !user.email) return Astro.redirect('/admin/login');
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
 
-const { data: profile } = await client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
 const { data: hotelUser } = await client.from('hotel_users').select('role, hotel_id').eq('user_id', user.id).maybeSingle();
+const role     = (hotelUser?.role ?? 'staff') as string;
+const hotelId  = hotelUser?.hotel_id as string | undefined;
+const isOwner  = role === 'owner';
+
+// ─── POST: Team-Sicherheit (Session-Timeout; nur Owner) ────────────────────
+let saved: { ok: boolean; msg: string } | null = null;
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  if (form.get('_action')?.toString() === 'team_security' && isOwner && hotelId) {
+    const session_timeout_hours = clampTimeoutHours(form.get('session_timeout_hours')?.toString());
+    const { error } = await client.from('hotels').update({ session_timeout_hours }).eq('id', hotelId);
+    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: 'Gespeichert' };
+  }
+}
+
+const { data: profile } = await client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
+const { data: hotelSec } = (isOwner && hotelId)
+  ? await client.from('hotels').select('mfa_required_for_team, session_timeout_hours').eq('id', hotelId).maybeSingle()
+  : { data: null };
 
 const firstName    = profile?.first_name ?? '';
 const lastName     = profile?.last_name ?? '';
 const currentEmail = user.email ?? '';
-const role         = (hotelUser?.role ?? 'staff') as string;
 const roleLabel    = ROLE_LABELS[role] ?? role;
 const fullName     = [firstName, lastName].filter(Boolean).join(' ');
 const initials     = (firstName.charAt(0) || currentEmail.charAt(0)).toUpperCase();
 const avatarUrl    = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
 
+const mfaRequiredForTeam = hotelSec?.mfa_required_for_team === true;
+const sessionTimeout     = String((hotelSec?.session_timeout_hours as number | undefined) ?? 4);
+
 // 2FA-Status (user_mfa ist Service-Role-verwaltet) + Hotel-Pflicht-Policy.
 const service = createSupabaseServiceRoleInstance();
 const mfaStatus = await getUserMfaStatus(service, user.id);
-const hotelPolicy = hotelUser?.hotel_id ? await getHotelMfaPolicy(service, hotelUser.hotel_id) : null;
+const hotelPolicy = hotelId ? await getHotelMfaPolicy(service, hotelId) : null;
 const mfaEnabled        = mfaStatus?.enabled ?? false;
 const mfaRequired       = hotelPolicy?.required ?? false;
 const recoveryRemaining = mfaStatus?.recoveryCodesRemaining ?? 0;
@@ -53,7 +73,64 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
       />
     </section>
 
+    {isOwner && (
+      <section class="acct__section" id="team-security-section">
+        <div class="acct__section-head">
+          <h2 class="acct__section-title">Team-Sicherheit</h2>
+          <p class="acct__section-desc">Sicherheitsregeln für dein gesamtes Team.</p>
+        </div>
+
+        <section class="s-card" id="team-security">
+          <div class="s-card__head">
+            <h2 class="s-card__title">Team-Sicherheit</h2>
+            <span class="s-card__num">01</span>
+          </div>
+
+          <form method="POST" class="s-card__body">
+            <input type="hidden" name="_action" value="team_security" />
+
+            <div class="field field--row">
+              <span class="field__label">2FA für alle Mitarbeiter</span>
+              <div x-data={`persistToggle({ initial: ${mfaRequiredForTeam}, field: 'mfa_required_for_team' })`}>
+                <label class="toggle-row">
+                  <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
+                  <span class="bt-visual" :class="{'is-checked': checked}">
+                    <span class="bt-knob"></span>
+                  </span>
+                  <span class="toggle-label">Mitarbeiter ohne 2FA können sich nicht anmelden</span>
+                </label>
+                <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
+              </div>
+            </div>
+
+            <div class="field field--row">
+              <label class="field__label" for="session-timeout">Session-Timeout</label>
+              <div class="s-select-wrap">
+                <select id="session-timeout" name="session_timeout_hours" class="s-select">
+                  <option value="1"  selected={sessionTimeout === '1'}>1 Stunde</option>
+                  <option value="2"  selected={sessionTimeout === '2'}>2 Stunden</option>
+                  <option value="4"  selected={sessionTimeout === '4'}>4 Stunden</option>
+                  <option value="8"  selected={sessionTimeout === '8'}>8 Stunden</option>
+                  <option value="24" selected={sessionTimeout === '24'}>24 Stunden</option>
+                  <option value="0"  selected={sessionTimeout === '0'}>Kein Timeout</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="s-card__footer">
+              <a href="/team-security" class="s-btn-link">↗ Audit-Log & Team-Verwaltung</a>
+              <button type="submit" class="v9-btn">Speichern</button>
+            </div>
+          </form>
+        </section>
+      </section>
+    )}
+
   </AccountShell>
+
+  {saved && (
+    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`(function(){var go=function(){window.retahaToast&&window.retahaToast(m,t)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})()`}</script>
+  )}
 
   <!-- Flash nach client-seitigem Reload (z.B. 2FA deaktiviert). -->
   <script is:inline>

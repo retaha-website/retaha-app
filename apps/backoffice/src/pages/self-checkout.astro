@@ -34,6 +34,7 @@ if (Astro.request.method === 'POST') {
 
   const reTime = /^([01]\d|2[0-3]):[0-5]\d$/;
   const coRaw = form.get('checkout_time')?.toString().trim() || '';
+  const ciRaw = form.get('checkin_time')?.toString().trim() || '';
   const noteDe = (form.get('note_de')?.toString() ?? '').trim().slice(0, 600);
   const noteEn = (form.get('note_en')?.toString() ?? '').trim().slice(0, 600);
 
@@ -56,6 +57,7 @@ if (Astro.request.method === 'POST') {
     // Modus nur bei aktiv schreiben; im Aus-Zustand den Modus unveraendert lassen.
     if (state === 'info' || state === 'self') updates.self_checkout_mode = state;
     if (reTime.test(coRaw)) updates.checkout_time = coRaw;
+    if (reTime.test(ciRaw)) updates.checkin_time = ciRaw;
 
     const { error } = await sb.from('hotel_settings').update(updates).eq('hotel_id', hotel.id);
     saved = error ? { ok: false, msg: error.message } : { ok: true, msg: 'Gespeichert' };
@@ -65,7 +67,7 @@ if (Astro.request.method === 'POST') {
 // ─── LADEN ─────────────────────────────────────────────────────────────────
 const { data: hs } = await sb
   .from('hotel_settings')
-  .select('features, self_checkout_mode, self_checkout_note, checkout_time')
+  .select('features, self_checkout_mode, self_checkout_note, checkout_time, checkin_time')
   .eq('hotel_id', hotel.id).maybeSingle();
 
 const features = ((hs?.features as Record<string, unknown>) ?? {});
@@ -73,6 +75,7 @@ const mode = (hs?.self_checkout_mode as string) === 'info' ? 'info' : 'self';
 // Master-Zustand konsistent zum Gast-Vorschau-Toggle (Default an = !== false).
 const scState = features.self_checkout === false ? 'off' : mode;
 const checkoutTime = ((hs?.checkout_time as string) ?? '11:00').toString().substring(0, 5);
+const checkinTime = ((hs?.checkin_time as string) ?? '15:00').toString().substring(0, 5);
 const note = ((hs?.self_checkout_note as Record<string, string>) ?? {});
 const noteDe = note.de ?? '';
 const noteEn = note.en ?? '';
@@ -123,18 +126,27 @@ const STATES: { value: string; label: string; sub: string }[] = [
         </div>
       </section>
 
-      <!-- ── CHECKOUT-ZEIT ─────────────────────────────────────────────── -->
+      <!-- ── ZEITEN (Check-in + Check-out) ─────────────────────────────── -->
       <section class="s-card" id="sc-time">
         <div class="s-card__head">
-          <h2 class="s-card__title">Checkout-Zeit</h2>
+          <h2 class="s-card__title">Zeiten</h2>
           <span class="s-card__num">02</span>
+        </div>
+        <p class="s-card__sub">Check-in- und Check-out-Zeit deines Hotels.</p>
+
+        <div class="field field--row">
+          <label class="field__label" for="checkin-time">Check-in ab</label>
+          <div class="field__input-wrap">
+            <input type="time" id="checkin-time" name="checkin_time" class="s-input" value={checkinTime} />
+            <span class="field__hint">Ab wann Gäste einchecken können (Standard 15:00).</span>
+          </div>
         </div>
 
         <div class="field field--row">
           <label class="field__label" for="checkout-time">Check-out bis</label>
           <div class="field__input-wrap">
             <input type="time" id="checkout-time" name="checkout_time" class="s-input" value={checkoutTime} />
-            <span class="field__hint">Steuert das Self-Checkout-Fenster (öffnet am Vorabend, schließt zu dieser Zeit + Kulanz). Die Check-in-Zeit liegt unter <a href="/profil/settings#stay-times">Allgemein</a>.</span>
+            <span class="field__hint">Steuert das Self-Checkout-Fenster (öffnet am Vorabend, schließt zu dieser Zeit + Kulanz).</span>
           </div>
         </div>
       </section>
@@ -165,7 +177,7 @@ const STATES: { value: string; label: string; sub: string }[] = [
   </div>
 
   {saved && (
-    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`window.addEventListener('DOMContentLoaded',function(){window.retahaToast&&window.retahaToast(m,t)})`}</script>
+    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`(function(){var go=function(){window.retahaToast&&window.retahaToast(m,t)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})()`}</script>
   )}
 
   <style>

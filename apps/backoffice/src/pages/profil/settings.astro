@@ -1,10 +1,10 @@
 ---
-// retaha Account — Hotel-Daten /profil/settings. In den Hub absorbiert (war
-// /settings, jetzt gelöscht). Sidebar/Header via AccountShell; die s-card-
-// Sektionen + Speicher-Handler 1:1 übernommen (admin-page.css ist global).
+// retaha Account — Hotel-Daten /profil/settings. In den Hub absorbiert.
+// Sidebar/Header via AccountShell; s-card-Sektionen (admin-page.css ist global).
+// Check-in lebt jetzt im Self-Checkout-Modul, Team-Sicherheit unter /profil/sicherheit.
 import Layout from '../../layouts/Layout.astro';
 import AccountShell from '../../components/account/AccountShell.astro';
-import { getUser, getUserHotels, createSupabaseServerInstance, createSupabaseServiceRoleInstance, clampTimeoutHours } from '@retaha/auth';
+import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -15,7 +15,7 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
-// ─── POST-HANDLER (1:1 aus /settings) ──────────────────────────────────────
+// ─── POST-HANDLER ──────────────────────────────────────────────────────────
 type SaveResult = { section: string; ok: boolean; msg: string };
 let saved: SaveResult | null = null;
 
@@ -118,28 +118,6 @@ if (Astro.request.method === 'POST') {
     saved = error
       ? { section: 'billing_address', ok: false, msg: error.message }
       : { section: 'billing_address', ok: true, msg: '✓ Gespeichert' };
-
-  } else if (action === 'stay_times') {
-    const reTime = /^([01]\d|2[0-3]):[0-5]\d$/;
-    const ci = form.get('checkin_time')?.toString().trim() || '';
-    if (!reTime.test(ci)) {
-      saved = { section: 'stay_times', ok: false, msg: 'Bitte gültige Zeit (HH:MM) angeben.' };
-    } else {
-      const { error } = await createSupabaseServiceRoleInstance()
-        .from('hotel_settings').update({ checkin_time: ci }).eq('hotel_id', hotel.id);
-      saved = error
-        ? { section: 'stay_times', ok: false, msg: error.message }
-        : { section: 'stay_times', ok: true, msg: '✓ Gespeichert' };
-    }
-
-  } else if (action === 'team_security') {
-    const session_timeout_hours = clampTimeoutHours(form.get('session_timeout_hours')?.toString());
-    const { error } = await client.from('hotels')
-      .update({ session_timeout_hours })
-      .eq('id', hotel.id);
-    saved = error
-      ? { section: 'team_security', ok: false, msg: error.message }
-      : { section: 'team_security', ok: true, msg: '✓ Gespeichert' };
   }
 }
 
@@ -150,17 +128,11 @@ const { data: h } = await client.from('hotels').select(`
   phone, email, website,
   legal_form, company_name, commercial_register, vat_id, tax_number,
   billing_recipient, billing_email,
-  billing_street, billing_zip, billing_city, billing_country,
-  mfa_required_for_team, session_timeout_hours
+  billing_street, billing_zip, billing_city, billing_country
 `).eq('id', hotel.id).maybeSingle();
-
-const { data: hsTimes } = await createSupabaseServiceRoleInstance()
-  .from('hotel_settings').select('checkin_time').eq('hotel_id', hotel.id).maybeSingle();
-const checkinTime = ((hsTimes as any)?.checkin_time ?? '15:00').toString().substring(0, 5);
 
 const d = (h ?? {}) as Record<string, unknown>;
 function val(key: string, fallback = '') { return (d[key] as string) ?? fallback; }
-function isChecked(key: string) { return d[key] === true; }
 function isSelected(key: string, value: string, fallback = '') {
   return (d[key] as string ?? fallback) === value;
 }
@@ -315,33 +287,11 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
           </form>
         </section>
 
-        <!-- ── 03 CHECK-IN ── -->
-        <section class="s-card" id="stay-times">
-          <div class="s-card__head">
-            <h2 class="s-card__title">Check-in</h2>
-            <span class="s-card__num">03</span>
-          </div>
-          <p class="s-card__sub">Standard-Check-in-Zeit deines Hotels. Die Check-out-Zeit verwaltest du unter <a href="/self-checkout">Self-Checkout</a>.</p>
-
-          <form method="POST" class="s-card__body">
-            <input type="hidden" name="_action" value="stay_times" />
-
-            <div class="field field--row">
-              <label class="field__label" for="checkin-time">Check-in ab</label>
-              <input type="time" id="checkin-time" name="checkin_time" class="s-input" value={checkinTime} />
-            </div>
-
-            <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
-            </div>
-          </form>
-        </section>
-
-        <!-- ── 04 GESCHÄFTSDATEN ── -->
+        <!-- ── 03 GESCHÄFTSDATEN ── -->
         <section class="s-card" id="business-data">
           <div class="s-card__head">
             <h2 class="s-card__title">Geschäftsdaten</h2>
-            <span class="s-card__num">04</span>
+            <span class="s-card__num">03</span>
           </div>
 
           <form method="POST" class="s-card__body">
@@ -389,11 +339,11 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
           </form>
         </section>
 
-        <!-- ── 05 RECHNUNGSADRESSE ── -->
+        <!-- ── 04 RECHNUNGSADRESSE ── -->
         <section class="s-card" id="billing-address">
           <div class="s-card__head">
             <h2 class="s-card__title">Rechnungsadresse</h2>
-            <span class="s-card__num">05</span>
+            <span class="s-card__num">04</span>
           </div>
           <p class="s-card__sub">Für das retaha-Abo</p>
 
@@ -454,72 +404,20 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
           </form>
         </section>
 
-        <!-- ── 06 TEAM-SICHERHEIT ── -->
-        <section class="s-card" id="team-security">
-          <div class="s-card__head">
-            <h2 class="s-card__title">Team-Sicherheit</h2>
-            <span class="s-card__num">06</span>
-          </div>
-
-          <div class="s-warning-row">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 width="16" height="16" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
-            </svg>
-            <span>Deine persönliche 2FA findest du unter
-              <a href="/profil/sicherheit">Mein Profil → Sicherheit</a>
-            </span>
-          </div>
-
-          <form method="POST" class="s-card__body">
-            <input type="hidden" name="_action" value="team_security" />
-
-            <div class="field field--row">
-              <span class="field__label">2FA für alle Mitarbeiter</span>
-              <div x-data={`persistToggle({ initial: ${isChecked('mfa_required_for_team')}, field: 'mfa_required_for_team' })`}>
-                <label class="toggle-row">
-                  <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
-                  <span class="bt-visual" :class="{'is-checked': checked}">
-                    <span class="bt-knob"></span>
-                  </span>
-                  <span class="toggle-label">Mitarbeiter ohne 2FA können sich nicht anmelden</span>
-                </label>
-                <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
-              </div>
-            </div>
-
-            <div class="field field--row">
-              <label class="field__label" for="session-timeout">Session-Timeout</label>
-              <div class="s-select-wrap">
-                <select id="session-timeout" name="session_timeout_hours" class="s-select">
-                  <option value="1"  selected={isSelected('session_timeout_hours','1')}>1 Stunde</option>
-                  <option value="2"  selected={isSelected('session_timeout_hours','2')}>2 Stunden</option>
-                  <option value="4"  selected={isSelected('session_timeout_hours','4','4')}>4 Stunden</option>
-                  <option value="8"  selected={isSelected('session_timeout_hours','8')}>8 Stunden</option>
-                  <option value="24" selected={isSelected('session_timeout_hours','24')}>24 Stunden</option>
-                  <option value="0"  selected={isSelected('session_timeout_hours','0')}>Kein Timeout</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="s-card__footer">
-              <a href="/team-security" class="s-btn-link">↗ Audit-Log & Team-Verwaltung</a>
-              <button type="submit" class="v9-btn">Speichern</button>
-            </div>
-          </form>
-        </section>
-
       </div>
     </section>
 
   </AccountShell>
 
   {saved && (
-    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`window.addEventListener('DOMContentLoaded',function(){window.retahaToast&&window.retahaToast(m,t)})`}</script>
+    <script is:inline define:vars={{ m: saved.ok ? 'Gespeichert' : saved.msg, t: saved.ok ? 'success' : 'error' }}>{`(function(){var go=function(){window.retahaToast&&window.retahaToast(m,t)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})()`}</script>
   )}
 </Layout>
+
+<style>
+  /* Billing-Felder: gleicher Abstand wie s-card__body (Wrapper-Div bricht den Flex-Gap sonst) */
+  #billing-fields { display: flex; flex-direction: column; gap: 18px; }
+</style>
 
 <script>
   // Radio-Cards toggle
