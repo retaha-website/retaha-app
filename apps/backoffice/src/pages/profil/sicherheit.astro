@@ -1,0 +1,64 @@
+---
+// retaha Account — Sicherheit /profil/sicherheit. Eigene Seite (nur 2FA/
+// Sicherheitsoptionen), gleiche Hub-Shell wie /profil. Pflicht-Redirect-Ziel
+// (?required=true). Custom-TOTP via TwoFactorSection (user_mfa).
+import Layout from '../../layouts/Layout.astro';
+import AccountShell from '../../components/account/AccountShell.astro';
+import TwoFactorSection from '../../components/profil/TwoFactorSection.astro';
+import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user || !user.email) return Astro.redirect('/admin/login');
+
+const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
+const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+
+const { data: profile } = await client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
+const { data: hotelUser } = await client.from('hotel_users').select('role, hotel_id').eq('user_id', user.id).maybeSingle();
+
+const firstName    = profile?.first_name ?? '';
+const lastName     = profile?.last_name ?? '';
+const currentEmail = user.email ?? '';
+const role         = (hotelUser?.role ?? 'staff') as string;
+const roleLabel    = ROLE_LABELS[role] ?? role;
+const fullName     = [firstName, lastName].filter(Boolean).join(' ');
+const initials     = ((firstName.charAt(0) + lastName.charAt(0)).trim() || currentEmail.charAt(0)).toUpperCase();
+
+// 2FA-Status (user_mfa ist Service-Role-verwaltet) + Hotel-Pflicht-Policy.
+const service = createSupabaseServiceRoleInstance();
+const mfaStatus = await getUserMfaStatus(service, user.id);
+const hotelPolicy = hotelUser?.hotel_id ? await getHotelMfaPolicy(service, hotelUser.hotel_id) : null;
+const mfaEnabled        = mfaStatus?.enabled ?? false;
+const mfaRequired       = hotelPolicy?.required ?? false;
+const recoveryRemaining = mfaStatus?.recoveryCodesRemaining ?? 0;
+const isRequired        = Astro.url.searchParams.get('required') === 'true';
+---
+
+<Layout title="retaha Account · Sicherheit" activeTab="backoffice">
+  <AccountShell active="security" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel}>
+
+    <section class="acct__section" id="security-section">
+      <div class="acct__section-head">
+        <h2 class="acct__section-title">Sicherheit</h2>
+        <p class="acct__section-desc">Zwei-Faktor-Authentifizierung für dein retaha-Konto.</p>
+      </div>
+
+      <TwoFactorSection
+        mfaEnabled={mfaEnabled}
+        mfaRequired={mfaRequired}
+        recoveryRemaining={recoveryRemaining}
+        isRequired={isRequired}
+      />
+    </section>
+
+  </AccountShell>
+
+  <!-- Flash nach client-seitigem Reload (z.B. 2FA deaktiviert). -->
+  <script is:inline>
+    window.addEventListener('DOMContentLoaded', function () {
+      var f = sessionStorage.getItem('pr_flash');
+      if (f) { sessionStorage.removeItem('pr_flash'); window.retahaToast && window.retahaToast(f, 'success'); }
+    });
+  </script>
+</Layout>

@@ -2,7 +2,7 @@
  * MFA-Enforcement — Owner-Policy fuer Hotel-Team
  *
  * Owner kann via /team-security verlangen, dass alle Hotel-Members
- * MFA aktivieren. Pending Users werden bei Login auf /profil?required=true
+ * MFA aktivieren. Pending Users werden bei Login auf /profil/sicherheit?required=true
  * redirected (Setup-Wizard in der Sicherheit-Karte von „Mein Profil").
  *
  * Datenmodell:

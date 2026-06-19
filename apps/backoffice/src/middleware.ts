@@ -8,7 +8,7 @@
  *      Rolle ohne BO-Zugriff) wird zum Dashboard umgeleitet — auch bei direkt
  *      eingetippter URL. UI-Ausblenden ist Kosmetik; DIES ist die Durchsetzung.
  *   4. 2FA-ENFORCEMENT: (a) Force-Setup — Hotel-Pflicht + kein Faktor →
- *      /profil?required=true. (b) Login-Challenge — Faktor aktiv + kein gültiger
+ *      /profil/sicherheit?required=true. (b) Login-Challenge — Faktor aktiv + kein gültiger
  *      signierter MFA-Marker → /mfa (auth-App). Präzedenz exklusiv (enabled vs. nicht).
  *
  * Fail closed: unbekannte/fehlende Rolle bzw. Token-Fehler → geringste Rechte
@@ -114,7 +114,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // ── 2FA-Enforcement (Force-Setup + Login-Challenge) ──
-  // Präzedenz: kein Faktor + Hotel-Pflicht → Setup (/profil?required=true);
+  // Präzedenz: kein Faktor + Hotel-Pflicht → Setup (/profil/sicherheit?required=true);
   //            Faktor aktiv + kein gültiger Marker → Challenge (/mfa).
   // (enabled vs. nicht-enabled → exklusiv, kein Doppel-Redirect.)
   if (roles.length > 0 && !isApiOrAuthPath(url.pathname)) {
@@ -128,7 +128,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
       // Force-Setup — /profil ausnehmen (= Redirect-Ziel, sonst Loop).
       if (!url.pathname.startsWith('/profil') && shouldForceSetup(mfaStatus, policy)) {
-        return Response.redirect(new URL('/profil?required=true', url.origin).toString(), 302);
+        return Response.redirect(new URL('/profil/sicherheit?required=true', url.origin).toString(), 302);
       }
 
       // Login-Challenge — signierter Marker fehlt/ungültig → /mfa (auth-App).

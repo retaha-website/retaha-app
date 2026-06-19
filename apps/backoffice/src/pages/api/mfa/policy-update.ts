@@ -64,7 +64,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // 'personal on' kann nicht hier aktiviert werden — User muss durch Setup-Wizard
     return bad(
       'use-wizard',
-      'aktivierung nur ueber setup-wizard moeglich (/profil#security)',
+      'aktivierung nur ueber setup-wizard moeglich (/profil/sicherheit)',
     );
   }
 

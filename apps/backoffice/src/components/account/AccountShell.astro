@@ -1,0 +1,145 @@
+---
+// Geteilte Hub-Shell für „retaha Account" (Sidebar + Header + Content-Slot).
+// Genutzt von /profil (Konto) und /profil/sicherheit (Sicherheit) — gleiche
+// Sidebar/Nav, nur aktiver Eintrag + Slot-Inhalt unterscheiden sich.
+interface Props {
+  active: 'konto' | 'security';
+  initials: string;
+  displayName: string;
+  roleLabel: string;
+  subtitle?: string;
+}
+const {
+  active,
+  initials,
+  displayName,
+  roleLabel,
+  subtitle = 'Verwalte die Einstellungen in Bezug auf die Anmeldung bei deinem Account sowie die Account-Sicherheit.',
+} = Astro.props;
+---
+
+<div class="acct">
+
+  <!-- ── Sidebar ── -->
+  <aside class="acct__sidebar">
+    <div class="acct__user">
+      <div class="acct__avatar" aria-hidden="true">{initials}</div>
+      <div class="acct__user-meta">
+        <span class="acct__user-name">{displayName}</span>
+        <span class="acct__user-role">{roleLabel}</span>
+      </div>
+    </div>
+
+    <nav class="acct__nav" aria-label="Account-Navigation">
+      <div class="acct__navgroup">
+        <span class="acct__navgroup-title">Account</span>
+        <a href="/profil" class={`acct__navitem${active === 'konto' ? ' is-active' : ''}`} aria-current={active === 'konto' ? 'page' : undefined}>Konto</a>
+        <a href="/profil/sicherheit" class={`acct__navitem${active === 'security' ? ' is-active' : ''}`} aria-current={active === 'security' ? 'page' : undefined}>Sicherheit</a>
+      </div>
+      <div class="acct__navgroup">
+        <span class="acct__navgroup-title">Hotel</span>
+        <a href="/settings" class="acct__navitem">Hotel-Daten</a>
+        <a href="/team" class="acct__navitem">Team</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ── Content ── -->
+  <main class="acct__content">
+    <header class="acct__header">
+      <h1 class="acct__title">retaha Account<span class="dot-pink">.</span></h1>
+      <p class="acct__sub">{subtitle}</p>
+    </header>
+
+    <slot />
+  </main>
+</div>
+
+<style is:global>
+  [x-cloak] { display: none !important; }
+
+  /* ── Hub-Shell: Sidebar + Content ── */
+  .acct {
+    max-width: 1200px; margin: 0 auto; padding: 56px 32px 96px;
+    display: grid; grid-template-columns: 232px 1fr; gap: 64px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .acct { grid-template-columns: 1fr; gap: 40px; padding: 36px 20px 72px; }
+  }
+
+  .acct__sidebar { position: sticky; top: 32px; display: flex; flex-direction: column; gap: 30px; }
+  @media (max-width: 900px) { .acct__sidebar { position: static; top: 0; } }
+
+  .acct__user {
+    display: flex; align-items: center; gap: 12px;
+    padding-bottom: 28px; border-bottom: 1px solid var(--border);
+  }
+  .acct__avatar {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: var(--ink); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500;
+    border-radius: var(--r-sm);
+  }
+  .acct__user-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .acct__user-name {
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .acct__user-role {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
+  }
+
+  .acct__nav { display: flex; flex-direction: column; gap: 30px; }
+  .acct__navgroup { display: flex; flex-direction: column; gap: 7px; }
+  .acct__navgroup-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint);
+    padding: 0 12px 4px;
+  }
+  .acct__navitem {
+    display: block; padding: 11px 14px; border-radius: var(--r-sm);
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--ink-soft); text-decoration: none;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .acct__navitem:hover { background: var(--bg-deep); color: var(--ink); }
+  .acct__navitem.is-active { background: var(--te-yellow); color: #0A0A0A; font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .acct__nav { flex-direction: row; flex-wrap: wrap; gap: 10px 20px; }
+    .acct__navgroup { flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .acct__navgroup-title { padding: 0; }
+  }
+
+  /* Content */
+  .acct__content { min-width: 0; }
+  .acct__header { padding: 0 0 40px; border-bottom: 1px solid var(--border); margin-bottom: 48px; }
+  .acct__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(30px, 4.5vw, 46px); font-weight: 400;
+    line-height: 1.04; letter-spacing: -0.025em; color: var(--ink);
+  }
+  .acct__sub {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--ink-muted); letter-spacing: 0.04em; margin-top: 14px;
+  }
+
+  .acct__section { margin-bottom: 72px; }
+  .acct__section:last-child { margin-bottom: 0; }
+  .acct__section-head { margin-bottom: 28px; }
+  .acct__section-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .acct__section-desc {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--ink-muted); letter-spacing: 0.04em; margin-top: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .acct__navitem { transition: none; }
+  }
+</style>

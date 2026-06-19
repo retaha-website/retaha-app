@@ -21,7 +21,7 @@ export const APPS: SetupApp[] = [
   { id: 4, num: '04', label: 'PMS-Bridge',   sub: 'Apaleo · Protel',
     activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'LINKED' }, href: '/pms'               },
   { id: 5, num: '05', label: '2FA-Sicherheit', sub: 'Zwei-Faktor',
-    activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'ARMED'  }, href: '/profil#security'   },
+    activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'ARMED'  }, href: '/profil/sicherheit'   },
   { id: 6, num: '06', label: 'NFC-Karten',   sub: 'Gast-Content',
     activeAt: 71, doneAt: 100, sticker: { todo: '0/6',  active: 'START', done: '6/6 ON' }, href: '/admin/nfc-tags'    },
   { id: 7, num: '07', label: 'Team',         sub: 'Einladen',
