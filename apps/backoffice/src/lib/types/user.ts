@@ -1,3 +1,5 @@
+import type { LanguageCode } from '@retaha/i18n';
+
 export type UserRole = 'owner' | 'manager' | 'staff';
 
 export interface UserProfile {
@@ -13,7 +15,7 @@ export interface UserProfile {
   hotel_subscription_status: string;
   hotel_theme: string | null;
   avatar_url: string | null;
-  language: 'de' | 'en';
+  language: LanguageCode;
 }
 
 export function getInitials(profile: UserProfile): string {

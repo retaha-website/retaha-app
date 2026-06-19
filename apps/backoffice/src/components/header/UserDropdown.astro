@@ -1,6 +1,7 @@
 ---
 import type { UserProfile } from '../../lib/types/user';
 import { getInitials, getDisplayName } from '../../lib/types/user';
+import { bt, LANGUAGES, LANGUAGE_LABELS } from '@retaha/i18n';
 
 interface Props {
   user: UserProfile;
@@ -10,7 +11,8 @@ const { user } = Astro.props;
 const initials = getInitials(user);
 const name = getDisplayName(user);
 
-const langLabel = user.language === 'en' ? 'EN' : 'DE';
+const lang = user.language;
+const langLabel = lang.toUpperCase();
 ---
 
 <div class="user-dropdown" id="userDropdown" role="menu" aria-hidden="true">
@@ -42,8 +44,8 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
         <circle cx="12" cy="7" r="4"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Mein Profil</span>
-        <span class="ud__item-sub">Name · E-Mail · Passwort</span>
+        <span class="ud__item-label">{bt('dd.profile', lang)}</span>
+        <span class="ud__item-sub">{bt('dd.profile.sub', lang)}</span>
       </div>
       <span class="ud__item-arrow" aria-hidden="true">→</span>
     </a>
@@ -54,8 +56,8 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
         <path d="M9 12l2 2 4-4"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Sicherheit & 2FA</span>
-        <span class="ud__item-sub">Passwort · Zwei-Faktor</span>
+        <span class="ud__item-label">{bt('dd.security', lang)}</span>
+        <span class="ud__item-sub">{bt('dd.security.sub', lang)}</span>
       </div>
       <span class="ud__item-arrow" aria-hidden="true">→</span>
     </a>
@@ -66,8 +68,8 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Benachrichtigungen</span>
-        <span class="ud__item-sub">E-Mail · Push · WhatsApp</span>
+        <span class="ud__item-label">{bt('dd.notifications', lang)}</span>
+        <span class="ud__item-sub">{bt('dd.notifications.sub', lang)}</span>
       </div>
       <span class="ud__item-arrow" aria-hidden="true">→</span>
     </a>
@@ -77,25 +79,36 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
 
   <!-- Allgemein -->
   <div class="ud__items">
-    <button type="button" class="ud__item" id="langBtn" role="menuitem" aria-haspopup="menu">
+    <button type="button" class="ud__item" id="langBtn" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="langOptions">
       <svg class="ud__item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/>
         <line x1="2" y1="12" x2="22" y2="12"/>
         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Sprache</span>
+        <span class="ud__item-label">{bt('dd.language', lang)}</span>
       </div>
       <span class="ud__item-value">{langLabel}</span>
+      <span class="ud__item-chevron" aria-hidden="true">▾</span>
     </button>
+
+    <div class="ud__lang-options" id="langOptions" role="menu" aria-label={bt('dd.language.choose', lang)}>
+      {LANGUAGES.map((l) => (
+        <button type="button" class={`ud__lang-opt${l === lang ? ' is-current' : ''}`} data-lang={l} role="menuitemradio" aria-checked={l === lang ? 'true' : 'false'}>
+          <span class="ud__lang-name">{LANGUAGE_LABELS[l]}</span>
+          <span class="ud__lang-code">{l.toUpperCase()}</span>
+          {l === lang && <span class="ud__lang-check" aria-hidden="true">✓</span>}
+        </button>
+      ))}
+    </div>
 
     <a href="/hilfe" class="ud__item" role="menuitem">
       <svg class="ud__item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Hilfe & Support</span>
-        <span class="ud__item-sub">WhatsApp · Mail · Docs</span>
+        <span class="ud__item-label">{bt('dd.help', lang)}</span>
+        <span class="ud__item-sub">{bt('dd.help.sub', lang)}</span>
       </div>
       <span class="ud__item-arrow" aria-hidden="true">→</span>
     </a>
@@ -112,7 +125,7 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
         <line x1="21" y1="12" x2="9" y2="12"/>
       </svg>
       <div class="ud__item-text">
-        <span class="ud__item-label">Abmelden</span>
+        <span class="ud__item-label">{bt('dd.logout', lang)}</span>
         <span class="ud__item-sub">{name}</span>
       </div>
     </button>
@@ -295,4 +308,22 @@ const langLabel = user.language === 'en' ? 'EN' : 'DE';
   .ud__item--logout:hover { background: var(--burgund-soft); }
   .ud__item--logout:hover .ud__item-icon { color: var(--burgund); }
   .ud__item--logout:hover .ud__item-label { color: var(--burgund); }
+
+  /* Sprach-Picker — inline (kein Clipping durch overflow:hidden des Dropdowns) */
+  .ud__item-chevron { color: var(--ink-faint); font-size: 10px; margin-left: 6px; transition: transform 200ms ease; }
+  #langBtn[aria-expanded="true"] .ud__item-chevron { transform: rotate(180deg); }
+  .ud__lang-options { display: none; flex-direction: column; background: var(--bg-deep); border-top: 1px solid var(--border); }
+  .ud__lang-options.is-open { display: flex; }
+  .ud__lang-opt {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 18px 9px 52px; width: 100%;
+    background: transparent; border: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; color: var(--ink); text-align: left;
+    transition: background 150ms ease;
+  }
+  .ud__lang-opt:hover { background: var(--te-yellow-soft); }
+  .ud__lang-opt.is-current { font-weight: 500; }
+  .ud__lang-name { flex: 1; }
+  .ud__lang-code { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: var(--ink-muted); }
+  .ud__lang-check { color: var(--sage, #5C9070); font-weight: 600; }
 </style>

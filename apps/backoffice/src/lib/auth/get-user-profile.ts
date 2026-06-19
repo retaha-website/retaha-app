@@ -1,6 +1,7 @@
 import type { AstroCookies } from 'astro';
 import { createSupabaseServerInstance } from '@retaha/auth';
 import type { UserProfile, UserRole } from '../types/user';
+import { getLang } from '../i18n';
 
 export async function getUserProfileForLayout(
   cookies: AstroCookies,
@@ -53,6 +54,6 @@ export async function getUserProfileForLayout(
     hotel_subscription_status: h?.subscription_status ?? '',
     hotel_theme: h?.theme ?? null,
     avatar_url: ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null,
-    language: 'de',
+    language: getLang(cookies, request),
   };
 }

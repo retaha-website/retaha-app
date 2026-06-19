@@ -1,6 +1,7 @@
 ---
 import type { UserProfile } from '../../lib/types/user';
 import { getInitials } from '../../lib/types/user';
+import { bt } from '@retaha/i18n';
 import UserDropdown from './UserDropdown.astro';
 
 interface Props {
@@ -9,13 +10,14 @@ interface Props {
 
 const { user } = Astro.props;
 const firstInitial = getInitials(user).charAt(0);
+const lang = user.language;
 ---
 
 <div class="user-menu" id="userMenu">
   <button
     class={`user-avatar${user.avatar_url ? ' has-photo' : ''}`}
     id="userAvatar"
-    aria-label="Account-Menü öffnen"
+    aria-label={bt('menu.avatar.open', lang)}
     aria-haspopup="menu"
     aria-expanded="false"
   >
@@ -117,11 +119,24 @@ const firstInitial = getInitials(user).charAt(0);
       }
     });
 
+    // Sprach-Picker — reines Vanilla-JS (Alpine-unabhängig). Toggle der Inline-
+    // Optionsliste; Auswahl setzt das `retaha_lang`-Cookie + lädt neu.
     const langBtn = document.getElementById('langBtn');
-    if (langBtn) {
+    const langOptions = document.getElementById('langOptions');
+    if (langBtn && langOptions) {
       langBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        // TODO Phase 2: Sprach-Submenu (DE / EN)
+        const isOpen = langOptions.classList.toggle('is-open');
+        langBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      langOptions.querySelectorAll<HTMLButtonElement>('.ud__lang-opt').forEach((opt) => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const l = opt.getAttribute('data-lang');
+          if (!l) return;
+          document.cookie = `retaha_lang=${l}; path=/; max-age=31536000; samesite=lax`;
+          window.location.reload();
+        });
       });
     }
   }

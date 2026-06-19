@@ -3,6 +3,7 @@
 
 export * from './core';
 export * from './extra-langs';
+export * from './backoffice-strings';
 export * from './helpers';
 export * from './helpers/picker';
 export * from './helpers/save-hook';
