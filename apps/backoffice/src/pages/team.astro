@@ -87,7 +87,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
         <p class="acct__section-desc">Mitarbeiter dieses Hotels — Rollen, Einladungen, Zugriff.</p>
       </div>
 
-      <div x-data="teamPage()">
+      <div class="tm-root">
 
         <div class="settings-sections">
 
@@ -113,11 +113,10 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                       <div class="tm-row-actions">
                         {(canChangeRole && !isOwner && !isMe) ? (
                           <select
-                            class="s-select"
+                            class="s-select tm-role-select"
                             style="font-size:12px;padding:5px 10px"
                             data-member-id={m.id}
                             data-current-role={m.role}
-                            @change="changeRole($event)"
                           >
                             <option value="manager" selected={m.role === 'manager'}>Manager</option>
                             <option value="staff" selected={m.role === 'staff'}>Front-Desk</option>
@@ -130,9 +129,10 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                         {(canRemove && !isOwner && !isMe) && (
                           <button
                             type="button"
-                            class="v9-btn v9-btn--danger"
+                            class="v9-btn v9-btn--danger tm-remove-btn"
                             style="font-size:12px;padding:5px 12px"
-                            @click={`removeMember('${m.id}', '${displayName(m).replace(/'/g, "\\'")}')`}
+                            data-member-id={m.id}
+                            data-member-name={displayName(m)}
                           >
                             Entfernen
                           </button>
@@ -177,9 +177,10 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                         {canRemove && (
                           <button
                             type="button"
-                            class="v9-btn v9-btn--danger"
+                            class="v9-btn v9-btn--danger tm-remove-btn"
                             style="font-size:12px;padding:5px 12px"
-                            @click={`removeMember('${m.id}', '${(emailMap.get(m.user_id) || '').replace(/'/g, "\\'")}')`}
+                            data-member-id={m.id}
+                            data-member-name={emailMap.get(m.user_id) || ''}
                           >
                             Widerrufen
                           </button>
@@ -230,7 +231,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
           </div>
         )}
 
-      </div>{/* x-data teamPage */}
+      </div>{/* .tm-root */}
     </section>
 
   </AccountShell>
@@ -312,58 +313,53 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 </style>
 
 <script>
-  // Auf der GLOBALEN window.Alpine-Instanz (vom Layout gestartet) via alpine:init
-  // registrieren. Ein eigener `import Alpine` kann durch den AccountShell-Wrapper in
-  // einem zweiten, NIE gestarteten Chunk landen → teamPage auf falscher Instanz →
-  // x-data findet die Komponente nicht → Buttons tot. (Muster wie nfc-tags.)
-  document.addEventListener('alpine:init', () => {
-  // @ts-expect-error - Alpine global (vom Layout gesetzt)
-  window.Alpine.data('teamPage', () => ({
-    showToast(msg: string, kind: 'ok' | 'err' = 'ok') {
+  // Rollen-Wechsel + Entfernen: reines Vanilla-JS (Alpine-unabhängig). Registrierte
+  // Alpine-Components (Alpine.data via alpine:init) feuern unter dem AccountShell-
+  // Wrapper zu spät — siehe Invite-Fix. Daher hier kein Alpine.
+  (() => {
+    const toast = (msg: string, kind: 'ok' | 'err' = 'ok') =>
       (window as any).retahaToast?.(msg, kind === 'err' ? 'error' : 'success');
-    },
 
-    async changeRole(ev: Event) {
-      const sel = ev.target as HTMLSelectElement;
-      const memberId = sel.dataset.memberId;
-      const newRole = sel.value;
-      const prev = sel.dataset.currentRole;
-      try {
-        const res = await fetch('/api/admin/team/role', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ member_id: memberId, new_role: newRole }),
-        });
-        const data = await res.json();
-        if (!data.ok) {
-          sel.value = prev || 'staff';
-          this.showToast(data.message || data.error || 'Rollen-Wechsel fehlgeschlagen.', 'err');
-          return;
+    document.querySelectorAll<HTMLSelectElement>('.tm-role-select').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const prev = sel.dataset.currentRole || 'staff';
+        try {
+          const res = await fetch('/api/admin/team/role', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: sel.dataset.memberId, new_role: sel.value }),
+          });
+          const data = await res.json();
+          if (!data.ok) { sel.value = prev; toast(data.message || data.error || 'Rollen-Wechsel fehlgeschlagen.', 'err'); return; }
+          sel.dataset.currentRole = sel.value;
+          toast('Rolle aktualisiert.');
+        } catch {
+          sel.value = prev;
+          toast('Netzwerk-Fehler.', 'err');
         }
-        sel.dataset.currentRole = newRole;
-        this.showToast('Rolle aktualisiert.');
-      } catch (err: any) {
-        sel.value = prev || 'staff';
-        this.showToast('Netzwerk-Fehler.', 'err');
-      }
-    },
+      });
+    });
 
-    async removeMember(memberId: string, name: string) {
-      if (!confirm(`${name} wirklich entfernen?`)) return;
-      try {
-        const res = await fetch('/api/admin/team/remove', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ member_id: memberId }),
-        });
-        const data = await res.json();
-        if (!data.ok) { this.showToast(data.error || 'Entfernen fehlgeschlagen.', 'err'); return; }
-        this.showToast(`${name} entfernt.`);
-        setTimeout(() => window.location.reload(), 400);
-      } catch (err: any) {
-        this.showToast('Netzwerk-Fehler.', 'err');
-      }
-    },
-  }));
-  });
+    document.querySelectorAll<HTMLButtonElement>('.tm-remove-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.memberName || 'Dieses Mitglied';
+        if (!confirm(`${name} wirklich entfernen?`)) return;
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/admin/team/remove', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: btn.dataset.memberId }),
+          });
+          const data = await res.json();
+          if (!data.ok) { toast(data.error || 'Entfernen fehlgeschlagen.', 'err'); btn.disabled = false; return; }
+          toast(`${name} entfernt.`);
+          setTimeout(() => window.location.reload(), 400);
+        } catch {
+          toast('Netzwerk-Fehler.', 'err');
+          btn.disabled = false;
+        }
+      });
+    });
+  })();
 </script>
 
 <script>
