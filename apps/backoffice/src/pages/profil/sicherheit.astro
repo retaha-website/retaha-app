@@ -62,24 +62,18 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
     <section class="acct__section" id="security-section">
       <div class="acct__section-head">
         <h2 class="acct__section-title">Sicherheit</h2>
-        <p class="acct__section-desc">Zwei-Faktor-Authentifizierung für dein retaha-Konto.</p>
+        <p class="acct__section-desc">Zwei-Faktor-Authentifizierung für dein retaha-Konto und Sicherheitsregeln für dein gesamtes Team.</p>
       </div>
 
-      <TwoFactorSection
-        mfaEnabled={mfaEnabled}
-        mfaRequired={mfaRequired}
-        recoveryRemaining={recoveryRemaining}
-        isRequired={isRequired}
-      />
-    </section>
+      <div class="settings-sections">
+        <TwoFactorSection
+          mfaEnabled={mfaEnabled}
+          mfaRequired={mfaRequired}
+          recoveryRemaining={recoveryRemaining}
+          isRequired={isRequired}
+        />
 
-    {isOwner && (
-      <section class="acct__section" id="team-security-section">
-        <div class="acct__section-head">
-          <h2 class="acct__section-title">Team-Sicherheit</h2>
-          <p class="acct__section-desc">Sicherheitsregeln für dein gesamtes Team.</p>
-        </div>
-
+        {isOwner && (
         <section class="s-card" id="team-security">
           <div class="s-card__head">
             <h2 class="s-card__title">Team-Sicherheit</h2>
@@ -105,15 +99,18 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
 
             <div class="field field--row">
               <label class="field__label" for="session-timeout">Session-Timeout</label>
-              <div class="s-select-wrap">
-                <select id="session-timeout" name="session_timeout_hours" class="s-select">
-                  <option value="1"  selected={sessionTimeout === '1'}>1 Stunde</option>
-                  <option value="2"  selected={sessionTimeout === '2'}>2 Stunden</option>
-                  <option value="4"  selected={sessionTimeout === '4'}>4 Stunden</option>
-                  <option value="8"  selected={sessionTimeout === '8'}>8 Stunden</option>
-                  <option value="24" selected={sessionTimeout === '24'}>24 Stunden</option>
-                  <option value="0"  selected={sessionTimeout === '0'}>Kein Timeout</option>
-                </select>
+              <div class="field__input-wrap">
+                <div class="s-select-wrap">
+                  <select id="session-timeout" name="session_timeout_hours" class="s-select">
+                    <option value="1"  selected={sessionTimeout === '1'}>1 Stunde</option>
+                    <option value="2"  selected={sessionTimeout === '2'}>2 Stunden</option>
+                    <option value="4"  selected={sessionTimeout === '4'}>4 Stunden</option>
+                    <option value="8"  selected={sessionTimeout === '8'}>8 Stunden</option>
+                    <option value="24" selected={sessionTimeout === '24'}>24 Stunden</option>
+                    <option value="0"  selected={sessionTimeout === '0'}>Kein Timeout</option>
+                  </select>
+                </div>
+                <span class="field__hint">Nach dieser Zeit ohne Aktivität werden Mitarbeiter automatisch abgemeldet.</span>
               </div>
             </div>
 
@@ -123,8 +120,9 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
             </div>
           </form>
         </section>
-      </section>
-    )}
+        )}
+      </div>
+    </section>
 
   </AccountShell>
 
