@@ -27,6 +27,20 @@ explizite Bestätigung vom User vor Ausführung.
 - Persona-Param + postMessage-Highlight NUR für `showcase_`-Tokens
 - Echte Gäste-Sessions unberührt lassen
 
+## i18n (Mehrsprachigkeit, 11 Sprachen)
+
+- System: `@retaha/i18n`. Backoffice-UI-Strings = `packages/i18n/src/backoffice-strings.ts`
+  (`BO_STRINGS`), Aufruf via `bt(key, lang)`. DE = Source-of-Truth (handgepflegt).
+- Sprache im Backoffice: Cookie `retaha_lang` (Picker im Account-Dropdown) → `getLang()`
+  in `apps/backoffice/src/lib/i18n.ts`.
+- **WICHTIG — Übersetzungen sind NICHT automatisch.** Nach JEDER Änderung an einem
+  DE-String (neu **oder** geändert) muss das Translate-Script laufen:
+  `node --env-file=apps/backoffice/.env scripts/translate-backoffice-strings.mjs`
+  Es erkennt neue UND geänderte DE-Werte (Snapshot-Vergleich) und übersetzt sie in
+  alle 10 Sprachen (Haiku). Ohne den Lauf bleiben die anderen Sprachen veraltet.
+  **Nach DE-String-Änderung → Script laufen lassen, nicht vergessen.**
+- Fehlende Keys fallen via `bt()` sauber auf DE zurück (kein leerer String / Key-Leak).
+
 ## Architektur
 
 - 3-App Monorepo: `retaha-auth`, `retaha-backoffice`, `retaha-dashboard`, `retaha-guest`

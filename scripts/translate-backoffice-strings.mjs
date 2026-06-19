@@ -9,13 +9,16 @@
 // Kontext für den Prompt: kurze Admin-/Backoffice-UI-Labels (Hotelier-Seite).
 
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const FILE = join(ROOT, 'packages/i18n/src/backoffice-strings.ts');
+// Snapshot der DE-Werte beim letzten Lauf — um GEÄNDERTE Strings (nicht nur fehlende)
+// zu erkennen und neu zu übersetzen. Wird committet (= „zuletzt übersetzter DE-Stand").
+const SNAP = join(ROOT, 'packages/i18n/backoffice-strings.snapshot.json');
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey) { console.error('Missing ANTHROPIC_API_KEY (use --env-file=apps/backoffice/.env)'); process.exit(1); }
@@ -79,14 +82,16 @@ async function translateOne(text, label, retry = 0) {
 const data = parseStrings();
 const de = data.de ?? {};
 const keys = Object.keys(de);
-console.log(`BO_STRINGS DE-Keys: ${keys.length}`);
+const snap = existsSync(SNAP) ? JSON.parse(readFileSync(SNAP, 'utf8')) : {};
+const changed = keys.filter(k => snap[k] !== undefined && snap[k] !== de[k]);
+console.log(`BO_STRINGS DE-Keys: ${keys.length}${changed.length ? ` (${changed.length} geändert seit letztem Lauf → neu übersetzen)` : ''}`);
 
 let totalIn = 0, totalOut = 0, translated = 0, fails = 0;
 const result = { de };
 
 for (const lang of TARGET_LANGS) {
   result[lang] = { ...(data[lang] ?? {}) };
-  const missing = keys.filter(k => !result[lang][k]);
+  const missing = keys.filter(k => !result[lang][k] || (snap[k] !== undefined && snap[k] !== de[k]));
   console.log(`\n─── ${lang.toUpperCase()} ${LANG_LABELS[lang]} — ${missing.length} fehlend (${keys.length - missing.length} da)`);
   if (missing.length === 0) continue;
   const BATCH = 5, DELAY = 8000;
@@ -135,6 +140,7 @@ export function bt(key: string, lang: LanguageCode): string {
 `;
 
 writeFileSync(FILE, out);
+writeFileSync(SNAP, JSON.stringify(de, null, 0) + '\n');
 console.log(`\n✓ Geschrieben: ${FILE}`);
 console.log(`Translated: ${translated} · Failures: ${fails} · Tokens: ${totalIn} in + ${totalOut} out`);
 console.log(`Cost: $${((totalIn / 1e6) * PRICING.in + (totalOut / 1e6) * PRICING.out).toFixed(5)}`);
