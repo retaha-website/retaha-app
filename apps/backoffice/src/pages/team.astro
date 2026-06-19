@@ -314,11 +314,13 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 </style>
 
 <script>
-  import Alpine from 'alpinejs';
-  // Registrierung VOR Alpine.start() (Layout, Z.212) via alpine:init — sonst wird
-  // teamPage zu spät registriert und der „Mitarbeiter einladen"-Button reagiert nicht.
+  // Auf der GLOBALEN window.Alpine-Instanz (vom Layout gestartet) via alpine:init
+  // registrieren. Ein eigener `import Alpine` kann durch den AccountShell-Wrapper in
+  // einem zweiten, NIE gestarteten Chunk landen → teamPage auf falscher Instanz →
+  // x-data findet die Komponente nicht → Buttons tot. (Muster wie nfc-tags.)
   document.addEventListener('alpine:init', () => {
-  Alpine.data('teamPage', (init: any) => ({
+  // @ts-expect-error - Alpine global (vom Layout gesetzt)
+  window.Alpine.data('teamPage', (init: any) => ({
     canInvite: init.canInvite,
     canChangeRole: init.canChangeRole,
     canRemove: init.canRemove,
