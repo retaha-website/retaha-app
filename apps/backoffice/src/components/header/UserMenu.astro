@@ -13,13 +13,15 @@ const firstInitial = getInitials(user).charAt(0);
 
 <div class="user-menu" id="userMenu">
   <button
-    class="user-avatar"
+    class={`user-avatar${user.avatar_url ? ' has-photo' : ''}`}
     id="userAvatar"
     aria-label="Account-Menü öffnen"
     aria-haspopup="menu"
     aria-expanded="false"
   >
-    {firstInitial}
+    {user.avatar_url
+      ? <img src={user.avatar_url} alt="" class="user-avatar-img" />
+      : firstInitial}
   </button>
 
   <UserDropdown user={user} />
@@ -51,6 +53,12 @@ const firstInitial = getInitials(user).charAt(0);
     background: var(--te-yellow);
     color: #0A0A0A;
   }
+
+  /* Profilfoto füllt den Avatar; Hover = Gelb-Ring statt Gelb-Fläche. */
+  .user-avatar.has-photo { background: transparent; overflow: hidden; }
+  .user-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: var(--r-sm); }
+  .user-avatar.has-photo:hover,
+  .user-avatar.has-photo.is-open { background: transparent; box-shadow: 0 0 0 2px var(--te-yellow); }
 
   /* Mini-Pfeil unter Avatar wenn Dropdown offen */
   .user-avatar.is-open::after {

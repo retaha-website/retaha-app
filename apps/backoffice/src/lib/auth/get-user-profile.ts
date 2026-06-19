@@ -52,6 +52,7 @@ export async function getUserProfileForLayout(
     hotel_trial_started_at: h?.trial_started_at ?? null,
     hotel_subscription_status: h?.subscription_status ?? '',
     hotel_theme: h?.theme ?? null,
+    avatar_url: ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null,
     language: 'de',
   };
 }

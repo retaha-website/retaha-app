@@ -6,7 +6,7 @@
 // Supabase-Auth updateUser für E-Mail/Passwort), in die Kachel-Editoren verschoben.
 import Layout from '../layouts/Layout.astro';
 import AccountShell from '../components/account/AccountShell.astro';
-import { getUser, createSupabaseServerInstance } from '@retaha/auth';
+import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -46,10 +46,15 @@ if (Astro.request.method === 'POST') {
     } else if (newEmail === user.email) {
       message = { type: 'error', text: 'Das ist bereits deine aktuelle E-Mail.' };
     } else {
-      const { error } = await client.auth.updateUser({ email: newEmail });
+      // Admin-API (Service-Role): der Server-Client hat keine Auth-Session
+      // → client.auth.updateUser würde „Auth session missing!" werfen.
+      // email_confirm=true → neue Adresse sofort nutzbar (kein Bestätigungsschritt).
+      const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
+        user.id, { email: newEmail, email_confirm: true },
+      );
       message = error
         ? { type: 'error', text: `E-Mail-Änderung fehlgeschlagen: ${error.message}` }
-        : { type: 'success', text: 'Bestätigungs-Mail an die neue Adresse gesendet — aktiv erst nach Bestätigung.' };
+        : { type: 'success', text: 'E-Mail geändert.' };
     }
   }
 
@@ -61,7 +66,9 @@ if (Astro.request.method === 'POST') {
     } else if (pw !== pw2) {
       message = { type: 'error', text: 'Die Passwörter stimmen nicht überein.' };
     } else {
-      const { error } = await client.auth.updateUser({ password: pw });
+      const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
+        user.id, { password: pw },
+      );
       message = error
         ? { type: 'error', text: `Passwort-Änderung fehlgeschlagen: ${error.message}` }
         : { type: 'success', text: 'Passwort geändert.' };
@@ -180,7 +187,7 @@ const errorTile = message?.type === 'error'
                   </div>
                 </div>
               </div>
-              <span class="field__hint">Bestätigungs-Mail geht an die neue Adresse; aktiv erst nach Bestätigung.</span>
+              <span class="field__hint">Wird sofort übernommen — danach meldest du dich mit der neuen Adresse an.</span>
               <div class="acct-editor__actions">
                 <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
                 <button type="submit" class="v9-btn">E-Mail ändern</button>
