@@ -201,14 +201,25 @@
         }
         close.addEventListener('click', dismiss);
 
-        if (bar) {
-          requestAnimationFrame(function () { bar.classList.add('run'); });
-          bar.addEventListener('animationend', dismiss);
-          el.addEventListener('mouseenter', function () { el.classList.add('is-paused'); });
-          el.addEventListener('mouseleave', function () { el.classList.remove('is-paused'); });
-          // Fallback bei reduzierter Bewegung (Bar-Animation deaktiviert → kein animationend).
-          var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (reduced) setTimeout(dismiss, opts.duration || 5000);
+        // Auto-Dismiss per TIMER (robust) — NICHT an animationend hängen (feuert
+        // beim Mounten sofort → Toast verschwand unsichtbar). Die Progress-Bar ist
+        // rein visuell und synchron (gleiche Dauer). Hover pausiert Timer UND Bar.
+        if (!persist) {
+          var total = opts.duration || 5000;
+          var remaining = total;
+          var startedAt = Date.now();
+          var timer = setTimeout(dismiss, remaining);
+          if (bar) requestAnimationFrame(function () { bar.classList.add('run'); });
+          el.addEventListener('mouseenter', function () {
+            clearTimeout(timer);
+            remaining -= (Date.now() - startedAt);
+            el.classList.add('is-paused');
+          });
+          el.addEventListener('mouseleave', function () {
+            startedAt = Date.now();
+            el.classList.remove('is-paused');
+            timer = setTimeout(dismiss, Math.max(0, remaining));
+          });
         }
         return dismiss;
       } catch (_) {}
