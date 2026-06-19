@@ -54,6 +54,31 @@ const mfaEnabled        = mfaStatus?.enabled ?? false;
 const mfaRequired       = hotelPolicy?.required ?? false;
 const recoveryRemaining = mfaStatus?.recoveryCodesRemaining ?? 0;
 const isRequired        = Astro.url.searchParams.get('required') === 'true';
+
+// ─── Team-Übersicht (owner-only): Mitglieder + 2FA-Status (aus /team-security) ──
+type MfaState = 'active' | 'pending' | 'inactive';
+let team: { email: string; mfaState: MfaState }[] = [];
+let pendingCount = 0;
+if (isOwner && hotelId) {
+  const { data: members } = await service.from('hotel_users').select('user_id').eq('hotel_id', hotelId);
+  const memberIds = (members ?? []).map((m) => (m as { user_id: string }).user_id);
+  const { data: mfaRows } = memberIds.length
+    ? await service.from('user_mfa').select('user_id, enabled, verified_at').in('user_id', memberIds)
+    : { data: [] as unknown[] };
+  const mfaByUser = new Map(
+    (mfaRows ?? []).map((m) => [(m as { user_id: string }).user_id, m as { enabled: boolean; verified_at: string | null }]),
+  );
+  const { data: authList } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const emailMap = new Map((authList?.users ?? []).map((u) => [u.id, u.email ?? '']));
+  team = (members ?? []).map((m) => {
+    const uid = (m as { user_id: string }).user_id;
+    const mf = mfaByUser.get(uid);
+    const mfaState: MfaState = mf?.enabled && mf.verified_at ? 'active' : mf && !mf.enabled ? 'pending' : 'inactive';
+    return { email: emailMap.get(uid) || '—', mfaState };
+  });
+  pendingCount = team.filter((m) => m.mfaState !== 'active').length;
+}
+const activeCount = team.length - pendingCount;
 ---
 
 <Layout title="retaha Account · Sicherheit" activeTab="backoffice">
@@ -119,6 +144,35 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
               <button type="submit" class="v9-btn">Speichern</button>
             </div>
           </form>
+
+          <div class="ts-divider"></div>
+
+          <div class="ts-team">
+            <div class="ts-team__head">
+              <span class="ts-team__title">Team-Übersicht</span>
+              <span class="ts-team__sub">{team.length} {team.length === 1 ? 'Mitglied' : 'Mitglieder'} · {activeCount} mit 2FA aktiv</span>
+            </div>
+            <ul class="ts-team__list">
+              {team.map((m) => (
+                <li class="ts-team__row">
+                  <span class="ts-team__email">{m.email}</span>
+                  <span class={`ts-team__status ts-team__status--${m.mfaState}`}>
+                    {m.mfaState === 'active' ? '2FA aktiv' : m.mfaState === 'pending' ? 'nicht bestätigt' : 'nicht eingerichtet'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {mfaRequiredForTeam && pendingCount > 0 && (
+            <div class="ts-enforce" x-data={`{ busy: false, sendReminder() { this.busy = true; fetch('/api/mfa/send-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hotelId: ${JSON.stringify(hotelId)} }) }).then(function(r){return r.json()}).then(function(d){ window.retahaToast && window.retahaToast(d.ok ? 'Erinnerung gesendet.' : (d.message || 'Fehler beim Senden.'), d.ok ? 'success' : 'error'); }).catch(function(){ window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); }).finally(function(){ this.busy = false; }.bind(this)); } }`}>
+              <p class="ts-enforce__text">
+                <strong>{pendingCount} von {team.length} {team.length === 1 ? 'Mitglied' : 'Mitgliedern'}</strong>
+                {pendingCount === 1 ? ' hat' : ' haben'} 2FA noch nicht aktiviert — sie werden beim nächsten Login dazu aufgefordert.
+              </p>
+              <button type="button" class="v9-btn v9-btn--ghost" x-on:click="sendReminder()" x-bind:disabled="busy">Erinnerung senden</button>
+            </div>
+          )}
         </section>
         )}
       </div>
@@ -137,4 +191,22 @@ const isRequired        = Astro.url.searchParams.get('required') === 'true';
       if (f) { sessionStorage.removeItem('pr_flash'); window.retahaToast && window.retahaToast(f, 'success'); }
     });
   </script>
+
+  <style>
+    .ts-divider { height: 1px; background: var(--border); margin: 22px 0 20px; }
+    .ts-team__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .ts-team__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+    .ts-team__sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); }
+    .ts-team__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+    .ts-team__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+    .ts-team__row:last-child { border-bottom: none; }
+    .ts-team__email { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); word-break: break-all; }
+    .ts-team__status { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
+    .ts-team__status--active   { background: var(--sage-soft, rgba(92,144,112,0.10)); color: var(--sage, #5C9070); }
+    .ts-team__status--pending  { background: rgba(255,74,130,0.08); color: var(--pink, #FF4A82); }
+    .ts-team__status--inactive { background: var(--bg-deep); color: var(--ink-muted); }
+    .ts-enforce { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; padding: 14px 16px; background: var(--bg-deep); border-left: 3px solid var(--pink, #FF4A82); border-radius: var(--r-sm); }
+    .ts-enforce__text { font-size: 13px; color: var(--ink); margin: 0; line-height: 1.5; }
+    .ts-enforce__text strong { font-weight: 600; }
+  </style>
 </Layout>
