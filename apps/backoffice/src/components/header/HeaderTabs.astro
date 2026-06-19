@@ -1,19 +1,22 @@
 ---
+import { bt, type LanguageCode } from '@retaha/i18n';
+
 type TabKey = 'gast' | 'backoffice' | 'admin';
 
 interface Props {
   active: TabKey;
+  lang: LanguageCode;
 }
 
-const { active } = Astro.props;
+const { active, lang } = Astro.props;
 
 const GUEST_APP  = import.meta.env.GUEST_APP_URL  ?? 'https://app.retaha.de';
 const DASHBOARD  = import.meta.env.DASHBOARD_URL  ?? 'https://dashboard.retaha.de';
 
 const tabs = [
-  { key: 'gast'       as const, label: 'gast-ansicht', href: `${GUEST_APP}/gast-vorschau`, icon: 'phone'   },
-  { key: 'backoffice' as const, label: 'backoffice',   href: '/uebersicht',                icon: 'sliders' },
-  { key: 'admin'      as const, label: 'admin',        href: DASHBOARD,                    icon: 'grid'    },
+  { key: 'gast'       as const, label: bt('tab.guest', lang),      href: `${GUEST_APP}/gast-vorschau`, icon: 'phone'   },
+  { key: 'backoffice' as const, label: bt('tab.backoffice', lang), href: '/uebersicht',                icon: 'sliders' },
+  { key: 'admin'      as const, label: bt('tab.admin', lang),      href: DASHBOARD,                    icon: 'grid'    },
 ];
 ---
 
@@ -22,7 +25,7 @@ const tabs = [
     <a
       href={tab.href}
       class:list={['header-tabs__tab', { 'is-active': tab.key === active }]}
-      title={tab.key === active ? 'du bist hier' : `wechsle zu ${tab.label}`}
+      title={tab.key === active ? bt('tab.here', lang) : `${bt('tab.switch', lang)} ${tab.label}`}
       aria-current={tab.key === active ? 'page' : undefined}
     >
       {tab.icon === 'phone' && (
