@@ -1,21 +1,37 @@
 ---
 // retaha Account — Hub /profil (Konto-Sektion). Sidebar/Header via AccountShell.
-// Sicherheit (2FA) lebt auf eigener Seite /profil/sicherheit.
-//
-// REINE Präsentation: Speicher-Logik 1:1 (user_profiles-Upsert RLS-scoped;
-// Supabase-Auth updateUser für E-Mail/Passwort), in die Kachel-Editoren verschoben.
+// E-Mail-Änderung (primär + sekundär) per Bestätigungscode an die Zieladresse:
+// Code wird mit encryptSecret (MFA-Key) in user_metadata.pending_email abgelegt
+// (NICHT user-entschlüsselbar → kein Bypass), Versand via interne SMTP.
+// Passwort-Änderung mit Re-Auth (aktuelles Passwort). Kein DB-Change.
 import Layout from '../layouts/Layout.astro';
 import AccountShell from '../components/account/AccountShell.astro';
 import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { encryptSecret, decryptSecret } from '@retaha/auth/mfa';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@retaha/db';
+import { sendEmail as sendInternalEmail } from '../lib/email/microsoft-smtp';
+import { randomInt } from 'node:crypto';
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
-
 const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+const CODE_TTL_MS = 10 * 60 * 1000;
+
+interface Pending { email: string; purpose: 'primary' | 'secondary'; code_enc: string; exp: number; }
+
+function codeEmailHtml(code: string, purpose: 'primary' | 'secondary'): string {
+  const what = purpose === 'primary' ? 'Änderung deiner Login-E-Mail' : 'Hinzufügen deiner sekundären E-Mail';
+  return `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1A1A1A;background:#FBFAF7;padding:32px">
+    <div style="max-width:440px;margin:0 auto;background:#fff;border:1px solid #E7E4DD;border-radius:8px;padding:32px">
+      <p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#8C867F;margin:0 0 16px">retaha · Bestätigungscode</p>
+      <p style="font-size:15px;margin:0 0 8px">Dein Code für die ${what}:</p>
+      <p style="font-family:monospace;font-size:34px;letter-spacing:0.3em;font-weight:600;margin:16px 0;color:#0A0A0A">${code}</p>
+      <p style="font-size:13px;color:#8C867F;margin:8px 0 0">Gültig für 10 Minuten. Wenn du das nicht warst, ignoriere diese E-Mail.</p>
+    </div></body></html>`;
+}
 
 let message: { type: 'success' | 'error'; text: string } | null = null;
 let attemptedAction: string | undefined;
@@ -24,6 +40,8 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('_action')?.toString();
   attemptedAction = action;
+  const admin = createSupabaseServiceRoleInstance();
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
 
   if (action === 'save_profile') {
     const first = (form.get('first_name')?.toString() ?? '').trim();
@@ -41,25 +59,74 @@ if (Astro.request.method === 'POST') {
     }
   }
 
-  else if (action === 'change_email') {
-    const newEmail = (form.get('email')?.toString() ?? '').trim();
-    if (!newEmail || !newEmail.includes('@')) {
+  // ── E-Mail (primär/sekundär): Code senden ──
+  else if (action === 'send_email_code') {
+    const purpose = form.get('purpose')?.toString() === 'secondary' ? 'secondary' : 'primary';
+    const target = (form.get('email')?.toString() ?? '').trim().toLowerCase();
+    if (!target || !target.includes('@')) {
       message = { type: 'error', text: 'Bitte eine gültige E-Mail-Adresse eingeben.' };
-    } else if (newEmail === user.email) {
+    } else if (target === (user.email ?? '').toLowerCase()) {
       message = { type: 'error', text: 'Das ist bereits deine aktuelle E-Mail.' };
     } else {
-      // Admin-API (Service-Role): der Server-Client hat keine Auth-Session
-      // → client.auth.updateUser würde „Auth session missing!" werfen.
-      // email_confirm=true → neue Adresse sofort nutzbar (kein Bestätigungsschritt).
-      const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
-        user.id, { email: newEmail, email_confirm: true },
-      );
-      message = error
-        ? { type: 'error', text: `E-Mail-Änderung fehlgeschlagen: ${error.message}` }
-        : { type: 'success', text: 'E-Mail geändert.' };
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      const pending: Pending = { email: target, purpose, code_enc: encryptSecret(code), exp: Date.now() + CODE_TTL_MS };
+      const sent = await sendInternalEmail({
+        to: target,
+        subject: 'Dein retaha-Bestätigungscode',
+        html: codeEmailHtml(code, purpose),
+        fromName: 'retaha',
+      });
+      if (!sent.ok) {
+        message = { type: 'error', text: 'Code konnte nicht gesendet werden. Bitte später erneut versuchen.' };
+      } else {
+        await admin.auth.admin.updateUserById(user.id, { user_metadata: { ...meta, pending_email: pending } });
+        message = { type: 'success', text: `Bestätigungscode an ${target} gesendet.` };
+      }
     }
   }
 
+  // ── E-Mail: Code bestätigen → anwenden ──
+  else if (action === 'verify_email_code') {
+    const entered = (form.get('code')?.toString() ?? '').trim();
+    const pending = meta.pending_email as Pending | undefined;
+    if (!pending) {
+      message = { type: 'error', text: 'Kein offener Bestätigungscode.' };
+    } else if (Date.now() > pending.exp) {
+      await admin.auth.admin.updateUserById(user.id, { user_metadata: { ...meta, pending_email: null } });
+      message = { type: 'error', text: 'Code abgelaufen — bitte neu anfordern.' };
+    } else {
+      let valid = false;
+      try { valid = /^\d{6}$/.test(entered) && decryptSecret(pending.code_enc) === entered; } catch { valid = false; }
+      if (!valid) {
+        message = { type: 'error', text: 'Bestätigungscode ist falsch.' };
+      } else if (pending.purpose === 'primary') {
+        const { error } = await admin.auth.admin.updateUserById(user.id, {
+          email: pending.email, email_confirm: true, user_metadata: { ...meta, pending_email: null },
+        });
+        message = error
+          ? { type: 'error', text: `E-Mail-Änderung fehlgeschlagen: ${error.message}` }
+          : { type: 'success', text: 'E-Mail geändert.' };
+      } else {
+        const { error } = await admin.auth.admin.updateUserById(user.id, {
+          user_metadata: { ...meta, pending_email: null, secondary_email: pending.email },
+        });
+        message = error
+          ? { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` }
+          : { type: 'success', text: 'Sekundäre E-Mail hinzugefügt.' };
+      }
+    }
+  }
+
+  else if (action === 'cancel_email_code') {
+    await admin.auth.admin.updateUserById(user.id, { user_metadata: { ...meta, pending_email: null } });
+  }
+
+  else if (action === 'remove_secondary_email') {
+    await admin.auth.admin.updateUserById(user.id, { user_metadata: { ...meta, secondary_email: null } });
+    message = { type: 'success', text: 'Sekundäre E-Mail entfernt.' };
+  }
+
+  // ── Passwort (mit Re-Auth) ──
   else if (action === 'change_password') {
     const current = form.get('current_password')?.toString() ?? '';
     const pw  = form.get('password')?.toString() ?? '';
@@ -71,8 +138,6 @@ if (Astro.request.method === 'POST') {
     } else if (pw !== pw2) {
       message = { type: 'error', text: 'Die Passwörter stimmen nicht überein.' };
     } else {
-      // Aktuelles Passwort verifizieren (Re-Auth) über einen frischen Anon-Client
-      // — signInWithPassword berührt die laufende Session nicht.
       const url = getEnv('PUBLIC_SUPABASE_URL');
       const anon = getEnv('PUBLIC_SUPABASE_ANON_KEY');
       const check = (url && anon)
@@ -81,58 +146,47 @@ if (Astro.request.method === 'POST') {
       if (check.error) {
         message = { type: 'error', text: 'Aktuelles Passwort ist falsch.' };
       } else {
-        const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
-          user.id, { password: pw },
-        );
+        const { error } = await admin.auth.admin.updateUserById(user.id, { password: pw });
         message = error
           ? { type: 'error', text: `Passwort-Änderung fehlgeschlagen: ${error.message}` }
           : { type: 'success', text: 'Passwort geändert.' };
       }
     }
   }
-
-  else if (action === 'save_secondary_email') {
-    const remove = form.get('remove') === 'true';
-    const sec = (form.get('secondary_email')?.toString() ?? '').trim();
-    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-    if (!remove && (!sec || !sec.includes('@'))) {
-      message = { type: 'error', text: 'Bitte eine gültige sekundäre E-Mail eingeben.' };
-    } else if (!remove && sec.toLowerCase() === (user.email ?? '').toLowerCase()) {
-      message = { type: 'error', text: 'Sekundäre E-Mail muss sich von der primären unterscheiden.' };
-    } else {
-      const { error } = await createSupabaseServiceRoleInstance().auth.admin.updateUserById(
-        user.id, { user_metadata: { ...meta, secondary_email: remove ? null : sec } },
-      );
-      message = error
-        ? { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` }
-        : { type: 'success', text: remove ? 'Sekundäre E-Mail entfernt.' : 'Sekundäre E-Mail gespeichert.' };
-      if (!error) (user.user_metadata as Record<string, unknown>).secondary_email = remove ? null : sec;
-    }
-  }
 }
 
-const [{ data: profile }, { data: hotelUser }] = await Promise.all([
-  client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle(),
-  client.from('hotel_users').select('role').eq('user_id', user.id).maybeSingle(),
-]);
+// Frischen User nach POST lesen (Metadaten/Email können sich geändert haben).
+let displayUser = user;
+if (Astro.request.method === 'POST') {
+  const u2 = await getUser(Astro.cookies, Astro.request);
+  if (u2) displayUser = u2;
+}
+
+const { data: profile } = await client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
+const { data: hotelUser } = await client.from('hotel_users').select('role').eq('user_id', user.id).maybeSingle();
 
 const firstName    = profile?.first_name ?? '';
 const lastName     = profile?.last_name ?? '';
-const currentEmail = user.email ?? '';
+const currentEmail = displayUser.email ?? '';
 const role         = (hotelUser?.role ?? 'staff') as string;
 const roleLabel    = ROLE_LABELS[role] ?? role;
 const fullName     = [firstName, lastName].filter(Boolean).join(' ');
 const initials     = (firstName.charAt(0) || currentEmail.charAt(0)).toUpperCase();
-const avatarUrl    = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
-const secondaryEmail = ((user.user_metadata as Record<string, unknown> | undefined)?.secondary_email as string | undefined) ?? null;
+const dMeta        = (displayUser.user_metadata ?? {}) as Record<string, unknown>;
+const avatarUrl    = (dMeta.avatar_url as string | undefined) ?? null;
+const secondaryEmail = (dMeta.secondary_email as string | undefined) ?? null;
+const pendingEmail = dMeta.pending_email as Pending | undefined;
 
 // Bei Validierungsfehler öffnet der betroffene Editor nach dem Reload wieder.
-const errorTile = message?.type === 'error'
+const emailActions = ['send_email_code', 'verify_email_code', 'cancel_email_code', 'remove_secondary_email'];
+const errorTile = (message?.type === 'error' || (pendingEmail && attemptedAction === 'send_email_code'))
   ? (attemptedAction === 'save_profile' ? 'name'
-    : (attemptedAction === 'change_email' || attemptedAction === 'save_secondary_email') ? 'email'
+    : attemptedAction && emailActions.includes(attemptedAction) ? 'email'
     : attemptedAction === 'change_password' ? 'password'
     : null)
   : null;
+// Offener Code → E-Mail-Editor offen halten (zum Code-Eingeben).
+const openTile = pendingEmail ? 'email' : errorTile;
 ---
 
 <Layout title="retaha Account" activeTab="backoffice">
@@ -150,7 +204,7 @@ const errorTile = message?.type === 'error'
         <p class="acct__section-desc">Dein persönliches retaha-Konto — Name, E-Mail, Passwort.</p>
       </div>
 
-      <div class="acct-tiles" x-data={`{ open: ${JSON.stringify(errorTile)}, pwCurrent: '' }`}>
+      <div class="acct-tiles" x-data={`{ open: ${JSON.stringify(openTile)}, pwCurrent: '' }`}>
 
         <!-- NAME -->
         <div class="acct-tile acct-tile--editable" x-bind:class="{ 'is-open': open === 'name' }">
@@ -167,6 +221,7 @@ const errorTile = message?.type === 'error'
             <span class={`acct-tile__value${fullName ? '' : ' acct-tile__value--empty'}`}>{fullName || 'Noch nicht hinterlegt'}</span>
           </button>
           <div class="acct-tile__editor" id="ed-name" x-show="open === 'name'" x-cloak>
+            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label="Schließen">✕</button>
             <span class="acct-tile__label">Name bearbeiten</span>
             <form method="POST">
               <input type="hidden" name="_action" value="save_profile" />
@@ -186,7 +241,6 @@ const errorTile = message?.type === 'error'
               </div>
               <span class="field__hint">Wird für die persönliche Ansprache in E-Mails genutzt.</span>
               <div class="acct-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
                 <button type="submit" class="v9-btn">Speichern</button>
               </div>
             </form>
@@ -208,46 +262,91 @@ const errorTile = message?.type === 'error'
             <span class="acct-tile__value">{currentEmail}</span>
           </button>
           <div class="acct-tile__editor" id="ed-email" x-show="open === 'email'" x-cloak>
+            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label="Schließen">✕</button>
             <span class="acct-tile__label">E-Mail ändern</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="change_email" />
-              <div class="acct-row2">
+
+            {pendingEmail && pendingEmail.purpose === 'primary' ? (
+              <form method="POST">
+                <input type="hidden" name="_action" value="verify_email_code" />
+                <p class="acct-codehint">Bestätigungscode an <strong>{pendingEmail.email}</strong> gesendet.</p>
                 <div class="field">
-                  <span class="field__label">Aktuell</span>
-                  <div class="pr-readonly"><span>{currentEmail}</span></div>
-                </div>
-                <div class="field">
-                  <label class="field__label" for="email">Neue E-Mail</label>
+                  <label class="field__label" for="email_code">Bestätigungscode</label>
                   <div class="field__input-wrap">
-                    <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
+                    <input type="text" id="email_code" name="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" class="s-input acct-code-input" />
                   </div>
                 </div>
-              </div>
-              <span class="field__hint">Wird sofort übernommen — danach meldest du dich mit der neuen Adresse an.</span>
-              <div class="acct-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
-                <button type="submit" class="v9-btn">E-Mail ändern</button>
-              </div>
-            </form>
+                <div class="acct-editor__actions">
+                  <button type="submit" form="cancel-primary" class="v9-btn v9-btn--ghost">Andere Adresse</button>
+                  <button type="submit" class="v9-btn">Bestätigen</button>
+                </div>
+              </form>
+            ) : (
+              <form method="POST">
+                <input type="hidden" name="_action" value="send_email_code" />
+                <input type="hidden" name="purpose" value="primary" />
+                <div class="acct-row2">
+                  <div class="field">
+                    <span class="field__label">Aktuell</span>
+                    <div class="pr-readonly"><span>{currentEmail}</span></div>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="email">Neue E-Mail</label>
+                    <div class="field__input-wrap">
+                      <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
+                    </div>
+                  </div>
+                </div>
+                <span class="field__hint">Wir senden einen Bestätigungscode an die neue Adresse.</span>
+                <div class="acct-editor__actions">
+                  <button type="submit" class="v9-btn">Code senden</button>
+                </div>
+              </form>
+            )}
 
             <div class="acct-divider"></div>
 
-            <form method="POST">
-              <input type="hidden" name="_action" value="save_secondary_email" />
+            {secondaryEmail ? (
               <div class="field">
-                <label class="field__label" for="secondary_email">Sekundäre E-Mail{secondaryEmail ? ' · gesetzt' : ''}</label>
-                <div class="field__input-wrap">
-                  <input type="email" id="secondary_email" name="secondary_email" value={secondaryEmail ?? ''} placeholder="backup@beispiel.de" autocomplete="email" class="s-input" />
+                <span class="field__label">Sekundäre E-Mail</span>
+                <div class="acct-added-row">
+                  <span class="acct-added"><span class="acct-added__check">✓</span> {secondaryEmail} · hinzugefügt</span>
+                  <form method="POST">
+                    <input type="hidden" name="_action" value="remove_secondary_email" />
+                    <button type="submit" class="v9-btn v9-btn--ghost">Entfernen</button>
+                  </form>
                 </div>
-                <span class="field__hint">Optionale Backup-Adresse für dein Konto.</span>
               </div>
-              <div class="acct-editor__actions">
-                {secondaryEmail && (
-                  <button type="submit" name="remove" value="true" class="v9-btn v9-btn--ghost">Entfernen</button>
-                )}
-                <button type="submit" class="v9-btn">{secondaryEmail ? 'Aktualisieren' : 'Sekundäre Mail hinzufügen'}</button>
-              </div>
-            </form>
+            ) : pendingEmail && pendingEmail.purpose === 'secondary' ? (
+              <form method="POST">
+                <input type="hidden" name="_action" value="verify_email_code" />
+                <p class="acct-codehint">Bestätigungscode an <strong>{pendingEmail.email}</strong> gesendet.</p>
+                <div class="field">
+                  <label class="field__label" for="sec_code">Bestätigungscode</label>
+                  <div class="field__input-wrap">
+                    <input type="text" id="sec_code" name="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" class="s-input acct-code-input" />
+                  </div>
+                </div>
+                <div class="acct-editor__actions">
+                  <button type="submit" form="cancel-secondary" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                  <button type="submit" class="v9-btn">Bestätigen</button>
+                </div>
+              </form>
+            ) : (
+              <form method="POST">
+                <input type="hidden" name="_action" value="send_email_code" />
+                <input type="hidden" name="purpose" value="secondary" />
+                <div class="field">
+                  <label class="field__label" for="secondary_email">Sekundäre E-Mail</label>
+                  <div class="field__input-wrap">
+                    <input type="email" id="secondary_email" name="email" placeholder="backup@beispiel.de" autocomplete="email" class="s-input" />
+                  </div>
+                  <span class="field__hint">Optionale Backup-Adresse — wird per Code bestätigt.</span>
+                </div>
+                <div class="acct-editor__actions">
+                  <button type="submit" class="v9-btn">Sekundäre Mail hinzufügen</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 
@@ -266,6 +365,7 @@ const errorTile = message?.type === 'error'
             <span class="acct-tile__value acct-tile__value--mask">••••••••</span>
           </button>
           <div class="acct-tile__editor" id="ed-password" x-show="open === 'password'" x-cloak>
+            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label="Schließen">✕</button>
             <span class="acct-tile__label">Passwort ändern</span>
             <form method="POST">
               <input type="hidden" name="_action" value="change_password" />
@@ -292,7 +392,6 @@ const errorTile = message?.type === 'error'
               </div>
               <span class="field__hint">Neues Passwort: mindestens 8 Zeichen.</span>
               <div class="acct-editor__actions">
-                <button type="button" class="v9-btn v9-btn--ghost" x-on:click="open = null">Abbrechen</button>
                 <button type="submit" class="v9-btn" x-bind:disabled="!pwCurrent">Passwort ändern</button>
               </div>
             </form>
@@ -304,11 +403,18 @@ const errorTile = message?.type === 'error'
           <div class="acct-tile__face acct-tile__face--static">
             <span class="acct-tile__label">Rolle</span>
             <span class="acct-tile__value">{roleLabel}</span>
-            <span class="acct-tile__hint">vom Hotel zugewiesen</span>
+            <span class="acct-tile__hint">In der <a href="/team" class="acct-tile__hint-link">Team-Verwaltung</a> anpassbar</span>
           </div>
         </div>
 
       </div>
+
+      <!-- Abbrechen-Formulare für die Code-Schritte (außerhalb, um verschachtelte Forms zu vermeiden) -->
+      {pendingEmail && (
+        <form method="POST" id={pendingEmail.purpose === 'primary' ? 'cancel-primary' : 'cancel-secondary'} hidden>
+          <input type="hidden" name="_action" value="cancel_email_code" />
+        </form>
+      )}
     </section>
 
   </AccountShell>
@@ -357,14 +463,35 @@ const errorTile = message?.type === 'error'
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     letter-spacing: 0.06em; color: var(--ink-faint); margin-top: 2px;
   }
+  .acct-tile__hint-link { color: var(--ink-muted); text-decoration: underline; text-underline-offset: 2px; }
+  .acct-tile__hint-link:hover { color: var(--ink); }
 
   /* Editor (Inline-Aufklappen) */
-  .acct-tile__editor { display: flex; flex-direction: column; gap: 20px; padding: 32px 32px 34px; }
+  .acct-tile__editor { position: relative; display: flex; flex-direction: column; gap: 20px; padding: 22px 24px 24px; }
+  .acct-tile__close {
+    position: absolute; top: 14px; right: 16px;
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: var(--r-sm); cursor: pointer;
+    color: var(--ink-muted); font-size: 15px; line-height: 1; transition: background 150ms ease, color 150ms ease;
+  }
+  .acct-tile__close:hover { background: var(--bg-deep); color: var(--ink); }
+  .acct-tile__editor .field__label { padding-top: 0; }
   .acct-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
   @media (max-width: 560px) { .acct-row2 { grid-template-columns: 1fr; } }
-  .acct-tile__editor .field__label { padding-top: 0; }
   .acct-editor__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2px; }
   .acct-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+  .acct-codehint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); margin: 0; }
+  .acct-codehint strong { color: var(--ink); }
+  .acct-code-input { max-width: 160px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; text-align: center; }
+  .acct-added-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .acct-added {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink);
+    background: var(--sage-soft, rgba(92,144,112,0.10)); border: 1px solid var(--sage, #5C9070);
+    padding: 8px 12px; border-radius: var(--r-sm); word-break: break-word;
+  }
+  .acct-added__check { color: var(--sage-strong, #4a7a5c); font-weight: 600; }
 
   /* Read-only-Feld im V9-Stil (E-Mail „Aktuell") */
   .pr-readonly {
