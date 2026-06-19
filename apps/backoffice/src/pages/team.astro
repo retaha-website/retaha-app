@@ -1,17 +1,15 @@
 ---
-// Sprint Functional Modul A Phase 3 — Team-Verwaltung UI
+// Team-Verwaltung — jetzt als Untermenü des „retaha Account"-Hubs (AccountShell),
+// gleiche Shell/Design wie /profil, /profil/sicherheit, /profil/settings.
+// URL bleibt /team (überall referenziert: Hauptnav, Übersicht, Onboarding, Setup).
 //
-// Liste aller hotel_users für das eingeloggte Hotel mit:
+// Liste aller hotel_users für das eingeloggte Hotel:
 //   - aktive Mitglieder (accepted_at NOT NULL)
 //   - offene Einladungen (accepted_at IS NULL)
-//
-// Owner sieht Rollen-Dropdown + Entfernen-Button. Manager sieht nur
-// Einladen-Button. Staff sieht nur die Liste read-only.
-//
-// Discovery-Befund: user_profiles ist spärlich (nur 1 von 13 hat eins) —
-// Email aus auth.users als Fallback-Display.
+// Owner sieht Rollen-Dropdown + Entfernen + Einladen. (team.* ist Owner-only.)
 
 import Layout from '../layouts/Layout.astro';
+import AccountShell from '../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { ROLE_LABELS, hasPermission, type Role } from '@retaha/auth';
@@ -67,9 +65,179 @@ const pendingInvites = memberRows.filter(m => !m.accepted_at);
 const canInvite     = hasPermission(myRole, 'team.invite');
 const canChangeRole = hasPermission(myRole, 'team.change_role');
 const canRemove     = hasPermission(myRole, 'team.remove');
+
+// ─── Hub-Shell-Daten (User-Mini in der Sidebar) ────────────────────────────
+const HUB_ROLE: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+const myProfile = profileMap.get(user.id) as { first_name?: string; last_name?: string } | undefined;
+const hubFirst    = myProfile?.first_name ?? '';
+const hubLast     = myProfile?.last_name ?? '';
+const hubFullName = [hubFirst, hubLast].filter(Boolean).join(' ');
+const hubEmail    = user.email ?? '';
+const hubInitials = (hubFirst.charAt(0) || hubEmail.charAt(0)).toUpperCase();
+const hubAvatar   = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
+const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 ---
 
-<Layout title="Team" activeTab="backoffice">
+<Layout title="retaha Account · Team" activeTab="backoffice">
+  <AccountShell active="team" initials={hubInitials} displayName={hubFullName || hubEmail} roleLabel={hubRoleLabel} avatarUrl={hubAvatar}>
+
+    <section class="acct__section" id="team">
+      <div class="acct__section-head">
+        <h2 class="acct__section-title">Team</h2>
+        <p class="acct__section-desc">Mitarbeiter dieses Hotels — Rollen, Einladungen, Zugriff.</p>
+      </div>
+
+      <div x-data={`teamPage({ canInvite: ${canInvite}, canChangeRole: ${canChangeRole}, canRemove: ${canRemove}, myUserId: ${JSON.stringify(user.id)} })`}>
+
+        <div class="settings-sections">
+
+          <!-- Aktive Mitglieder -->
+          <section class="s-card">
+            <div class="s-card__head">
+              <h2 class="s-card__title">Aktive Mitglieder</h2>
+              <span class="s-card__num">{activeMembers.length}</span>
+            </div>
+            <div class="s-card__body">
+              <div class="tm-list">
+                {activeMembers.map(m => {
+                  const isMe = m.user_id === user.id;
+                  const isOwner = m.role === 'owner';
+                  return (
+                    <article class="tm-row" data-member-id={m.id}>
+                      <div class="tm-row-info">
+                        <p class="tm-row-name">
+                          {displayName(m)}{isMe && <span class="tm-row-self"> (du)</span>}
+                        </p>
+                        <p class="tm-row-meta">{emailMap.get(m.user_id) || '—'}</p>
+                      </div>
+                      <div class="tm-row-actions">
+                        {(canChangeRole && !isOwner && !isMe) ? (
+                          <select
+                            class="s-select"
+                            style="font-size:12px;padding:5px 10px"
+                            data-member-id={m.id}
+                            data-current-role={m.role}
+                            @change="changeRole($event)"
+                          >
+                            <option value="manager" selected={m.role === 'manager'}>Manager</option>
+                            <option value="staff" selected={m.role === 'staff'}>Front-Desk</option>
+                          </select>
+                        ) : (
+                          <span class={`tm-badge${isOwner ? ' tm-badge--owner' : ''}`}>
+                            {ROLE_LABELS[m.role as Role]}{isOwner && ' ★'}
+                          </span>
+                        )}
+                        {(canRemove && !isOwner && !isMe) && (
+                          <button
+                            type="button"
+                            class="v9-btn v9-btn--danger"
+                            style="font-size:12px;padding:5px 12px"
+                            @click={`removeMember('${m.id}', '${displayName(m).replace(/'/g, "\\'")}')`}
+                          >
+                            Entfernen
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+            {canInvite && (
+              <div class="s-card__footer">
+                <button type="button" @click="openInvite = true" class="v9-btn v9-btn--primary">
+                  + Mitarbeiter einladen
+                </button>
+              </div>
+            )}
+          </section>
+
+          <!-- Offene Einladungen -->
+          {pendingInvites.length > 0 && (
+            <section class="s-card">
+              <div class="s-card__head">
+                <h2 class="s-card__title">Offene Einladungen</h2>
+                <span class="s-card__num">{pendingInvites.length}</span>
+              </div>
+              <div class="s-card__body">
+                <div class="tm-list">
+                  {pendingInvites.map(m => (
+                    <article class="tm-row tm-row--pending">
+                      <div class="tm-row-info">
+                        <p class="tm-row-name">{emailMap.get(m.user_id) || '—'}</p>
+                        <p class="tm-row-meta">
+                          eingeladen als {ROLE_LABELS[m.role as Role]} ·{' '}
+                          {m.invited_at
+                            ? new Date(m.invited_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            : '—'}
+                        </p>
+                      </div>
+                      <div class="tm-row-actions">
+                        <span class="tm-badge tm-badge--pending">Ausstehend</span>
+                        {canRemove && (
+                          <button
+                            type="button"
+                            class="v9-btn v9-btn--danger"
+                            style="font-size:12px;padding:5px 12px"
+                            @click={`removeMember('${m.id}', '${(emailMap.get(m.user_id) || '').replace(/'/g, "\\'")}')`}
+                          >
+                            Widerrufen
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+        </div>{/* .settings-sections */}
+
+        <!-- Invite-Modal -->
+        {canInvite && (
+          <div x-show="openInvite" x-cloak class="bp-modal-bd" @click.self="openInvite = false">
+            <div class="bp-modal" role="dialog" aria-modal="true" @click.stop>
+              <div class="bp-modal-head">
+                <h3 class="bp-modal-title">Mitarbeiter einladen</h3>
+                <button type="button" @click="openInvite = false" class="bp-modal-x" aria-label="Schließen">✕</button>
+              </div>
+              <div class="bp-modal-body">
+                <div x-show="inviteError" x-cloak style="margin-bottom:12px">
+                  <p class="s-flash s-flash--err" x-text="inviteError" style="margin:0"></p>
+                </div>
+                <label class="tm-field">
+                  <span class="tm-field-label">E-Mail</span>
+                  <input type="email" x-model="inviteEmail" placeholder="kollege@hotel.de" class="s-input" />
+                </label>
+                <label class="tm-field">
+                  <span class="tm-field-label">Rolle</span>
+                  <select x-model="inviteRole" class="s-select">
+                    <option value="manager">Manager (Inhalte + Settings + Operations)</option>
+                    <option value="staff">Front-Desk (nur Operations)</option>
+                  </select>
+                </label>
+                <p class="tm-hint">
+                  Der Eingeladene bekommt einen Magic-Link per E-Mail. Beim ersten Login
+                  ist die Einladung automatisch akzeptiert.
+                </p>
+              </div>
+              <div class="bp-modal-foot">
+                <button type="button" @click="openInvite = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                <button type="button" @click="sendInvite()" :disabled="isSending" class="v9-btn v9-btn--primary">
+                  <span x-show="!isSending">Einladung senden</span>
+                  <span x-show="isSending" x-cloak>Sende …</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>{/* x-data teamPage */}
+    </section>
+
+  </AccountShell>
+</Layout>
 
 <style is:global>
 [x-cloak] { display: none !important; }
@@ -144,172 +312,6 @@ const canRemove     = hasPermission(myRole, 'team.remove');
 .tm-field-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
 .tm-hint { font-size: 12px; color: var(--ink-muted); margin: 10px 0 0; font-style: italic; }
 </style>
-
-<div
-  x-data={`teamPage({ canInvite: ${canInvite}, canChangeRole: ${canChangeRole}, canRemove: ${canRemove}, myUserId: ${JSON.stringify(user.id)} })`}
-  class="settings-page"
->
-
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
-    <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Team</span>
-  </nav>
-
-  <section class="settings-hero">
-    <span class="settings-hero__eyebrow">09 · Team</span>
-    <h1 class="settings-hero__title">Mitarbeiter dieses Hotels<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">
-      Owner verwaltet, Manager pflegen Inhalte + bestätigen Operations,
-      Staff bearbeiten Tages-Geschäft (Service-Anfragen, Buchungen).
-    </p>
-  </section>
-
-  <div class="settings-sections">
-
-    <!-- 01 Aktive Mitglieder -->
-    <section class="s-card">
-      <div class="s-card__head">
-        <h2 class="s-card__title">Aktive Mitglieder</h2>
-        <span class="s-card__num">{activeMembers.length}</span>
-      </div>
-      <div class="s-card__body">
-        <div class="tm-list">
-          {activeMembers.map(m => {
-            const isMe = m.user_id === user.id;
-            const isOwner = m.role === 'owner';
-            return (
-              <article class="tm-row" data-member-id={m.id}>
-                <div class="tm-row-info">
-                  <p class="tm-row-name">
-                    {displayName(m)}{isMe && <span class="tm-row-self"> (du)</span>}
-                  </p>
-                  <p class="tm-row-meta">{emailMap.get(m.user_id) || '—'}</p>
-                </div>
-                <div class="tm-row-actions">
-                  {(canChangeRole && !isOwner && !isMe) ? (
-                    <select
-                      class="s-select"
-                      style="font-size:12px;padding:5px 10px"
-                      data-member-id={m.id}
-                      data-current-role={m.role}
-                      @change="changeRole($event)"
-                    >
-                      <option value="manager" selected={m.role === 'manager'}>Manager</option>
-                      <option value="staff" selected={m.role === 'staff'}>Front-Desk</option>
-                    </select>
-                  ) : (
-                    <span class={`tm-badge${isOwner ? ' tm-badge--owner' : ''}`}>
-                      {ROLE_LABELS[m.role as Role]}{isOwner && ' ★'}
-                    </span>
-                  )}
-                  {(canRemove && !isOwner && !isMe) && (
-                    <button
-                      type="button"
-                      class="v9-btn v9-btn--danger"
-                      style="font-size:12px;padding:5px 12px"
-                      @click={`removeMember('${m.id}', '${displayName(m).replace(/'/g, "\\'")}')`}
-                    >
-                      Entfernen
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-      {canInvite && (
-        <div class="s-card__footer">
-          <button type="button" @click="openInvite = true" class="v9-btn v9-btn--primary">
-            + Mitarbeiter einladen
-          </button>
-        </div>
-      )}
-    </section>
-
-    <!-- 02 Offene Einladungen -->
-    {pendingInvites.length > 0 && (
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">Offene Einladungen</h2>
-          <span class="s-card__num">{pendingInvites.length}</span>
-        </div>
-        <div class="s-card__body">
-          <div class="tm-list">
-            {pendingInvites.map(m => (
-              <article class="tm-row tm-row--pending">
-                <div class="tm-row-info">
-                  <p class="tm-row-name">{emailMap.get(m.user_id) || '—'}</p>
-                  <p class="tm-row-meta">
-                    eingeladen als {ROLE_LABELS[m.role as Role]} ·{' '}
-                    {m.invited_at
-                      ? new Date(m.invited_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-                      : '—'}
-                  </p>
-                </div>
-                <div class="tm-row-actions">
-                  <span class="tm-badge tm-badge--pending">Ausstehend</span>
-                  {canRemove && (
-                    <button
-                      type="button"
-                      class="v9-btn v9-btn--danger"
-                      style="font-size:12px;padding:5px 12px"
-                      @click={`removeMember('${m.id}', '${(emailMap.get(m.user_id) || '').replace(/'/g, "\\'")}')`}
-                    >
-                      Widerrufen
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-    )}
-
-  </div>{/* .settings-sections */}
-
-  <!-- Invite-Modal -->
-  {canInvite && (
-    <div x-show="openInvite" x-cloak class="bp-modal-bd" @click.self="openInvite = false">
-      <div class="bp-modal" role="dialog" aria-modal="true" @click.stop>
-        <div class="bp-modal-head">
-          <h3 class="bp-modal-title">Mitarbeiter einladen</h3>
-          <button type="button" @click="openInvite = false" class="bp-modal-x" aria-label="Schließen">✕</button>
-        </div>
-        <div class="bp-modal-body">
-          <div x-show="inviteError" x-cloak style="margin-bottom:12px">
-            <p class="s-flash s-flash--err" x-text="inviteError" style="margin:0"></p>
-          </div>
-          <label class="tm-field">
-            <span class="tm-field-label">E-Mail</span>
-            <input type="email" x-model="inviteEmail" placeholder="kollege@hotel.de" class="s-input" />
-          </label>
-          <label class="tm-field">
-            <span class="tm-field-label">Rolle</span>
-            <select x-model="inviteRole" class="s-select">
-              <option value="manager">Manager (Inhalte + Settings + Operations)</option>
-              <option value="staff">Front-Desk (nur Operations)</option>
-            </select>
-          </label>
-          <p class="tm-hint">
-            Der Eingeladene bekommt einen Magic-Link per E-Mail. Beim ersten Login
-            ist die Einladung automatisch akzeptiert.
-          </p>
-        </div>
-        <div class="bp-modal-foot">
-          <button type="button" @click="openInvite = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
-          <button type="button" @click="sendInvite()" :disabled="isSending" class="v9-btn v9-btn--primary">
-            <span x-show="!isSending">Einladung senden</span>
-            <span x-show="isSending" x-cloak>Sende …</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
-
-</div>{/* .settings-page */}
 
 <script>
   import Alpine from 'alpinejs';
@@ -395,5 +397,3 @@ const canRemove     = hasPermission(myRole, 'team.remove');
     },
   }));
 </script>
-
-</Layout>
