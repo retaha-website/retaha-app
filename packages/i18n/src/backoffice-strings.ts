@@ -88,7 +88,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'admin',
     'tab.here': 'du bist hier',
     'tab.switch': 'wechsle zu',
-    'header.theme': 'Theme wechseln'
+    'header.theme': 'Theme wechseln',
+    'hub.subtitle': 'Verwalte die Einstellungen in Bezug auf die Anmeldung bei deinem Account sowie die Account-Sicherheit.',
+    'hub.avatar.change': 'Profilfoto ändern',
+    'hub.avatar.alt': 'Profilfoto',
+    'hub.avatar.upload': 'Profilfoto hochladen',
+    'hub.nav.aria': 'Account-Navigation',
+    'hub.group.account': 'Account',
+    'hub.konto': 'Konto',
+    'hub.security': 'Sicherheit',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Hotel-Daten',
+    'hub.team': 'Team'
   },
   en: {
     'dd.profile': 'My Profile',
@@ -172,7 +183,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'admin',
     'tab.here': 'you are here',
     'tab.switch': 'switch to',
-    'header.theme': 'Switch theme'
+    'header.theme': 'Switch theme',
+    'hub.subtitle': 'Manage login and security settings for your account.',
+    'hub.avatar.change': 'Change profile photo',
+    'hub.avatar.alt': 'Profile photo',
+    'hub.avatar.upload': 'Upload profile photo',
+    'hub.nav.aria': 'Account Navigation',
+    'hub.group.account': 'Account',
+    'hub.konto': 'Account',
+    'hub.security': 'Security',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Hotel data',
+    'hub.team': 'Team'
   },
   fr: {
     'dd.profile': 'Mon profil',
@@ -256,7 +278,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'admin',
     'tab.here': 'vous êtes ici',
     'tab.switch': 'basculer vers',
-    'header.theme': 'Changer de thème'
+    'header.theme': 'Changer de thème',
+    'hub.subtitle': 'Gérez les paramètres relatifs à la connexion à votre compte et à la sécurité du compte.',
+    'hub.avatar.change': 'Modifier la photo de profil',
+    'hub.avatar.alt': 'Photo de profil',
+    'hub.avatar.upload': 'Télécharger la photo de profil',
+    'hub.nav.aria': 'Navigation du compte',
+    'hub.group.account': 'Compte',
+    'hub.konto': 'Compte',
+    'hub.security': 'Sécurité',
+    'hub.group.hotel': 'Hôtel',
+    'hub.hoteldata': 'Données de l\'hôtel',
+    'hub.team': 'Équipe'
   },
   es: {
     'dd.profile': 'Mi perfil',
@@ -340,7 +373,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'Administrador',
     'tab.here': 'Estás aquí',
     'tab.switch': 'cambiar a',
-    'header.theme': 'Cambiar tema'
+    'header.theme': 'Cambiar tema',
+    'hub.subtitle': 'Administra los ajustes relacionados con el inicio de sesión de tu cuenta y la seguridad de la cuenta.',
+    'hub.avatar.change': 'Cambiar foto de perfil',
+    'hub.avatar.alt': 'Foto de perfil',
+    'hub.avatar.upload': 'Cargar foto de perfil',
+    'hub.nav.aria': 'Navegación de cuenta',
+    'hub.group.account': 'Cuenta',
+    'hub.konto': 'Cuenta',
+    'hub.security': 'Seguridad',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Datos del hotel',
+    'hub.team': 'Equipo'
   },
   it: {
     'dd.profile': 'Il mio profilo',
@@ -424,7 +468,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'amministratore',
     'tab.here': 'sei qui',
     'tab.switch': 'passa a',
-    'header.theme': 'Cambia tema'
+    'header.theme': 'Cambia tema',
+    'hub.subtitle': 'Gestisci le impostazioni relative all\'accesso al tuo account e alla sicurezza dell\'account.',
+    'hub.avatar.change': 'Cambia foto profilo',
+    'hub.avatar.alt': 'Foto del profilo',
+    'hub.avatar.upload': 'Carica foto profilo',
+    'hub.nav.aria': 'Navigazione account',
+    'hub.group.account': 'Account',
+    'hub.konto': 'Conto',
+    'hub.security': 'Sicurezza',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Dati dell\'hotel',
+    'hub.team': 'Team'
   },
   pt: {
     'dd.profile': 'Meu perfil',
@@ -508,7 +563,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'administrador',
     'tab.here': 'você está aqui',
     'tab.switch': 'mudar para',
-    'header.theme': 'Mudar tema'
+    'header.theme': 'Mudar tema',
+    'hub.subtitle': 'Gerencie as configurações relacionadas ao login da sua conta e à segurança da conta.',
+    'hub.avatar.change': 'Alterar foto de perfil',
+    'hub.avatar.alt': 'Foto de perfil',
+    'hub.avatar.upload': 'Carregar foto de perfil',
+    'hub.nav.aria': 'Navegação da conta',
+    'hub.group.account': 'Conta',
+    'hub.konto': 'Conta',
+    'hub.security': 'Segurança',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Dados do Hotel',
+    'hub.team': 'Equipe'
   },
   nl: {
     'dd.profile': 'Mijn profiel',
@@ -592,7 +658,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'beheerder',
     'tab.here': 'je bent hier',
     'tab.switch': 'schakel over naar',
-    'header.theme': 'Thema wijzigen'
+    'header.theme': 'Thema wijzigen',
+    'hub.subtitle': 'Beheer instellingen voor accountaanmelding en accountbeveiliging.',
+    'hub.avatar.change': 'Profielfoto wijzigen',
+    'hub.avatar.alt': 'Profielfoto',
+    'hub.avatar.upload': 'Profielfoto uploaden',
+    'hub.nav.aria': 'Account-navigatie',
+    'hub.group.account': 'Account',
+    'hub.konto': 'Account',
+    'hub.security': 'Veiligheid',
+    'hub.group.hotel': 'Hotel',
+    'hub.hoteldata': 'Hotelgegevens',
+    'hub.team': 'Team'
   },
   ru: {
     'dd.profile': 'Мой профиль',
@@ -676,7 +753,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'администратор',
     'tab.here': 'ты здесь',
     'tab.switch': 'переключиться на',
-    'header.theme': 'Сменить тему'
+    'header.theme': 'Сменить тему',
+    'hub.subtitle': 'Управляйте параметрами входа в аккаунт и безопасностью аккаунта.',
+    'hub.avatar.change': 'Изменить фото профиля',
+    'hub.avatar.alt': 'Фото профиля',
+    'hub.avatar.upload': 'Загрузить фото профиля',
+    'hub.nav.aria': 'Навигация аккаунта',
+    'hub.group.account': 'Аккаунт',
+    'hub.konto': 'Учетная запись',
+    'hub.security': 'Безопасность',
+    'hub.group.hotel': 'Отель',
+    'hub.hoteldata': 'Данные отеля',
+    'hub.team': 'Команда'
   },
   ar: {
     'dd.profile': 'ملفي الشخصي',
@@ -760,7 +848,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'المسؤول',
     'tab.here': 'أنت هنا',
     'tab.switch': 'انتقل إلى',
-    'header.theme': 'تبديل المظهر'
+    'header.theme': 'تبديل المظهر',
+    'hub.subtitle': 'إدارة إعدادات تسجيل الدخول وأمان حسابك',
+    'hub.avatar.change': 'تغيير صورة الملف الشخصي',
+    'hub.avatar.alt': 'صورة الملف الشخصي',
+    'hub.avatar.upload': 'تحميل صورة الملف الشخصي',
+    'hub.nav.aria': 'ملاحة الحساب',
+    'hub.group.account': 'الحساب',
+    'hub.konto': 'حساب',
+    'hub.security': 'الأمان',
+    'hub.group.hotel': 'فندق',
+    'hub.hoteldata': 'بيانات الفندق',
+    'hub.team': 'فريق'
   },
   zh: {
     'dd.profile': '我的资料',
@@ -844,7 +943,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': '管理员',
     'tab.here': '你在这里',
     'tab.switch': '切换到',
-    'header.theme': '切换主题'
+    'header.theme': '切换主题',
+    'hub.subtitle': '管理与您的账户登录和账户安全相关的设置。',
+    'hub.avatar.change': '更改头像',
+    'hub.avatar.alt': '头像',
+    'hub.avatar.upload': '上传个人资料照片',
+    'hub.nav.aria': '账户导航',
+    'hub.group.account': '账户',
+    'hub.konto': '账户',
+    'hub.security': '安全性',
+    'hub.group.hotel': '酒店',
+    'hub.hoteldata': '酒店数据',
+    'hub.team': '团队'
   },
   tr: {
     'dd.profile': 'Profilim',
@@ -928,7 +1038,18 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'tab.admin': 'yönetici',
     'tab.here': 'sen burasındaysın',
     'tab.switch': 'şuraya geç',
-    'header.theme': 'Temayı değiştir'
+    'header.theme': 'Temayı değiştir',
+    'hub.subtitle': 'Hesap giriş ve hesap güvenliği ayarlarını yönetin.',
+    'hub.avatar.change': 'Profil fotoğrafını değiştir',
+    'hub.avatar.alt': 'Profil Fotoğrafı',
+    'hub.avatar.upload': 'Profil fotoğrafını yükle',
+    'hub.nav.aria': 'Hesap Navigasyonu',
+    'hub.group.account': 'Hesap',
+    'hub.konto': 'Hesap',
+    'hub.security': 'Güvenlik',
+    'hub.group.hotel': 'Otel',
+    'hub.hoteldata': 'Otel Verileri',
+    'hub.team': 'Takım'
   }
 };
 

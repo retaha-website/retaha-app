@@ -7,6 +7,8 @@ import AccountShell from '../../components/account/AccountShell.astro';
 import TwoFactorSection from '../../components/profil/TwoFactorSection.astro';
 import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance, clampTimeoutHours } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
+import { getLang } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -82,7 +84,7 @@ const activeCount = team.length - pendingCount;
 ---
 
 <Layout title="retaha Account · Sicherheit" activeTab="backoffice">
-  <AccountShell active="security" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel} avatarUrl={avatarUrl}>
+  <AccountShell active="security" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel} avatarUrl={avatarUrl} lang={lang}>
 
     <section class="acct__section" id="security-section">
       <div class="acct__section-head">

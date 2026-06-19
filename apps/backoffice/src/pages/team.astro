@@ -13,7 +13,9 @@ import AccountShell from '../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { ROLE_LABELS, hasPermission, type Role } from '@retaha/auth';
+import { getLang } from '../lib/i18n';
 
+const lang = getLang(Astro.cookies, Astro.request);
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
 
@@ -79,7 +81,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 ---
 
 <Layout title="retaha Account · Team" activeTab="backoffice">
-  <AccountShell active="team" initials={hubInitials} displayName={hubFullName || hubEmail} roleLabel={hubRoleLabel} avatarUrl={hubAvatar}>
+  <AccountShell active="team" initials={hubInitials} displayName={hubFullName || hubEmail} roleLabel={hubRoleLabel} avatarUrl={hubAvatar} lang={lang}>
 
     <section class="acct__section" id="team">
       <div class="acct__section-head">

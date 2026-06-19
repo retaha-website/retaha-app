@@ -2,6 +2,8 @@
 // Geteilte Hub-Shell für „retaha Account" (Sidebar + Header + Content-Slot).
 // Genutzt von /profil (Konto) und /profil/sicherheit (Sicherheit) — gleiche
 // Sidebar/Nav, nur aktiver Eintrag + Slot-Inhalt unterscheiden sich.
+import { bt, type LanguageCode } from '@retaha/i18n';
+
 interface Props {
   active: 'konto' | 'security' | 'hotel' | 'team';
   initials: string;
@@ -9,6 +11,7 @@ interface Props {
   roleLabel: string;
   avatarUrl?: string | null;
   subtitle?: string;
+  lang: LanguageCode;
 }
 const {
   active,
@@ -16,8 +19,10 @@ const {
   displayName,
   roleLabel,
   avatarUrl = null,
-  subtitle = 'Verwalte die Einstellungen in Bezug auf die Anmeldung bei deinem Account sowie die Account-Sicherheit.',
+  subtitle,
+  lang,
 } = Astro.props;
+const sub = subtitle ?? bt('hub.subtitle', lang);
 ---
 
 <div class="acct">
@@ -25,14 +30,14 @@ const {
   <!-- ── Sidebar ── -->
   <aside class="acct__sidebar">
     <div class="acct__user">
-      <label class="acct__avatar" title="Profilfoto ändern">
+      <label class="acct__avatar" title={bt('hub.avatar.change', lang)}>
         {avatarUrl
-          ? <img src={avatarUrl} alt="Profilfoto" class="acct__avatar-img" />
+          ? <img src={avatarUrl} alt={bt('hub.avatar.alt', lang)} class="acct__avatar-img" />
           : <span class="acct__avatar-initial" aria-hidden="true">{initials}</span>}
         <span class="acct__avatar-cam" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </span>
-        <input type="file" accept="image/*" class="sr-only acct__avatar-input" aria-label="Profilfoto hochladen" />
+        <input type="file" accept="image/*" class="sr-only acct__avatar-input" aria-label={bt('hub.avatar.upload', lang)} />
       </label>
       <div class="acct__user-meta">
         <span class="acct__user-name">{displayName}</span>
@@ -40,16 +45,16 @@ const {
       </div>
     </div>
 
-    <nav class="acct__nav" aria-label="Account-Navigation">
+    <nav class="acct__nav" aria-label={bt('hub.nav.aria', lang)}>
       <div class="acct__navgroup">
-        <span class="acct__navgroup-title">Account</span>
-        <a href="/profil" class={`acct__navitem${active === 'konto' ? ' is-active' : ''}`} aria-current={active === 'konto' ? 'page' : undefined}>Konto</a>
-        <a href="/profil/sicherheit" class={`acct__navitem${active === 'security' ? ' is-active' : ''}`} aria-current={active === 'security' ? 'page' : undefined}>Sicherheit</a>
+        <span class="acct__navgroup-title">{bt('hub.group.account', lang)}</span>
+        <a href="/profil" class={`acct__navitem${active === 'konto' ? ' is-active' : ''}`} aria-current={active === 'konto' ? 'page' : undefined}>{bt('hub.konto', lang)}</a>
+        <a href="/profil/sicherheit" class={`acct__navitem${active === 'security' ? ' is-active' : ''}`} aria-current={active === 'security' ? 'page' : undefined}>{bt('hub.security', lang)}</a>
       </div>
       <div class="acct__navgroup">
-        <span class="acct__navgroup-title">Hotel</span>
-        <a href="/profil/settings" class={`acct__navitem${active === 'hotel' ? ' is-active' : ''}`} aria-current={active === 'hotel' ? 'page' : undefined}>Hotel-Daten</a>
-        <a href="/team" class={`acct__navitem${active === 'team' ? ' is-active' : ''}`} aria-current={active === 'team' ? 'page' : undefined}>Team</a>
+        <span class="acct__navgroup-title">{bt('hub.group.hotel', lang)}</span>
+        <a href="/profil/settings" class={`acct__navitem${active === 'hotel' ? ' is-active' : ''}`} aria-current={active === 'hotel' ? 'page' : undefined}>{bt('hub.hoteldata', lang)}</a>
+        <a href="/team" class={`acct__navitem${active === 'team' ? ' is-active' : ''}`} aria-current={active === 'team' ? 'page' : undefined}>{bt('hub.team', lang)}</a>
       </div>
     </nav>
   </aside>
@@ -58,7 +63,7 @@ const {
   <main class="acct__content">
     <header class="acct__header">
       <h1 class="acct__title">retaha Account<span class="dot-pink">.</span></h1>
-      <p class="acct__sub">{subtitle}</p>
+      <p class="acct__sub">{sub}</p>
     </header>
 
     <slot />
