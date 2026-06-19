@@ -126,7 +126,7 @@ const slots = [
 
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       const json = await res.json();
-      if (!res.ok) { alert(`Upload fehlgeschlagen: ${json.error}`); return; }
+      if (!res.ok) { (window as any).retahaToast?.(`Upload fehlgeschlagen: ${json.error}`, 'error'); return; }
 
       // Live-Preview im Phone updaten
       const phoneLogo = document.querySelector<HTMLImageElement>('#brandPhoneScreen .gate-hero-logo');
@@ -145,6 +145,7 @@ const slots = [
         actions.hidden = false;
         actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
       }
+      (window as any).retahaToast?.('Logo gespeichert');
     });
   });
 
@@ -180,6 +181,9 @@ const slots = [
                 phoneLogo.hidden = true;
                 if (phoneFallback) phoneFallback.hidden = false;
               }
+              (window as any).retahaToast?.('Logo entfernt');
+            } else {
+              (window as any).retahaToast?.('Entfernen fehlgeschlagen', 'error');
             }
           });
         }

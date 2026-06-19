@@ -127,6 +127,7 @@ const assets = [
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       if (res.ok) {
         showStatus(slot, true, '✓ Gespeichert');
+        (window as any).retahaToast?.('Asset gespeichert');
         const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
         if (actions) {
           actions.hidden = false;
@@ -140,6 +141,7 @@ const assets = [
       } else {
         const j = await res.json();
         showStatus(slot, false, `✗ ${j.error}`);
+        (window as any).retahaToast?.(`Upload fehlgeschlagen: ${j.error}`, 'error');
       }
     });
   }
@@ -165,10 +167,13 @@ const assets = [
               const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
               if (actions) actions.hidden = true;
               showStatus(slot, true, '✓ Entfernt');
+              (window as any).retahaToast?.('Asset entfernt');
               if (key === 'splash_background') {
                 const heroBg = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-bg');
                 if (heroBg) heroBg.style.backgroundImage = '';
               }
+            } else {
+              (window as any).retahaToast?.('Entfernen fehlgeschlagen', 'error');
             }
           });
         }

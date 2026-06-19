@@ -197,7 +197,7 @@ function fmtDate(iso: string | null): string {
                     class="nf-btn-danger nf-btn-small"
                     type="button"
                     :disabled="busy"
-                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) location.reload(); else alert('Fehler: ' + (d.error || 'unbekannt')); })`}
+                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { window.retahaToastFlash && window.retahaToastFlash('Tag gelöscht'); location.reload(); } else { window.retahaToast && window.retahaToast('Fehler: ' + (d.error || 'unbekannt'), 'error'); } })`}
                   >Löschen</button>
                 )}
               </div>
@@ -248,6 +248,7 @@ function fmtDate(iso: string | null): string {
             });
             const data = await res.json();
             if (!data.ok) { this.form.error = data.error || 'Fehler'; return; }
+            window.retahaToastFlash && window.retahaToastFlash('NFC-Tag erstellt');
             location.reload();
           } finally { this.form.busy = false; }
         },
@@ -265,6 +266,7 @@ function fmtDate(iso: string | null): string {
             });
             const data = await res.json();
             if (!data.ok) { this.bulkForm.error = data.error || 'Fehler'; return; }
+            window.retahaToastFlash && window.retahaToastFlash('NFC-Tags erstellt');
             location.reload();
           } finally { this.bulkForm.busy = false; }
         },

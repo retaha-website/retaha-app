@@ -218,5 +218,26 @@
       var d = (e && e.detail) || {};
       window.retahaToast(d.message, d.type, d);
     });
+
+    // Reload-Flash: für Save-Aktionen, die per location.reload() neu laden.
+    //   window.retahaToastFlash('Gespeichert')  →  dann location.reload()
+    // Der Toast erscheint nach dem Neuladen (unten rechts), genau wie ein Direkt-Toast.
+    window.retahaToastFlash = function (message, type, opts) {
+      try {
+        var payload = { message: message, type: type || 'success' };
+        if (opts) for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) payload[k] = opts[k];
+        sessionStorage.setItem('retaha_toast_flash', JSON.stringify(payload));
+      } catch (_) {}
+    };
+    try {
+      var raw = sessionStorage.getItem('retaha_toast_flash');
+      if (raw) {
+        sessionStorage.removeItem('retaha_toast_flash');
+        var f = JSON.parse(raw);
+        var fire = function () { window.retahaToast(f.message, f.type, f); };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fire);
+        else fire();
+      }
+    } catch (_) {}
   })();
 </script>
