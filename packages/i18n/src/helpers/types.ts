@@ -11,7 +11,7 @@
 // AR und ZH sind RTL/CJK — keine Sonderbehandlung in dieser Phase, aber
 // Phase 5 (Editor-UI) und Phase 7 (Gast-Frontend) brauchen dir="rtl" für AR.
 
-export const LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const;
+export const LANGUAGES = ['de', 'en', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'ar', 'zh', 'tr'] as const;
 export type LanguageCode = typeof LANGUAGES[number];
 
 export const LANGUAGE_LABELS: Record<LanguageCode, string> = {
@@ -25,6 +25,7 @@ export const LANGUAGE_LABELS: Record<LanguageCode, string> = {
   ru: 'Русский',
   ar: 'العربية',
   zh: '中文',
+  tr: 'Türkçe',
 };
 
 /** ISO 639-1 fallback default. Wenn weder User-Sprache noch Hotel-Default verfügbar. */
