@@ -7,6 +7,7 @@ interface Props {
   initials: string;
   displayName: string;
   roleLabel: string;
+  avatarUrl?: string | null;
   subtitle?: string;
 }
 const {
@@ -14,6 +15,7 @@ const {
   initials,
   displayName,
   roleLabel,
+  avatarUrl = null,
   subtitle = 'Verwalte die Einstellungen in Bezug auf die Anmeldung bei deinem Account sowie die Account-Sicherheit.',
 } = Astro.props;
 ---
@@ -23,7 +25,15 @@ const {
   <!-- ── Sidebar ── -->
   <aside class="acct__sidebar">
     <div class="acct__user">
-      <div class="acct__avatar" aria-hidden="true">{initials}</div>
+      <label class="acct__avatar" title="Profilfoto ändern">
+        {avatarUrl
+          ? <img src={avatarUrl} alt="Profilfoto" class="acct__avatar-img" />
+          : <span class="acct__avatar-initial" aria-hidden="true">{initials}</span>}
+        <span class="acct__avatar-cam" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </span>
+        <input type="file" accept="image/*" class="sr-only acct__avatar-input" aria-label="Profilfoto hochladen" />
+      </label>
       <div class="acct__user-meta">
         <span class="acct__user-name">{displayName}</span>
         <span class="acct__user-role">{roleLabel}</span>
@@ -72,16 +82,25 @@ const {
   @media (max-width: 900px) { .acct__sidebar { position: static; top: 0; } }
 
   .acct__user {
-    display: flex; align-items: center; gap: 12px;
-    padding-bottom: 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    padding-top: 5px; padding-bottom: 28px; border-bottom: 1px solid var(--border);
   }
+  /* Klickbarer Avatar — Foto oder Initiale, Hover/Fokus zeigt Kamera-Overlay. */
   .acct__avatar {
-    width: 40px; height: 40px; flex-shrink: 0;
+    position: relative; width: 44px; height: 44px; flex-shrink: 0;
     background: var(--ink); color: var(--bg);
     display: flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); overflow: hidden; cursor: pointer;
   }
+  .acct__avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .acct__avatar-initial { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; }
+  .acct__avatar-cam {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(10, 10, 10, 0.5); color: #fff; opacity: 0; transition: opacity 150ms ease;
+  }
+  .acct__avatar:hover .acct__avatar-cam,
+  .acct__avatar:focus-within .acct__avatar-cam { opacity: 1; }
+  .acct__avatar-cam svg { width: 17px; height: 17px; }
   .acct__user-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .acct__user-name {
     font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
@@ -140,6 +159,29 @@ const {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .acct__navitem { transition: none; }
+    .acct__navitem, .acct__avatar-cam { transition: none; }
   }
 </style>
+
+<script>
+  // Profilfoto-Upload: File-Input → /api/account/avatar → Reload (alle Avatare frisch).
+  document.querySelectorAll<HTMLInputElement>('.acct__avatar-input').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const toast = (window as any).retahaToast as ((m: string, t?: string) => void) | undefined;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/account/avatar', { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload fehlgeschlagen');
+        toast?.('Profilfoto aktualisiert');
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        toast?.(err instanceof Error ? err.message : 'Fehler beim Upload', 'error');
+        input.value = '';
+      }
+    });
+  });
+</script>

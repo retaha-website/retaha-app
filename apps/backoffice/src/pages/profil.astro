@@ -80,7 +80,8 @@ const currentEmail = user.email ?? '';
 const role         = (hotelUser?.role ?? 'staff') as string;
 const roleLabel    = ROLE_LABELS[role] ?? role;
 const fullName     = [firstName, lastName].filter(Boolean).join(' ');
-const initials     = ((firstName.charAt(0) + lastName.charAt(0)).trim() || currentEmail.charAt(0)).toUpperCase();
+const initials     = (firstName.charAt(0) || currentEmail.charAt(0)).toUpperCase();
+const avatarUrl    = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
 
 // Bei Validierungsfehler öffnet der betroffene Editor nach dem Reload wieder.
 const errorTile = message?.type === 'error'
@@ -92,7 +93,7 @@ const errorTile = message?.type === 'error'
 ---
 
 <Layout title="retaha Account" activeTab="backoffice">
-  <AccountShell active="konto" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel}>
+  <AccountShell active="konto" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel} avatarUrl={avatarUrl}>
 
     {message && (
       <script is:inline define:vars={{ m: message.text, t: message.type === 'success' ? 'success' : 'error' }}>
