@@ -1,6 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -43,27 +45,38 @@ function pickI18n(value: any, lang: string, fallbackLang: string = 'de'): string
 }
 
 const INTERNAL_ACTIONS = [
-  { value: 'open_breakfast',  label: 'Frühstück' },
-  { value: 'open_service',    label: 'Service-Anfrage' },
-  { value: 'open_eve',        label: 'Eve KI-Concierge' },
-  { value: 'open_places',     label: 'Empfehlungen' },
-  { value: 'open_wifi',       label: 'WLAN' },
-  { value: 'open_conference', label: 'Konferenz' },
-  { value: 'open_wallet',     label: 'Wallet (bald verfügbar)' },
+  { value: 'open_breakfast',  label: bt('ac.action.breakfast', lang) },
+  { value: 'open_service',    label: bt('ac.action.service', lang) },
+  { value: 'open_eve',        label: bt('ac.action.eve', lang) },
+  { value: 'open_places',     label: bt('ac.action.places', lang) },
+  { value: 'open_wifi',       label: bt('ac.action.wifi', lang) },
+  { value: 'open_conference', label: bt('ac.action.conference', lang) },
+  { value: 'open_wallet',     label: bt('ac.action.wallet', lang) },
 ];
 
 const CARD_CLASSES = [
-  { value: 'rec-anthrazit', label: 'Anthrazit · dunkel' },
-  { value: 'rec-pink',      label: 'Pink-Shock · Statement' },
-  { value: 'rec-white',     label: 'Weiß · Brutalist' },
+  { value: 'rec-anthrazit', label: bt('ac.class.anthrazit', lang) },
+  { value: 'rec-pink',      label: bt('ac.class.pink', lang) },
+  { value: 'rec-white',     label: bt('ac.class.white', lang) },
 ];
 
 const CARD_TYPE_LABELS: Record<string, string> = {
-  internal_action: 'Interne Action',
-  external_link:   'Externer Link',
-  info:            'Info-Card (kein Click)',
-  phone:           'Telefon-Link',
-  email:           'Email-Link',
+  internal_action: bt('ac.type.internal', lang),
+  external_link:   bt('ac.type.external', lang),
+  info:            bt('ac.type.info', lang),
+  phone:           bt('ac.type.phone', lang),
+  email:           bt('ac.type.email', lang),
+};
+
+// Client-Strings für die Alpine-Komponente
+const acT = {
+  fileTooBig: bt('ac.js.filetoobig', lang),
+  titleRequired: bt('ac.js.titlerequired', lang),
+  saved: bt('common.saved', lang),
+  netErr: bt('ac.js.neterr', lang),
+  imageUpload: bt('ac.js.imageupload', lang),
+  deleteConfirm: bt('ac.js.deleteconfirm', lang),
+  deleted: bt('ac.js.deleted', lang),
 };
 ---
 
@@ -76,29 +89,28 @@ const CARD_TYPE_LABELS: Record<string, string> = {
       internalActions: INTERNAL_ACTIONS,
       cardClasses: CARD_CLASSES,
       typeLabels: CARD_TYPE_LABELS,
+      t: acT,
     })})`}
     class="ac-root"
   >
     <header class="ac-header">
-      <p class="ac-eyebrow">08 · Hero-Karten</p>
-      <h1 class="ac-title">Die Karten oben im Gast-Bereich<span class="h-dot">.</span></h1>
-      <p class="ac-sub">Swipebar, sortierbar, mehrsprachig. Empfehlung: 3–5 Karten — mehr macht das Swipen mühsam.</p>
+      <p class="ac-eyebrow">{bt('ac.eyebrow', lang)}</p>
+      <h1 class="ac-title" set:html={bt('ac.title', lang)}></h1>
+      <p class="ac-sub">{bt('ac.sub', lang)}</p>
     </header>
 
     {overFive && (
-      <div class="ac-hint-banner">
-        <strong>{cardList.length} Karten aktiv.</strong> Empfehlung sind 3–5 — Gäste swipen sonst zu lange. (Kein Limit, nur ein Hinweis.)
-      </div>
+      <div class="ac-hint-banner" set:html={bt('ac.hintbanner', lang).replace('{n}', String(cardList.length))}></div>
     )}
 
     <div class="ac-actions-row">
-      <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">+ Neue Karte</button>
-      <span class="ac-counter">{cardList.length} {cardList.length === 1 ? 'Karte' : 'Karten'}</span>
+      <button type="button" @click="openNew()" class="ac-btn ac-btn--primary">{bt('ac.new', lang)}</button>
+      <span class="ac-counter">{cardList.length} {cardList.length === 1 ? bt('ac.card.one', lang) : bt('ac.card.many', lang)}</span>
     </div>
 
     {cardList.length === 0 ? (
       <div class="ac-empty">
-        <p class="ac-empty-text">Noch keine Karten. Lege deine erste an — z.B. „Frühstück reservieren" als interne Action.</p>
+        <p class="ac-empty-text">{bt('ac.empty', lang)}</p>
       </div>
     ) : (
       <div class="ac-list">
@@ -114,7 +126,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
             <div class="ac-row-meta">
               <div class="ac-row-badges">
                 <span class="ac-badge">{CARD_TYPE_LABELS[c.card_type] ?? c.card_type}</span>
-                {!c.is_published && <span class="ac-badge ac-badge--draft">Entwurf</span>}
+                {!c.is_published && <span class="ac-badge ac-badge--draft">{bt('ac.badge.draft', lang)}</span>}
                 {c.action_target && <span class="ac-badge ac-badge--target">{c.action_target}</span>}
               </div>
               <p class="ac-row-title">{pickI18n(c.title_i18n, hotelDefaultLang) || c.title_de}</p>
@@ -123,10 +135,10 @@ const CARD_TYPE_LABELS: Record<string, string> = {
               )}
             </div>
             <div class="ac-row-actions">
-              <button type="button" @click={`moveCard('${c.id}','up')`} disabled={idx === 0} class="ac-icon-btn" title="Nach oben">↑</button>
-              <button type="button" @click={`moveCard('${c.id}','down')`} disabled={idx === cardList.length - 1} class="ac-icon-btn" title="Nach unten">↓</button>
-              <button type="button" @click={`openEdit('${c.id}')`} class="ac-icon-btn" title="Bearbeiten">✎</button>
-              <button type="button" @click={`deleteCard('${c.id}')`} class="ac-icon-btn ac-icon-btn--danger" title="Löschen">×</button>
+              <button type="button" @click={`moveCard('${c.id}','up')`} disabled={idx === 0} class="ac-icon-btn" title={bt('ac.up', lang)}>↑</button>
+              <button type="button" @click={`moveCard('${c.id}','down')`} disabled={idx === cardList.length - 1} class="ac-icon-btn" title={bt('ac.down', lang)}>↓</button>
+              <button type="button" @click={`openEdit('${c.id}')`} class="ac-icon-btn" title={bt('si.items.edit', lang)}>✎</button>
+              <button type="button" @click={`deleteCard('${c.id}')`} class="ac-icon-btn ac-icon-btn--danger" title={bt('nfc.delete', lang)}>×</button>
             </div>
           </article>
         ))}
@@ -134,13 +146,13 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     )}
 
     <section class="ac-preview-section">
-      <h2 class="ac-section-title">Live-Vorschau im Gast-Bereich</h2>
+      <h2 class="ac-section-title">{bt('ac.preview.title', lang)}</h2>
       <p class="ac-section-sub">
-        Vorschau in {LANG_LABELS[hotelDefaultLang]}. Gäste sehen automatische Übersetzungen in {otherEnabledLabel || 'ihrer Sprache'}.
+        {bt('ac.preview.sub', lang).replace('{lang}', LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang).replace('{others}', otherEnabledLabel || bt('ac.preview.theirlang', lang))}
       </p>
 
       {cardList.length === 0 ? (
-        <p class="ac-preview-empty">Keine Karten zum Vorschauen.</p>
+        <p class="ac-preview-empty">{bt('ac.preview.empty', lang)}</p>
       ) : (
         <div class="ac-preview-stage">
           <div class="ac-preview-scroller">
@@ -167,107 +179,102 @@ const CARD_TYPE_LABELS: Record<string, string> = {
     <div x-show="editorOpen" x-cloak class="ac-modal-backdrop" @click.self="closeEditor()">
       <div class="ac-modal" @click.stop>
         <header class="ac-modal-head">
-          <h3 x-text="editorMode === 'new' ? 'Neue Karte' : 'Karte bearbeiten'"></h3>
+          <h3 x-text={`editorMode === 'new' ? ${JSON.stringify(bt('ac.modal.new', lang))} : ${JSON.stringify(bt('ac.modal.edit', lang))}`}></h3>
           <button type="button" @click="closeEditor()" class="ac-modal-close">×</button>
         </header>
 
         <div class="ac-modal-body">
           <label class="ac-field">
-            <span class="ac-field-label">Karten-Typ</span>
+            <span class="ac-field-label">{bt('ac.modal.type', lang)}</span>
             <select x-model="editor.card_type" @change="onTypeChange()" class="ac-input">
-              <option value="internal_action">Interne Action</option>
-              <option value="external_link">Externer Link</option>
-              <option value="info">Info-Card (kein Click)</option>
-              <option value="phone">Telefon-Link</option>
-              <option value="email">Email-Link</option>
+              <option value="internal_action">{bt('ac.type.internal', lang)}</option>
+              <option value="external_link">{bt('ac.type.external', lang)}</option>
+              <option value="info">{bt('ac.type.info', lang)}</option>
+              <option value="phone">{bt('ac.type.phone', lang)}</option>
+              <option value="email">{bt('ac.type.email', lang)}</option>
             </select>
           </label>
 
           <div x-show="editor.card_type === 'internal_action'" class="ac-field">
-            <span class="ac-field-label">Welches Sheet öffnen?</span>
+            <span class="ac-field-label">{bt('ac.modal.sheet', lang)}</span>
             <select x-model="editor.action_target" class="ac-input">
-              <option value="">wählen</option>
+              <option value="">{bt('ac.modal.choose', lang)}</option>
               {INTERNAL_ACTIONS.map(a => <option value={a.value}>{a.label}</option>)}
             </select>
           </div>
 
           <div x-show="editor.card_type === 'external_link'" class="ac-field">
-            <span class="ac-field-label">URL (https://…)</span>
+            <span class="ac-field-label">{bt('ac.modal.url', lang)}</span>
             <input type="url" x-model="editor.action_target" placeholder="https://booking.gate-garden.de" class="ac-input" />
           </div>
 
           <div x-show="editor.card_type === 'phone'" class="ac-field">
-            <span class="ac-field-label">Telefonnummer</span>
+            <span class="ac-field-label">{bt('ac.modal.phone', lang)}</span>
             <input type="tel" x-model="editor.action_target" placeholder="+49 30 12345678" class="ac-input" />
           </div>
 
           <div x-show="editor.card_type === 'email'" class="ac-field">
-            <span class="ac-field-label">Email-Adresse</span>
+            <span class="ac-field-label">{bt('ac.modal.email', lang)}</span>
             <input type="email" x-model="editor.action_target" placeholder="rezeption@gate-garden.de" class="ac-input" />
           </div>
 
-          <div class="ac-i18n-hint">
-            <strong>Eingabe in {LANG_LABELS[hotelDefaultLang]}</strong> · Wird {otherEnabled.length > 0
-              ? `automatisch in ${otherEnabledLabel} übersetzt`
-              : 'aktuell nicht übersetzt (keine weiteren Gast-Sprachen aktiviert)'
-            }
-          </div>
+          <div class="ac-i18n-hint" set:html={`<strong>${bt('ac.modal.inputin', lang)} ${LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang}</strong> · ${otherEnabled.length > 0 ? bt('ac.modal.willtranslate', lang).replace('{langs}', otherEnabledLabel) : bt('ac.modal.notranslate', lang)}`}></div>
 
           <label class="ac-field">
-            <span class="ac-field-label">Titel <span class="ac-required">*</span></span>
+            <span class="ac-field-label">{bt('ac.modal.titlelabel', lang)} <span class="ac-required">*</span></span>
             <input type="text" x-model="editor.title" required maxlength="60" class="ac-input" />
           </label>
           <label class="ac-field">
-            <span class="ac-field-label">Eyebrow <span class="ac-optional">(z.B. „Morgen Mittag")</span></span>
+            <span class="ac-field-label">{bt('ac.modal.eyebrow', lang)} <span class="ac-optional">{bt('ac.modal.eyebrowhint', lang)}</span></span>
             <input type="text" x-model="editor.eyebrow" maxlength="40" class="ac-input" />
           </label>
           <label class="ac-field">
-            <span class="ac-field-label">Untertitel <span class="ac-optional">(2–3 Sätze)</span></span>
+            <span class="ac-field-label">{bt('ac.modal.subtitle', lang)} <span class="ac-optional">{bt('ac.modal.subtitlehint', lang)}</span></span>
             <textarea x-model="editor.subtitle" rows="2" maxlength="200" class="ac-input"></textarea>
           </label>
           <label class="ac-field">
-            <span class="ac-field-label">Button-Text (CTA)</span>
+            <span class="ac-field-label">{bt('ac.modal.cta', lang)}</span>
             <input type="text" x-model="editor.cta" maxlength="30" class="ac-input" placeholder="z.B. Tisch reservieren" />
           </label>
 
           <div class="ac-field">
-            <span class="ac-field-label">Bild <span class="ac-optional">(max 2 MB, JPEG/PNG/WebP, wird auf 1200px verkleinert)</span></span>
+            <span class="ac-field-label">{bt('ac.modal.image', lang)} <span class="ac-optional">{bt('ac.modal.imagehint', lang)}</span></span>
             <div class="ac-image-row">
               <div class="ac-image-preview">
                 <template x-if="editor.imagePreview || editor.image_url">
                   <img :src="editor.imagePreview || editor.image_url" alt="" />
                 </template>
                 <template x-if="!editor.imagePreview && !editor.image_url">
-                  <span class="ac-image-placeholder">kein Bild</span>
+                  <span class="ac-image-placeholder">{bt('ac.modal.noimage', lang)}</span>
                 </template>
               </div>
               <div class="ac-image-actions">
                 <input type="file" accept="image/jpeg,image/png,image/webp" @change="onFileChange($event)" class="ac-input ac-input--file" />
-                <button type="button" x-show="editor.imagePreview || editor.image_url" @click="clearImage()" class="ac-btn ac-btn--ghost">Bild entfernen</button>
+                <button type="button" x-show="editor.imagePreview || editor.image_url" @click="clearImage()" class="ac-btn ac-btn--ghost">{bt('ac.modal.removeimage', lang)}</button>
               </div>
             </div>
           </div>
 
           <div class="ac-field-row">
             <label class="ac-field">
-              <span class="ac-field-label">Karten-Stil</span>
+              <span class="ac-field-label">{bt('ac.modal.style', lang)}</span>
               <select x-model="editor.card_class" class="ac-input">
                 {CARD_CLASSES.map(c => <option value={c.value}>{c.label}</option>)}
               </select>
             </label>
             <label class="ac-field ac-field--checkbox">
               <input type="checkbox" x-model="editor.is_published" />
-              <span>Veröffentlicht (im Gast-Frontend sichtbar)</span>
+              <span>{bt('ac.modal.published', lang)}</span>
             </label>
           </div>
         </div>
 
         <footer class="ac-modal-foot">
           <span x-show="saveError" x-text="saveError" class="ac-error"></span>
-          <button type="button" @click="closeEditor()" class="ac-btn ac-btn--ghost">Abbrechen</button>
+          <button type="button" @click="closeEditor()" class="ac-btn ac-btn--ghost">{bt('common.cancel', lang)}</button>
           <button type="button" @click="saveEditor()" :disabled="isSaving" class="ac-btn ac-btn--primary">
-            <span x-show="!isSaving">Speichern</span>
-            <span x-show="isSaving">Speichere…</span>
+            <span x-show="!isSaving">{bt('common.save', lang)}</span>
+            <span x-show="isSaving">{bt('ac.modal.saving', lang)}</span>
           </button>
         </footer>
       </div>
@@ -305,6 +312,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
         internalActions: initial.internalActions,
         cardClasses: initial.cardClasses,
         typeLabels: initial.typeLabels,
+        t: initial.t,
 
         editorOpen: false,
         editorMode: 'new' as 'new' | 'edit',
@@ -353,7 +361,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
           const file = input.files?.[0];
           if (!file) return;
           if (file.size > 2 * 1024 * 1024) {
-            this.showToast('Datei zu groß (max 2 MB)', 'error');
+            this.showToast(this.t.fileTooBig, 'error');
             input.value = '';
             return;
           }
@@ -369,7 +377,7 @@ const CARD_TYPE_LABELS: Record<string, string> = {
 
         async saveEditor() {
           if (!this.editor.title?.trim()) {
-            this.saveError = 'Titel ist Pflicht.';
+            this.saveError = this.t.titleRequired;
             return;
           }
           this.isSaving = true;
@@ -399,13 +407,13 @@ const CARD_TYPE_LABELS: Record<string, string> = {
               fd.append('image', this.editor.imageFile);
               const upRes = await fetch('/api/action-cards/upload-image', { method: 'POST', body: fd });
               const upData = await upRes.json();
-              if (!upRes.ok || !upData.ok) { this.saveError = `Bild-Upload: ${upData.error || upRes.statusText}`; return; }
+              if (!upRes.ok || !upData.ok) { this.saveError = `${this.t.imageUpload}: ${upData.error || upRes.statusText}`; return; }
             }
-            this.showToast('Gespeichert.', 'success');
+            this.showToast(this.t.saved, 'success');
             this.editorOpen = false;
             setTimeout(() => window.location.reload(), 600);
           } catch (err: any) {
-            this.saveError = `Netzwerk-Fehler: ${err.message ?? err}`;
+            this.saveError = `${this.t.netErr}: ${err.message ?? err}`;
           } finally {
             this.isSaving = false;
           }
@@ -422,14 +430,14 @@ const CARD_TYPE_LABELS: Record<string, string> = {
         },
 
         async deleteCard(id: string) {
-          if (!confirm('Diese Karte wirklich löschen?')) return;
+          if (!confirm(this.t.deleteConfirm)) return;
           const res = await fetch('/api/action-cards/delete', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) { this.showToast(data.error || `API ${res.status}: ${res.statusText}`, 'error'); return; }
-          this.showToast('Gelöscht.', 'success');
+          this.showToast(this.t.deleted, 'success');
           setTimeout(() => window.location.reload(), 400);
         },
 
