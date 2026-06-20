@@ -16,7 +16,7 @@
  *
  * Public-Routes-Whitelist (kein Auth/Role-Check):
  *   /api/webhooks/*, /api/stripe/*, /api/health, /api/cron/*, /admin/login,
- *   /admin/auth/*, /onboarding/*, /api/marketing/consent/*, /api/marketing/track/*
+ *   /admin/auth/*, /api/marketing/consent/*, /api/marketing/track/*
  */
 
 import { defineMiddleware } from 'astro:middleware';
@@ -46,7 +46,6 @@ const PUBLIC_PATTERNS = [
   /^\/api\/cron\//,
   /^\/admin\/login$/,
   /^\/admin\/auth\//,
-  /^\/onboarding\//,
   /^\/api\/marketing\/consent\//,
   /^\/api\/marketing\/track\//,
 ];
