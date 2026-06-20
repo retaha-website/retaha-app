@@ -2,6 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import EditorialPageHeader from '@retaha/ui/components/admin/EditorialPageHeader.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -31,9 +33,9 @@ if (Astro.request.method === 'POST') {
       .upsert({ hotel_id: hotel.id, ...updates }, { onConflict: 'hotel_id' });
 
     if (error) {
-      message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      message = { type: 'error', text: `${bt('prof.msg.savefail', lang)}: ${error.message}` };
     } else {
-      message = { type: 'success', text: 'Konferenz-Zeiten gespeichert.' };
+      message = { type: 'success', text: bt('conf.msg.timessaved', lang) };
     }
   } else if (action === 'save_rooms') {
     const roomsJson = form.get('rooms_json')?.toString();
@@ -47,12 +49,12 @@ if (Astro.request.method === 'POST') {
           .upsert({ hotel_id: hotel.id, conference_rooms: rooms, updated_at: new Date().toISOString() }, { onConflict: 'hotel_id' });
 
         if (error) {
-          message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+          message = { type: 'error', text: `${bt('prof.msg.savefail', lang)}: ${error.message}` };
         } else {
-          message = { type: 'success', text: 'Salons gespeichert.' };
+          message = { type: 'success', text: bt('conf.msg.roomssaved', lang) };
         }
       } catch (e: any) {
-        message = { type: 'error', text: `Ungültige Daten: ${e.message || 'unbekannt'}` };
+        message = { type: 'error', text: `${bt('conf.msg.invaliddata', lang)}: ${e.message || 'unbekannt'}` };
       }
     }
   }
@@ -68,16 +70,30 @@ const rooms = ((settings?.conference_rooms as any[]) || []);
 const startTime = ((settings as any)?.conference_start_time || '08:00').substring(0, 5);
 const endTime = ((settings as any)?.conference_end_time || '20:00').substring(0, 5);
 const slotMin = (settings as any)?.conference_slot_minutes || 60;
+
+// Client-Strings für das is:inline-Script (define:vars)
+const tJs = {
+  salon: bt('conf.js.salon', lang),
+  remove: bt('common.remove', lang),
+  slug: bt('conf.js.slug', lang),
+  capacity: bt('conf.js.capacity', lang),
+  nameDe: bt('conf.js.namede', lang),
+  nameEn: bt('conf.js.nameen', lang),
+  descDe: bt('conf.js.descde', lang),
+  descEn: bt('conf.js.descen', lang),
+  confirm: bt('conf.js.confirm', lang),
+  newRoom: bt('conf.js.newroom', lang),
+};
 ---
 
 <Layout title="Konferenz" activeTab="backoffice">
   <div class="-mt-10">
     <EditorialPageHeader
       sectionNumber="05"
-      sectionLabel="Konferenz"
-      headlineLight="Wo deine Gäste"
-      headlineBold="tagen können"
-      subtitle="Salons, Kapazitäten, Anlässe."
+      sectionLabel={bt('nav.conference', lang)}
+      headlineLight={bt('conf.hl.light', lang)}
+      headlineBold={bt('conf.hl.bold', lang)}
+      subtitle={bt('conf.subtitle', lang)}
     />
   </div>
 
@@ -92,29 +108,29 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
   )}
 
   <section class="bg-white border border-anthrazit/[0.12] p-6 mb-6">
-    <h2 class="text-xl font-medium mb-4">Buchungszeiten</h2>
+    <h2 class="text-xl font-medium mb-4">{bt('conf.times.title', lang)}</h2>
     <form method="POST">
       <input type="hidden" name="_action" value="save_times" />
       <div class="grid grid-cols-3 gap-4">
         <label class="block">
-          <span class="eyebrow text-anthrazit/55 block mb-1">Beginn</span>
+          <span class="eyebrow text-anthrazit/55 block mb-1">{bt('conf.times.start', lang)}</span>
           <input type="time" name="conference_start_time" value={startTime}
             class="w-full px-3 py-2 border border-anthrazit/20 text-sm focus:outline-none focus:border-anthrazit" />
         </label>
         <label class="block">
-          <span class="eyebrow text-anthrazit/55 block mb-1">Ende</span>
+          <span class="eyebrow text-anthrazit/55 block mb-1">{bt('conf.times.end', lang)}</span>
           <input type="time" name="conference_end_time" value={endTime}
             class="w-full px-3 py-2 border border-anthrazit/20 text-sm focus:outline-none focus:border-anthrazit" />
         </label>
         <label class="bauhaus-field">
-          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Slot-Länge (Min)</span>
+          <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">{bt('conf.times.slot', lang)}</span>
           <input type="number" name="conference_slot_minutes" value={slotMin} min="15" max="240" step="15"
             class="bauhaus-input" />
         </label>
       </div>
       <div class="flex justify-end mt-4">
         <button type="submit" class="bauhaus-button bauhaus-button--primary">
-          Zeiten speichern
+          {bt('conf.times.save', lang)}
         </button>
       </div>
     </form>
@@ -122,9 +138,9 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
 
   <section class="bg-white border border-anthrazit/[0.12] p-6">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-medium">Salons</h2>
+      <h2 class="text-xl font-medium">{bt('conf.rooms.title', lang)}</h2>
       <button type="button" id="add-room-btn" class="bauhaus-button bauhaus-button--secondary">
-        + Salon hinzufügen
+        {bt('conf.rooms.add', lang)}
       </button>
     </div>
 
@@ -134,13 +150,13 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
       <div id="rooms-container" class="space-y-4 mb-6"></div>
       <div class="flex justify-end pt-4 border-t border-anthrazit/[0.12]">
         <button type="submit" class="bauhaus-button bauhaus-button--primary">
-          Salons speichern
+          {bt('conf.rooms.save', lang)}
         </button>
       </div>
     </form>
   </section>
 
-  <script is:inline define:vars={{ initialRooms: rooms }}>
+  <script is:inline define:vars={{ initialRooms: rooms, t: tJs }}>
     let rooms = JSON.parse(JSON.stringify(initialRooms || []));
 
     function escapeHtml(s) {
@@ -158,33 +174,33 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
         div.className = 'border border-anthrazit/[0.12] p-4';
         div.innerHTML = `
           <div class="flex justify-between items-start mb-3">
-            <span class="bg-anthrazit/[0.04] text-anthrazit/70 text-xs px-2 py-1 font-mono-display">Salon ${idx + 1}</span>
-            <button type="button" data-action="delete" data-idx="${idx}" class="bauhaus-button bauhaus-button--ghost">Entfernen</button>
+            <span class="bg-anthrazit/[0.04] text-anthrazit/70 text-xs px-2 py-1 font-mono-display">${t.salon} ${idx + 1}</span>
+            <button type="button" data-action="delete" data-idx="${idx}" class="bauhaus-button bauhaus-button--ghost">${t.remove}</button>
           </div>
           <div class="grid grid-cols-12 gap-3">
             <label class="bauhaus-field col-span-4">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Slug (id)</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.slug}</span>
               <input type="text" data-idx="${idx}" data-field="id" value="${escapeHtml(room.id || '')}" placeholder="z.B. salon-linde" class="bauhaus-input bauhaus-input--mono" />
             </label>
             <label class="bauhaus-field col-span-2">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Kapazität</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.capacity}</span>
               <input type="number" data-idx="${idx}" data-field="capacity" value="${room.capacity || 8}" min="1" max="100" class="bauhaus-input" />
             </label>
             <div class="col-span-6"></div>
             <label class="bauhaus-field col-span-6">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (DE)</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.nameDe}</span>
               <input type="text" data-idx="${idx}" data-field="name_de" value="${escapeHtml(room.name_de || '')}" class="bauhaus-input" />
             </label>
             <label class="bauhaus-field col-span-6">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Name (EN)</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.nameEn}</span>
               <input type="text" data-idx="${idx}" data-field="name_en" value="${escapeHtml(room.name_en || '')}" class="bauhaus-input" />
             </label>
             <label class="bauhaus-field col-span-6">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (DE)</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.descDe}</span>
               <textarea data-idx="${idx}" data-field="description_de" rows="2" class="bauhaus-textarea">${escapeHtml(room.description_de || '')}</textarea>
             </label>
             <label class="bauhaus-field col-span-6">
-              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">Beschreibung (EN)</span>
+              <span class="bauhaus-field-eyebrow bauhaus-field-eyebrow--sub">${t.descEn}</span>
               <textarea data-idx="${idx}" data-field="description_en" rows="2" class="bauhaus-textarea">${escapeHtml(room.description_en || '')}</textarea>
             </label>
           </div>
@@ -203,7 +219,7 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
       container.querySelectorAll('[data-action="delete"]').forEach(btn => {
         btn.addEventListener('click', e => {
           const idx = parseInt(e.currentTarget.dataset.idx);
-          if (confirm('Salon wirklich entfernen?')) { rooms.splice(idx, 1); render(); }
+          if (confirm(t.confirm)) { rooms.splice(idx, 1); render(); }
         });
       });
 
@@ -211,7 +227,7 @@ const slotMin = (settings as any)?.conference_slot_minutes || 60;
     }
 
     document.getElementById('add-room-btn').addEventListener('click', () => {
-      rooms.push({ id: 'salon-' + Date.now(), name_de: 'Neuer Salon', name_en: '', capacity: 8, description_de: '', description_en: '' });
+      rooms.push({ id: 'salon-' + Date.now(), name_de: t.newRoom, name_en: '', capacity: 8, description_de: '', description_en: '' });
       render();
     });
 

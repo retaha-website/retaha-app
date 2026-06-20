@@ -12,6 +12,8 @@
 // hotel_settings ist service-role-managed (wie Fruehstuecks-/Service-Zeiten).
 import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -42,7 +44,7 @@ if (Astro.request.method === 'POST') {
     .from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle();
 
   if (selErr) {
-    saved = { ok: false, msg: 'DB-Lesefehler — bitte neu laden.' };
+    saved = { ok: false, msg: bt('sc.msg.dberror', lang) };
   } else {
     const features = { ...((cur?.features as Record<string, unknown>) ?? {}), self_checkout: active };
     const note: Record<string, string> = {};
@@ -60,7 +62,7 @@ if (Astro.request.method === 'POST') {
     if (reTime.test(ciRaw)) updates.checkin_time = ciRaw;
 
     const { error } = await sb.from('hotel_settings').update(updates).eq('hotel_id', hotel.id);
-    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: 'Gespeichert' };
+    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: bt('common.savedshort', lang) };
   }
 }
 
@@ -81,9 +83,9 @@ const noteDe = note.de ?? '';
 const noteEn = note.en ?? '';
 
 const STATES: { value: string; label: string; sub: string }[] = [
-  { value: 'self', label: 'Self-Checkout', sub: 'Gast checkt in der App selbst aus (zeitbewusstes Fenster)' },
-  { value: 'info', label: 'Nur Infos',     sub: 'Checkout-Zeit & Hinweise anzeigen — kein Auscheck-Button' },
-  { value: 'off',  label: 'Aus',           sub: 'Kein Self-Checkout, keine Infos in der Gäste-App' },
+  { value: 'self', label: bt('sc.state.self.label', lang), sub: bt('sc.state.self.sub', lang) },
+  { value: 'info', label: bt('sc.state.info.label', lang), sub: bt('sc.state.info.sub', lang) },
+  { value: 'off',  label: bt('sc.state.off.label', lang),  sub: bt('sc.state.off.sub', lang) },
 ];
 ---
 
@@ -92,15 +94,15 @@ const STATES: { value: string; label: string; sub: string }[] = [
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Self-Checkout</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.checkout', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Gäste-Module</span>
-      <h1 class="settings-hero__title">Self-Checkout<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Digitale Abreise: Modus, Checkout-Zeit und Gast-Hinweise.</p>
+      <span class="settings-hero__eyebrow">{bt('nav.sec.guestmodules', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('sc.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('sc.hero.sub', lang)}</p>
     </section>
 
     <form method="POST" class="settings-sections">
@@ -108,13 +110,13 @@ const STATES: { value: string; label: string; sub: string }[] = [
       <!-- ── MODUS (Master = features.self_checkout) ───────────────────── -->
       <section class="s-card" id="sc-mode">
         <div class="s-card__head">
-          <h2 class="s-card__title">Modus</h2>
+          <h2 class="s-card__title">{bt('sc.mode.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
-        <p class="s-card__sub">Steuert denselben Schalter wie der Self-Checkout-Toggle in der Gäste-Vorschau.</p>
+        <p class="s-card__sub">{bt('sc.mode.sub', lang)}</p>
 
         <div class="field">
-          <div class="radio-cards radio-cards--stack" role="radiogroup" aria-label="Self-Checkout-Modus">
+          <div class="radio-cards radio-cards--stack" role="radiogroup" aria-label={bt('sc.mode.aria', lang)}>
             {STATES.map(s => (
               <label class={`radio-card radio-card--wide ${scState === s.value ? 'is-active' : ''}`}>
                 <input type="radio" name="sc_state" value={s.value} checked={scState === s.value} class="sr-only" />
@@ -129,24 +131,24 @@ const STATES: { value: string; label: string; sub: string }[] = [
       <!-- ── ZEITEN (Check-in + Check-out) ─────────────────────────────── -->
       <section class="s-card" id="sc-time">
         <div class="s-card__head">
-          <h2 class="s-card__title">Zeiten</h2>
+          <h2 class="s-card__title">{bt('sc.time.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
-        <p class="s-card__sub">Check-in- und Check-out-Zeit deines Hotels.</p>
+        <p class="s-card__sub">{bt('sc.time.sub', lang)}</p>
 
         <div class="field field--row">
-          <label class="field__label" for="checkin-time">Check-in ab</label>
+          <label class="field__label" for="checkin-time">{bt('sc.time.checkin', lang)}</label>
           <div class="field__input-wrap">
             <input type="time" id="checkin-time" name="checkin_time" class="s-input" value={checkinTime} />
-            <span class="field__hint">Ab wann Gäste einchecken können (Standard 15:00).</span>
+            <span class="field__hint">{bt('sc.time.checkinhint', lang)}</span>
           </div>
         </div>
 
         <div class="field field--row">
-          <label class="field__label" for="checkout-time">Check-out bis</label>
+          <label class="field__label" for="checkout-time">{bt('sc.time.checkout', lang)}</label>
           <div class="field__input-wrap">
             <input type="time" id="checkout-time" name="checkout_time" class="s-input" value={checkoutTime} />
-            <span class="field__hint">Steuert das Self-Checkout-Fenster (öffnet am Vorabend, schließt zu dieser Zeit + Kulanz).</span>
+            <span class="field__hint">{bt('sc.time.checkouthint', lang)}</span>
           </div>
         </div>
       </section>
@@ -154,30 +156,30 @@ const STATES: { value: string; label: string; sub: string }[] = [
       <!-- ── GAST-HINWEIS ──────────────────────────────────────────────── -->
       <section class="s-card" id="sc-note">
         <div class="s-card__head">
-          <h2 class="s-card__title">Gast-Hinweis</h2>
+          <h2 class="s-card__title">{bt('sc.note.title', lang)}</h2>
           <span class="s-card__num">03</span>
         </div>
-        <p class="s-card__sub">Erscheint im Checkout-Screen (z.&nbsp;B. Schlüsselrückgabe, Late-Checkout auf Anfrage). Im Modus „Nur Infos" der zentrale Hinweis.</p>
+        <p class="s-card__sub" set:html={bt('sc.note.sub', lang)}></p>
 
         <div class="field field--row">
-          <label class="field__label" for="note-de">Deutsch</label>
+          <label class="field__label" for="note-de">{bt('sc.note.de', lang)}</label>
           <textarea id="note-de" name="note_de" class="s-input s-textarea" rows="2" placeholder="z.B. Schlüsselkarte einfach im Zimmer lassen. Late-Checkout auf Anfrage an der Rezeption.">{noteDe}</textarea>
         </div>
         <div class="field field--row">
-          <label class="field__label" for="note-en">English</label>
+          <label class="field__label" for="note-en">{bt('sc.note.en', lang)}</label>
           <textarea id="note-en" name="note_en" class="s-input s-textarea" rows="2" placeholder="e.g. Just leave the key card in the room. Late check-out on request at reception.">{noteEn}</textarea>
         </div>
       </section>
 
       <div class="sc-savebar">
-        <button type="submit" class="v9-btn">Speichern</button>
+        <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
       </div>
 
     </form>
   </div>
 
   {saved && (
-    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? 'Gespeichert' : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
+    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
   )}
 
   <style>
