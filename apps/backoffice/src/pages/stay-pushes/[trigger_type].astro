@@ -7,6 +7,8 @@ import {
   STAY_PUSH_TRIGGER_LABELS, STAY_PUSH_TRIGGER_DESCRIPTIONS, STAY_PUSH_TRIGGER_VARIABLES,
 } from '@retaha/marketing';
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -57,6 +59,17 @@ const STAY_VAR_EXAMPLES: Record<string, string> = {
   time:          '19:30',
 };
 
+const spEditorT = {
+  noTitle: bt('sp.editor.notitle', lang),
+  noText: bt('sp.editor.notext', lang),
+  titleRequired: bt('sp.editor.titlerequired', lang),
+  bodyRequired: bt('sp.editor.bodyrequired', lang),
+  unknownVars: bt('sp.editor.unknownvars', lang),
+  forbiddenVars: bt('sp.editor.forbiddenvars', lang),
+  saveFail: bt('sp.editor.savefail', lang),
+  netErr: bt('sp.editor.neterr', lang),
+};
+
 const DEMO_VARS = {
   first_name: 'Anna',
   last_name: 'Schmidt',
@@ -74,42 +87,42 @@ const DEMO_VARS = {
 
 <Layout title={`Stay-Push · ${STAY_PUSH_TRIGGER_LABELS[triggerType]}`} activeTab="backoffice">
   <div class="se-page">
-    <div class="se-breadcrumb"><a href="/stay-pushes">← Alle Stay-Pushes</a></div>
+    <div class="se-breadcrumb"><a href="/stay-pushes">{bt('sp.editor.back', lang)}</a></div>
 
     <header class="se-header">
-      <p class="se-eyebrow">Stay-Push · {STAY_PUSH_TRIGGER_LABELS[triggerType]}</p>
-      <h1 class="se-title">{STAY_PUSH_TRIGGER_LABELS[triggerType]}<span class="h-dot">.</span></h1>
-      <p class="se-sub">{STAY_PUSH_TRIGGER_DESCRIPTIONS[triggerType]}</p>
+      <p class="se-eyebrow">{bt('sp.editor.eyebrow', lang)} · {bt('sp.trigger.' + triggerType + '.label', lang)}</p>
+      <h1 class="se-title">{bt('sp.trigger.' + triggerType + '.label', lang)}<span class="h-dot">.</span></h1>
+      <p class="se-sub">{bt('sp.trigger.' + triggerType + '.desc', lang)}</p>
     </header>
 
     <div class="se-grid" x-data="stayPushEditor()" x-init="init()">
 
       <div class="se-col se-col-form">
-        <h3 class="se-section-title">Text ({hotelDefaultLang.toUpperCase()})</h3>
-        <p class="se-hint">Beim Speichern wird in alle aktivierten Sprachen automatisch übersetzt. Variablen wie <code>{`{{first_name}}`}</code> werden beim Versand mit echten Werten ersetzt.</p>
+        <h3 class="se-section-title">{bt('sp.editor.text', lang)} ({hotelDefaultLang.toUpperCase()})</h3>
+        <p class="se-hint" set:html={bt('sp.editor.hint', lang)}></p>
 
         <label class="se-field">
-          <span class="se-label">Aktiv</span>
+          <span class="se-label">{bt('bf.modal.active', lang)}</span>
           <div class="se-toggle">
             <input type="checkbox" x-model="form.is_active" id="se-active-toggle" />
             <label for="se-active-toggle"></label>
           </div>
-          <span class="se-toggle-text" x-text="form.is_active ? 'Push wird bei Trigger versandt' : 'Push deaktiviert — Trigger feuert ins Leere'"></span>
+          <span class="se-toggle-text" x-text={`form.is_active ? ${JSON.stringify(bt('sp.editor.toggleon', lang))} : ${JSON.stringify(bt('sp.editor.toggleoff', lang))}`}></span>
         </label>
 
         <label class="se-field">
-          <span class="se-label">Titel</span>
+          <span class="se-label">{bt('sp.editor.titlelabel', lang)}</span>
           <input type="text" x-model="form.title" placeholder="z.B. Willkommen im {{hotel_name}}!" class="se-input" maxlength="60" />
-          <span class="se-hint">Max 60 Zeichen (Google-Wallet-Limit)</span>
+          <span class="se-hint">{bt('sp.editor.titlehint', lang)}</span>
         </label>
 
         <label class="se-field">
-          <span class="se-label">Body</span>
+          <span class="se-label">{bt('sp.editor.body', lang)}</span>
           <textarea x-model="form.body" rows="4" placeholder="z.B. Schön dass du da bist, {{first_name}}." class="se-input se-textarea" maxlength="1024"></textarea>
         </label>
 
         <div class="se-field">
-          <span class="se-label">Verfügbare Variablen</span>
+          <span class="se-label">{bt('sp.editor.vars', lang)}</span>
           <div class="se-var-chips">
             {allowedVars.map(v => (
               <button type="button" class="se-var-chip" @click={`insertVar('${v}')`}>
@@ -125,14 +138,14 @@ const DEMO_VARS = {
         </template>
 
         <div class="se-actions">
-          <a href="/stay-pushes" class="se-btn-ghost">Abbrechen</a>
-          <button type="button" class="se-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? 'Wird gespeichert (übersetzt …)' : 'Speichern'"></button>
+          <a href="/stay-pushes" class="se-btn-ghost">{bt('common.cancel', lang)}</a>
+          <button type="button" class="se-btn-primary" :disabled="submitting" @click="save()" x-text={`submitting ? ${JSON.stringify(bt('sp.editor.saving', lang))} : ${JSON.stringify(bt('common.save', lang))}`}></button>
         </div>
       </div>
 
       <div class="se-col se-col-preview">
-        <h3 class="se-section-title">Vorschau</h3>
-        <p class="se-hint">So sieht der Push aus. Demo-Daten ersetzen die Variablen.</p>
+        <h3 class="se-section-title">{bt('sp.editor.preview', lang)}</h3>
+        <p class="se-hint">{bt('sp.editor.previewhint', lang)}</p>
         <div class="se-mockup">
           <div class="se-mockup-frame">
             <div class="se-mockup-status">retaha · Wallet-Push</div>
@@ -141,13 +154,13 @@ const DEMO_VARS = {
                 <span class="se-mockup-logo">{hotel.name.slice(0, 1).toUpperCase()}</span>
                 <div>
                   <div class="se-mockup-hotel">{hotel.name}</div>
-                  <div class="se-mockup-now">jetzt</div>
+                  <div class="se-mockup-now">{bt('sp.editor.now', lang)}</div>
                 </div>
               </div>
               <div class="se-mockup-title" x-text="previewTitle"></div>
               <div class="se-mockup-body" x-text="previewBody"></div>
             </div>
-            <div class="se-mockup-note">Service-Push · Vertragserfüllung</div>
+            <div class="se-mockup-note">{bt('sp.editor.mockupnote', lang)}</div>
           </div>
         </div>
       </div>
@@ -158,8 +171,9 @@ const DEMO_VARS = {
     INITIAL: { title: initialTitle, body: initialBody, is_active: initialActive },
     TRIGGER: triggerType,
     DEMO: DEMO_VARS,
+    SET: spEditorT,
   }}>
-    window.__RETAHA_SE__ = { INITIAL, TRIGGER, DEMO };
+    window.__RETAHA_SE__ = { INITIAL, TRIGGER, DEMO, T: SET };
   </script>
 
   <script>
@@ -194,17 +208,17 @@ const DEMO_VARS = {
         },
 
         get previewTitle() {
-          return renderVars(this.form.title || '(kein Titel)', this.cfg.DEMO);
+          return renderVars(this.form.title || this.cfg.T.noTitle, this.cfg.DEMO);
         },
         get previewBody() {
-          return renderVars(this.form.body || '(kein Text)', this.cfg.DEMO);
+          return renderVars(this.form.body || this.cfg.T.noText, this.cfg.DEMO);
         },
 
         async save() {
           if (this.submitting) return;
           this.errorMsg = '';
-          if (!this.form.title?.trim()) { this.errorMsg = 'Bitte gib einen Titel an.'; return; }
-          if (!this.form.body?.trim())  { this.errorMsg = 'Bitte gib einen Text an.'; return; }
+          if (!this.form.title?.trim()) { this.errorMsg = this.cfg.T.titleRequired; return; }
+          if (!this.form.body?.trim())  { this.errorMsg = this.cfg.T.bodyRequired; return; }
 
           this.submitting = true;
           try {
@@ -221,17 +235,17 @@ const DEMO_VARS = {
             if (!data.ok) {
               if (data.error === 'invalid_variables') {
                 const parts: string[] = [];
-                if (data.unknown?.length)   parts.push('Unbekannte Variablen: ' + data.unknown.map((v: string) => `{{${v}}}`).join(', '));
-                if (data.forbidden?.length) parts.push('Verbotene Variablen: ' + data.forbidden.map((v: string) => `{{${v}}}`).join(', '));
+                if (data.unknown?.length)   parts.push(this.cfg.T.unknownVars + ' ' + data.unknown.map((v: string) => `{{${v}}}`).join(', '));
+                if (data.forbidden?.length) parts.push(this.cfg.T.forbiddenVars + ' ' + data.forbidden.map((v: string) => `{{${v}}}`).join(', '));
                 this.errorMsg = parts.join(' · ');
               } else {
-                this.errorMsg = data.error || 'Speichern fehlgeschlagen.';
+                this.errorMsg = data.error || this.cfg.T.saveFail;
               }
               return;
             }
             window.location.href = '/stay-pushes';
           } catch (err: any) {
-            this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+            this.errorMsg = this.cfg.T.netErr + ' ' + (err.message || 'unbekannt');
           } finally {
             this.submitting = false;
           }

@@ -4,10 +4,10 @@ import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/au
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
 import {
-  STAY_PUSH_TRIGGER_LABELS,
-  STAY_PUSH_TRIGGER_DESCRIPTIONS,
   STAY_PUSH_TRIGGER_ORDER,
 } from '@retaha/marketing';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -35,13 +35,9 @@ function pickI18n(jsonb: any): string {
 <Layout title="Stay-Pushes" activeTab="backoffice">
   <div class="sp-page">
     <header class="sp-header">
-      <p class="sp-eyebrow">Wallet · Stay-Pushes</p>
-      <h1 class="sp-title">Push-Nachrichten während des Aufenthalts<span class="h-dot">.</span></h1>
-      <p class="sp-sub">
-        Service-Pushes (z.B. Bestätigung einer Service-Anfrage) sind <strong>Vertragserfüllung</strong>
-        und gehen unabhängig vom Marketing-Opt-Out raus. Sie folgen automatisch auf Booking-Events
-        oder einen Cron — du kannst pro Trigger den Text editieren oder den Push deaktivieren.
-      </p>
+      <p class="sp-eyebrow">{bt('sp.eyebrow', lang)}</p>
+      <h1 class="sp-title" set:html={bt('sp.title', lang)}></h1>
+      <p class="sp-sub" set:html={bt('sp.sub', lang)}></p>
     </header>
 
     <div class="sp-list">
@@ -52,21 +48,17 @@ function pickI18n(jsonb: any): string {
         return (
           <a href={`/stay-pushes/${trigger}`} class={`sp-card${active ? '' : ' sp-card--off'}`}>
             <div class="sp-card-head">
-              <span class={`sp-pill${active ? ' is-on' : ''}`}>{active ? 'aktiv' : 'inaktiv'}</span>
-              <span class="sp-card-trigger">{STAY_PUSH_TRIGGER_LABELS[trigger]}</span>
+              <span class={`sp-pill${active ? ' is-on' : ''}`}>{active ? bt('nfc.pill.active', lang) : bt('nfc.pill.inactive', lang)}</span>
+              <span class="sp-card-trigger">{bt('sp.trigger.' + trigger + '.label', lang)}</span>
             </div>
-            <p class="sp-card-preview">{preview || <em>(noch nicht konfiguriert)</em>}</p>
-            <p class="sp-card-sub">{STAY_PUSH_TRIGGER_DESCRIPTIONS[trigger]}</p>
+            <p class="sp-card-preview">{preview || <em>{bt('sp.notconfigured', lang)}</em>}</p>
+            <p class="sp-card-sub">{bt('sp.trigger.' + trigger + '.desc', lang)}</p>
           </a>
         );
       })}
     </div>
 
-    <div class="sp-footnote">
-      <strong>DSGVO-Hinweis:</strong> Stay-Pushes gelten als Vertragserfüllung (DSGVO Art. 6 Abs. 1 lit. b).
-      Sie ignorieren Marketing-Opt-Out, werden aber blockiert wenn der Pass <code>state='expired'</code> oder
-      noch nicht in Google synchronisiert ist.
-    </div>
+    <div class="sp-footnote" set:html={bt('sp.footnote', lang)}></div>
   </div>
 
   <style>
