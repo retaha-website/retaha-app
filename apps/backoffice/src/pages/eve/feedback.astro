@@ -2,6 +2,8 @@
 import Layout from '../../layouts/Layout.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance, getUserRole, hasPermission } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -74,29 +76,29 @@ if (rows.length > 0 && stayIds.length > 0) {
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Eve Concierge</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.eve', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">EVE · KI-CONCIERGE</span>
-      <h1 class="settings-hero__title">Eve's Feedback<span class="dot-pink">?</span></h1>
-      <p class="settings-hero__sub">Gäste können einzelne Antworten mit Daumen hoch/runter bewerten. Filter zeigt was schief läuft.</p>
+      <span class="settings-hero__eyebrow">{bt('evf.hero.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('evf.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('evf.hero.sub', lang)}</p>
     </section>
 
-    <EveSubNav currentPath={Astro.url.pathname} />
+    <EveSubNav currentPath={Astro.url.pathname} lang={lang} />
 
     <!-- Filter-Tabs -->
     <div class="evf-tabs">
       <a href="?filter=negative" class={`evf-tab${filter === -1 ? ' is-active' : ''}`}>
         <span class="evf-tab-icon">👎</span>
-        Nicht hilfreich
+        {bt('evf.tab.neg', lang)}
         <span class="evf-tab-count">{negativeCount ?? 0}</span>
       </a>
       <a href="?filter=positive" class={`evf-tab${filter === 1 ? ' is-active' : ''}`}>
         <span class="evf-tab-icon">👍</span>
-        Hilfreich
+        {bt('evf.tab.pos', lang)}
         <span class="evf-tab-count">{positiveCount ?? 0}</span>
       </a>
     </div>
@@ -104,8 +106,8 @@ if (rows.length > 0 && stayIds.length > 0) {
     {rows.length === 0 ? (
       <div class="evf-empty">
         <p>{filter === -1
-          ? 'Keine negativen Bewertungen — Eve macht ihren Job ✓'
-          : 'Noch keine positiven Bewertungen.'}
+          ? bt('evf.empty.neg', lang)
+          : bt('evf.empty.pos', lang)}
         </p>
       </div>
     ) : (
@@ -114,15 +116,15 @@ if (rows.length > 0 && stayIds.length > 0) {
           const prior = priorByMessageId[r.message?.id];
           const guestName = r.stay?.guest
             ? [r.stay.guest.first_name, r.stay.guest.last_name].filter(Boolean).join(' ')
-            : 'Gast';
-          const dateStr = new Date(r.created_at).toLocaleString('de-DE', {
+            : bt('evf.guest', lang);
+          const dateStr = new Date(r.created_at).toLocaleString(lang, {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
           });
           return (
             <article class="s-card evf-card">
               <div class="s-card__head">
                 <span class={`evf-badge evf-badge--${r.rating === 1 ? 'pos' : 'neg'}`}>
-                  {r.rating === 1 ? '👍 Hilfreich' : '👎 Nicht hilfreich'}
+                  {r.rating === 1 ? bt('evf.badge.pos', lang) : bt('evf.badge.neg', lang)}
                 </span>
                 <span class="s-card__num">{guestName} · {dateStr}</span>
               </div>
@@ -130,17 +132,17 @@ if (rows.length > 0 && stayIds.length > 0) {
               <div class="s-card__body">
                 {prior && (
                   <div class="evf-msg evf-msg--user">
-                    <p class="evf-msg-label">Gast fragte:</p>
+                    <p class="evf-msg-label">{bt('evf.msg.asked', lang)}</p>
                     <p class="evf-msg-text">„{prior.content}"</p>
                   </div>
                 )}
                 <div class="evf-msg evf-msg--eve">
-                  <p class="evf-msg-label">Eve antwortete:</p>
-                  <p class="evf-msg-text">{r.message?.content ?? '(Message gelöscht)'}</p>
+                  <p class="evf-msg-label">{bt('evf.msg.answered', lang)}</p>
+                  <p class="evf-msg-text">{r.message?.content ?? bt('evf.msg.deleted', lang)}</p>
                 </div>
                 {r.optional_comment && (
                   <div class="evf-msg evf-msg--comment">
-                    <p class="evf-msg-label">Gast-Kommentar:</p>
+                    <p class="evf-msg-label">{bt('evf.msg.comment', lang)}</p>
                     <p class="evf-msg-text">„{r.optional_comment}"</p>
                   </div>
                 )}
