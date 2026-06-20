@@ -3,6 +3,8 @@ import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { resendGetDomain, resendAddDomain, resendVerifyDomain, resendDeleteDomain, type ResendDomainRecord } from '../lib/resend-domain';
 import { getEnv } from '@retaha/db';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -29,24 +31,24 @@ if (Astro.request.method === 'POST') {
   if (action === 'add') {
     const domain = form.get('domain')?.toString().trim().toLowerCase();
     if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
-      message = { type: 'error', text: 'Ungültiges Domain-Format (z.B. gategardenhotel.de — ohne https:// oder www.).' };
+      message = { type: 'error', text: bt('ed.msg.invalidformat', lang) };
     } else {
       const resp = await resendAddDomain(domain);
       if (!resp.ok) {
-        message = { type: 'error', text: `Resend-API-Fehler: ${resp.error}` };
+        message = { type: 'error', text: `${bt('ed.msg.apierror', lang)}: ${resp.error}` };
       } else {
         const { error: dbErr } = await sb.from('hotel_settings').upsert(
           { hotel_id: hotel.id, custom_email_domain: domain, custom_email_status: 'pending', resend_domain_id: resp.data.id, updated_at: new Date().toISOString() },
           { onConflict: 'hotel_id' },
         );
-        if (dbErr) message = { type: 'error', text: `Speichern fehlgeschlagen: ${dbErr.message}` };
+        if (dbErr) message = { type: 'error', text: `${bt('prof.msg.savefail', lang)}: ${dbErr.message}` };
         else message = { type: 'success', text: 'Domain bei Resend angelegt. Bitte die unten gezeigten DNS-Einträge bei deinem Domain-Provider hinterlegen, dann „Domain verifizieren" klicken.' };
         return Astro.redirect('/email-domain?saved=added');
       }
     }
   } else if (action === 'verify') {
     if (!settings?.resend_domain_id) {
-      message = { type: 'error', text: 'Keine Domain konfiguriert.' };
+      message = { type: 'error', text: bt('ed.msg.nodomain', lang) };
     } else {
       const resp = await resendVerifyDomain(settings.resend_domain_id);
       const newStatus = resp.ok ? resp.data.status : 'failed';
@@ -72,11 +74,11 @@ const saved = Astro.url.searchParams.get('saved');
 const status = Astro.url.searchParams.get('status');
 
 if (!message) {
-  if (saved === 'added') message = { type: 'success', text: 'Domain bei Resend angelegt. Bitte die DNS-Einträge unten hinterlegen, dann „Domain verifizieren" klicken.' };
-  else if (saved === 'verified' && status === 'verified') message = { type: 'success', text: 'Domain verifiziert! Gast-Mails werden ab sofort von deiner Custom-Domain versendet.' };
-  else if (saved === 'verified' && status === 'pending') message = { type: 'error', text: 'Domain noch nicht verifiziert — DNS-Propagation kann bis 24h dauern.' };
-  else if (saved === 'verified' && status === 'failed') message = { type: 'error', text: 'Verifikation fehlgeschlagen — bitte DNS-Einträge prüfen.' };
-  else if (saved === 'removed') message = { type: 'success', text: 'Domain entfernt. Mails werden wieder von noreply@retaha.de versendet.' };
+  if (saved === 'added') message = { type: 'success', text: bt('ed.msg.added', lang) };
+  else if (saved === 'verified' && status === 'verified') message = { type: 'success', text: bt('ed.msg.verified', lang) };
+  else if (saved === 'verified' && status === 'pending') message = { type: 'error', text: bt('ed.msg.pending', lang) };
+  else if (saved === 'verified' && status === 'failed') message = { type: 'error', text: bt('ed.msg.failed', lang) };
+  else if (saved === 'removed') message = { type: 'success', text: bt('ed.msg.removed', lang) };
 }
 
 const { data: freshSettings } = await sb
@@ -102,25 +104,19 @@ if (freshSettings?.resend_domain_id) {
 <div class="settings-page">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Email-Domain</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.emaildomain', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">E-Mail</span>
-    <h1 class="settings-hero__title">Eigene Absender-Domain<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">
-      Customer-Facing-Mails versenden wir auf Wunsch von
-      <code>welcome@deine-domain.de</code> statt von <code>noreply@retaha.de</code>.
-      Premium-Vertrauen statt Service-Provider-Optik.
-    </p>
+    <span class="settings-hero__eyebrow">{bt('ed.hero.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('ed.hero.title', lang)}></h1>
+    <p class="settings-hero__sub" set:html={bt('ed.hero.sub', lang)}></p>
   </section>
 
   {!resendApiKeySet && (
-    <div class="s-flash s-flash--warn" style="margin-bottom:20px">
-      <strong>RESEND_API_KEY nicht konfiguriert</strong> — kontaktiere Taha für API-Key-Setup.
-    </div>
+    <div class="s-flash s-flash--warn" style="margin-bottom:20px" set:html={bt('ed.nokey', lang)}></div>
   )}
 
   {message && (
@@ -134,20 +130,17 @@ if (freshSettings?.resend_domain_id) {
     {!freshSettings?.custom_email_domain ? (
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Domain hinzufügen</h2>
+          <h2 class="s-card__title">{bt('ed.add.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint">
-            Trage deine Hotel-Domain ein (z.B. <code>gategardenhotel.de</code>).
-            Wir legen sie bei Resend an und zeigen dir die DNS-Einträge.
-          </p>
+          <p class="field__hint" set:html={bt('ed.add.hint', lang)}></p>
 
           <form method="POST">
             <input type="hidden" name="_action" value="add" />
 
             <label class="sp-field">
-              <span class="sp-label">Domain</span>
+              <span class="sp-label">{bt('ed.domain', lang)}</span>
               <input
                 type="text"
                 name="domain"
@@ -158,14 +151,12 @@ if (freshSettings?.resend_domain_id) {
                 class="s-input s-input--mono"
                 disabled={!resendApiKeySet}
               />
-              <span class="field__hint" style="margin-top:4px">
-                Ohne https:// oder www. — nur die Apex-Domain.
-              </span>
+              <span class="field__hint" style="margin-top:4px">{bt('ed.add.domainhint', lang)}</span>
             </label>
 
             <div style="margin-top:16px">
               <button type="submit" class="v9-btn v9-btn--primary" disabled={!resendApiKeySet}>
-                Bei Resend anlegen
+                {bt('ed.add.btn', lang)}
               </button>
             </div>
           </form>
@@ -175,17 +166,17 @@ if (freshSettings?.resend_domain_id) {
       <>
         <section class="s-card">
           <div class="s-card__head">
-            <h2 class="s-card__title">Konfigurierte Domain</h2>
+            <h2 class="s-card__title">{bt('ed.config.title', lang)}</h2>
             <span class="s-card__num">01</span>
           </div>
           <div class="s-card__body">
             {(() => {
               const statusValue = freshSettings.custom_email_status ?? 'pending';
               const badge = statusValue === 'verified'
-                ? { label: '✓ Verifiziert', style: 'background:#D1FAE5;color:#065F46' }
+                ? { label: bt('ed.badge.verified', lang), style: 'background:#D1FAE5;color:#065F46' }
                 : statusValue === 'failed'
-                  ? { label: '✗ Fehler',    style: 'background:#FEE2E2;color:#991B1B' }
-                  : { label: '⏳ Pending',   style: 'background:#FEF3C7;color:#92400E' };
+                  ? { label: bt('ed.badge.failed', lang),    style: 'background:#FEE2E2;color:#991B1B' }
+                  : { label: bt('ed.badge.pending', lang),   style: 'background:#FEF3C7;color:#92400E' };
               return (
                 <span style={`${badge.style};display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:4px;margin-bottom:12px`}>
                   {badge.label}
@@ -198,15 +189,9 @@ if (freshSettings?.resend_domain_id) {
             </p>
 
             {freshSettings.custom_email_status === 'verified' ? (
-              <p class="field__hint">
-                Customer-Facing-Mails gehen ab sofort von deiner Domain raus.
-                Hotelier-interne Mails (Booking-Notifications) bleiben über noreply@retaha.de.
-              </p>
+              <p class="field__hint">{bt('ed.config.verifiedhint', lang)}</p>
             ) : (
-              <p class="field__hint">
-                DNS-Einträge unten beim Provider hinterlegen, dann „Domain verifizieren" klicken.
-                DNS-Propagation kann bis zu 24 Stunden dauern.
-              </p>
+              <p class="field__hint">{bt('ed.config.pendinghint', lang)}</p>
             )}
           </div>
           <div class="s-card__footer">
@@ -214,15 +199,15 @@ if (freshSettings?.resend_domain_id) {
               <form method="POST" style="margin:0">
                 <input type="hidden" name="_action" value="verify" />
                 <button type="submit" class="v9-btn v9-btn--primary">
-                  Domain verifizieren
+                  {bt('ed.config.verify', lang)}
                 </button>
               </form>
             )}
             <form method="POST" style="margin:0"
-                  onsubmit="return confirm('Domain wirklich entfernen? Mails gehen dann wieder von noreply@retaha.de raus.')">
+                  onsubmit={`return confirm(${JSON.stringify(bt('ed.config.removeconfirm', lang))})`}>
               <input type="hidden" name="_action" value="remove" />
               <button type="submit" class="v9-btn v9-btn--ghost">
-                Domain entfernen
+                {bt('ed.config.remove', lang)}
               </button>
             </form>
           </div>
@@ -230,30 +215,27 @@ if (freshSettings?.resend_domain_id) {
 
         {domainDetailError && (
           <div class="s-flash s-flash--err">
-            Domain-Details konnten nicht von Resend geladen werden: {domainDetailError}
+            {bt('ed.detailerror', lang)}: {domainDetailError}
           </div>
         )}
 
         {domainDetail && domainDetail.records.length > 0 && (
           <section class="s-card">
             <div class="s-card__head">
-              <h2 class="s-card__title">DNS-Einträge</h2>
+              <h2 class="s-card__title">{bt('ed.dns.title', lang)}</h2>
               <span class="s-card__num">02</span>
             </div>
             <div class="s-card__body">
-              <p class="field__hint" style="margin-bottom:16px">
-                Diese Einträge bei deinem Domain-Provider hinterlegen (Strato: „Domains → DNS-Verwaltung",
-                IONOS: „Domain → Domain-Tools").
-              </p>
+              <p class="field__hint" style="margin-bottom:16px">{bt('ed.dns.hint', lang)}</p>
               <div style="overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-sm,4px)">
                 <table style="width:100%;border-collapse:collapse;font-size:12px">
                   <thead>
                     <tr style="background:var(--bg-deep,#F0EDE6)">
-                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">Typ</th>
-                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">Name / Host</th>
-                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">Wert</th>
+                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">{bt('ed.dns.type', lang)}</th>
+                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">{bt('ed.dns.name', lang)}</th>
+                      <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">{bt('ed.dns.value', lang)}</th>
                       {domainDetail.records.some(r => r.priority !== undefined) && (
-                        <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">Priorität</th>
+                        <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);border-bottom:1px solid var(--border)">{bt('ed.dns.priority', lang)}</th>
                       )}
                     </tr>
                   </thead>
