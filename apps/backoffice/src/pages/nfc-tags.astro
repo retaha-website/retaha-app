@@ -5,6 +5,8 @@ import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
 import { getEnv } from '@retaha/db';
 import QRCode from 'qrcode';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -43,53 +45,59 @@ for (const t of tags) {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  guest_stay:    'Fester Stay-Link',
-  hotel_general: 'Allgemein (Hotel)',
-  room:          'Zimmer-Tag',
-  custom_url:    'Beliebige URL',
+  guest_stay:    bt('nfc.type.stay', lang),
+  hotel_general: bt('nfc.type.general', lang),
+  room:          bt('nfc.type.room', lang),
+  custom_url:    bt('nfc.type.url', lang),
 };
 
 function targetSummary(t: any): string {
-  if (t.target_type === 'room' && t.target_value?.room_number) return `Zimmer ${t.target_value.room_number}`;
+  if (t.target_type === 'room' && t.target_value?.room_number) return `${bt('nfc.target.room', lang)} ${t.target_value.room_number}`;
   if (t.target_type === 'custom_url' && t.target_value?.url) {
     try { return new URL(t.target_value.url).host; } catch { return t.target_value.url; }
   }
-  if (t.target_type === 'hotel_general') return 'Aktiver Gast > Showcase > Welcome';
+  if (t.target_type === 'hotel_general') return bt('nfc.target.general', lang);
   if (t.target_type === 'guest_stay' && t.target_value?.stay_id) return 'Stay ' + String(t.target_value.stay_id).slice(0, 8);
   return '—';
 }
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString(lang, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+// Client-Strings für Alpine-Component (über JSON-Block #nfc-i18n)
+const tJs = {
+  labelMissing: bt('nfc.js.labelmissing', lang),
+  error: bt('nfc.js.error', lang),
+  tagCreated: bt('nfc.js.tagcreated', lang),
+  bulkRange: bt('nfc.js.bulkrange', lang),
+  tagsCreated: bt('nfc.js.tagscreated', lang),
+};
 ---
 
 <Layout title="NFC-Tags" activeTab="backoffice">
   <div class="nf-page" x-data="nfcTagsAdmin()">
     <header class="nf-header">
-      <p class="nf-eyebrow">NFC-Tags · Holzkarten</p>
-      <h1 class="nf-title">Karten programmieren und verwalten<span class="h-dot">.</span></h1>
-      <p class="nf-sub">
-        Lege Tags an, drucke den <strong>Programmier-QR</strong> und schreibe damit
-        die URL auf deine physischen NFC-Holzkarten von Hannah.
-      </p>
+      <p class="nf-eyebrow">{bt('nfc.eyebrow', lang)}</p>
+      <h1 class="nf-title" set:html={bt('nfc.title', lang)}></h1>
+      <p class="nf-sub" set:html={bt('nfc.sub', lang)}></p>
     </header>
 
     <section class="nf-howto">
-      <p class="nf-section-eyebrow">Wie programmiere ich einen Tag?</p>
+      <p class="nf-section-eyebrow">{bt('nfc.howto.title', lang)}</p>
       <div class="nf-steps">
         <div class="nf-step">
           <span class="nf-step-num">1</span>
-          <p class="nf-step-text">Tag unten anlegen (Label + Typ wählen). Bei Bulk: "+10 Zimmer-Tags" erstellt 101-110 auf einen Schlag.</p>
+          <p class="nf-step-text" set:html={bt('nfc.step1', lang)}></p>
         </div>
         <div class="nf-step">
           <span class="nf-step-num">2</span>
-          <p class="nf-step-text">Auf dem Smartphone die kostenlose App <strong>"NFC Tools"</strong> installieren (Android oder iOS).</p>
+          <p class="nf-step-text" set:html={bt('nfc.step2', lang)}></p>
         </div>
         <div class="nf-step">
           <span class="nf-step-num">3</span>
-          <p class="nf-step-text">"Programmier-QR" auf dem Tag öffnen, mit "NFC Tools" scannen, URL auf die Holzkarte schreiben. Fertig.</p>
+          <p class="nf-step-text" set:html={bt('nfc.step3', lang)}></p>
         </div>
       </div>
     </section>
@@ -97,10 +105,10 @@ function fmtDate(iso: string | null): string {
     {canWrite && (
       <section class="nf-form-row">
         <button class="nf-btn-primary" type="button" @click="single = !single; bulk = false">
-          <span x-text="single ? '✕ Schließen' : '+ Neuer Tag'"></span>
+          <span x-text={`single ? ${JSON.stringify(bt('nfc.close', lang))} : ${JSON.stringify(bt('nfc.newtag.btn', lang))}`}></span>
         </button>
         <button class="nf-btn-ghost" type="button" @click="bulk = !bulk; single = false">
-          <span x-text="bulk ? '✕ Schließen' : '+10 Zimmer-Tags'"></span>
+          <span x-text={`bulk ? ${JSON.stringify(bt('nfc.close', lang))} : ${JSON.stringify(bt('nfc.bulk.btn', lang))}`}></span>
         </button>
       </section>
     )}
@@ -108,54 +116,54 @@ function fmtDate(iso: string | null): string {
     {canWrite && (
       <>
         <section class="nf-create" x-show="single" x-cloak>
-          <h3 class="nf-form-title">Neuer Tag</h3>
+          <h3 class="nf-form-title">{bt('nfc.form.newtag', lang)}</h3>
           <label class="nf-field">
-            <span class="nf-label">Label</span>
+            <span class="nf-label">{bt('nfc.label', lang)}</span>
             <input type="text" x-model="form.label" placeholder="z.B. Lobby Empfang" class="nf-input" maxlength="60" />
           </label>
           <label class="nf-field">
-            <span class="nf-label">Typ</span>
+            <span class="nf-label">{bt('nfc.type', lang)}</span>
             <select x-model="form.target_type" class="nf-input">
-              <option value="hotel_general">Allgemein (Hotel) — dynamisches Routing</option>
-              <option value="room">Zimmer-Tag</option>
-              <option value="custom_url">Beliebige URL</option>
-              <option value="guest_stay">Fester Stay-Link</option>
+              <option value="hotel_general">{bt('nfc.type.general.opt', lang)}</option>
+              <option value="room">{bt('nfc.type.room.opt', lang)}</option>
+              <option value="custom_url">{bt('nfc.type.url.opt', lang)}</option>
+              <option value="guest_stay">{bt('nfc.type.stay.opt', lang)}</option>
             </select>
           </label>
           <label class="nf-field" x-show="form.target_type === 'room'">
-            <span class="nf-label">Zimmer-Nummer</span>
+            <span class="nf-label">{bt('nfc.roomnr', lang)}</span>
             <input type="text" x-model="form.room_number" placeholder="z.B. 204" class="nf-input" />
           </label>
           <label class="nf-field" x-show="form.target_type === 'custom_url'">
-            <span class="nf-label">URL (https://…)</span>
+            <span class="nf-label">{bt('nfc.url', lang)}</span>
             <input type="url" x-model="form.url" placeholder="https://www.google.com/maps/place/…" class="nf-input" />
           </label>
           <label class="nf-field" x-show="form.target_type === 'guest_stay'">
-            <span class="nf-label">Stay-ID</span>
+            <span class="nf-label">{bt('nfc.stayid', lang)}</span>
             <input type="text" x-model="form.stay_id" placeholder="UUID" class="nf-input" />
           </label>
           <template x-if="form.error">
             <p class="nf-error" x-text="form.error"></p>
           </template>
           <div class="nf-actions">
-            <button type="button" class="nf-btn-primary" :disabled="form.busy" @click="createTag()" x-text="form.busy ? 'Wird erstellt …' : 'Tag erstellen'"></button>
+            <button type="button" class="nf-btn-primary" :disabled="form.busy" @click="createTag()" x-text={`form.busy ? ${JSON.stringify(bt('nfc.creating', lang))} : ${JSON.stringify(bt('nfc.create', lang))}`}></button>
           </div>
         </section>
 
         <section class="nf-create" x-show="bulk" x-cloak>
-          <h3 class="nf-form-title">Bulk: Zimmer-Tags</h3>
-          <p class="nf-form-hint">Erstelle einen Tag pro Zimmer in einem Nummern-Bereich. Label-Format: "Prefix N".</p>
+          <h3 class="nf-form-title">{bt('nfc.bulk.title', lang)}</h3>
+          <p class="nf-form-hint">{bt('nfc.bulk.hint', lang)}</p>
           <div class="nf-row">
             <label class="nf-field">
-              <span class="nf-label">Von</span>
+              <span class="nf-label">{bt('nfc.from', lang)}</span>
               <input type="number" min="1" x-model.number="bulkForm.from" class="nf-input nf-input--narrow" />
             </label>
             <label class="nf-field">
-              <span class="nf-label">Bis</span>
+              <span class="nf-label">{bt('nfc.to', lang)}</span>
               <input type="number" min="1" x-model.number="bulkForm.to" class="nf-input nf-input--narrow" />
             </label>
             <label class="nf-field nf-flex-1">
-              <span class="nf-label">Label-Prefix</span>
+              <span class="nf-label">{bt('nfc.prefix', lang)}</span>
               <input type="text" x-model="bulkForm.prefix" placeholder="z.B. Zimmer" class="nf-input" />
             </label>
           </div>
@@ -163,53 +171,53 @@ function fmtDate(iso: string | null): string {
             <p class="nf-error" x-text="bulkForm.error"></p>
           </template>
           <div class="nf-actions">
-            <button type="button" class="nf-btn-primary" :disabled="bulkForm.busy" @click="createBulk()" x-text="bulkForm.busy ? 'Wird erstellt …' : `${(bulkForm.to - bulkForm.from + 1)} Tags erstellen`"></button>
+            <button type="button" class="nf-btn-primary" :disabled="bulkForm.busy" @click="createBulk()" x-text={`bulkForm.busy ? ${JSON.stringify(bt('nfc.creating', lang))} : (bulkForm.to - bulkForm.from + 1) + ' ' + ${JSON.stringify(bt('nfc.bulk.createsuffix', lang))}`}></button>
           </div>
         </section>
       </>
     )}
 
     <section class="nf-list-section">
-      <p class="nf-section-eyebrow">{tags.length} {tags.length === 1 ? 'Tag' : 'Tags'}</p>
+      <p class="nf-section-eyebrow">{tags.length} {tags.length === 1 ? bt('nfc.tag.one', lang) : bt('nfc.tag.many', lang)}</p>
       {tags.length === 0 ? (
-        <div class="nf-empty"><p>Noch keine Tags. Lege deinen ersten an oder Bulk-erstelle Zimmer-Tags.</p></div>
+        <div class="nf-empty"><p>{bt('nfc.empty', lang)}</p></div>
       ) : (
         <ul class="nf-list">
           {tags.map((t) => (
             <li class={`nf-tag-card${!t.is_active ? ' nf-tag-card--off' : ''}`} x-data={`{ showQr: false, busy: false }`}>
               <div class="nf-tag-main">
                 <div class="nf-tag-head">
-                  <span class={`nf-tag-pill${t.is_active ? ' is-on' : ''}`}>{t.is_active ? 'aktiv' : 'inaktiv'}</span>
+                  <span class={`nf-tag-pill${t.is_active ? ' is-on' : ''}`}>{t.is_active ? bt('nfc.pill.active', lang) : bt('nfc.pill.inactive', lang)}</span>
                   <span class="nf-tag-type">{TYPE_LABELS[t.target_type] ?? t.target_type}</span>
                 </div>
                 <h3 class="nf-tag-label">{t.label}</h3>
                 <p class="nf-tag-target">→ {targetSummary(t)}</p>
                 <div class="nf-tag-meta">
-                  <span><strong>{t.scan_count}</strong> Scans</span>
+                  <span><strong>{t.scan_count}</strong> {bt('nfc.scans', lang)}</span>
                   <span class="nf-tag-meta-sep">·</span>
-                  <span>letzter: {fmtDate(t.last_scanned_at)}</span>
+                  <span>{bt('nfc.last', lang)} {fmtDate(t.last_scanned_at)}</span>
                 </div>
               </div>
               <div class="nf-tag-actions">
-                <button class="nf-btn-ghost nf-btn-small" type="button" @click="showQr = !showQr" x-text="showQr ? '✕ QR' : '📱 Programmier-QR'"></button>
+                <button class="nf-btn-ghost nf-btn-small" type="button" @click="showQr = !showQr" x-text={`showQr ? ${JSON.stringify(bt('nfc.qr.hide', lang))} : ${JSON.stringify(bt('nfc.qr.show', lang))}`}></button>
                 {canWrite && (
                   <button
                     class="nf-btn-danger nf-btn-small"
                     type="button"
                     :disabled="busy"
-                    @click={`if (!confirm('Tag löschen?')) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { window.retahaToastFlash && window.retahaToastFlash('Tag gelöscht'); location.reload(); } else { window.retahaToast && window.retahaToast('Fehler: ' + (d.error || 'unbekannt'), 'error'); } })`}
-                  >Löschen</button>
+                    @click={`if (!confirm(${JSON.stringify(bt('nfc.js.deleteconfirm', lang))})) return; busy = true; fetch('/api/admin/nfc-tags/${t.id}', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { busy = false; if (d.ok) { window.retahaToastFlash && window.retahaToastFlash(${JSON.stringify(bt('nfc.js.deleted', lang))}); location.reload(); } else { window.retahaToast && window.retahaToast(${JSON.stringify(bt('nfc.js.deletefail', lang))} + ' ' + (d.error || 'unbekannt'), 'error'); } })`}
+                  >{bt('nfc.delete', lang)}</button>
                 )}
               </div>
               <div x-show="showQr" x-cloak class="nf-qr">
                 {tagQrMap.has(t.id) ? (
                   <>
-                    <img src={tagQrMap.get(t.id)} alt={`QR für ${t.label}`} class="nf-qr-img" />
-                    <p class="nf-qr-help">Diesen QR in der "NFC Tools"-App scannen → "Schreiben"-Befehl → URL auf Holzkarte übertragen.</p>
+                    <img src={tagQrMap.get(t.id)} alt={bt('nfc.qr.alt', lang).replace('{label}', t.label)} class="nf-qr-img" />
+                    <p class="nf-qr-help">{bt('nfc.qr.help', lang)}</p>
                     <code class="nf-qr-url">{`${siteOrigin}/n/${t.id}`}</code>
                   </>
                 ) : (
-                  <p class="nf-qr-help">QR-Code konnte nicht generiert werden.</p>
+                  <p class="nf-qr-help">{bt('nfc.qr.failed', lang)}</p>
                 )}
               </div>
             </li>
@@ -219,7 +227,10 @@ function fmtDate(iso: string | null): string {
     </section>
   </div>
 
+  <script type="application/json" id="nfc-i18n" is:inline set:html={JSON.stringify(tJs)}></script>
+
   <script>
+    const T = JSON.parse(document.getElementById('nfc-i18n')?.textContent || '{}');
     document.addEventListener('alpine:init', () => {
       // @ts-expect-error - Alpine global
       window.Alpine.data('nfcTagsAdmin', () => ({
@@ -235,7 +246,7 @@ function fmtDate(iso: string | null): string {
           if (this.form.busy) return;
           this.form.error = '';
           const payload: any = { label: this.form.label?.trim(), target_type: this.form.target_type };
-          if (!payload.label) { this.form.error = 'Label fehlt.'; return; }
+          if (!payload.label) { this.form.error = T.labelMissing; return; }
           if (this.form.target_type === 'room') payload.target_value = { room_number: this.form.room_number?.trim() };
           if (this.form.target_type === 'custom_url') payload.target_value = { url: this.form.url?.trim() };
           if (this.form.target_type === 'guest_stay') payload.target_value = { stay_id: this.form.stay_id?.trim() };
@@ -247,8 +258,8 @@ function fmtDate(iso: string | null): string {
               body: JSON.stringify(payload),
             });
             const data = await res.json();
-            if (!data.ok) { this.form.error = data.error || 'Fehler'; return; }
-            window.retahaToastFlash && window.retahaToastFlash('NFC-Tag erstellt');
+            if (!data.ok) { this.form.error = data.error || T.error; return; }
+            window.retahaToastFlash && window.retahaToastFlash(T.tagCreated);
             location.reload();
           } finally { this.form.busy = false; }
         },
@@ -256,7 +267,7 @@ function fmtDate(iso: string | null): string {
         async createBulk() {
           if (this.bulkForm.busy) return;
           this.bulkForm.error = '';
-          if (this.bulkForm.to < this.bulkForm.from) { this.bulkForm.error = 'Bis muss größer als Von sein.'; return; }
+          if (this.bulkForm.to < this.bulkForm.from) { this.bulkForm.error = T.bulkRange; return; }
           this.bulkForm.busy = true;
           try {
             const res = await fetch('/api/admin/nfc-tags/create', {
@@ -265,8 +276,8 @@ function fmtDate(iso: string | null): string {
               body: JSON.stringify({ bulk: { mode: 'room_range', from: this.bulkForm.from, to: this.bulkForm.to, label_prefix: this.bulkForm.prefix } }),
             });
             const data = await res.json();
-            if (!data.ok) { this.bulkForm.error = data.error || 'Fehler'; return; }
-            window.retahaToastFlash && window.retahaToastFlash('NFC-Tags erstellt');
+            if (!data.ok) { this.bulkForm.error = data.error || T.error; return; }
+            window.retahaToastFlash && window.retahaToastFlash(T.tagsCreated);
             location.reload();
           } finally { this.bulkForm.busy = false; }
         },
