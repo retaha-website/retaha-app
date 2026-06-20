@@ -3,6 +3,8 @@ import Layout from '../../layouts/Layout.astro';
 import EveSubNav from '../../components/admin/EveSubNav.astro';
 import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 interface TuningRule {
   trigger: string;
@@ -31,8 +33,8 @@ if (Astro.request.method === 'POST') {
       .from('hotel_settings')
       .update({ eve_enabled: enabled, updated_at: new Date().toISOString() })
       .eq('hotel_id', hotel.id);
-    if (error) message = { type: 'error', text: `Umschalten fehlgeschlagen: ${error.message}` };
-    else message = { type: 'success', text: enabled ? 'Eve ist jetzt für deine Gäste aktiv.' : 'Eve ist deaktiviert.' };
+    if (error) message = { type: 'error', text: `${bt('evs.msg.togglefail', lang)}: ${error.message}` };
+    else message = { type: 'success', text: enabled ? bt('evs.msg.enabled', lang) : bt('evs.msg.disabled', lang) };
   }
 
   else if (action === 'save_persona') {
@@ -42,11 +44,11 @@ if (Astro.request.method === 'POST') {
     const onlineUntil = form.get('eve_online_until')?.toString() || null;
 
     if (!name) {
-      message = { type: 'error', text: 'Name darf nicht leer sein.' };
+      message = { type: 'error', text: bt('evs.msg.nameempty', lang) };
     } else if (!['warm_formal', 'casual', 'custom'].includes(tonality ?? '')) {
-      message = { type: 'error', text: 'Ungültige Tonalität.' };
+      message = { type: 'error', text: bt('evs.msg.invalidtonality', lang) };
     } else if (tonality === 'custom' && !customPersona) {
-      message = { type: 'error', text: 'Bei "Eigene Beschreibung" musst du den Persona-Text ausfüllen.' };
+      message = { type: 'error', text: bt('evs.msg.custompersona', lang) };
     } else {
       const { error } = await client
         .from('hotel_settings')
@@ -58,8 +60,8 @@ if (Astro.request.method === 'POST') {
           updated_at: new Date().toISOString(),
         })
         .eq('hotel_id', hotel.id);
-      if (error) message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
-      else message = { type: 'success', text: 'Persönlichkeit gespeichert.' };
+      if (error) message = { type: 'error', text: `${bt('prof.msg.savefail', lang)}: ${error.message}` };
+      else message = { type: 'success', text: bt('evs.msg.personasaved', lang) };
     }
   }
 
@@ -78,7 +80,7 @@ if (Astro.request.method === 'POST') {
       const forceModelRaw = form.get('force_model')?.toString();
       const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (!trigger || !instruction) {
-        message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
+        message = { type: 'error', text: bt('evs.msg.rulerequired', lang) };
       } else {
         newRules.push({ trigger, instruction, ...(force_model && { force_model }) });
       }
@@ -87,7 +89,7 @@ if (Astro.request.method === 'POST') {
       const indexStr = form.get('rule_index')?.toString();
       const idx = indexStr ? parseInt(indexStr, 10) : -1;
       if (idx < 0 || idx >= currentRules.length) {
-        message = { type: 'error', text: 'Ungültiger Index.' };
+        message = { type: 'error', text: bt('evs.msg.invalidindex', lang) };
       } else {
         newRules = currentRules.filter((_, i) => i !== idx);
       }
@@ -100,9 +102,9 @@ if (Astro.request.method === 'POST') {
       const forceModelRaw = form.get('force_model')?.toString();
       const force_model = (forceModelRaw === 'haiku' || forceModelRaw === 'sonnet') ? forceModelRaw : undefined;
       if (idx < 0 || idx >= currentRules.length) {
-        message = { type: 'error', text: 'Ungültiger Index.' };
+        message = { type: 'error', text: bt('evs.msg.invalidindex', lang) };
       } else if (!trigger || !instruction) {
-        message = { type: 'error', text: 'Trigger und Instruction sind Pflichtfelder.' };
+        message = { type: 'error', text: bt('evs.msg.rulerequired', lang) };
       } else {
         newRules[idx] = { trigger, instruction, ...(force_model && { force_model }) };
       }
@@ -113,12 +115,12 @@ if (Astro.request.method === 'POST') {
         .from('hotel_settings')
         .update({ eve_tuning_rules: newRules, updated_at: new Date().toISOString() })
         .eq('hotel_id', hotel.id);
-      if (error) message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+      if (error) message = { type: 'error', text: `${bt('prof.msg.savefail', lang)}: ${error.message}` };
       else {
         const msgMap = {
-          tuning_rule_add: 'Regel hinzugefügt.',
-          tuning_rule_update: 'Regel aktualisiert.',
-          tuning_rule_delete: 'Regel gelöscht.',
+          tuning_rule_add: bt('evs.msg.ruleadded', lang),
+          tuning_rule_update: bt('evs.msg.ruleupdated', lang),
+          tuning_rule_delete: bt('evs.msg.ruledeleted', lang),
         };
         message = { type: 'success', text: msgMap[action as keyof typeof msgMap] };
       }
@@ -148,15 +150,15 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Eve Concierge</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.eve', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">EVE · KI-CONCIERGE</span>
-      <h1 class="settings-hero__title">Eve's Persönlichkeit<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Name, Tonalität und Verhaltens-Regeln. Was Eve weiß steht im Wissens-Tab.</p>
+      <span class="settings-hero__eyebrow">{bt('evf.hero.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('evs.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('evs.hero.sub', lang)}</p>
     </section>
 
     {message && (
@@ -170,58 +172,58 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
       <!-- 01 Modul-Status -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Eve Concierge</h2>
+          <h2 class="s-card__title">{bt('nav.eve', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
 
         <div class="s-card__body">
-          <p class="field__hint">{eveEnabled ? 'Eve ist aktiv und im Gast-Frontend sichtbar.' : 'Eve ist deaktiviert — der Concierge-Tile bleibt im Gast-Frontend ausgeblendet.'}</p>
+          <p class="field__hint">{eveEnabled ? bt('evs.mod.on', lang) : bt('evs.mod.off', lang)}</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <ModStatusLed on={eveEnabled} />
             <form method="POST" style="margin:0">
               <input type="hidden" name="_action" value="toggle_enabled" />
               <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
               <button type="submit" class={`v9-btn${eveEnabled ? ' v9-btn--ghost' : ''}`}>
-                {eveEnabled ? 'Deaktivieren' : 'Aktivieren'}
+                {eveEnabled ? bt('evs.deactivate', lang) : bt('evs.activate', lang)}
               </button>
             </form>
           </div>
         </div>
       </section>
 
-      <EveSubNav currentPath={Astro.url.pathname} />
+      <EveSubNav currentPath={Astro.url.pathname} lang={lang} />
 
       <!-- ── Persona ── -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Persönlichkeit</h2>
+          <h2 class="s-card__title">{bt('evs.persona.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Wie Eve sich präsentiert und spricht.</p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">{bt('evs.persona.sub', lang)}</p>
 
         <form method="POST" x-data={`{ tonality: '${eveTonality}' }`}>
           <input type="hidden" name="_action" value="save_persona" />
           <div class="s-card__body">
 
             <div class="field field--row">
-              <label class="field__label field__label--req" for="eve-name">Name</label>
+              <label class="field__label field__label--req" for="eve-name">{bt('si.items.name', lang)}</label>
               <div class="field__input-wrap">
                 <input
                   type="text" id="eve-name" name="eve_name"
                   value={eveName} required maxlength="40"
                   class="s-input" autocomplete="off"
                 />
-                <span class="field__hint">Wie soll deine KI-Concierge heißen? Beispiele: Eve, Maria, Anton, Sophie.</span>
+                <span class="field__hint">{bt('evs.persona.namehint', lang)}</span>
               </div>
             </div>
 
             <div class="field field--row">
-              <span class="field__label">Tonalität</span>
+              <span class="field__label">{bt('evs.persona.tonality', lang)}</span>
               <div class="radio-cards" role="radiogroup">
                 {[
-                  ['warm_formal', 'Warm-formal', 'Premium-Concierge: professionell, aufmerksam, diskret.'],
-                  ['casual', 'Casual', 'Locker und freundlich — für junge Boutique-Hotels.'],
-                  ['custom', 'Eigene', 'Frei-Text-Persona. Volle Kontrolle.'],
+                  ['warm_formal', bt('evs.ton.warm.label', lang), bt('evs.ton.warm.hint', lang)],
+                  ['casual', bt('evs.ton.casual.label', lang), bt('evs.ton.casual.hint', lang)],
+                  ['custom', bt('evs.ton.custom.label', lang), bt('evs.ton.custom.hint', lang)],
                 ].map(([val, label, hint]) => (
                   <label class={`radio-card ${eveTonality === val ? 'is-active' : ''}`} title={hint}>
                     <input
@@ -238,7 +240,7 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
 
             <div x-show="tonality === 'custom'" x-cloak>
               <div class="field field--row">
-                <label class="field__label" for="eve-custom-persona">Persona-Text</label>
+                <label class="field__label" for="eve-custom-persona">{bt('evs.persona.text', lang)}</label>
                 <div class="field__input-wrap">
                   <textarea
                     id="eve-custom-persona" name="eve_custom_persona" rows="4"
@@ -250,31 +252,29 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
             </div>
 
             <div class="field field--row">
-              <span class="field__label">Anrede an Gast</span>
+              <span class="field__label">{bt('evs.persona.address', lang)}</span>
               <div>
                 <div class="ev-readonly-field">
-                  <span>{guestAddressForm === 'du' ? 'Du' : 'Sie'}</span>
-                  <a href="/admin/settings" class="s-btn-link">In Allgemeinen Einstellungen ändern ↗</a>
+                  <span>{guestAddressForm === 'du' ? bt('evs.address.du', lang) : bt('evs.address.sie', lang)}</span>
+                  <a href="/admin/settings" class="s-btn-link">{bt('evs.persona.addresslink', lang)}</a>
                 </div>
               </div>
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="eve-online-until">Online bis</label>
+              <label class="field__label" for="eve-online-until">{bt('evs.persona.onlineuntil', lang)}</label>
               <div class="field__input-wrap">
                 <input
                   type="time" id="eve-online-until" name="eve_online_until"
                   value={eveOnlineUntil} class="s-input ev-time-input"
                 />
-                <span class="field__hint">
-                  Anzeige-Hint im Gast-Frontend ("online bis 22:00"). Eve ist technisch 24/7 verfügbar.
-                </span>
+                <span class="field__hint">{bt('evs.persona.onlinehint', lang)}</span>
               </div>
             </div>
 
           </div>
           <div class="s-card__footer">
-            <button type="submit" class="v9-btn">Persönlichkeit speichern</button>
+            <button type="submit" class="v9-btn">{bt('evs.persona.save', lang)}</button>
           </div>
         </form>
       </section>
@@ -282,27 +282,27 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
       <!-- ── Tuning-Rules ── -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Eve trainieren</h2>
+          <h2 class="s-card__title">{bt('evs.tune.title', lang)}</h2>
           <span class="s-card__num">03</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Verhaltensregeln — was Eve tun soll, wenn bestimmte Themen auftauchen. Beispiel: "Bei Restaurant-Fragen zuerst unser hauseigenes Restaurant nennen." Fakten wie Check-out, WLAN oder Anfahrt gehören in den <a href="/eve/knowledge" class="s-btn-link">Wissens-Tab →</a></p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;" set:html={bt('evs.tune.sub', lang).replace('{link}', `<a href="/eve/knowledge" class="s-btn-link">${bt('evs.tune.sublink', lang)}</a>`)}></p>
 
         <form method="POST">
           <input type="hidden" name="_action" value="tuning_rule_add" />
           <div class="s-card__body">
             <div class="field field--row">
-              <label class="field__label field__label--req" for="rule-trigger">Wenn Gast fragt nach</label>
+              <label class="field__label field__label--req" for="rule-trigger">{bt('evs.tune.trigger', lang)}</label>
               <div class="field__input-wrap">
                 <input
                   type="text" id="rule-trigger" name="trigger" required
                   placeholder="z.B. restaurant-empfehlung"
                   class="s-input ev-mono-input" autocomplete="off"
                 />
-                <span class="field__hint">Substring-Match (case-insensitive). Wenn die Gast-Anfrage diesen Text enthält, gilt diese Regel.</span>
+                <span class="field__hint">{bt('evs.tune.triggerhint', lang)}</span>
               </div>
             </div>
             <div class="field field--row">
-              <label class="field__label field__label--req" for="rule-instruction">Antworte so</label>
+              <label class="field__label field__label--req" for="rule-instruction">{bt('evs.tune.instruction', lang)}</label>
               <textarea
                 id="rule-instruction" name="instruction" required rows="3"
                 placeholder="z.B. 'Empfiehl immer erst unser hauseigenes Restaurant Maria.'"
@@ -310,24 +310,24 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
               ></textarea>
             </div>
             <div class="field field--row">
-              <label class="field__label" for="rule-force-model">Modell für diese Regel</label>
+              <label class="field__label" for="rule-force-model">{bt('evs.tune.model', lang)}</label>
               <div class="field__input-wrap">
                 <select id="rule-force-model" name="force_model" class="s-input">
-                  <option value="">Auto (Router entscheidet)</option>
-                  <option value="sonnet">Sonnet — für besonders sorgfältige Antworten</option>
-                  <option value="haiku">Haiku — für schnelle, einfache Antworten</option>
+                  <option value="">{bt('evs.model.auto', lang)}</option>
+                  <option value="sonnet">{bt('evs.model.sonnet', lang)}</option>
+                  <option value="haiku">{bt('evs.model.haiku', lang)}</option>
                 </select>
-                <span class="field__hint">Optional. Überschreibt die automatische Modellwahl für Anfragen, die diese Regel treffen.</span>
+                <span class="field__hint">{bt('evs.tune.modelhint', lang)}</span>
               </div>
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="submit" class="v9-btn">+ Regel hinzufügen</button>
+            <button type="submit" class="v9-btn">{bt('evs.tune.add', lang)}</button>
           </div>
         </form>
 
         {tuningRules.length === 0 && (
-          <p class="ev-empty-hint">Noch keine Regeln angelegt.</p>
+          <p class="ev-empty-hint">{bt('evs.tune.empty', lang)}</p>
         )}
 
         {tuningRules.length > 0 && (
@@ -339,18 +339,18 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                     <p class="ev-rule-trigger">{rule.trigger}</p>
                     <p class="ev-item__a">{rule.instruction}</p>
                     {rule.force_model && (
-                      <p class="ev-rule-model"><span class="ev-model-badge">{rule.force_model}</span>Modell-Override</p>
+                      <p class="ev-rule-model"><span class="ev-model-badge">{rule.force_model}</span>{bt('evs.tune.override', lang)}</p>
                     )}
                   </div>
                   <div class="ev-item__actions">
                     <button
                       type="button" @click="editing = true"
                       class="v9-btn v9-btn--ghost ev-action-btn"
-                    >Bearbeiten</button>
-                    <form method="POST" class="inline" onsubmit="return confirm('Diese Regel wirklich löschen?')">
+                    >{bt('si.items.edit', lang)}</button>
+                    <form method="POST" class="inline" onsubmit={`return confirm(${JSON.stringify(bt('evs.confirm.delete', lang))})`}>
                       <input type="hidden" name="_action" value="tuning_rule_delete" />
                       <input type="hidden" name="rule_index" value={index} />
-                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">Löschen</button>
+                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">{bt('nfc.delete', lang)}</button>
                     </form>
                   </div>
                 </div>
@@ -360,18 +360,18 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                   <input type="hidden" name="rule_index" value={index} />
                   <div class="ev-item__edit-body">
                     <div class="field field--row">
-                      <label class="field__label">Trigger</label>
+                      <label class="field__label">{bt('evs.edit.trigger', lang)}</label>
                       <input type="text" name="trigger" value={rule.trigger} required class="s-input ev-mono-input" />
                     </div>
                     <div class="field field--row">
-                      <label class="field__label">Instruction</label>
+                      <label class="field__label">{bt('evs.edit.instruction', lang)}</label>
                       <textarea name="instruction" required rows="3" class="s-input s-textarea">{rule.instruction}</textarea>
                     </div>
                     <div class="field field--row">
-                      <label class="field__label">Modell</label>
+                      <label class="field__label">{bt('evs.edit.model', lang)}</label>
                       <div class="field__input-wrap">
                         <select name="force_model" class="s-input">
-                          <option value="" selected={!rule.force_model}>Auto</option>
+                          <option value="" selected={!rule.force_model}>{bt('evs.model.autoshort', lang)}</option>
                           <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
                           <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
                         </select>
@@ -379,8 +379,8 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
-                    <button type="submit" class="v9-btn">Speichern</button>
-                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                    <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
+                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
                   </div>
                 </form>
               </article>
