@@ -3,54 +3,55 @@ import BrandSection from './BrandSection.astro';
 import ColorPicker from './ColorPicker.astro';
 import type { BrandingData } from '@retaha/auth';
 import { computeBrandPalette } from '@retaha/auth';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { branding: BrandingData; }
-const { branding } = Astro.props;
+interface Props { branding: BrandingData; lang: LanguageCode; }
+const { branding, lang } = Astro.props;
 
 const primary = branding.brand_primary ?? '#FF4A82';
 const palette = computeBrandPalette(primary);
 ---
 
-<BrandSection title="Brand-Farben" num="02">
+<BrandSection title={bt('brand.colors.title', lang)} num="02" lang={lang}>
   <form method="POST" id="colorsForm">
     <input type="hidden" name="_action" value="colors" />
 
     <!-- Primary -->
     <div class="field field--row">
-      <label class="field__label req" for="brand-primary">Primärfarbe *</label>
+      <label class="field__label req" for="brand-primary">{bt('brand.colors.primary', lang)}</label>
       <div class="color-row">
         <input type="text" id="brand-primary" name="brand_primary" class="s-input color-hex"
           value={primary} placeholder="#FF4A82" maxlength="7" />
-        <ColorPicker targetId="brand-primary" value={primary} ariaLabel="Farbwähler Primärfarbe" />
+        <ColorPicker targetId="brand-primary" value={primary} ariaLabel={bt('brand.colors.pickeria', lang)} />
       </div>
     </div>
-    <p class="field__hint">Hauptakzentfarbe — alle weiteren Rollen werden automatisch abgeleitet</p>
+    <p class="field__hint">{bt('brand.colors.hint', lang)}</p>
 
     <!-- Palette-Rollen -->
     <div class="variants">
-      <span class="variants__label">Abgeleitete Palette</span>
+      <span class="variants__label">{bt('brand.colors.palette', lang)}</span>
       <div class="variant-grid" id="variantGrid">
         <div class="variant-chip" id="chip-accent" style={`background:${primary}`}>
-          <span class="variant-chip__role">Akzent</span>
+          <span class="variant-chip__role">{bt('brand.role.accent', lang)}</span>
           <span class="variant-chip__hex" id="chip-accent-hex">{primary}</span>
         </div>
         <div class="variant-chip" id="chip-hover" style={`background:${palette.hover}`}>
-          <span class="variant-chip__role">Hover</span>
+          <span class="variant-chip__role">{bt('brand.role.hover', lang)}</span>
           <span class="variant-chip__hex" id="chip-hover-hex">{palette.hover}</span>
         </div>
         <div class="variant-chip" id="chip-soft" style={`background:${palette.soft}`}>
-          <span class="variant-chip__role">Soft</span>
+          <span class="variant-chip__role">{bt('brand.role.soft', lang)}</span>
           <span class="variant-chip__hex" id="chip-soft-hex">{palette.soft}</span>
         </div>
         <div class="variant-chip" id="chip-on" style={`background:${palette.onAccent}`}>
-          <span class="variant-chip__role">Text-auf-Akzent</span>
+          <span class="variant-chip__role">{bt('brand.role.onaccent', lang)}</span>
           <span class="variant-chip__hex" id="chip-on-hex">{palette.onAccent}</span>
         </div>
       </div>
     </div>
 
     <div class="s-card__footer">
-      <button type="submit" class="v9-btn">Speichern</button>
+      <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
     </div>
   </form>
 </BrandSection>

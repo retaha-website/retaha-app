@@ -1,43 +1,45 @@
 ---
 import BrandSection from './BrandSection.astro';
 import type { BrandingData } from '@retaha/auth';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { branding: BrandingData; }
-const { branding } = Astro.props;
+interface Props { branding: BrandingData; lang: LanguageCode; }
+const { branding, lang } = Astro.props;
 
 const slots = [
-  { key: 'logo_primary',  label: 'Primary',      hint: 'Wort + Symbol · Header, E-Mails',   required: true },
-  { key: 'logo_icon',     label: 'Icon Only',     hint: 'Symbol · Favicon, App-Icon, Wallet' },
-  { key: 'logo_wordmark', label: 'Wordmark Only', hint: 'Nur Text · Footer, Briefkopf'       },
-  { key: 'logo_dark',     label: 'Dark Variant',  hint: 'Für dunkle Hintergründe'            },
+  { key: 'logo_primary',  labelKey: 'brand.logo.s1.label', hintKey: 'brand.logo.s1.hint', required: true },
+  { key: 'logo_icon',     labelKey: 'brand.logo.s2.label', hintKey: 'brand.logo.s2.hint' },
+  { key: 'logo_wordmark', labelKey: 'brand.logo.s3.label', hintKey: 'brand.logo.s3.hint' },
+  { key: 'logo_dark',     labelKey: 'brand.logo.s4.label', hintKey: 'brand.logo.s4.hint' },
 ];
 ---
 
-<BrandSection title="Logo" num="01">
+<BrandSection title={bt('brand.logo.title', lang)} num="01" lang={lang}>
   <div class="logo-grid">
     {slots.map(slot => {
       const url = branding[slot.key as keyof BrandingData] as string | null;
+      const label = bt(slot.labelKey, lang);
       return (
         <div class="logo-slot" data-key={slot.key}>
           <div class="logo-slot__head">
             <span class="logo-slot__label">
-              {slot.label}
+              {label}
               {slot.required && <span class="req">*</span>}
             </span>
-            <span class="logo-slot__hint">{slot.hint}</span>
+            <span class="logo-slot__hint">{bt(slot.hintKey, lang)}</span>
           </div>
           <div class={`logo-slot__drop ${url ? 'has-image' : ''}`}>
-            <img src={url || undefined} alt={`Logo ${slot.label}`} class="logo-slot__img" hidden={!url || undefined} />
+            <img src={url || undefined} alt={bt('brand.logo.alt', lang).replace('{name}', label)} class="logo-slot__img" hidden={!url || undefined} />
             <div class="logo-slot__empty" hidden={!!url || undefined}>
               <span class="logo-slot__plus">+</span>
-              <span class="logo-slot__cta">Ablegen oder klicken</span>
+              <span class="logo-slot__cta">{bt('brand.drop.cta', lang)}</span>
               <span class="logo-slot__fmt">SVG · PNG</span>
             </div>
             <input type="file" class="logo-slot__input" accept="image/svg+xml,image/png,image/jpeg" data-key={slot.key} />
           </div>
           <div class="logo-slot__actions" hidden={!url || undefined}>
-            <button class="logo-slot__btn" data-action="replace" data-key={slot.key} type="button">Ersetzen</button>
-            <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key={slot.key} type="button">Entfernen</button>
+            <button class="logo-slot__btn" data-action="replace" data-key={slot.key} type="button">{bt('brand.replace', lang)}</button>
+            <button class="logo-slot__btn logo-slot__btn--del" data-action="delete" data-key={slot.key} type="button">{bt('common.remove', lang)}</button>
           </div>
         </div>
       );
@@ -100,6 +102,7 @@ const slots = [
 </style>
 
 <script>
+  const T = JSON.parse(document.getElementById('brand-i18n')?.textContent || '{}');
   // Logo Upload
   document.querySelectorAll<HTMLInputElement>('.logo-slot__input').forEach(input => {
     input.addEventListener('change', async () => {
@@ -126,7 +129,7 @@ const slots = [
 
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       const json = await res.json();
-      if (!res.ok) { (window as any).retahaToast?.(`Upload fehlgeschlagen: ${json.error}`, 'error'); return; }
+      if (!res.ok) { (window as any).retahaToast?.(`${T.uploadfail}: ${json.error}`, 'error'); return; }
 
       // Live-Preview im Phone updaten
       const phoneLogo = document.querySelector<HTMLImageElement>('#brandPhoneScreen .gate-hero-logo');
@@ -145,7 +148,7 @@ const slots = [
         actions.hidden = false;
         actions.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b => b.dataset.key = key);
       }
-      (window as any).retahaToast?.('Logo gespeichert');
+      (window as any).retahaToast?.(T.logoSaved);
     });
   });
 
@@ -161,7 +164,7 @@ const slots = [
           const input = slot.querySelector<HTMLInputElement>('.logo-slot__input');
           input?.click();
         } else if (action === 'delete') {
-          (window as any).__brandConfirm('Logo wirklich entfernen?', async () => {
+          (window as any).__brandConfirm(T.logoConfirm, async () => {
             const fd = new FormData();
             fd.append('key', key);
             fd.append('delete', 'true');
@@ -181,9 +184,9 @@ const slots = [
                 phoneLogo.hidden = true;
                 if (phoneFallback) phoneFallback.hidden = false;
               }
-              (window as any).retahaToast?.('Logo entfernt');
+              (window as any).retahaToast?.(T.logoRemoved);
             } else {
-              (window as any).retahaToast?.('Entfernen fehlgeschlagen', 'error');
+              (window as any).retahaToast?.(T.removefail, 'error');
             }
           });
         }

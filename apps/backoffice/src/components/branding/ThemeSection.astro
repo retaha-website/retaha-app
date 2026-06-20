@@ -1,13 +1,15 @@
 ---
 import BrandSection from './BrandSection.astro';
 import type { BrandingData } from '@retaha/auth';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   branding: BrandingData;
   hotelName?: string;
+  lang: LanguageCode;
 }
 
-const { branding } = Astro.props;
+const { branding, lang } = Astro.props;
 
 // Set to true to re-enable Editorial + Maison in the theme picker
 const SHOW_ALL_IDENTITIES = false;
@@ -16,7 +18,7 @@ const raw = branding.design_identity ?? 'bauhaus';
 const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus';
 ---
 
-<BrandSection title="Design-Identität" num="03">
+<BrandSection title={bt('brand.theme.title', lang)} num="03" lang={lang}>
   <div
     x-data={`{ theme: '${active}' }`}
     x-init="$watch('theme', t => $dispatch('brand-theme-selected', { theme: t }))"
@@ -39,8 +41,8 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
           </div>
           <div class="di-card__body">
             <div class="di-card__title bauhaus-title">Bauhaus</div>
-            <div class="di-card__desc">Anti-Luxus · Selbstbewusst</div>
-            <div class="di-card__meta">Space Grotesk · Pink-Punkt</div>
+            <div class="di-card__desc">{bt('brand.theme.bauhaus.desc', lang)}</div>
+            <div class="di-card__meta">{bt('brand.theme.bauhaus.meta', lang)}</div>
           </div>
         </button>
 
@@ -87,11 +89,11 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
         </svg>
-        <p>Brand-Farben aus Abschnitt 02 werden in alle Identitäten als Primary übernommen.</p>
+        <p>{bt('brand.theme.info', lang)}</p>
       </div>
 
       <div class="s-card__footer">
-        <button type="submit" class="v9-btn">Speichern</button>
+        <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
       </div>
     </form>
   </div>

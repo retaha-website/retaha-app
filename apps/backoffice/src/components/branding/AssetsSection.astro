@@ -1,38 +1,39 @@
 ---
 import BrandSection from './BrandSection.astro';
 import type { BrandingData } from '@retaha/auth';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { branding: BrandingData; }
-const { branding } = Astro.props;
+interface Props { branding: BrandingData; lang: LanguageCode; }
+const { branding, lang } = Astro.props;
 
 const assets = [
-  { key: 'splash_background', label: 'Welcome-Hintergrund',   hint: 'Splash-Screen · Gäste-App Start',              ratio: '9/16' },
-  { key: 'wallet_pass_bg',    label: 'Wallet-Pass',           hint: 'Apple / Google Wallet-Karten',                 ratio: '16/9' },
-  { key: 'email_header',      label: 'E-Mail-Header',         hint: 'Banner oben in Gäste-Mails (600 × 200 px)',    ratio: '3/1'  },
+  { key: 'splash_background', labelKey: 'brand.asset.1.label', hintKey: 'brand.asset.1.hint', ratio: '9/16' },
+  { key: 'wallet_pass_bg',    labelKey: 'brand.asset.2.label', hintKey: 'brand.asset.2.hint', ratio: '16/9' },
+  { key: 'email_header',      labelKey: 'brand.asset.3.label', hintKey: 'brand.asset.3.hint', ratio: '3/1'  },
 ];
 ---
 
-<BrandSection title="Brand-Assets" num="04" optional>
+<BrandSection title={bt('brand.assets.title', lang)} num="04" lang={lang} optional>
   <div class="asset-grid">
     {assets.map(a => {
       const url = branding[a.key as keyof BrandingData] as string | null;
       return (
         <div class="asset-slot" data-slot={a.key}>
           <div class="asset-slot__head">
-            <span class="asset-slot__label">{a.label}</span>
-            <span class="asset-slot__hint">{a.hint}</span>
+            <span class="asset-slot__label">{bt(a.labelKey, lang)}</span>
+            <span class="asset-slot__hint">{bt(a.hintKey, lang)}</span>
           </div>
           <div class="asset-slot__drop" style={`aspect-ratio:${a.ratio}`} data-key={a.key}>
             <img class="asset-slot__img" alt="" src={url || undefined} hidden={!url || undefined} />
             <div class="asset-slot__empty" hidden={!!url || undefined}>
               <span class="asset-slot__plus">+</span>
-              <span class="asset-slot__cta">Ablegen oder klicken</span>
+              <span class="asset-slot__cta">{bt('brand.drop.cta', lang)}</span>
             </div>
             <input type="file" class="asset-slot__input" accept="image/jpeg,image/png,image/webp" data-key={a.key} />
           </div>
           <div class="asset-slot__actions" hidden={!url || undefined}>
-            <button class="asset-slot__btn" data-action="replace" data-key={a.key} type="button">Ersetzen</button>
-            <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key={a.key} type="button">Entfernen</button>
+            <button class="asset-slot__btn" data-action="replace" data-key={a.key} type="button">{bt('brand.replace', lang)}</button>
+            <button class="asset-slot__btn asset-slot__btn--del" data-action="delete" data-key={a.key} type="button">{bt('common.remove', lang)}</button>
           </div>
           <div class="asset-slot__status" hidden></div>
         </div>
@@ -91,6 +92,7 @@ const assets = [
 </style>
 
 <script>
+  const T = JSON.parse(document.getElementById('brand-i18n')?.textContent || '{}');
   function showStatus(slot: HTMLElement, ok: boolean, msg: string) {
     const el = slot.querySelector<HTMLElement>('.asset-slot__status');
     if (!el) return;
@@ -126,8 +128,8 @@ const assets = [
       fd.append('key', key); fd.append('file', file);
       const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
       if (res.ok) {
-        showStatus(slot, true, '✓ Gespeichert');
-        (window as any).retahaToast?.('Asset gespeichert');
+        showStatus(slot, true, T.assetSavedStatus);
+        (window as any).retahaToast?.(T.assetSaved);
         const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
         if (actions) {
           actions.hidden = false;
@@ -141,7 +143,7 @@ const assets = [
       } else {
         const j = await res.json();
         showStatus(slot, false, `✗ ${j.error}`);
-        (window as any).retahaToast?.(`Upload fehlgeschlagen: ${j.error}`, 'error');
+        (window as any).retahaToast?.(`${T.uploadfail}: ${j.error}`, 'error');
       }
     });
   }
@@ -154,7 +156,7 @@ const assets = [
         if (btn.dataset.action === 'replace') {
           slot.querySelector<HTMLInputElement>('.asset-slot__input')?.click();
         } else if (btn.dataset.action === 'delete') {
-          (window as any).__brandConfirm('Asset wirklich entfernen?', async () => {
+          (window as any).__brandConfirm(T.assetConfirm, async () => {
             const fd = new FormData();
             fd.append('key', key); fd.append('delete', 'true');
             const res = await fetch('/api/branding/upload-logo', { method: 'POST', body: fd });
@@ -166,14 +168,14 @@ const assets = [
               drop.classList.remove('has-image');
               const actions = slot.querySelector<HTMLElement>('.asset-slot__actions');
               if (actions) actions.hidden = true;
-              showStatus(slot, true, '✓ Entfernt');
-              (window as any).retahaToast?.('Asset entfernt');
+              showStatus(slot, true, T.assetRemovedStatus);
+              (window as any).retahaToast?.(T.assetRemoved);
               if (key === 'splash_background') {
                 const heroBg = document.querySelector<HTMLElement>('#brandPhoneScreen .gate-hero-bg');
                 if (heroBg) heroBg.style.backgroundImage = '';
               }
             } else {
-              (window as any).retahaToast?.('Entfernen fehlgeschlagen', 'error');
+              (window as any).retahaToast?.(T.removefail, 'error');
             }
           });
         }

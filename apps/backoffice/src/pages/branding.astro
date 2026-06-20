@@ -9,13 +9,15 @@ import AssetsSection  from '../components/branding/AssetsSection.astro';
 import BrandMiniPreview from '../components/branding/BrandMiniPreview.astro';
 import DemoQrCard from '@retaha/ui/components/shared/DemoQrCard.astro';
 import { getOrCreateShowcaseUrl } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect('/onboarding/locale');
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
@@ -39,7 +41,7 @@ if (Astro.request.method === 'POST') {
     const brand_theme = form.get('brand_theme')?.toString();
     const validThemes = ['coffee','ocean','forest','custom'];
     if (!brand_theme || !validThemes.includes(brand_theme)) {
-      saved = { section: 'theme', ok: false, msg: 'Ungültiges Theme.' };
+      saved = { section: 'theme', ok: false, msg: bt('brand.msg.invalidtheme', lang) };
     } else {
       const { error } = await client.from('hotels')
         .update({ brand_theme, theme: brand_theme })
@@ -53,7 +55,7 @@ if (Astro.request.method === 'POST') {
     const design_identity = form.get('design_identity')?.toString();
     const validIdentities = ['classic', 'bauhaus', 'editorial', 'maison'];
     if (!design_identity || !validIdentities.includes(design_identity)) {
-      saved = { section: 'identity', ok: false, msg: 'Ungültige Design-Identität.' };
+      saved = { section: 'identity', ok: false, msg: bt('brand.msg.invalididentity', lang) };
     } else {
       const { error } = await client.from('hotels')
         .update({ design_identity })
@@ -78,47 +80,61 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
   <div class="branding-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Branding</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.branding', lang)}</span>
     </nav>
 
     <section class="branding-hero">
-      <span class="branding-hero__eyebrow">Brand-Identity</span>
-      <h1 class="branding-hero__title">Branding & Marken-Identität<span class="dot-pink">.</span></h1>
-      <p class="branding-hero__sub">Logo, Farben und Theme deines Hotels — überall sichtbar.</p>
+      <span class="branding-hero__eyebrow">{bt('brand.hero.eyebrow', lang)}</span>
+      <h1 class="branding-hero__title" set:html={bt('brand.hero.title', lang)}></h1>
+      <p class="branding-hero__sub">{bt('brand.hero.sub', lang)}</p>
     </section>
 
     {saved && (
-      <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? 'Gespeichert' : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
+      <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? bt('common.savedshort', lang) : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
     )}
 
     <div class="branding-layout">
 
       <div class="branding-sections">
-        <LogoSection branding={branding} />
-        <ColorsSection branding={branding} />
-        <ThemeSection branding={branding} hotelName={hotel.name} />
-        <AssetsSection branding={branding} />
+        <LogoSection branding={branding} lang={lang} />
+        <ColorsSection branding={branding} lang={lang} />
+        <ThemeSection branding={branding} hotelName={hotel.name} lang={lang} />
+        <AssetsSection branding={branding} lang={lang} />
       </div>
 
       <div class="branding-col-right">
         <div class="branding-sidebar">
-          <BrandMiniPreview branding={branding} hotelName={hotel.name} />
+          <BrandMiniPreview branding={branding} hotelName={hotel.name} lang={lang} />
           <DemoQrCard demoUrl={demoUrl} compact />
         </div>
       </div>
 
     </div>
+
+    <script type="application/json" id="brand-i18n" is:inline set:html={JSON.stringify({
+      uploadfail: bt('brand.js.uploadfail', lang),
+      removefail: bt('brand.js.removefail', lang),
+      logoSaved: bt('brand.js.logo.saved', lang),
+      logoConfirm: bt('brand.js.logo.confirm', lang),
+      logoRemoved: bt('brand.js.logo.removed', lang),
+      assetSavedStatus: bt('brand.js.asset.savedstatus', lang),
+      assetSaved: bt('brand.js.asset.saved', lang),
+      assetConfirm: bt('brand.js.asset.confirm', lang),
+      assetRemovedStatus: bt('brand.js.asset.removedstatus', lang),
+      assetRemoved: bt('brand.js.asset.removed', lang),
+      openGuest: bt('brand.preview.openguest', lang),
+    })}></script>
   </div>
 
   <div id="bConfirmModal" role="dialog" aria-modal="true" hidden>
     <div class="bcm-backdrop" id="bConfirmBackdrop"></div>
     <div class="bcm-box">
-      <p class="bcm-msg" id="bConfirmMsg">Wirklich entfernen?</p>
+      <p class="bcm-msg" id="bConfirmMsg"></p>
       <div class="bcm-actions">
-        <button class="bcm-btn bcm-btn--cancel" id="bConfirmCancel" type="button">Abbrechen</button>
-        <button class="bcm-btn bcm-btn--ok" id="bConfirmOk" type="button">Entfernen</button>
+        <button class="bcm-btn bcm-btn--cancel" id="bConfirmCancel" type="button">{bt('common.cancel', lang)}</button>
+        <button class="bcm-btn bcm-btn--ok" id="bConfirmOk" type="button">{bt('common.remove', lang)}</button>
       </div>
     </div>
   </div>

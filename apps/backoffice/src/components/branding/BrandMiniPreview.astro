@@ -3,9 +3,10 @@ import BauhausPreview from './previews/BauhausPreview.astro';
 import EditorialPreview from './previews/EditorialPreview.astro';
 import MaisonPreview from './previews/MaisonPreview.astro';
 import type { BrandingData } from '@retaha/auth';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { branding: BrandingData; hotelName: string; }
-const { branding, hotelName } = Astro.props;
+interface Props { branding: BrandingData; hotelName: string; lang: LanguageCode; }
+const { branding, hotelName, lang } = Astro.props;
 const brandPrimary = branding.brand_primary ?? null;
 
 const raw = branding.design_identity ?? 'bauhaus';
@@ -18,11 +19,11 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
   x-on:brand-theme-selected.window="theme = $event.detail.theme"
 >
   <div class="brand-preview__head">
-    <span class="brand-preview__eyebrow">Live-Vorschau</span>
+    <span class="brand-preview__eyebrow">{bt('brand.preview.eyebrow', lang)}</span>
     <h3
       class="brand-preview__title"
       x-text="theme === 'bauhaus' ? 'Bauhaus' : theme === 'editorial' ? 'Editorial' : 'Maison'"
-    >Deine Marke</h3>
+    >{bt('brand.preview.title', lang)}</h3>
   </div>
 
   <!-- Skaliertes Phone-Preview -->
@@ -41,7 +42,7 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
   </div>
 
   <button class="brand-preview__link" id="open-guest-preview" type="button">
-    → In Gäste-App öffnen
+    {bt('brand.preview.openguest', lang)}
     <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
       <path d="M6 3l5 5-5 5"/>
     </svg>
@@ -49,6 +50,7 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
 </aside>
 
 <script>
+  const T = JSON.parse(document.getElementById('brand-i18n')?.textContent || '{}');
   // Live-Update: Brand-Color → Preview (color-change events from ColorsSection)
   document.querySelectorAll<HTMLInputElement>('[data-swatch]').forEach(input => {
     if (input.id !== 'brand-primary') return;
@@ -72,7 +74,7 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
       if (win) win.location.href = 'https://app.retaha.de/gast-vorschau';
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '→ In Gäste-App öffnen <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>';
+      btn.innerHTML = T.openGuest + ' <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>';
     }
   });
 </script>
