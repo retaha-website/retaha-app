@@ -5,6 +5,8 @@ import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/au
 import { buildPhotoUrl, type PickCategory } from '../lib/places/google-client';
 import { addPickToHotel } from '../lib/places/pick-actions';
 import { mergeAndTranslate, asLanguageCode } from '@retaha/i18n';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -41,13 +43,13 @@ if (Astro.request.method === 'POST') {
     const placeId = form.get('place_id')?.toString().trim() ?? '';
     const cat = form.get('category')?.toString() ?? '';
     if (!placeId || !['restaurant', 'cafe', 'bar', 'activity', 'sight'].includes(cat)) {
-      message = { type: 'error', text: 'Place-ID und Kategorie sind Pflicht.' };
+      message = { type: 'error', text: bt('pl.msg.required', lang) };
     } else {
       const result = await addPickToHotel(client, hotel.id, placeId, cat as PickCategory);
       if (result.ok) {
         return Astro.redirect(`/places?cat=${cat}&saved=pick_added`);
       }
-      message = { type: 'error', text: result.error ?? 'Pick anlegen fehlgeschlagen.' };
+      message = { type: 'error', text: result.error ?? bt('pl.msg.addfail', lang) };
     }
   }
 
@@ -55,7 +57,7 @@ if (Astro.request.method === 'POST') {
     const id = form.get('id')?.toString();
     const note = form.get('hotel_note_default')?.toString().trim() || null;
     if (!id) {
-      message = { type: 'error', text: 'Keine ID übergeben.' };
+      message = { type: 'error', text: bt('pl.msg.noid', lang) };
     } else {
       const { data: existing } = await client
         .from('hotel_place_picks')
@@ -78,13 +80,13 @@ if (Astro.request.method === 'POST') {
       const { error } = await client.from('hotel_place_picks').update(updates)
         .eq('id', id).eq('hotel_id', hotel.id);
       if (error) {
-        message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+        message = { type: 'error', text: `${bt('pl.msg.updatefail', lang)}: ${error.message}` };
       } else {
         const langCount = Object.keys(hookResult.i18n).length;
         message = {
           type: 'success',
-          text: `Notiz gespeichert — ${langCount} Sprachen` +
-                (hookResult.failures.length ? ` · ${hookResult.failures.length} Übersetzungs-Fehler` : ''),
+          text: bt('pl.msg.notesaved', lang).replace('{n}', String(langCount)) +
+                (hookResult.failures.length ? bt('pl.msg.notefailsuffix', lang).replace('{n}', String(hookResult.failures.length)) : ''),
         };
       }
     }
@@ -93,11 +95,11 @@ if (Astro.request.method === 'POST') {
   else if (action === 'pick_delete') {
     const id = form.get('id')?.toString();
     if (!id) {
-      message = { type: 'error', text: 'Keine ID übergeben.' };
+      message = { type: 'error', text: bt('pl.msg.noid', lang) };
     } else {
       const { error } = await client.from('hotel_place_picks').delete().eq('id', id).eq('hotel_id', hotel.id);
-      if (error) message = { type: 'error', text: `Löschen fehlgeschlagen: ${error.message}` };
-      else message = { type: 'success', text: 'Pick entfernt.' };
+      if (error) message = { type: 'error', text: `${bt('pl.msg.deletefail', lang)}: ${error.message}` };
+      else message = { type: 'success', text: bt('pl.msg.pickremoved', lang) };
     }
   }
 
@@ -114,7 +116,7 @@ if (Astro.request.method === 'POST') {
         sort_order: newOrder,
         updated_at: new Date().toISOString(),
       }).eq('id', id).eq('hotel_id', hotel.id);
-      message = { type: 'success', text: dir === 'up' ? 'Nach oben verschoben.' : 'Nach unten verschoben.' };
+      message = { type: 'success', text: dir === 'up' ? bt('pl.msg.movedup', lang) : bt('pl.msg.moveddown', lang) };
     }
   }
 }
@@ -123,10 +125,10 @@ if (Astro.request.method === 'POST') {
 // This mirrors the guest app's TAB_DB_CATS mapping in recommendations.astro
 type BackofficeTabKey = 'restaurant' | 'cafe' | 'bar' | 'explore';
 const TABS: Array<{ key: BackofficeTabKey; label: string }> = [
-  { key: 'restaurant', label: 'Restaurants' },
-  { key: 'cafe',       label: 'Cafés' },
-  { key: 'bar',        label: 'Bars' },
-  { key: 'explore',    label: 'Sehenswertes' }, // DB: sight + activity
+  { key: 'restaurant', label: bt('pl.tab.restaurant', lang) },
+  { key: 'cafe',       label: bt('pl.tab.cafe', lang) },
+  { key: 'bar',        label: bt('pl.tab.bar', lang) },
+  { key: 'explore',    label: bt('pl.tab.explore', lang) }, // DB: sight + activity
 ];
 const VALID_TABS: BackofficeTabKey[] = ['restaurant', 'cafe', 'bar', 'explore'];
 
@@ -195,8 +197,17 @@ const autoSuggestions = nearbyPlaces
 
 const savedParam = Astro.url.searchParams.get('saved');
 if (savedParam === 'pick_added' && !message) {
-  message = { type: 'success', text: 'Pick hinzugefügt — bitte Notiz pflegen.' };
+  message = { type: 'success', text: bt('pl.msg.pickadded', lang) };
 }
+
+// Client-Strings für die Alpine-Komponenten (via #places-i18n JSON-Block)
+const plT = {
+  error: bt('pl.js.error', lang),
+  refreshed: bt('pl.js.refreshed', lang),
+  netErr: bt('pl.js.neterr', lang),
+  removeConfirm: bt('pl.js.removeconfirm', lang),
+  remove: bt('common.remove', lang),
+};
 
 
 ---
@@ -205,15 +216,15 @@ if (savedParam === 'pick_added' && !message) {
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Empfehlungen</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.places', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Gäste-Module · Empfehlungen</span>
-      <h1 class="settings-hero__title">Deine Empfehlungen<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Restaurants, Cafés, Bars und Sehenswertes. Eve zeigt deine Picks zuerst.</p>
+      <span class="settings-hero__eyebrow">{bt('pl.hero.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('pl.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('pl.hero.sub', lang)}</p>
     </section>
 
     {message && (
@@ -232,10 +243,7 @@ if (savedParam === 'pick_added' && !message) {
     )}
 
     {!hasAddress && (
-      <div class="s-warning-row">
-        <strong>Hotel-Adresse fehlt.</strong>
-        Bitte zuerst die Adresse in den <a href="/admin/settings" class="s-link">Allgemeinen Einstellungen</a> pflegen — sonst können keine Empfehlungen in der Nähe gefunden werden.
-      </div>
+      <div class="s-warning-row" set:html={bt('pl.noaddr', lang).replace('{link}', `<a href="/admin/settings" class="s-link">${bt('pl.noaddr.link', lang)}</a>`)}></div>
     )}
 
     <div class="settings-sections">
@@ -243,20 +251,20 @@ if (savedParam === 'pick_added' && !message) {
       <!-- 01 Modul -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Empfehlungsmodul</h2>
+          <h2 class="s-card__title">{bt('pl.mod.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <p class="field__hint">{bt('si.mod.hint', lang)}</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <ModStatusLed on={recommendationsOn} />
-            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
           </div>
         </div>
       </section>
 
       <!-- Kategorie-Tabs -->
-      <nav class="places-tabs" aria-label="Kategorien">
+      <nav class="places-tabs" aria-label={bt('pl.tabs.aria', lang)}>
         {TABS.map(tab => (
           <a
             href={`/places?cat=${tab.key}`}
@@ -274,7 +282,7 @@ if (savedParam === 'pick_added' && !message) {
       <!-- 02 Suche & Hinzufügen -->
       <section class="s-card" id="add-pick">
         <div class="s-card__head">
-          <h2 class="s-card__title">{TABS.find(t => t.key === activeTab)?.label} suchen</h2>
+          <h2 class="s-card__title">{bt('pl.search.title', lang).replace('{cat}', TABS.find(t => t.key === activeTab)?.label ?? '')}</h2>
           <span class="s-card__num">02</span>
         </div>
 
@@ -284,7 +292,7 @@ if (savedParam === 'pick_added' && !message) {
               type="text"
               x-model="query"
               x-on:input.debounce.300ms="search()"
-              placeholder={hasAddress ? `${TABS.find(t => t.key === activeTab)?.label} suchen…` : 'Erst Adresse in Einstellungen hinterlegen…'}
+              placeholder={hasAddress ? bt('pl.search.placeholder', lang).replace('{cat}', TABS.find(t => t.key === activeTab)?.label ?? '') : bt('pl.search.noaddr', lang)}
               :disabled="!hasAddress || pending"
               class="s-input"
               autocomplete="off"
@@ -309,7 +317,7 @@ if (savedParam === 'pick_added' && !message) {
               </template>
             </div>
           </div>
-          <p class="s-hint">Name eingeben (mind. 2 Zeichen). Eve empfiehlt deine Picks zuerst.</p>
+          <p class="s-hint">{bt('pl.search.hint', lang)}</p>
         </div>
       </section>
 
@@ -317,7 +325,7 @@ if (savedParam === 'pick_added' && !message) {
       <section class="s-card" id="picks-list">
         <div class="s-card__head">
           <h2 class="s-card__title">
-            Deine Picks
+            {bt('pl.picks.title', lang)}
             {activePicks.length > 0 && <span class="s-card__title-count">({activePicks.length})</span>}
           </h2>
           <span class="s-card__num">03</span>
@@ -325,10 +333,10 @@ if (savedParam === 'pick_added' && !message) {
 
         <div class="s-card__body">
           {activePicks.length === 0 && (
-            <p class="places-empty">Noch keine Picks in dieser Kategorie. Suche oben nach einem Ort.</p>
+            <p class="places-empty">{bt('pl.picks.empty', lang)}</p>
           )}
           {activePicks.length > 0 && (
-            <p class="s-hint">Ziehen zum Sortieren — die oberste Empfehlung zeigt Eve dem Gast zuerst.</p>
+            <p class="s-hint">{bt('pl.picks.sorthint', lang)}</p>
           )}
 
           <div class="picks-list" x-data="picksSort()">
@@ -356,7 +364,7 @@ if (savedParam === 'pick_added' && !message) {
                     <span class="pc-rank" data-rank-badge>#{idx + 1}</span>
                     <!-- Name + Adresse Caption -->
                     <div class="pc-cap">
-                      <div class="pc-name">{cd.name ?? '(Name fehlt)'}</div>
+                      <div class="pc-name">{cd.name ?? bt('pl.card.noname', lang)}</div>
                       <div class="pc-addr">{cd.formatted_address ?? ''}</div>
                     </div>
                     <!-- Rating-Chip unten rechts -->
@@ -376,7 +384,7 @@ if (savedParam === 'pick_added' && !message) {
                       class="pc-drag"
                       @click.stop
                       @pointerdown.stop={`dndPtrDown($event, '${pick.id}')`}
-                      aria-label="Reihenfolge ändern"
+                      aria-label={bt('pl.card.draghandle', lang)}
                       role="button"
                       tabindex="0"
                     >
@@ -391,7 +399,7 @@ if (savedParam === 'pick_added' && !message) {
                         type="button"
                         class="pc-kebab"
                         @click="menuOpen = !menuOpen"
-                        aria-label="Aktionen"
+                        aria-label={bt('pl.card.actions', lang)}
                         aria-haspopup="true"
                       >
                         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -401,16 +409,16 @@ if (savedParam === 'pick_added' && !message) {
                       <div class="pc-menu" x-show="menuOpen" x-cloak @click.outside="menuOpen = false">
                         <button type="button" class="pc-menu-btn" @click="menuOpen=false; openEditor()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-                          <span x-text="savedNote ? 'Notiz bearbeiten' : 'Notiz hinzufügen'">Notiz</span>
+                          <span x-text={`savedNote ? ${JSON.stringify(bt('pl.card.noteedit', lang))} : ${JSON.stringify(bt('pl.card.noteadd', lang))}`}>{bt('pl.card.note', lang)}</span>
                         </button>
                         <button type="button" class="pc-menu-btn" :disabled="refreshing" @click="menuOpen=false; refresh()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-                          Aktualisieren
+                          {bt('pl.card.refresh', lang)}
                         </button>
                         <div class="pc-menu-sep"></div>
                         <button type="button" class="pc-menu-btn" @click="menuOpen=false; removePick()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-                          Aus Picks entfernen
+                          {bt('pl.card.remove', lang)}
                         </button>
                       </div>
                     </div>
@@ -421,15 +429,15 @@ if (savedParam === 'pick_added' && !message) {
                     <div class="pc-note-edit">
                       <textarea
                         class="pc-note-ta"
-                        placeholder="Deine Empfehlung für den Gast …"
+                        placeholder={bt('pl.card.noteplaceholder', lang)}
                         x-model="noteText"
                       ></textarea>
                       <div class="pc-note-actions">
                         <button type="button" class="pc-note-save" :disabled="noteSaving" @click="saveNote()">
-                          <span x-show="!noteSaving">SPEICHERN</span>
+                          <span x-show="!noteSaving">{bt('pl.card.notesave', lang)}</span>
                           <span x-show="noteSaving" x-cloak>…</span>
                         </button>
-                        <button type="button" class="pc-note-cancel" @click="cancelEdit()">Abbrechen</button>
+                        <button type="button" class="pc-note-cancel" @click="cancelEdit()">{bt('common.cancel', lang)}</button>
                       </div>
                     </div>
                     <!-- Hidden delete form (submitted by removePick()) -->
@@ -449,7 +457,7 @@ if (savedParam === 'pick_added' && !message) {
       <section class="s-card" id="nearby" x-data={`placesRefresh('${activeTab}')`}>
         <div class="s-card__head">
           <h2 class="s-card__title">
-            Mehr in der Nähe
+            {bt('pl.nearby.title', lang)}
             {autoSuggestions.length > 0 && <span class="s-card__title-count">({autoSuggestions.length})</span>}
           </h2>
           <span class="s-card__num">04</span>
@@ -457,14 +465,14 @@ if (savedParam === 'pick_added' && !message) {
 
         <div class="s-card__body">
           <div class="places-nearby-head">
-            <p class="s-hint">Automatische Vorschläge aus Google Places in deiner Umgebung.</p>
+            <p class="s-hint">{bt('pl.nearby.hint', lang)}</p>
             <button
               type="button"
               class="places-refresh-icon-btn"
               :disabled="refreshing"
               x-on:click="refreshNearby()"
-              title="Empfehlungen aktualisieren"
-              aria-label="Empfehlungen aktualisieren"
+              title={bt('pl.nearby.refresh', lang)}
+              aria-label={bt('pl.nearby.refresh', lang)}
             >
               <svg x-show="!refreshing" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
@@ -483,13 +491,11 @@ if (savedParam === 'pick_added' && !message) {
           ></p>
 
           {!nearbyHasCache && (
-            <p class="places-empty">
-              Noch keine Auto-Empfehlungen. Klick auf "Aktualisieren" um Google Places abzufragen.
-            </p>
+            <p class="places-empty">{bt('pl.nearby.empty', lang)}</p>
           )}
 
           {autoSuggestions.length === 0 && nearbyHasCache && (
-            <p class="places-empty">Alle Vorschläge sind bereits in deinen Picks.</p>
+            <p class="places-empty">{bt('pl.nearby.allpicked', lang)}</p>
           )}
 
           <div class="nearby-grid">
@@ -510,14 +516,14 @@ if (savedParam === 'pick_added' && !message) {
                     </span>
                   )}
                   <div class="nb-cap">
-                    <div class="nb-name">{s.name ?? '(kein Name)'}</div>
+                    <div class="nb-name">{s.name ?? bt('pl.nearby.noname', lang)}</div>
                     <div class="nb-addr">{s.formattedAddress ?? ''}</div>
                   </div>
                   <form class="nb-add-form" method="POST">
                     <input type="hidden" name="_action" value="pick_add" />
                     <input type="hidden" name="category" value={activeDbCategory} />
                     <input type="hidden" name="place_id" value={s.placeId ?? s.place_id} />
-                    <button type="submit" class="nb-add" title={`${s.name ?? ''} zu Picks`} aria-label={`${s.name ?? ''} zu Picks`}>
+                    <button type="submit" class="nb-add" title={bt('pl.nearby.add', lang).replace('{name}', s.name ?? '')} aria-label={bt('pl.nearby.add', lang).replace('{name}', s.name ?? '')}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter" width="22" height="22" aria-hidden="true">
                         <path d="M12 5V19"/><path d="M5 12H19"/>
                       </svg>
@@ -533,11 +539,14 @@ if (savedParam === 'pick_added' && !message) {
     </div><!-- .settings-sections -->
 
   </div><!-- .settings-page -->
+
+  <script type="application/json" id="places-i18n" is:inline set:html={JSON.stringify(plT)}></script>
 </Layout>
 
 <script is:inline>
   // is:inline runs synchronously during HTML parsing, BEFORE the Layout's deferred module script
   // calls Alpine.start(). This ensures our alpine:init listener is registered before that event fires.
+  var T = JSON.parse(document.getElementById('places-i18n').textContent || '{}');
   document.addEventListener('alpine:init', function () {
     var A = window.Alpine;
     if (!A) return;
@@ -591,16 +600,16 @@ if (savedParam === 'pick_added' && !message) {
               var body = await res.json();
               if (!body.ok) {
                 this.refreshOk = false;
-                this.refreshMessage = 'Fehler: ' + (body.error || 'unbekannt');
+                this.refreshMessage = T.error + ': ' + (body.error || 'unbekannt');
                 return;
               }
               total += body.total_places_cached || 0;
             }
             this.refreshOk = true;
-            this.refreshMessage = 'Aktualisiert — ' + total + ' Places gefunden. (Seite neu laden für Anzeige.)';
+            this.refreshMessage = T.refreshed.replace('{n}', total);
           } catch (err) {
             this.refreshOk = false;
-            this.refreshMessage = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+            this.refreshMessage = T.netErr + ': ' + (err && err.message ? err.message : String(err));
           } finally {
             this.refreshing = false;
           }
@@ -687,10 +696,10 @@ if (savedParam === 'pick_added' && !message) {
 
         removePick: function () {
           var self = this;
-          this.$store.confirm.ask('Pick wirklich entfernen?', function () {
+          this.$store.confirm.ask(T.removeConfirm, function () {
             var form = self._cardEl ? self._cardEl.querySelector('.pc-delete-form') : null;
             if (form) form.submit();
-          }, 'Entfernen');
+          }, T.remove);
         },
       };
     });
