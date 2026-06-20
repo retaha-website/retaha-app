@@ -887,7 +887,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Fehler',
     'pl.js.refreshed': 'Aktualisiert — {n} Places gefunden. (Seite neu laden für Anzeige.)',
     'pl.js.neterr': 'Netzwerk-Fehler',
-    'pl.js.removeconfirm': 'Pick wirklich entfernen?'
+    'pl.js.removeconfirm': 'Pick wirklich entfernen?',
+    'cs.status': 'In Arbeit',
+    'cs.meta': 'Geplant für',
+    'cs.back': '→ Zurück zur Übersicht',
+    'cs.close': 'Schließen, zurück zur Übersicht',
+    'cs.wallet.eyebrow': 'apple/google wallet zertifikate',
+    'cs.wallet.desc': 'Konfiguriere die Zertifikate für deine Apple- und Google-Wallet-Karten — einmaliges Setup.',
+    'cs.recovery.eyebrow': 'abgebrochene buchungen retten',
+    'cs.recovery.desc': 'Gäste die ihre Buchung abgebrochen haben bekommen automatisch eine Erinnerung mit Anreiz — höhere Conversion-Rate.',
+    'cs.engine.eyebrow': 'Ohne Provision',
+    'cs.engine.desc': 'Gäste buchen direkt auf deiner Website, ohne über Booking.com zu gehen — du sparst die Provision.',
+    'cs.bestprice.eyebrow': 'rate-management',
+    'cs.bestprice.desc': 'Vergleich deine Preise live mit Booking.com, Expedia & Co. — und ändere sie aus retaha heraus.'
   },
   en: {
     'dd.profile': 'My Profile',
@@ -1770,7 +1782,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Error',
     'pl.js.refreshed': 'Updated — {n} places found. (Reload page to display.)',
     'pl.js.neterr': 'Network error',
-    'pl.js.removeconfirm': 'Really delete pick?'
+    'pl.js.removeconfirm': 'Really delete pick?',
+    'cs.status': 'In Progress',
+    'cs.meta': 'Planned for',
+    'cs.back': '→ Back to overview',
+    'cs.close': 'Close, back to overview',
+    'cs.wallet.eyebrow': 'Apple/Google Wallet certificates',
+    'cs.wallet.desc': 'Configure certificates for your Apple and Google Wallet cards — one-time setup.',
+    'cs.recovery.eyebrow': 'save abandoned bookings',
+    'cs.recovery.desc': 'Guests who abandoned their booking automatically receive a reminder with incentive — higher conversion rate.',
+    'cs.engine.eyebrow': 'Without commission',
+    'cs.engine.desc': 'Guests book directly on your website without going through Booking.com — you save the commission.',
+    'cs.bestprice.eyebrow': 'rate management',
+    'cs.bestprice.desc': 'Compare your prices live with Booking.com, Expedia & Co. — and adjust them directly in retaha.'
   },
   fr: {
     'dd.profile': 'Mon profil',
@@ -2653,7 +2677,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Erreur',
     'pl.js.refreshed': 'Mis à jour — {n} places trouvées. (Rechargez la page pour l\'affichage.)',
     'pl.js.neterr': 'Erreur réseau',
-    'pl.js.removeconfirm': 'Supprimer définitivement la sélection?'
+    'pl.js.removeconfirm': 'Supprimer définitivement la sélection?',
+    'cs.status': 'En cours',
+    'cs.meta': 'Prévu pour',
+    'cs.back': '→ Retour à l\'aperçu',
+    'cs.close': 'Fermer, retour à l\'aperçu',
+    'cs.wallet.eyebrow': 'certificats Apple/Google Wallet',
+    'cs.wallet.desc': 'Configure les certificats pour tes cartes Apple et Google Wallet — une seule configuration.',
+    'cs.recovery.eyebrow': 'sauver les réservations abandonnées',
+    'cs.recovery.desc': 'Les clients qui ont annulé leur réservation reçoivent automatiquement un rappel avec incentif — taux de conversion plus élevé.',
+    'cs.engine.eyebrow': 'Sans commission',
+    'cs.engine.desc': 'Les clients réservent directement sur votre site web, sans passer par Booking.com — vous économisez la commission.',
+    'cs.bestprice.eyebrow': 'gestion des tarifs',
+    'cs.bestprice.desc': 'Comparez vos tarifs en direct avec Booking.com, Expedia & Co. — et modifiez-les depuis retaha.'
   },
   es: {
     'dd.profile': 'Mi perfil',
@@ -3536,7 +3572,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Error',
     'pl.js.refreshed': 'Actualizado — {n} Places encontrados. (Recarga la página para verlos.)',
     'pl.js.neterr': 'Error de red',
-    'pl.js.removeconfirm': '¿Eliminar Pick realmente?'
+    'pl.js.removeconfirm': '¿Eliminar Pick realmente?',
+    'cs.status': 'En progreso',
+    'cs.meta': 'Planificado para',
+    'cs.back': '→ Volver a la descripción general',
+    'cs.close': 'Cerrar, volver a resumen',
+    'cs.wallet.eyebrow': 'certificados de Apple/Google Wallet',
+    'cs.wallet.desc': 'Configura los certificados para tus tarjetas Apple Wallet y Google Wallet — configuración única.',
+    'cs.recovery.eyebrow': 'salvar reservas abortadas',
+    'cs.recovery.desc': 'Huéspedes que cancelaron su reserva reciben automáticamente un recordatorio con incentivo — mayor tasa de conversión.',
+    'cs.engine.eyebrow': 'Sin comisión',
+    'cs.engine.desc': 'Los huéspedes reservan directamente en tu sitio web, sin pasar por Booking.com — ahorras la comisión.',
+    'cs.bestprice.eyebrow': 'gestión de tarifas',
+    'cs.bestprice.desc': 'Compara tus precios en directo con Booking.com, Expedia y otros — y cámbialos desde retaha.'
   },
   it: {
     'dd.profile': 'Il mio profilo',
@@ -4419,7 +4467,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Errore',
     'pl.js.refreshed': 'Aggiornato — {n} Places trovati. (Ricaricare la pagina per visualizzare.)',
     'pl.js.neterr': 'Errore di rete',
-    'pl.js.removeconfirm': 'Rimuovere veramente Pick?'
+    'pl.js.removeconfirm': 'Rimuovere veramente Pick?',
+    'cs.status': 'In corso',
+    'cs.meta': 'Pianificato per',
+    'cs.back': '→ Indietro alla panoramica',
+    'cs.close': 'Chiudi, torna alla panoramica',
+    'cs.wallet.eyebrow': 'certificati Apple/Google Wallet',
+    'cs.wallet.desc': 'Configura i certificati per le tue carte Apple Wallet e Google Wallet — configurazione una tantum.',
+    'cs.recovery.eyebrow': 'salvare prenotazioni abbandonate',
+    'cs.recovery.desc': 'Ospiti che hanno annullato la prenotazione ricevono automaticamente un promemoria con incentivo — tasso di conversione più elevato.',
+    'cs.engine.eyebrow': 'Senza commissione',
+    'cs.engine.desc': 'Gli ospiti prenotano direttamente sul tuo sito, senza passare per Booking.com — risparmi la commissione.',
+    'cs.bestprice.eyebrow': 'gestione tariffe',
+    'cs.bestprice.desc': 'Confronta i tuoi prezzi in tempo reale con Booking.com, Expedia e altri — e modificali direttamente da retaha.'
   },
   pt: {
     'dd.profile': 'Meu perfil',
@@ -5302,7 +5362,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Erro',
     'pl.js.refreshed': 'Atualizado — {n} Places encontrados. (Recarregue a página para exibir.)',
     'pl.js.neterr': 'Erro de rede',
-    'pl.js.removeconfirm': 'Remover seleção realmente?'
+    'pl.js.removeconfirm': 'Remover seleção realmente?',
+    'cs.status': 'Em andamento',
+    'cs.meta': 'Planejado para',
+    'cs.back': '→ Voltar para a visão geral',
+    'cs.close': 'Fechar, voltar à visão geral',
+    'cs.wallet.eyebrow': 'certificados Apple/Google Wallet',
+    'cs.wallet.desc': 'Configure os certificados para seus cartões Apple Wallet e Google Wallet — configuração única.',
+    'cs.recovery.eyebrow': 'salvar reservas canceladas',
+    'cs.recovery.desc': 'Hóspedes que cancelaram sua reserva recebem automaticamente um lembrete com incentivo — maior taxa de conversão.',
+    'cs.engine.eyebrow': 'Sem comissão',
+    'cs.engine.desc': 'Hóspedes reservam diretamente no seu site, sem passar pela Booking.com — você economiza a comissão.',
+    'cs.bestprice.eyebrow': 'gerenciamento de tarifas',
+    'cs.bestprice.desc': 'Compare seus preços ao vivo com Booking.com, Expedia e outros — e altere-os dentro do retaha.'
   },
   nl: {
     'dd.profile': 'Mijn profiel',
@@ -6185,7 +6257,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Fout',
     'pl.js.refreshed': 'Bijgewerkt — {n} plaatsen gevonden. (Pagina vernieuwen om weer te geven.)',
     'pl.js.neterr': 'Netwerkfout',
-    'pl.js.removeconfirm': 'Echt verwijderen?'
+    'pl.js.removeconfirm': 'Echt verwijderen?',
+    'cs.status': 'In bewerking',
+    'cs.meta': 'Gepland voor',
+    'cs.back': '→ Terug naar overzicht',
+    'cs.close': 'Sluiten, terug naar overzicht',
+    'cs.wallet.eyebrow': 'Apple/Google Wallet certificaten',
+    'cs.wallet.desc': 'Configureer de certificaten voor je Apple- en Google Wallet-kaarten — eenmalige setup.',
+    'cs.recovery.eyebrow': 'afgebroken boekingen redden',
+    'cs.recovery.desc': 'Gasten die hun boeking hebben geannuleerd, ontvangen automatisch een herinnering met incentive — hogere conversieratio.',
+    'cs.engine.eyebrow': 'Zonder commissie',
+    'cs.engine.desc': 'Gasten boeken rechtstreeks op je website, zonder via Booking.com te gaan — je bespaart de commissie.',
+    'cs.bestprice.eyebrow': 'tariefbeheer',
+    'cs.bestprice.desc': 'Vergelijk je prijzen live met Booking.com, Expedia & Co. — en wijzig ze vanuit retaha.'
   },
   ru: {
     'dd.profile': 'Мой профиль',
@@ -7068,7 +7152,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Ошибка',
     'pl.js.refreshed': 'Обновлено — найдено {n} мест. (Перезагрузите страницу для отображения.)',
     'pl.js.neterr': 'Ошибка сети',
-    'pl.js.removeconfirm': 'Удалить pick навсегда?'
+    'pl.js.removeconfirm': 'Удалить pick навсегда?',
+    'cs.status': 'В процессе',
+    'cs.meta': 'Запланировано на',
+    'cs.back': '→ Вернуться к обзору',
+    'cs.close': 'Закрыть, вернуться к обзору',
+    'cs.wallet.eyebrow': 'Сертификаты Apple/Google Wallet',
+    'cs.wallet.desc': 'Настройте сертификаты для карт Apple Wallet и Google Wallet — одноразовая настройка.',
+    'cs.recovery.eyebrow': 'спасить отмененные бронирования',
+    'cs.recovery.desc': 'Гости, отменившие бронирование, автоматически получают напоминание со стимулом — выше коэффициент конверсии.',
+    'cs.engine.eyebrow': 'Без комиссии',
+    'cs.engine.desc': 'Гости бронируют прямо на вашем сайте, без Booking.com — вы экономите комиссию.',
+    'cs.bestprice.eyebrow': 'управление тарифами',
+    'cs.bestprice.desc': 'Сравнивайте свои цены в реальном времени с Booking.com, Expedia и другими — и меняйте их прямо в retaha.'
   },
   ar: {
     'dd.profile': 'ملفي الشخصي',
@@ -7951,7 +8047,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'خطأ',
     'pl.js.refreshed': 'تم التحديث — تم العثور على {n} أماكن. (أعد تحميل الصفحة للعرض.)',
     'pl.js.neterr': 'خطأ في الشبكة',
-    'pl.js.removeconfirm': 'هل تريد فعلاً حذف Pick؟'
+    'pl.js.removeconfirm': 'هل تريد فعلاً حذف Pick؟',
+    'cs.status': 'قيد المعالجة',
+    'cs.meta': 'مخطط له',
+    'cs.back': '← العودة إلى نظرة عامة',
+    'cs.close': 'إغلاق، الرجوع إلى النظرة العامة',
+    'cs.wallet.eyebrow': 'شهادات Apple/Google Wallet',
+    'cs.wallet.desc': 'قم بتكوين الشهادات لبطاقات Apple و Google Wallet — إعداد لمرة واحدة.',
+    'cs.recovery.eyebrow': 'إنقاذ الحجوزات المتروكة',
+    'cs.recovery.desc': 'الضيوف الذين أوقفوا الحجز يتلقون تذكيراً آلياً مع حافز — معدل تحويل أعلى.',
+    'cs.engine.eyebrow': 'بدون عمولة',
+    'cs.engine.desc': 'الضيوف يحجزون مباشرة على موقعك الإلكتروني، بدون المرور عبر Booking.com — توفر العمولة.',
+    'cs.bestprice.eyebrow': 'إدارة الأسعار',
+    'cs.bestprice.desc': 'قارن أسعارك مباشرة مع Booking.com و Expedia وغيرها — وعدّلها من retaha.'
   },
   zh: {
     'dd.profile': '我的资料',
@@ -8834,7 +8942,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': '错误',
     'pl.js.refreshed': '已更新 — 找到 {n} 个位置。(刷新页面以显示。)',
     'pl.js.neterr': '网络错误',
-    'pl.js.removeconfirm': '确定要删除此选项？'
+    'pl.js.removeconfirm': '确定要删除此选项？',
+    'cs.status': '进行中',
+    'cs.meta': '计划于',
+    'cs.back': '→ 返回概览',
+    'cs.close': '关闭，返回概览',
+    'cs.wallet.eyebrow': 'Apple/Google Wallet 证书',
+    'cs.wallet.desc': '配置你的 Apple 和 Google Wallet 卡证书——一次性设置。',
+    'cs.recovery.eyebrow': '救救被放弃的预订',
+    'cs.recovery.desc': '放弃预订的客人会自动收到带有激励的提醒邮件 — 提高转化率。',
+    'cs.engine.eyebrow': '无佣金',
+    'cs.engine.desc': '客人直接在你的网站上预订，无需通过 Booking.com，这样你可以省去佣金。',
+    'cs.bestprice.eyebrow': '费率管理',
+    'cs.bestprice.desc': '与 Booking.com、Expedia 等实时比较您的价格 — 并在 retaha 中进行更改。'
   },
   tr: {
     'dd.profile': 'Profilim',
@@ -9717,7 +9837,19 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pl.js.error': 'Hata',
     'pl.js.refreshed': 'Güncellendi — {n} yer bulundu. (Görüntülemek için sayfayı yenileyin.)',
     'pl.js.neterr': 'Ağ hatası',
-    'pl.js.removeconfirm': 'Gerçekten kaldırmak istiyor musunuz?'
+    'pl.js.removeconfirm': 'Gerçekten kaldırmak istiyor musunuz?',
+    'cs.status': 'İşlem Devam Ediyor',
+    'cs.meta': 'Planlandı',
+    'cs.back': '→ Genel Bakışa Dön',
+    'cs.close': 'Kapat, genel bakışa dön',
+    'cs.wallet.eyebrow': 'apple/google wallet sertifikaları',
+    'cs.wallet.desc': 'Apple ve Google Wallet kartlarınız için sertifikaları yapılandırın — tek seferlik kurulum.',
+    'cs.recovery.eyebrow': 'iptal edilen rezervasyonları kurtarmak',
+    'cs.recovery.desc': 'Rezervasyonlarını iptal eden misafirler otomatik olarak hatırlatma ve teşvik alırlar — daha yüksek dönüşüm oranı.',
+    'cs.engine.eyebrow': 'Komisyonsuz',
+    'cs.engine.desc': 'Misafirler Booking.com üzerinden gitmeden doğrudan web sitenizde rezervasyon yapar — komisyonu tasarruf edersiniz.',
+    'cs.bestprice.eyebrow': 'ücret-yönetimi',
+    'cs.bestprice.desc': 'retaha\'da Booking.com, Expedia ve diğerleriyle fiyatlarınızı canlı olarak karşılaştırın — ve doğrudan değiştirin.'
   }
 };
 

@@ -7,6 +7,8 @@
 import Layout from '../layouts/Layout.astro';
 import ComingSoonModal from '@retaha/ui/components/admin/ComingSoonModal.astro';
 import { getUser, getUserHotels } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -19,8 +21,12 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 <Layout title="Wallet-Keys" activeTab="backoffice">
   <ComingSoonModal
     feature_name="wallet-keys"
-    feature_eyebrow="apple/google wallet zertifikate"
-    feature_description="Konfiguriere die Zertifikate für deine Apple- und Google-Wallet-Karten — einmaliges Setup."
+    feature_eyebrow={bt('cs.wallet.eyebrow', lang)}
+    feature_description={bt('cs.wallet.desc', lang)}
     planned_release="Q4 2026"
+    status_label={bt('cs.status', lang)}
+    meta_label={bt('cs.meta', lang)}
+    back_label={bt('cs.back', lang)}
+    close_label={bt('cs.close', lang)}
   />
 </Layout>

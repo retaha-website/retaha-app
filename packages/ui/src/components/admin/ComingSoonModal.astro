@@ -33,6 +33,11 @@ interface Props {
   planned_release?: string;
   /** Wohin Close-Button springt. Default: /admin/dashboard */
   back_to?: string;
+  /** i18n-Chrome (Defaults DE) — Aufrufer reicht übersetzte Werte. */
+  status_label?: string;
+  meta_label?: string;
+  back_label?: string;
+  close_label?: string;
 }
 
 const {
@@ -41,6 +46,10 @@ const {
   feature_description,
   planned_release,
   back_to = '/admin/dashboard',
+  status_label = 'In Arbeit',
+  meta_label = 'Geplant für',
+  back_label = '→ Zurück zur Übersicht',
+  close_label = 'Schließen, zurück zur Übersicht',
 } = Astro.props;
 
 const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
@@ -64,7 +73,7 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
       class="coming-soon-close"
       x-ref="closeBtn"
       @click="close()"
-      aria-label="Schließen, zurück zur Übersicht"
+      aria-label={close_label}
     >×</button>
 
     <div class="coming-soon-shapes" aria-hidden="true">
@@ -81,14 +90,14 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
 
     <p class="coming-soon-status-line">
       <span class="coming-soon-status-marker"></span>
-      <span class="coming-soon-status-text">In Arbeit</span>
+      <span class="coming-soon-status-text">{status_label}</span>
     </p>
 
     <p class="coming-soon-description">{feature_description}</p>
 
     {planned_release && (
       <p class="coming-soon-meta">
-        <span class="coming-soon-meta-label">Geplant für</span>
+        <span class="coming-soon-meta-label">{meta_label}</span>
         <span class="coming-soon-meta-value">{planned_release}</span>
       </p>
     )}
@@ -98,7 +107,7 @@ const titleId = `coming-soon-${feature_name.toLowerCase().replace(/[^a-z0-9]+/g,
       class="coming-soon-back-btn"
       @click="close()"
     >
-      → Zurück zur Übersicht
+      {back_label}
     </button>
   </div>
 </div>
