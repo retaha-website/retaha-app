@@ -5,6 +5,8 @@ import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { invalidateTranslationsForKnowledge } from '@retaha/eve';
 import { mergeAndTranslate, asLanguageCode } from '@retaha/i18n';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
@@ -46,7 +48,7 @@ if (Astro.request.method === 'POST') {
     const question = form.get('question')?.toString().trim() ?? '';
     const answer   = form.get('answer')?.toString().trim() ?? '';
     if (!question || !answer) {
-      message = { type: 'error', text: 'Frage und Antwort sind Pflichtfelder.' };
+      message = { type: 'error', text: bt('evk.msg.faqrequired', lang) };
     } else {
       // INSERT first with base-language i18n — row is committed before translation
       const baseQI18n = { [hotelDefaultLang]: makeI18nEntry(question) };
@@ -64,10 +66,10 @@ if (Astro.request.method === 'POST') {
         .select('id')
         .single();
       if (error) {
-        message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
+        message = { type: 'error', text: `${bt('evk.msg.createfail', lang)}: ${error.message}` };
       } else {
         highlightId = data?.id ?? null;
-        message = { type: 'success', text: 'FAQ-Eintrag hinzugefügt.' };
+        message = { type: 'success', text: bt('evk.msg.faqadded', lang) };
         // Translate and update i18n — entry already saved, this is best-effort
         try {
           const [qI18n, aI18n] = await Promise.all([
@@ -87,7 +89,7 @@ if (Astro.request.method === 'POST') {
     const question = form.get('question')?.toString().trim() ?? '';
     const answer   = form.get('answer')?.toString().trim() ?? '';
     if (!id || !question || !answer) {
-      message = { type: 'error', text: 'Fehlende Felder beim Update.' };
+      message = { type: 'error', text: bt('evk.msg.updatemissing', lang) };
     } else {
       // UPDATE core text first — saved regardless of translation outcome
       const { error: coreErr } = await client
@@ -96,9 +98,9 @@ if (Astro.request.method === 'POST') {
         .eq('id', id)
         .eq('hotel_id', hotel.id);
       if (coreErr) {
-        message = { type: 'error', text: `Update fehlgeschlagen: ${coreErr.message}` };
+        message = { type: 'error', text: `${bt('evk.msg.updatefail', lang)}: ${coreErr.message}` };
       } else {
-        message = { type: 'success', text: 'FAQ-Eintrag aktualisiert.' };
+        message = { type: 'success', text: bt('evk.msg.faqupdated', lang) };
         highlightId = id;
         // Translate and update i18n — best-effort after core save
         try {
@@ -122,7 +124,7 @@ if (Astro.request.method === 'POST') {
   else if (action === 'faq_delete') {
     const id = form.get('id')?.toString();
     if (!id) {
-      message = { type: 'error', text: 'Keine ID übergeben.' };
+      message = { type: 'error', text: bt('evk.msg.noid', lang) };
     } else {
       await invalidateTranslationsForKnowledge(id);
       const { error } = await client
@@ -131,9 +133,9 @@ if (Astro.request.method === 'POST') {
         .eq('id', id)
         .eq('hotel_id', hotel.id);
       if (error) {
-        message = { type: 'error', text: `Löschen fehlgeschlagen: ${error.message}` };
+        message = { type: 'error', text: `${bt('evk.msg.deletefail', lang)}: ${error.message}` };
       } else {
-        message = { type: 'success', text: 'FAQ-Eintrag gelöscht.' };
+        message = { type: 'success', text: bt('evk.msg.faqdeleted', lang) };
       }
     }
   }
@@ -141,7 +143,7 @@ if (Astro.request.method === 'POST') {
   else if (action === 'rules_save' || action === 'directions_save') {
     const category = action === 'rules_save' ? 'rules' : 'directions';
     const answer = form.get('answer')?.toString().trim() ?? '';
-    const catLabel = category === 'rules' ? 'Hausregeln' : 'Anfahrt';
+    const catLabel = category === 'rules' ? bt('evk.cat.rules', lang) : bt('evk.cat.directions', lang);
 
     if (!answer) {
       const { error } = await client
@@ -150,9 +152,9 @@ if (Astro.request.method === 'POST') {
         .eq('hotel_id', hotel.id)
         .eq('category', category);
       if (error) {
-        message = { type: 'error', text: `Löschen fehlgeschlagen: ${error.message}` };
+        message = { type: 'error', text: `${bt('evk.msg.deletefail', lang)}: ${error.message}` };
       } else {
-        message = { type: 'success', text: `${catLabel} gelöscht.` };
+        message = { type: 'success', text: bt('evk.msg.catdeleted', lang).replace('{cat}', catLabel) };
       }
     } else {
       const { data: existing } = await client
@@ -169,9 +171,9 @@ if (Astro.request.method === 'POST') {
           .update({ answer, updated_at: NOW() })
           .eq('id', existing.id);
         if (error) {
-          message = { type: 'error', text: `Update fehlgeschlagen: ${error.message}` };
+          message = { type: 'error', text: `${bt('evk.msg.updatefail', lang)}: ${error.message}` };
         } else {
-          message = { type: 'success', text: `${catLabel} aktualisiert.` };
+          message = { type: 'success', text: bt('evk.msg.catupdated', lang).replace('{cat}', catLabel) };
           try {
             const { data: existingRow } = await client
               .from('eve_knowledge')
@@ -195,9 +197,9 @@ if (Astro.request.method === 'POST') {
           .insert({ hotel_id: hotel.id, category, answer, answer_i18n: baseAI18n, language_code: hotelDefaultLang })
           .select('id').single();
         if (error) {
-          message = { type: 'error', text: `Anlegen fehlgeschlagen: ${error.message}` };
+          message = { type: 'error', text: `${bt('evk.msg.createfail', lang)}: ${error.message}` };
         } else {
-          message = { type: 'success', text: `${catLabel} gespeichert.` };
+          message = { type: 'success', text: bt('evk.msg.catsaved', lang).replace('{cat}', catLabel) };
           try {
             const aI18n = await translateField(`eve_knowledge.${category}.new.answer`, baseAI18n, answer);
             await client.from('eve_knowledge')
@@ -242,15 +244,15 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
   >
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Eve Concierge</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.eve', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">EVE · KI-CONCIERGE</span>
-      <h1 class="settings-hero__title">Eve's Wissen<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Pflege Frage-Antwort-Paare, Hausregeln und Anfahrt. Eve nutzt das im Gast-Chat.</p>
+      <span class="settings-hero__eyebrow">{bt('evf.hero.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('evk.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('evk.hero.sub', lang)}</p>
     </section>
 
     {message && (
@@ -264,19 +266,19 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <!-- 01 Modul-Status -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Eve Concierge</h2>
+          <h2 class="s-card__title">{bt('nav.eve', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <p class="field__hint">{bt('si.mod.hint', lang)}</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <ModStatusLed on={eveEnabled} />
-            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
           </div>
         </div>
       </section>
 
-      <EveSubNav currentPath={Astro.url.pathname} />
+      <EveSubNav currentPath={Astro.url.pathname} lang={lang} />
 
       <div class="s-warning-row" style="margin-bottom: 4px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
@@ -285,23 +287,23 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
           <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
         </svg>
         <span>
-          Pflege das Wissen von Eve in deiner Standardsprache (<strong>{LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang}</strong>). Eve übersetzt automatisch in alle verfügbaren Sprachen.
+          {bt('evk.warn.pre', lang)} (<strong>{LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang}</strong>). {bt('evk.warn.post', lang)}
         </span>
       </div>
 
       <!-- ── FAQ ── -->
       <section class="s-card" id="faq-section">
         <div class="s-card__head">
-          <h2 class="s-card__title">Häufige Fragen</h2>
+          <h2 class="s-card__title">{bt('evk.faq.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Fakten die Eve genau beantworten soll — Check-out-Zeit, WLAN-Passwort, Frühstückszeiten, Anfahrt. Verhaltensregeln ("was soll Eve tun wenn…") gehören in den <a href="/eve/settings" class="s-btn-link">Einstellungs-Tab →</a></p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;" set:html={bt('evk.faq.sub', lang).replace('{link}', `<a href="/eve/settings" class="s-btn-link">${bt('evk.faq.sublink', lang)}</a>`)}></p>
 
         <form method="POST">
           <input type="hidden" name="_action" value="faq_create" />
           <div class="s-card__body">
             <div class="field field--row">
-              <label class="field__label field__label--req" for="faq-question">Frage</label>
+              <label class="field__label field__label--req" for="faq-question">{bt('evk.faq.question', lang)}</label>
               <input
                 type="text" id="faq-question" name="question" required
                 placeholder="z.B. Wann ist Check-out?"
@@ -309,7 +311,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
               />
             </div>
             <div class="field field--row">
-              <label class="field__label field__label--req" for="faq-answer">Antwort</label>
+              <label class="field__label field__label--req" for="faq-answer">{bt('evk.faq.answer', lang)}</label>
               <textarea
                 id="faq-answer" name="answer" required rows="3"
                 placeholder="z.B. 11:00 Uhr. Late-Check-out bis 13:00 für €15 möglich."
@@ -318,12 +320,12 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="submit" class="v9-btn">+ FAQ hinzufügen</button>
+            <button type="submit" class="v9-btn">{bt('evk.faq.add', lang)}</button>
           </div>
         </form>
 
         {faqs.length === 0 && (
-          <p class="ev-empty-hint">Noch keine FAQs angelegt.</p>
+          <p class="ev-empty-hint">{bt('evk.faq.empty', lang)}</p>
         )}
 
         {faqs.length > 0 && (
@@ -345,11 +347,11 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
                     <button
                       type="button" @click="editing = true"
                       class="v9-btn v9-btn--ghost ev-action-btn"
-                    >Bearbeiten</button>
-                    <form method="POST" class="inline" onsubmit="return confirm('Diesen Eintrag wirklich löschen?')">
+                    >{bt('si.items.edit', lang)}</button>
+                    <form method="POST" class="inline" onsubmit={`return confirm(${JSON.stringify(bt('evk.confirm.delete', lang))})`}>
                       <input type="hidden" name="_action" value="faq_delete" />
                       <input type="hidden" name="id" value={faq.id} />
-                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">Löschen</button>
+                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">{bt('nfc.delete', lang)}</button>
                     </form>
                   </div>
                 </div>
@@ -359,21 +361,21 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
                   <input type="hidden" name="id" value={faq.id} />
                   <div class="ev-item__edit-body">
                     <div class="field field--row">
-                      <label class="field__label">Frage</label>
+                      <label class="field__label">{bt('evk.faq.question', lang)}</label>
                       <input
                         type="text" name="question" required class="s-input"
                         value={pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}
                       />
                     </div>
                     <div class="field field--row">
-                      <label class="field__label">Antwort</label>
+                      <label class="field__label">{bt('evk.faq.answer', lang)}</label>
                       <textarea name="answer" required rows="3" class="s-input s-textarea"
                       >{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</textarea>
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
-                    <button type="submit" class="v9-btn">Speichern</button>
-                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">Abbrechen</button>
+                    <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
+                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
                   </div>
                 </form>
               </article>
@@ -385,10 +387,10 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <!-- ── Hausregeln ── -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Hausregeln</h2>
+          <h2 class="s-card__title">{bt('evk.cat.rules', lang)}</h2>
           <span class="s-card__num">03</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Frei-Text. Eve referenziert das wenn Gäste nach Regeln fragen (Rauchen, Haustiere, Ruhezeit, etc.).</p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">{bt('evk.rules.sub', lang)}</p>
 
         <form method="POST">
           <input type="hidden" name="_action" value="rules_save" />
@@ -400,7 +402,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
             >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
           </div>
           <div class="s-card__footer">
-            <button type="submit" class="v9-btn">Hausregeln speichern</button>
+            <button type="submit" class="v9-btn">{bt('evk.rules.save', lang)}</button>
           </div>
         </form>
       </section>
@@ -408,10 +410,10 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       <!-- ── Anfahrt ── -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Anfahrt</h2>
+          <h2 class="s-card__title">{bt('evk.cat.directions', lang)}</h2>
           <span class="s-card__num">04</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">Wie kommt der Gast ans Hotel? ÖPNV-Tipps, Parkplatz-Info, Flughafen-Verbindung.</p>
+        <p class="s-card__sub" style="margin: -16px 0 20px;">{bt('evk.dir.sub', lang)}</p>
 
         <form method="POST">
           <input type="hidden" name="_action" value="directions_save" />
@@ -423,7 +425,7 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
             >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
           </div>
           <div class="s-card__footer">
-            <button type="submit" class="v9-btn">Anfahrt speichern</button>
+            <button type="submit" class="v9-btn">{bt('evk.dir.save', lang)}</button>
           </div>
         </form>
       </section>
