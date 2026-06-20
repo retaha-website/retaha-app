@@ -2,6 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import ModStatusLed from '../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -50,7 +52,7 @@ for (const day of WEEK_DAYS) {
 }
 
 const defaultLang = (hotelRow?.default_language as string | undefined) || 'de';
-const LANG_LABELS: Record<string, string> = { de: 'Deutsch', en: 'Englisch', fr: 'Français', es: 'Español' };
+const LANG_LABELS: Record<string, string> = { de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español' };
 const langLabel = LANG_LABELS[defaultLang] ?? 'Deutsch';
 
 const rawItems = ((s.service_items as any[]) ?? []);
@@ -62,11 +64,40 @@ const itemsDisplay = rawItems.map((item: any) => ({
 }));
 
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+
+// Client-Strings für die Alpine-Komponenten (via window._siInit.t)
+const siT = {
+  error: bt('si.js.error', lang),
+  saved: bt('common.savedshort', lang),
+  netErr: bt('si.js.neterr', lang),
+  removeConfirm: bt('si.js.removeconfirm', lang),
+  remove: bt('common.remove', lang),
+  nameEmpty: bt('si.js.nameempty', lang),
+  itemsSaved1: bt('si.js.itemsaved.one', lang),
+  itemsSavedN: bt('si.js.itemsaved.many', lang),
+  saveError: bt('si.js.saveerror', lang),
+};
+const siIconLabels: Record<string, string> = {
+  bell:      bt('si.icon.bell', lang),
+  coffee:    bt('si.icon.coffee', lang),
+  clock:     bt('si.icon.clock', lang),
+  key:       bt('si.icon.key', lang),
+  briefcase: bt('si.icon.briefcase', lang),
+  car:       bt('si.icon.car', lang),
+  droplet:   bt('si.icon.droplet', lang),
+  moon:      bt('si.icon.moon', lang),
+  sun:       bt('si.icon.sun', lang),
+  layers:    bt('si.icon.layers', lang),
+};
+const siDayLabels = {
+  mon: bt('si.day.mon', lang), tue: bt('si.day.tue', lang), wed: bt('si.day.wed', lang),
+  thu: bt('si.day.thu', lang), fri: bt('si.day.fri', lang), sat: bt('si.day.sat', lang), sun: bt('si.day.sun', lang),
+};
 ---
 
 <Layout title="Service-Items" activeTab="backoffice" hotelName={hotel.name}>
 
-<script is:inline define:vars={{ _siInit: { hours: initialHours, items: itemsDisplay, serviceOn, defaultLang, langLabel } }}>
+<script is:inline define:vars={{ _siInit: { hours: initialHours, items: itemsDisplay, serviceOn, defaultLang, langLabel, t: siT, iconLabels: siIconLabels, dayLabels: siDayLabels } }}>
   window._siInit = _siInit;
 </script>
 
@@ -173,15 +204,15 @@ input:-webkit-autofill:focus {
 <div class="settings-page">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Service-Items</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('si.breadcrumb', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">Service-Modul</span>
-    <h1 class="settings-hero__title">Service-Anfragen<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">Zeiten und Items, die Gäste im Check-in anfordern können.</p>
+    <span class="settings-hero__eyebrow">{bt('si.hero.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('si.hero.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('si.hero.sub', lang)}</p>
   </section>
 
   <div class="settings-sections">
@@ -189,15 +220,15 @@ input:-webkit-autofill:focus {
     <!-- 01 Modul-Status -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Service-Modul</h2>
+        <h2 class="s-card__title">{bt('si.mod.title', lang)}</h2>
         <span class="s-card__num">01</span>
       </div>
       <div class="s-card__body">
-        <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+        <p class="field__hint">{bt('si.mod.hint', lang)}</p>
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
           <ModStatusLed on={serviceOn} />
           <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">
-            In der Gäste-App-Vorschau steuern →
+            {bt('si.mod.link', lang)}
           </a>
         </div>
       </div>
@@ -206,12 +237,12 @@ input:-webkit-autofill:focus {
     <!-- 02 Service-Zeiten (pro Wochentag) -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Service-Zeiten</h2>
+        <h2 class="s-card__title">{bt('si.hours.title', lang)}</h2>
         <span class="s-card__num">02</span>
       </div>
       <div x-data="siHours()">
         <div class="s-card__body">
-          <p class="field__hint">Buchbare Zeitfenster pro Wochentag — geschlossene Tage zeigen keine Service-Option.</p>
+          <p class="field__hint">{bt('si.hours.hint', lang)}</p>
           <div class="sp-hours-grid">
             <template x-for="d in days" :key="d.key">
               <div class="sp-hours-row" :class="{'sp-hours-row--closed': hours[d.key].closed}">
@@ -226,7 +257,7 @@ input:-webkit-autofill:focus {
                     x-show="!hours[d.key].closed"
                     :value="hours[d.key].end"
                     @change="hours[d.key].end = $event.target.value" />
-                  <span x-show="hours[d.key].closed" class="sp-hours-closed-txt">Geschlossen</span>
+                  <span x-show="hours[d.key].closed" class="sp-hours-closed-txt">{bt('si.hours.closed', lang)}</span>
                 </div>
                 <label class="toggle-row" style="margin:0;gap:6px">
                   <input type="checkbox"
@@ -236,20 +267,20 @@ input:-webkit-autofill:focus {
                   <span class="bt-visual" :class="{'is-checked': hours[d.key].closed}">
                     <span class="bt-knob"></span>
                   </span>
-                  <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">Zu</span>
+                  <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">{bt('si.hours.closetoggle', lang)}</span>
                 </label>
               </div>
             </template>
           </div>
           <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <button type="button" @click="copyMonToAll()" class="v9-btn v9-btn--ghost" style="font-size:10px;padding:6px 12px">
-              Auf alle Tage übernehmen
+              {bt('si.hours.copyall', lang)}
             </button>
-            <span style="font-size:12px;color:var(--ink-muted)">Montag-Zeiten auf alle Tage</span>
+            <span style="font-size:12px;color:var(--ink-muted)">{bt('si.hours.copyallhint', lang)}</span>
           </div>
         </div>
         <div class="s-card__footer">
-          <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+          <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
         </div>
       </div>
     </section>
@@ -260,24 +291,24 @@ input:-webkit-autofill:focus {
   <section class="s-card" id="service-items" style="margin-top:20px" x-data="siItems()">
     <div class="s-card__head" style="align-items:center">
       <div>
-        <span class="s-card__num" style="display:block;margin-bottom:6px">Service-Items</span>
-        <h2 class="s-card__title">Was Gäste anfragen können<span class="dot-pink">.</span></h2>
+        <span class="s-card__num" style="display:block;margin-bottom:6px">{bt('si.breadcrumb', lang)}</span>
+        <h2 class="s-card__title" set:html={bt('si.items.title', lang)}></h2>
       </div>
       <button type="button" @click="openAdd()" x-show="editingItem === null" class="v9-btn" style="flex-shrink:0">
-        + Item hinzufügen
+        {bt('si.items.add', lang)}
       </button>
     </div>
 
     <div class="s-card__body">
       <p class="field__hint">
-        Name und Beschreibung auf <strong x-text="langLabel"></strong> eingeben — das Backend übersetzt automatisch in alle Gastsprachen.
+        {bt('si.items.langhint.pre', lang)} <strong x-text="langLabel"></strong> {bt('si.items.langhint.post', lang)}
       </p>
 
       <!-- Empty state: no items and no form open -->
       <template x-if="items.length === 0 && editingItem === null">
         <div class="sp-empty">
-          <p>Noch keine Service-Items. Klicke auf „+ Item hinzufügen".</p>
-          <button type="button" @click="openAdd()" class="v9-btn" style="margin-top:14px">Erstes Item anlegen</button>
+          <p>{bt('si.items.empty', lang)}</p>
+          <button type="button" @click="openAdd()" class="v9-btn" style="margin-top:14px">{bt('si.items.first', lang)}</button>
         </div>
       </template>
 
@@ -290,16 +321,16 @@ input:-webkit-autofill:focus {
                 <span x-html="iconHtml(String(item.icon))"></span>
               </div>
               <div class="si-card__body">
-                <div class="si-card__name" x-text="item.name || '(kein Name)'"></div>
+                <div class="si-card__name" x-text={`item.name || ${JSON.stringify(bt('si.items.noname', lang))}`}></div>
                 <div class="si-card__desc" x-show="item.description" x-text="String(item.description)"></div>
               </div>
               <div class="si-card__actions">
                 <button type="button" class="si-card__btn" @click="openEdit(item)"
-                  title="Bearbeiten" :aria-label="'Bearbeiten: ' + item.name">
+                  title={bt('si.items.edit', lang)} :aria-label={`${JSON.stringify(bt('si.items.edit', lang))} + ': ' + item.name`}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                 </button>
                 <button type="button" class="si-card__btn si-card__btn--danger" @click="removeItem(item._key)"
-                  title="Entfernen" :aria-label="'Entfernen: ' + item.name">
+                  title={bt('common.remove', lang)} :aria-label={`${JSON.stringify(bt('common.remove', lang))} + ': ' + item.name`}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
                 </button>
               </div>
@@ -312,12 +343,12 @@ input:-webkit-autofill:focus {
       <template x-if="editingItem !== null">
         <div class="si-edit-form">
           <div class="si-edit-form__head">
-            <span class="si-edit-form__title" x-text="editingKey === null ? 'Neues Item' : 'Item bearbeiten'"></span>
+            <span class="si-edit-form__title" x-text={`editingKey === null ? ${JSON.stringify(bt('si.items.new', lang))} : ${JSON.stringify(bt('si.items.editform', lang))}`}></span>
           </div>
 
           <label class="sp-field">
             <span class="sp-label">
-              Name
+              {bt('si.items.name', lang)}
               <span class="sp-label-hint" x-text="'(' + langLabel + ')'"></span>
             </span>
             <input type="text" x-model.lazy="editingItem.name"
@@ -326,8 +357,8 @@ input:-webkit-autofill:focus {
 
           <label class="sp-field">
             <span class="sp-label">
-              Beschreibung
-              <span class="sp-label-hint">(optional)</span>
+              {bt('si.items.desc', lang)}
+              <span class="sp-label-hint">{bt('si.items.optional', lang)}</span>
             </span>
             <textarea x-model.lazy="editingItem.description"
               rows="2" autocomplete="off"
@@ -335,7 +366,7 @@ input:-webkit-autofill:focus {
           </label>
 
           <div class="sp-field">
-            <span class="sp-label">Icon</span>
+            <span class="sp-label">{bt('si.items.iconlabel', lang)}</span>
             <div class="sp-icon-grid">
               <template x-for="ico in serviceIcons" :key="ico.key">
                 <button type="button"
@@ -352,10 +383,10 @@ input:-webkit-autofill:focus {
           </div>
 
           <div class="si-edit-form__actions">
-            <button type="button" @click="cancelEdit()" class="v9-btn v9-btn--ghost">Abbrechen</button>
+            <button type="button" @click="cancelEdit()" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
             <button type="button" @click="saveEdit()" :disabled="saving" class="v9-btn">
-              <span x-show="!saving">Speichern</span>
-              <span x-show="saving" x-cloak>Übersetzt & speichert …</span>
+              <span x-show="!saving">{bt('common.save', lang)}</span>
+              <span x-show="saving" x-cloak>{bt('si.items.saving', lang)}</span>
             </button>
           </div>
         </div>
@@ -364,7 +395,7 @@ input:-webkit-autofill:focus {
 
     <!-- Footer add button — only visible when no form is open -->
     <div class="s-card__footer" x-show="editingItem === null" style="gap:12px">
-      <button type="button" @click="openAdd()" class="v9-btn v9-btn--ghost">+ Item hinzufügen</button>
+      <button type="button" @click="openAdd()" class="v9-btn v9-btn--ghost">{bt('si.items.add', lang)}</button>
     </div>
   </section>
 
@@ -394,6 +425,8 @@ input:-webkit-autofill:focus {
 
     A.data('siHours', function () {
       var init = window._siInit || {};
+      var dl = init.dayLabels || {};
+      var t = init.t || {};
       return {
         hours: init.hours || {},
         saving: false,
@@ -404,13 +437,13 @@ input:-webkit-autofill:focus {
         _beforeUnload: null,
 
         days: [
-          { key: 'mon', label: 'Mo' },
-          { key: 'tue', label: 'Di' },
-          { key: 'wed', label: 'Mi' },
-          { key: 'thu', label: 'Do' },
-          { key: 'fri', label: 'Fr' },
-          { key: 'sat', label: 'Sa' },
-          { key: 'sun', label: 'So' },
+          { key: 'mon', label: dl.mon || 'Mo' },
+          { key: 'tue', label: dl.tue || 'Di' },
+          { key: 'wed', label: dl.wed || 'Mi' },
+          { key: 'thu', label: dl.thu || 'Do' },
+          { key: 'fri', label: dl.fri || 'Fr' },
+          { key: 'sat', label: dl.sat || 'Sa' },
+          { key: 'sun', label: dl.sun || 'So' },
         ],
 
         init: function () {
@@ -452,15 +485,15 @@ input:-webkit-autofill:focus {
             });
             var d = await res.json();
             if (!d.ok) {
-              this.error = d.error || 'Fehler';
+              this.error = d.error || t.error;
               (window as any).retahaToast?.(this.error, 'error');
               return;
             }
             this.success = false;
             this._origStr = JSON.stringify(this.hours);
-            (window as any).retahaToast?.('Gespeichert');
+            (window as any).retahaToast?.(t.saved);
           } catch (err) {
-            this.error = 'Netzwerk-Fehler';
+            this.error = t.netErr;
             (window as any).retahaToast?.(this.error, 'error');
           } finally {
             this.saving = false;
@@ -472,6 +505,7 @@ input:-webkit-autofill:focus {
     A.data('siItems', function () {
       var init = window._siInit || {};
       var raw = init.items || [];
+      var t = init.t || {};
       return {
         items: raw.map(function (item, idx) { return Object.assign({ _key: idx }, item); }),
         _nextKey: raw.length,
@@ -482,7 +516,7 @@ input:-webkit-autofill:focus {
         editingKey: null,
 
         saving: false,
-        serviceIcons: SERVICE_ICONS,
+        serviceIcons: SERVICE_ICONS.map(function (i) { return Object.assign({}, i, { label: (init.iconLabels && init.iconLabels[i.key]) || i.label }); }),
 
         iconHtml: function (key) {
           var ico = SERVICE_ICONS.find(function (i) { return i.key === key; });
@@ -507,19 +541,19 @@ input:-webkit-autofill:focus {
         removeItem: function (key) {
           var self = this;
           this.$store.confirm.ask(
-            'Dieses Service-Item wirklich entfernen?',
+            t.removeConfirm,
             async function () {
               self.items = self.items.filter(function (it) { return it._key !== key; });
               await self._persistItems();
             },
-            'Entfernen',
+            t.remove,
           );
         },
 
         saveEdit: async function () {
           if (this.saving || !this.editingItem) return;
           if (!String(this.editingItem.name || '').trim()) {
-            this.showToast('Name darf nicht leer sein', 'err');
+            this.showToast(t.nameEmpty, 'err');
             return;
           }
 
@@ -548,12 +582,12 @@ input:-webkit-autofill:focus {
             });
             var d = await res.json();
             if (d.ok) {
-              this.showToast(payload.length + ' Item' + (payload.length !== 1 ? 's' : '') + ' gespeichert', 'ok');
+              this.showToast(payload.length + ' ' + (payload.length !== 1 ? t.itemsSavedN : t.itemsSaved1), 'ok');
             } else {
-              this.showToast(d.error || 'Fehler beim Speichern', 'err');
+              this.showToast(d.error || t.saveError, 'err');
             }
           } catch (err) {
-            this.showToast('Netzwerk-Fehler', 'err');
+            this.showToast(t.netErr, 'err');
           } finally {
             this.saving = false;
           }
