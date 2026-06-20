@@ -2,31 +2,33 @@
 import AppTile from './AppTile.astro';
 import { APPS } from '../../lib/uebersicht/apps-data';
 import { getAppStatus, getDoneCount, type Stage } from '../../lib/uebersicht/setup-stage';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   stage: Stage;
+  lang: LanguageCode;
 }
 
-const { stage } = Astro.props;
+const { stage, lang } = Astro.props;
 const done = getDoneCount(stage);
 const open = 7 - done;
 ---
 
 <section class="apps-section">
   <div class="apps__head">
-    <span class="apps__label">Deine Apps · 07 Bereiche</span>
+    <span class="apps__label">{bt('apps.head', lang)}</span>
     <div class="apps__counts">
       {open > 0 && (
-        <span class="count-badge count-badge--open">{open} offen</span>
+        <span class="count-badge count-badge--open">{open} {bt('apps.open', lang)}</span>
       )}
       {done > 0 && (
-        <span class="count-badge count-badge--done">{done} erledigt</span>
+        <span class="count-badge count-badge--done">{done} {bt('apps.done', lang)}</span>
       )}
     </div>
   </div>
   <div class="apps-grid">
     {APPS.map(app => (
-      <AppTile app={app} status={getAppStatus(app, stage)} />
+      <AppTile app={app} status={getAppStatus(app, stage)} lang={lang} />
     ))}
   </div>
 </section>

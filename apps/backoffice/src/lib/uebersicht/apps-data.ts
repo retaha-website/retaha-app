@@ -11,19 +11,20 @@ export interface SetupApp {
   href: string;
 }
 
+// label/sub sind bt()-Keys (in BO_STRINGS gepflegt); Komponenten lösen via bt(app.label, lang) auf.
 export const APPS: SetupApp[] = [
-  { id: 1, num: '01', label: 'Hotel-Daten',  sub: 'Name · Adresse',
+  { id: 1, num: '01', label: 'app.1.label',  sub: 'app.1.sub',
     activeAt: 0,  doneAt: 15,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/profil/settings'          },
-  { id: 2, num: '02', label: 'Branding',     sub: 'Farben · Schrift',
+  { id: 2, num: '02', label: 'app.2.label',  sub: 'app.2.sub',
     activeAt: 15, doneAt: 30,  sticker: { todo: 'WAIT', active: 'START', done: 'DONE'   }, href: '/branding'          },
-  { id: 3, num: '03', label: 'Module',       sub: 'Eve · Empfehlungen',
+  { id: 3, num: '03', label: 'app.3.label',  sub: 'app.3.sub',
     activeAt: 30, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: '3/5 ON' }, href: '/features'          },
-  { id: 4, num: '04', label: 'PMS-Bridge',   sub: 'Apaleo · Protel',
+  { id: 4, num: '04', label: 'app.4.label',  sub: 'app.4.sub',
     activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'LINKED' }, href: '/pms'               },
-  { id: 5, num: '05', label: '2FA-Sicherheit', sub: 'Zwei-Faktor',
+  { id: 5, num: '05', label: 'app.5.label',  sub: 'app.5.sub',
     activeAt: -1, doneAt: 71,  sticker: { todo: 'WAIT', active: 'START', done: 'ARMED'  }, href: '/profil/sicherheit'   },
-  { id: 6, num: '06', label: 'NFC-Karten',   sub: 'Gast-Content',
+  { id: 6, num: '06', label: 'app.6.label',  sub: 'app.6.sub',
     activeAt: 71, doneAt: 100, sticker: { todo: '0/6',  active: 'START', done: '6/6 ON' }, href: '/admin/nfc-tags'    },
-  { id: 7, num: '07', label: 'Team',         sub: 'Einladen',
+  { id: 7, num: '07', label: 'app.7.label',  sub: 'app.7.sub',
     activeAt: -1, doneAt: 100, sticker: { todo: 'SOLO', active: 'START', done: '3 USR'  }, href: '/team'              },
 ];

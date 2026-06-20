@@ -2,12 +2,14 @@
 import KeyHanger from './KeyHanger.astro';
 import { APPS, type AppStatus } from '../../lib/uebersicht/apps-data';
 import { getAppStatus, getDoneCount, type Stage } from '../../lib/uebersicht/setup-stage';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   stage: Stage;
+  lang: LanguageCode;
 }
 
-const { stage } = Astro.props;
+const { stage, lang } = Astro.props;
 const done = getDoneCount(stage);
 const doneStr = String(done).padStart(2, '0');
 
@@ -16,16 +18,16 @@ const delays = ['0s', '0.3s', '0.6s', '0.2s', '0.5s', '0.7s', '0.4s'];
 
 <section class="rack-banner">
   <div class="rack-banner__inner">
-    <span class="rack-banner__label">Dein Hausschlüsselbund</span>
+    <span class="rack-banner__label">{bt('rack.label', lang)}</span>
     <span class="rack-banner__count">
-      <strong>{doneStr}/07</strong> übergeben
+      <strong>{doneStr}/07</strong> {bt('rack.handed', lang)}
     </span>
     <div class="rack-banner__keys">
       {APPS.map((app, i) => (
-        <a href={`#app-${app.num}`} class="rack-key-link" aria-label={`Zur App: ${app.label}`}>
+        <a href={`#app-${app.num}`} class="rack-key-link" aria-label={bt('rack.toapp', lang).replace('{label}', bt(app.label, lang))}>
           <KeyHanger
             num={app.num}
-            label={app.label}
+            label={bt(app.label, lang)}
             status={getAppStatus(app, stage)}
             delay={delays[i]}
           />

@@ -1,11 +1,13 @@
 ---
 import LiveTile from './LiveTile.astro';
 import type { LiveTileData } from '../../lib/uebersicht/live-data';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   tiles: LiveTileData[];
+  lang: LanguageCode;
 }
-const { tiles } = Astro.props;
+const { tiles, lang } = Astro.props;
 
 const now = new Date();
 const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -13,12 +15,12 @@ const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinut
 
 <section class="live-section">
   <div class="live__head">
-    <span class="live__label">Live · aus deinem Hotel</span>
-    <span class="live__time">Aktuell · {timeStr}</span>
+    <span class="live__label">{bt('live.head', lang)}</span>
+    <span class="live__time">{bt('live.now', lang)} · {timeStr}</span>
   </div>
   <div class="live-tiles">
     {tiles.map(tile => (
-      <LiveTile tile={tile} />
+      <LiveTile tile={tile} lang={lang} />
     ))}
   </div>
 </section>

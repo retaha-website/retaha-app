@@ -1,11 +1,13 @@
 ---
 import { getDoneCount, type Stage } from '../../lib/uebersicht/setup-stage';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   stage: Stage;
+  lang: LanguageCode;
 }
 
-const { stage } = Astro.props;
+const { stage, lang } = Astro.props;
 const done = getDoneCount(stage);
 const isDone = stage === 100;
 ---
@@ -14,11 +16,11 @@ const isDone = stage === 100;
   <div class="setup__box">
     <div class="setup__row">
       <span class="setup__label">
-        {isDone ? 'Setup vollständig' : 'Setup-Fortschritt'}
+        {isDone ? bt('setup.complete', lang) : bt('setup.progress', lang)}
       </span>
       <span class="setup__value">
         <strong class:list={[{ 'is-done': isDone }]}>{stage}%</strong>
-        <span> · {done} von 7 Schritten</span>
+        <span> · {bt('setup.steps', lang).replace('{done}', String(done))}</span>
       </span>
     </div>
     <div class="progress-rail" role="progressbar" aria-valuenow={stage} aria-valuemin={0} aria-valuemax={100}>

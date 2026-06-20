@@ -25,25 +25,5 @@ export function getDoneCount(stage: Stage): number {
   return 7;
 }
 
-export const HERO_TEXTS: Record<Stage, { title: string; sub: string }> = {
-  0: {
-    title: 'Willkommen<span class="dot-pink">.</span><br><strong>Lass uns dein Hotel einrichten.</strong>',
-    sub:   'Sieben Apps, sieben Bereiche. Wir gehen das gemeinsam durch.',
-  },
-  15: {
-    title: 'Gut gemacht<span class="dot-pink">.</span><br><strong>Jetzt kommt das Branding.</strong>',
-    sub:   'Hotel-Daten stehen. Jetzt Logo, Farben und Theme einrichten.',
-  },
-  30: {
-    title: 'Schöner Anfang<span class="dot-pink">.</span><br><strong>Weiter geht es.</strong>',
-    sub:   'Hotel-Daten und Branding stehen. Fünf Bereiche noch.',
-  },
-  71: {
-    title: 'Noch wenige Schritte,<br><strong>dann ist dein Hotel bereit<span class="dot-pink">.</span></strong>',
-    sub:   'Karten brauchen Inhalt, ein Team fehlt noch. Fast geschafft.',
-  },
-  100: {
-    title: 'Dein Hotel<br><strong>läuft<span class="dot-pink">.</span></strong>',
-    sub:   'Alle Einstellungen findest du in den Apps. Klicke um zu ändern.',
-  },
-};
+// Hero-Texte (title/sub) liegen als bt()-Keys 'hero.<stage>.title|sub' in BO_STRINGS;
+// HeroSection löst sie sprachabhängig auf (title via set:html, da HTML enthalten).

@@ -8,6 +8,8 @@ import LiveTilesSection from '../components/uebersicht/LiveTilesSection.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { normalizeStage } from '../lib/uebersicht/setup-stage';
 import { getLiveData } from '../lib/uebersicht/live-data';
+import { getLang } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -63,9 +65,9 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
   userInitial={userInitial}
 >
-  <HeroSection stage={stage} />
-  <RackBanner stage={stage} />
-  <SetupStatus stage={stage} />
-  <AppGrid stage={stage} />
-  <LiveTilesSection tiles={liveData} />
+  <HeroSection stage={stage} lang={lang} />
+  <RackBanner stage={stage} lang={lang} />
+  <SetupStatus stage={stage} lang={lang} />
+  <AppGrid stage={stage} lang={lang} />
+  <LiveTilesSection tiles={liveData} lang={lang} />
 </Layout>
