@@ -7,14 +7,14 @@ import AccountShell from '../../components/account/AccountShell.astro';
 import TwoFactorSection from '../../components/profil/TwoFactorSection.astro';
 import { getUser, createSupabaseServerInstance, createSupabaseServiceRoleInstance, clampTimeoutHours } from '@retaha/auth';
 import { getUserMfaStatus, getHotelMfaPolicy } from '@retaha/auth/mfa';
-import { getLang } from '../../lib/i18n';
+import { getLang, bt } from '../../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
 
 const client = createSupabaseServerInstance(Astro.cookies, Astro.request);
-const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+const ROLE_LABELS: Record<string, string> = { owner: bt('role.owner', lang), manager: bt('role.manager', lang), staff: bt('role.staff', lang) };
 
 const { data: hotelUser } = await client.from('hotel_users').select('role, hotel_id').eq('user_id', user.id).maybeSingle();
 const role     = (hotelUser?.role ?? 'staff') as string;
@@ -28,7 +28,7 @@ if (Astro.request.method === 'POST') {
   if (form.get('_action')?.toString() === 'team_security' && isOwner && hotelId) {
     const session_timeout_hours = clampTimeoutHours(form.get('session_timeout_hours')?.toString());
     const { error } = await client.from('hotels').update({ session_timeout_hours }).eq('id', hotelId);
-    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: 'Gespeichert' };
+    saved = error ? { ok: false, msg: error.message } : { ok: true, msg: bt('common.savedshort', lang) };
   }
 }
 
@@ -88,8 +88,8 @@ const activeCount = team.length - pendingCount;
 
     <section class="acct__section" id="security-section">
       <div class="acct__section-head">
-        <h2 class="acct__section-title">Sicherheit</h2>
-        <p class="acct__section-desc">Zwei-Faktor-Authentifizierung für dein retaha-Konto und Sicherheitsregeln für dein gesamtes Team.</p>
+        <h2 class="acct__section-title">{bt('hub.security', lang)}</h2>
+        <p class="acct__section-desc">{bt('sec.section.desc', lang)}</p>
       </div>
 
       <div class="settings-sections">
@@ -99,12 +99,13 @@ const activeCount = team.length - pendingCount;
           recoveryRemaining={recoveryRemaining}
           isRequired={isRequired}
           magicLinkEnabled={(mfaStatus as Record<string, unknown> | null)?.requireOnMagicLink === true}
+          lang={lang}
         />
 
         {isOwner && (
         <section class="s-card" id="team-security">
           <div class="s-card__head">
-            <h2 class="s-card__title">Team-Sicherheit</h2>
+            <h2 class="s-card__title">{bt('sec.team.title', lang)}</h2>
             <span class="s-card__num">02</span>
           </div>
 
@@ -112,38 +113,38 @@ const activeCount = team.length - pendingCount;
             <input type="hidden" name="_action" value="team_security" />
 
             <div class="field field--row">
-              <span class="field__label">2FA für alle Mitarbeiter</span>
+              <span class="field__label">{bt('sec.team.mfaall', lang)}</span>
               <div x-data={`persistToggle({ initial: ${mfaRequiredForTeam}, field: 'mfa_required_for_team' })`}>
                 <label class="toggle-row">
                   <input type="checkbox" :checked="checked" class="sr-only" @change="toggle($event)" />
                   <span class="bt-visual" :class="{'is-checked': checked}">
                     <span class="bt-knob"></span>
                   </span>
-                  <span class="toggle-label">Mitarbeiter ohne 2FA können sich nicht anmelden</span>
+                  <span class="toggle-label">{bt('sec.team.mfaall.hint', lang)}</span>
                 </label>
                 <p x-show="error" x-cloak class="field__hint" style="color:var(--burgund);margin-top:4px" x-text="error"></p>
               </div>
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="session-timeout">Session-Timeout</label>
+              <label class="field__label" for="session-timeout">{bt('sec.team.timeout', lang)}</label>
               <div class="field__input-wrap">
                 <div class="s-select-wrap">
                   <select id="session-timeout" name="session_timeout_hours" class="s-select">
-                    <option value="1"  selected={sessionTimeout === '1'}>1 Stunde</option>
-                    <option value="2"  selected={sessionTimeout === '2'}>2 Stunden</option>
-                    <option value="4"  selected={sessionTimeout === '4'}>4 Stunden</option>
-                    <option value="8"  selected={sessionTimeout === '8'}>8 Stunden</option>
-                    <option value="24" selected={sessionTimeout === '24'}>24 Stunden</option>
-                    <option value="0"  selected={sessionTimeout === '0'}>Kein Timeout</option>
+                    <option value="1"  selected={sessionTimeout === '1'}>{bt('sec.timeout.1h', lang)}</option>
+                    <option value="2"  selected={sessionTimeout === '2'}>{bt('sec.timeout.2h', lang)}</option>
+                    <option value="4"  selected={sessionTimeout === '4'}>{bt('sec.timeout.4h', lang)}</option>
+                    <option value="8"  selected={sessionTimeout === '8'}>{bt('sec.timeout.8h', lang)}</option>
+                    <option value="24" selected={sessionTimeout === '24'}>{bt('sec.timeout.24h', lang)}</option>
+                    <option value="0"  selected={sessionTimeout === '0'}>{bt('sec.timeout.none', lang)}</option>
                   </select>
                 </div>
-                <span class="field__hint">Nach dieser Zeit ohne Aktivität werden Mitarbeiter automatisch abgemeldet.</span>
+                <span class="field__hint">{bt('sec.team.timeout.hint', lang)}</span>
               </div>
             </div>
 
             <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
+              <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
             </div>
           </form>
 
@@ -151,15 +152,15 @@ const activeCount = team.length - pendingCount;
 
           <div class="ts-team">
             <div class="ts-team__head">
-              <span class="ts-team__title">Team-Übersicht</span>
-              <span class="ts-team__sub">{team.length} {team.length === 1 ? 'Mitglied' : 'Mitglieder'} · {activeCount} mit 2FA aktiv</span>
+              <span class="ts-team__title">{bt('sec.overview.title', lang)}</span>
+              <span class="ts-team__sub">{team.length} {team.length === 1 ? bt('sec.member.one', lang) : bt('sec.member.many', lang)} · {activeCount} {bt('sec.overview.activesuffix', lang)}</span>
             </div>
             <ul class="ts-team__list">
               {team.map((m) => (
                 <li class="ts-team__row">
                   <span class="ts-team__email">{m.email}</span>
                   <span class={`ts-team__status ts-team__status--${m.mfaState}`}>
-                    {m.mfaState === 'active' ? '2FA aktiv' : m.mfaState === 'pending' ? 'nicht bestätigt' : 'nicht eingerichtet'}
+                    {m.mfaState === 'active' ? bt('sec.status.active', lang) : m.mfaState === 'pending' ? bt('sec.status.pending', lang) : bt('sec.status.inactive', lang)}
                   </span>
                 </li>
               ))}
@@ -167,12 +168,9 @@ const activeCount = team.length - pendingCount;
           </div>
 
           {mfaRequiredForTeam && pendingCount > 0 && (
-            <div class="ts-enforce" x-data={`{ busy: false, sendReminder() { this.busy = true; fetch('/api/mfa/send-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hotelId: ${JSON.stringify(hotelId)} }) }).then(function(r){return r.json()}).then(function(d){ window.retahaToast && window.retahaToast(d.ok ? 'Erinnerung gesendet.' : (d.message || 'Fehler beim Senden.'), d.ok ? 'success' : 'error'); }).catch(function(){ window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); }).finally(function(){ this.busy = false; }.bind(this)); } }`}>
-              <p class="ts-enforce__text">
-                <strong>{pendingCount} von {team.length} {team.length === 1 ? 'Mitglied' : 'Mitgliedern'}</strong>
-                {pendingCount === 1 ? ' hat' : ' haben'} 2FA noch nicht aktiviert — sie werden beim nächsten Login dazu aufgefordert.
-              </p>
-              <button type="button" class="v9-btn v9-btn--ghost" x-on:click="sendReminder()" x-bind:disabled="busy">Erinnerung senden</button>
+            <div class="ts-enforce" x-data={`{ busy: false, sendReminder() { this.busy = true; fetch('/api/mfa/send-reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hotelId: ${JSON.stringify(hotelId)} }) }).then(function(r){return r.json()}).then(function(d){ window.retahaToast && window.retahaToast(d.ok ? ${JSON.stringify(bt('sec.reminder.sent', lang))} : (d.message || ${JSON.stringify(bt('sec.reminder.fail', lang))}), d.ok ? 'success' : 'error'); }).catch(function(){ window.retahaToast && window.retahaToast(${JSON.stringify(bt('sec.reminder.neterr', lang))}, 'error'); }).finally(function(){ this.busy = false; }.bind(this)); } }`}>
+              <p class="ts-enforce__text" set:html={bt('sec.enforce', lang).replace('{count}', String(pendingCount)).replace('{total}', String(team.length)).replace('{members}', team.length === 1 ? bt('sec.member.one', lang) : bt('sec.member.many', lang))}></p>
+              <button type="button" class="v9-btn v9-btn--ghost" x-on:click="sendReminder()" x-bind:disabled="busy">{bt('sec.enforce.send', lang)}</button>
             </div>
           )}
         </section>
@@ -183,7 +181,7 @@ const activeCount = team.length - pendingCount;
   </AccountShell>
 
   {saved && (
-    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? 'Gespeichert' : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
+    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
   )}
 
   <!-- Flash nach client-seitigem Reload (z.B. 2FA deaktiviert). -->

@@ -5,7 +5,7 @@
 import Layout from '../../layouts/Layout.astro';
 import AccountShell from '../../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
-import { getLang } from '../../lib/i18n';
+import { getLang, bt } from '../../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -32,7 +32,7 @@ if (Astro.request.method === 'POST') {
     const currencyRaw    = form.get('currency')?.toString() || 'EUR';
     const currency       = ['EUR', 'CHF'].includes(currencyRaw) ? currencyRaw : 'EUR';
     if (!name) {
-      saved = { section: 'hotel_identity', ok: false, msg: 'Hotel-Name ist ein Pflichtfeld.' };
+      saved = { section: 'hotel_identity', ok: false, msg: bt('set.msg.nameRequired', lang) };
     } else {
       const { data: current } = await client.from('hotels')
         .select('setup_progress').eq('id', hotel.id).maybeSingle();
@@ -140,7 +140,7 @@ function isSelected(key: string, value: string, fallback = '') {
 }
 
 // ─── Hub-Shell-Daten (User-Mini) ───────────────────────────────────────────
-const ROLE_LABELS: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+const ROLE_LABELS: Record<string, string> = { owner: bt('role.owner', lang), manager: bt('role.manager', lang), staff: bt('role.staff', lang) };
 const role = (hotels?.[0]?.role ?? 'staff') as string;
 const roleLabel = ROLE_LABELS[role] ?? role;
 const { data: profile } = await client.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
@@ -157,8 +157,8 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
 
     <section class="acct__section">
       <div class="acct__section-head">
-        <h2 class="acct__section-title">Hotel-Daten</h2>
-        <p class="acct__section-desc">Daten und Regeln deines Hotels.</p>
+        <h2 class="acct__section-title">{bt('hub.hoteldata', lang)}</h2>
+        <p class="acct__section-desc">{bt('set.section.desc', lang)}</p>
       </div>
 
       <div class="settings-sections">
@@ -166,7 +166,7 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
         <!-- ── 01 HOTEL-IDENTITÄT ── -->
         <section class="s-card" id="hotel-identity">
           <div class="s-card__head">
-            <h2 class="s-card__title">Hotel-Identität</h2>
+            <h2 class="s-card__title">{bt('set.identity.title', lang)}</h2>
             <span class="s-card__num">01</span>
           </div>
 
@@ -174,18 +174,18 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             <input type="hidden" name="_action" value="hotel_identity" />
 
             <div class="field field--row">
-              <label class="field__label field__label--req" for="hotel-name">Hotel-Name</label>
+              <label class="field__label field__label--req" for="hotel-name">{bt('set.identity.name', lang)}</label>
               <div class="field__input-wrap">
                 <input type="text" id="hotel-name" name="name" class="s-input"
                   value={val('name')} placeholder="z.B. Hotel Sonnenhof" required />
-                <span class="field__hint">Wird überall verwendet — Header, E-Mails, Gäste-App</span>
+                <span class="field__hint">{bt('set.identity.name.hint', lang)}</span>
               </div>
             </div>
 
             <div class="field field--row">
-              <span class="field__label">Klassifikation</span>
+              <span class="field__label">{bt('set.identity.classification', lang)}</span>
               <div class="radio-cards" role="radiogroup">
-                {[['3','3 Sterne'],['4','4 Sterne'],['4s','4 Superior'],['5','5 Sterne'],['boutique','Boutique']].map(([v, l]) => (
+                {[['3',bt('set.class.3', lang)],['4',bt('set.class.4', lang)],['4s',bt('set.class.4s', lang)],['5',bt('set.class.5', lang)],['boutique',bt('set.class.boutique', lang)]].map(([v, l]) => (
                   <label class={`radio-card ${val('classification') === v ? 'is-active' : ''}`}>
                     <input type="radio" name="classification" value={v}
                       checked={val('classification') === v} class="sr-only" />
@@ -196,30 +196,30 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="hotel-type">Hotel-Typ</label>
+              <label class="field__label" for="hotel-type">{bt('set.identity.type', lang)}</label>
               <div class="s-select-wrap">
                 <select id="hotel-type" name="hotel_type" class="s-select">
-                  <option value="city"     selected={isSelected('hotel_type','city')}>Stadt-Hotel</option>
-                  <option value="resort"   selected={isSelected('hotel_type','resort')}>Resort</option>
-                  <option value="wellness" selected={isSelected('hotel_type','wellness')}>Wellness-Hotel</option>
-                  <option value="business" selected={isSelected('hotel_type','business')}>Business-Hotel</option>
-                  <option value="boutique" selected={isSelected('hotel_type','boutique')}>Boutique-Hotel</option>
+                  <option value="city"     selected={isSelected('hotel_type','city')}>{bt('set.type.city', lang)}</option>
+                  <option value="resort"   selected={isSelected('hotel_type','resort')}>{bt('set.type.resort', lang)}</option>
+                  <option value="wellness" selected={isSelected('hotel_type','wellness')}>{bt('set.type.wellness', lang)}</option>
+                  <option value="business" selected={isSelected('hotel_type','business')}>{bt('set.type.business', lang)}</option>
+                  <option value="boutique" selected={isSelected('hotel_type','boutique')}>{bt('set.type.boutique', lang)}</option>
                 </select>
               </div>
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="hotel-currency">Währung</label>
+              <label class="field__label" for="hotel-currency">{bt('set.identity.currency', lang)}</label>
               <div class="s-select-wrap">
                 <select id="hotel-currency" name="currency" class="s-select">
-                  <option value="EUR" selected={isSelected('currency','EUR','EUR')}>EUR — Euro (€)</option>
-                  <option value="CHF" selected={isSelected('currency','CHF')}>CHF — Schweizer Franken</option>
+                  <option value="EUR" selected={isSelected('currency','EUR','EUR')}>{bt('set.currency.eur', lang)}</option>
+                  <option value="CHF" selected={isSelected('currency','CHF')}>{bt('set.currency.chf', lang)}</option>
                 </select>
               </div>
             </div>
 
             <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
+              <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
             </div>
           </form>
         </section>
@@ -227,7 +227,7 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
         <!-- ── 02 ADRESSE & KONTAKT ── -->
         <section class="s-card" id="address-contact">
           <div class="s-card__head">
-            <h2 class="s-card__title">Adresse & Kontakt</h2>
+            <h2 class="s-card__title">{bt('set.address.title', lang)}</h2>
             <span class="s-card__num">02</span>
           </div>
 
@@ -235,13 +235,13 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             <input type="hidden" name="_action" value="address_contact" />
 
             <div class="field field--row">
-              <label class="field__label" for="address-street">Straße</label>
+              <label class="field__label" for="address-street">{bt('set.address.street', lang)}</label>
               <input type="text" id="address-street" name="address_street" class="s-input"
                 value={val('address_street')} placeholder="z.B. Musterstraße 1" />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="address-zip">PLZ / Stadt</label>
+              <label class="field__label" for="address-zip">{bt('set.address.zipcity', lang)}</label>
               <div class="field__split">
                 <input type="text" id="address-zip" name="address_zip" class="s-input s-input--zip"
                   value={val('address_zip')} placeholder="12345" />
@@ -251,40 +251,40 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="address-country">Land</label>
+              <label class="field__label" for="address-country">{bt('set.address.country', lang)}</label>
               <div class="s-select-wrap">
                 <select id="address-country" name="country" class="s-select">
-                  <option value="DE" selected={isSelected('country','DE','DE')}>Deutschland</option>
-                  <option value="AT" selected={isSelected('country','AT')}>Österreich</option>
-                  <option value="CH" selected={isSelected('country','CH')}>Schweiz</option>
-                  <option value="LU" selected={isSelected('country','LU')}>Luxemburg</option>
+                  <option value="DE" selected={isSelected('country','DE','DE')}>{bt('set.country.de', lang)}</option>
+                  <option value="AT" selected={isSelected('country','AT')}>{bt('set.country.at', lang)}</option>
+                  <option value="CH" selected={isSelected('country','CH')}>{bt('set.country.ch', lang)}</option>
+                  <option value="LU" selected={isSelected('country','LU')}>{bt('set.country.lu', lang)}</option>
                 </select>
               </div>
             </div>
 
-            <div class="s-divider-label">Kontakt (für Gäste sichtbar)</div>
+            <div class="s-divider-label">{bt('set.address.contactdivider', lang)}</div>
 
             <div class="field field--row">
-              <label class="field__label" for="hotel-phone">Telefon / Rezeption</label>
+              <label class="field__label" for="hotel-phone">{bt('set.address.phone', lang)}</label>
               <input type="tel" id="hotel-phone" name="phone" class="s-input"
                 value={val('phone')} placeholder="z. B. +49 30 1234567"
-                pattern="[+0-9 ()\-\/]*" title="Erlaubt: +, Ziffern, Leerzeichen, (, ), -, /" />
+                pattern="[+0-9 ()\-\/]*" title={bt('set.address.phone.title', lang)} />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="hotel-email">E-Mail</label>
+              <label class="field__label" for="hotel-email">{bt('prof.email.label', lang)}</label>
               <input type="email" id="hotel-email" name="email" class="s-input"
                 value={val('email')} placeholder="info@mein-hotel.de" />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="hotel-website">Website</label>
+              <label class="field__label" for="hotel-website">{bt('set.address.website', lang)}</label>
               <input type="url" id="hotel-website" name="website" class="s-input"
                 value={val('website')} placeholder="https://mein-hotel.de" />
             </div>
 
             <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
+              <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
             </div>
           </form>
         </section>
@@ -292,7 +292,7 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
         <!-- ── 03 GESCHÄFTSDATEN ── -->
         <section class="s-card" id="business-data">
           <div class="s-card__head">
-            <h2 class="s-card__title">Geschäftsdaten</h2>
+            <h2 class="s-card__title">{bt('set.business.title', lang)}</h2>
             <span class="s-card__num">03</span>
           </div>
 
@@ -300,10 +300,10 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             <input type="hidden" name="_action" value="business_data" />
 
             <div class="field field--row">
-              <label class="field__label" for="legal-form">Rechtsform</label>
+              <label class="field__label" for="legal-form">{bt('set.business.legalform', lang)}</label>
               <div class="s-select-wrap">
                 <select id="legal-form" name="legal_form" class="s-select">
-                  <option value="">Bitte wählen</option>
+                  <option value="">{bt('set.business.choose', lang)}</option>
                   {[['GmbH','GmbH'],['GmbH & Co. KG','GmbH & Co. KG'],['UG','UG (haftungsbeschränkt)'],['AG','AG'],['KG','KG'],['OHG','OHG'],['GbR','GbR'],['Einzelunternehmen','Einzelunternehmen']].map(([v,l]) => (
                     <option value={v} selected={val('legal_form') === v}>{l}</option>
                   ))}
@@ -312,31 +312,31 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="company-name">Firmenname</label>
+              <label class="field__label" for="company-name">{bt('set.business.company', lang)}</label>
               <input type="text" id="company-name" name="company_name" class="s-input"
                 value={val('company_name')} placeholder="Hotel Sonnenhof GmbH" />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="commercial-register">Handelsregister-Nr.</label>
+              <label class="field__label" for="commercial-register">{bt('set.business.register', lang)}</label>
               <input type="text" id="commercial-register" name="commercial_register" class="s-input"
                 value={val('commercial_register')} placeholder="HRB 12345" />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="vat-id">USt-ID</label>
+              <label class="field__label" for="vat-id">{bt('set.business.vat', lang)}</label>
               <input type="text" id="vat-id" name="vat_id" class="s-input"
                 value={val('vat_id')} placeholder="DE123456789" />
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="tax-number">Steuernummer</label>
+              <label class="field__label" for="tax-number">{bt('set.business.taxnr', lang)}</label>
               <input type="text" id="tax-number" name="tax_number" class="s-input"
                 value={val('tax_number')} placeholder="12/345/67890" />
             </div>
 
             <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
+              <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
             </div>
           </form>
         </section>
@@ -344,10 +344,10 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
         <!-- ── 04 RECHNUNGSADRESSE ── -->
         <section class="s-card" id="billing-address">
           <div class="s-card__head">
-            <h2 class="s-card__title">Rechnungsadresse</h2>
+            <h2 class="s-card__title">{bt('set.billing.title', lang)}</h2>
             <span class="s-card__num">04</span>
           </div>
-          <p class="s-card__sub">Für das retaha-Abo</p>
+          <p class="s-card__sub">{bt('set.billing.sub', lang)}</p>
 
           <form method="POST" class="s-card__body">
             <input type="hidden" name="_action" value="billing_address" />
@@ -355,30 +355,30 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
             <label class="toggle-row">
               <input type="checkbox" name="billing_same_as_hotel" id="billing-same" class="sr-only" />
               <span class="bt-visual"><span class="bt-knob"></span></span>
-              <span class="toggle-label">Wie Hotel-Adresse übernehmen</span>
+              <span class="toggle-label">{bt('set.billing.same', lang)}</span>
             </label>
 
             <div id="billing-fields">
               <div class="field field--row">
-                <label class="field__label" for="billing-recipient">Empfänger</label>
+                <label class="field__label" for="billing-recipient">{bt('set.billing.recipient', lang)}</label>
                 <input type="text" id="billing-recipient" name="billing_recipient" class="s-input"
                   value={val('billing_recipient')} placeholder="Hotel Sonnenhof GmbH" />
               </div>
 
               <div class="field field--row">
-                <label class="field__label" for="billing-email">Rechnungs-E-Mail</label>
+                <label class="field__label" for="billing-email">{bt('set.billing.email', lang)}</label>
                 <input type="email" id="billing-email" name="billing_email" class="s-input"
                   value={val('billing_email')} placeholder="buchhaltung@mein-hotel.de" />
               </div>
 
               <div class="field field--row">
-                <label class="field__label" for="billing-street">Straße</label>
+                <label class="field__label" for="billing-street">{bt('set.address.street', lang)}</label>
                 <input type="text" id="billing-street" name="billing_street" class="s-input"
                   value={val('billing_street')} placeholder="z.B. Musterstraße 1" />
               </div>
 
               <div class="field field--row">
-                <label class="field__label" for="billing-zip">PLZ / Stadt</label>
+                <label class="field__label" for="billing-zip">{bt('set.address.zipcity', lang)}</label>
                 <div class="field__split">
                   <input type="text" id="billing-zip" name="billing_zip" class="s-input s-input--zip"
                     value={val('billing_zip')} placeholder="12345" />
@@ -388,20 +388,20 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
               </div>
 
               <div class="field field--row">
-                <label class="field__label" for="billing-country">Land</label>
+                <label class="field__label" for="billing-country">{bt('set.address.country', lang)}</label>
                 <div class="s-select-wrap">
                   <select id="billing-country" name="billing_country" class="s-select">
-                    <option value="DE" selected={isSelected('billing_country','DE','DE')}>Deutschland</option>
-                    <option value="AT" selected={isSelected('billing_country','AT')}>Österreich</option>
-                    <option value="CH" selected={isSelected('billing_country','CH')}>Schweiz</option>
-                    <option value="LU" selected={isSelected('billing_country','LU')}>Luxemburg</option>
+                    <option value="DE" selected={isSelected('billing_country','DE','DE')}>{bt('set.country.de', lang)}</option>
+                    <option value="AT" selected={isSelected('billing_country','AT')}>{bt('set.country.at', lang)}</option>
+                    <option value="CH" selected={isSelected('billing_country','CH')}>{bt('set.country.ch', lang)}</option>
+                    <option value="LU" selected={isSelected('billing_country','LU')}>{bt('set.country.lu', lang)}</option>
                   </select>
                 </div>
               </div>
             </div>
 
             <div class="s-card__footer">
-              <button type="submit" class="v9-btn">Speichern</button>
+              <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
             </div>
           </form>
         </section>
@@ -412,7 +412,7 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
   </AccountShell>
 
   {saved && (
-    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? 'Gespeichert' : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
+    <script is:inline set:html={`(function(){var m=${JSON.stringify(saved.ok ? bt('common.savedshort', lang) : saved.msg)},t=${JSON.stringify(saved.ok ? 'success' : 'error')};function go(){window.retahaToast&&window.retahaToast(m,t)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`}></script>
   )}
 </Layout>
 

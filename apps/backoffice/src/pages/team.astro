@@ -12,8 +12,8 @@ import Layout from '../layouts/Layout.astro';
 import AccountShell from '../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
-import { ROLE_LABELS, hasPermission, type Role } from '@retaha/auth';
-import { getLang } from '../lib/i18n';
+import { hasPermission } from '@retaha/auth';
+import { getLang, bt } from '../lib/i18n';
 
 const lang = getLang(Astro.cookies, Astro.request);
 const user = await getUser(Astro.cookies, Astro.request);
@@ -69,7 +69,7 @@ const canChangeRole = hasPermission(myRole, 'team.change_role');
 const canRemove     = hasPermission(myRole, 'team.remove');
 
 // ─── Hub-Shell-Daten (User-Mini in der Sidebar) ────────────────────────────
-const HUB_ROLE: Record<string, string> = { owner: 'Inhaber', manager: 'Manager', staff: 'Mitarbeiter' };
+const HUB_ROLE: Record<string, string> = { owner: bt('role.owner', lang), manager: bt('role.manager', lang), staff: bt('role.staff', lang) };
 const myProfile = profileMap.get(user.id) as { first_name?: string; last_name?: string } | undefined;
 const hubFirst    = myProfile?.first_name ?? '';
 const hubLast     = myProfile?.last_name ?? '';
@@ -85,8 +85,8 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 
     <section class="acct__section" id="team">
       <div class="acct__section-head">
-        <h2 class="acct__section-title">Team</h2>
-        <p class="acct__section-desc">Mitarbeiter dieses Hotels — Rollen, Einladungen, Zugriff.</p>
+        <h2 class="acct__section-title">{bt('hub.team', lang)}</h2>
+        <p class="acct__section-desc">{bt('team.section.desc', lang)}</p>
       </div>
 
       <div class="tm-root">
@@ -96,7 +96,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
           <!-- Aktive Mitglieder -->
           <section class="s-card">
             <div class="s-card__head">
-              <h2 class="s-card__title">Aktive Mitglieder</h2>
+              <h2 class="s-card__title">{bt('team.active.title', lang)}</h2>
               <span class="s-card__num">01</span>
             </div>
             <div class="s-card__body">
@@ -108,7 +108,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                     <article class="tm-row" data-member-id={m.id}>
                       <div class="tm-row-info">
                         <p class="tm-row-name">
-                          {displayName(m)}{isMe && <span class="tm-row-self"> (du)</span>}
+                          {displayName(m)}{isMe && <span class="tm-row-self"> {bt('team.self', lang)}</span>}
                         </p>
                         <p class="tm-row-meta">{emailMap.get(m.user_id) || '—'}</p>
                       </div>
@@ -120,12 +120,12 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                             data-member-id={m.id}
                             data-current-role={m.role}
                           >
-                            <option value="manager" selected={m.role === 'manager'}>Manager</option>
-                            <option value="staff" selected={m.role === 'staff'}>Front-Desk</option>
+                            <option value="manager" selected={m.role === 'manager'}>{bt('role.manager', lang)}</option>
+                            <option value="staff" selected={m.role === 'staff'}>{bt('team.role.frontdesk', lang)}</option>
                           </select>
                         ) : (
                           <span class={`tm-badge${isOwner ? ' tm-badge--owner' : ''}`}>
-                            {ROLE_LABELS[m.role as Role]}{isOwner && ' ★'}
+                            {bt('role.' + m.role, lang)}{isOwner && ' ★'}
                           </span>
                         )}
                         {(canRemove && !isOwner && !isMe) && (
@@ -136,7 +136,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                             data-member-id={m.id}
                             data-member-name={displayName(m)}
                           >
-                            Entfernen
+                            {bt('common.remove', lang)}
                           </button>
                         )}
                       </div>
@@ -148,7 +148,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
             {canInvite && (
               <div class="s-card__footer">
                 <button type="button" id="tm-invite-open" class="v9-btn v9-btn--primary">
-                  + Mitarbeiter einladen
+                  {bt('team.invite.btn', lang)}
                 </button>
               </div>
             )}
@@ -158,7 +158,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
           {pendingInvites.length > 0 && (
             <section class="s-card">
               <div class="s-card__head">
-                <h2 class="s-card__title">Offene Einladungen</h2>
+                <h2 class="s-card__title">{bt('team.pending.title', lang)}</h2>
                 <span class="s-card__num">02</span>
               </div>
               <div class="s-card__body">
@@ -168,14 +168,14 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                       <div class="tm-row-info">
                         <p class="tm-row-name">{emailMap.get(m.user_id) || '—'}</p>
                         <p class="tm-row-meta">
-                          eingeladen als {ROLE_LABELS[m.role as Role]} ·{' '}
+                          {bt('team.invited.as', lang).replace('{role}', bt('role.' + m.role, lang))}{' '}
                           {m.invited_at
-                            ? new Date(m.invited_at).toLocaleString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            ? new Date(m.invited_at).toLocaleString(lang, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                             : '—'}
                         </p>
                       </div>
                       <div class="tm-row-actions">
-                        <span class="tm-badge tm-badge--pending">Ausstehend</span>
+                        <span class="tm-badge tm-badge--pending">{bt('team.pending.badge', lang)}</span>
                         {canRemove && (
                           <button
                             type="button"
@@ -184,7 +184,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                             data-member-id={m.id}
                             data-member-name={emailMap.get(m.user_id) || ''}
                           >
-                            Widerrufen
+                            {bt('team.revoke', lang)}
                           </button>
                         )}
                       </div>
@@ -202,38 +202,49 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
           <div id="tm-invite-modal" class="bp-modal-bd">
             <div class="bp-modal" role="dialog" aria-modal="true">
               <div class="bp-modal-head">
-                <h3 class="bp-modal-title">Mitarbeiter einladen</h3>
-                <button type="button" class="bp-modal-x tm-invite-close" aria-label="Schließen">✕</button>
+                <h3 class="bp-modal-title">{bt('team.modal.title', lang)}</h3>
+                <button type="button" class="bp-modal-x tm-invite-close" aria-label={bt('common.close', lang)}>✕</button>
               </div>
               <div class="bp-modal-body">
                 <div id="tm-invite-error" class="tm-invite-error" hidden style="margin-bottom:12px">
                   <p class="s-flash s-flash--err" style="margin:0"></p>
                 </div>
                 <label class="tm-field">
-                  <span class="tm-field-label">E-Mail</span>
+                  <span class="tm-field-label">{bt('prof.email.label', lang)}</span>
                   <input type="email" id="tm-invite-email" placeholder="kollege@hotel.de" class="s-input" />
                 </label>
                 <label class="tm-field">
-                  <span class="tm-field-label">Rolle</span>
+                  <span class="tm-field-label">{bt('prof.role.label', lang)}</span>
                   <select id="tm-invite-role" class="s-select">
-                    <option value="manager">Manager (Inhalte + Settings + Operations)</option>
-                    <option value="staff">Front-Desk (nur Operations)</option>
+                    <option value="manager">{bt('team.modal.role.manager', lang)}</option>
+                    <option value="staff">{bt('team.modal.role.staff', lang)}</option>
                   </select>
                 </label>
-                <p class="tm-hint">
-                  Der Eingeladene bekommt einen Magic-Link per E-Mail. Beim ersten Login
-                  ist die Einladung automatisch akzeptiert.
-                </p>
+                <p class="tm-hint">{bt('team.modal.hint', lang)}</p>
               </div>
               <div class="bp-modal-foot">
-                <button type="button" class="v9-btn v9-btn--ghost tm-invite-close">Abbrechen</button>
-                <button type="button" id="tm-invite-send" class="v9-btn v9-btn--primary">Einladung senden</button>
+                <button type="button" class="v9-btn v9-btn--ghost tm-invite-close">{bt('common.cancel', lang)}</button>
+                <button type="button" id="tm-invite-send" class="v9-btn v9-btn--primary">{bt('team.modal.send', lang)}</button>
               </div>
             </div>
           </div>
         )}
 
       </div>{/* .tm-root */}
+
+      <script type="application/json" id="tm-i18n" is:inline set:html={JSON.stringify({
+        roleFailed: bt('team.js.rolefailed', lang),
+        roleUpdated: bt('team.js.roleupdated', lang),
+        netErr: bt('sec.reminder.neterr', lang),
+        memberFallback: bt('team.js.memberfallback', lang),
+        removeConfirm: bt('team.js.removeconfirm', lang),
+        removeFailed: bt('team.js.removefailed', lang),
+        removed: bt('team.js.removed', lang),
+        emailInvalid: bt('team.js.emailinvalid', lang),
+        sending: bt('team.js.sending', lang),
+        inviteFailed: bt('team.js.invitefailed', lang),
+        invited: bt('team.js.invited', lang),
+      })}></script>
     </section>
 
   </AccountShell>
@@ -319,6 +330,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
   // Alpine-Components (Alpine.data via alpine:init) feuern unter dem AccountShell-
   // Wrapper zu spät — siehe Invite-Fix. Daher hier kein Alpine.
   (() => {
+    const T = JSON.parse(document.getElementById('tm-i18n')?.textContent || '{}');
     const toast = (msg: string, kind: 'ok' | 'err' = 'ok') =>
       (window as any).retahaToast?.(msg, kind === 'err' ? 'error' : 'success');
 
@@ -331,20 +343,20 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
             body: JSON.stringify({ member_id: sel.dataset.memberId, new_role: sel.value }),
           });
           const data = await res.json();
-          if (!data.ok) { sel.value = prev; toast(data.message || data.error || 'Rollen-Wechsel fehlgeschlagen.', 'err'); return; }
+          if (!data.ok) { sel.value = prev; toast(data.message || data.error || T.roleFailed, 'err'); return; }
           sel.dataset.currentRole = sel.value;
-          toast('Rolle aktualisiert.');
+          toast(T.roleUpdated);
         } catch {
           sel.value = prev;
-          toast('Netzwerk-Fehler.', 'err');
+          toast(T.netErr, 'err');
         }
       });
     });
 
     document.querySelectorAll<HTMLButtonElement>('.tm-remove-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const name = btn.dataset.memberName || 'Dieses Mitglied';
-        if (!confirm(`${name} wirklich entfernen?`)) return;
+        const name = btn.dataset.memberName || T.memberFallback;
+        if (!confirm(T.removeConfirm.replace('{name}', name))) return;
         btn.disabled = true;
         try {
           const res = await fetch('/api/admin/team/remove', {
@@ -352,11 +364,11 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
             body: JSON.stringify({ member_id: btn.dataset.memberId }),
           });
           const data = await res.json();
-          if (!data.ok) { toast(data.error || 'Entfernen fehlgeschlagen.', 'err'); btn.disabled = false; return; }
-          toast(`${name} entfernt.`);
+          if (!data.ok) { toast(data.error || T.removeFailed, 'err'); btn.disabled = false; return; }
+          toast(T.removed.replace('{name}', name));
           setTimeout(() => window.location.reload(), 400);
         } catch {
-          toast('Netzwerk-Fehler.', 'err');
+          toast(T.netErr, 'err');
           btn.disabled = false;
         }
       });
@@ -369,6 +381,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
   // Submit funktionieren auch, falls Alpine auf der Seite nicht initialisiert).
   // Endpoint /api/admin/team/invite bleibt unverändert.
   (() => {
+    const T = JSON.parse(document.getElementById('tm-i18n')?.textContent || '{}');
     const openBtn = document.getElementById('tm-invite-open');
     const modal = document.getElementById('tm-invite-modal');
     if (!openBtn || !modal) return;
@@ -392,21 +405,21 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
     sendBtn?.addEventListener('click', async () => {
       const email = (emailInput?.value || '').trim();
       const role = roleSelect?.value || 'staff';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('Bitte eine gültige E-Mail eingeben.'); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError(T.emailInvalid); return; }
       sendBtn.disabled = true;
       const orig = sendBtn.textContent;
-      sendBtn.textContent = 'Sende …';
+      sendBtn.textContent = T.sending;
       try {
         const res = await fetch('/api/admin/team/invite', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, role }),
         });
         const data = await res.json();
-        if (!data.ok) { showError(data.message || data.error || 'Einladung fehlgeschlagen.'); sendBtn.disabled = false; sendBtn.textContent = orig; return; }
-        (window as any).retahaToast?.(`${email} eingeladen — Magic-Link versendet.`);
+        if (!data.ok) { showError(data.message || data.error || T.inviteFailed); sendBtn.disabled = false; sendBtn.textContent = orig; return; }
+        (window as any).retahaToast?.(T.invited.replace('{email}', email));
         setTimeout(() => window.location.reload(), 600);
       } catch {
-        showError('Netzwerk-Fehler.');
+        showError(T.netErr);
         sendBtn.disabled = false; sendBtn.textContent = orig;
       }
     });

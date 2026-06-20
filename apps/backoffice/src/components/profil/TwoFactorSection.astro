@@ -9,6 +9,7 @@
 // isRequired (?required=true) bleibt erhalten für den künftigen Pflicht-Redirect
 // (RBAC) — Ziel wird dann diese Profil-Seite (role-agnostic).
 import TrianglePulse from '@retaha/ui/components/TrianglePulse.astro';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props {
   mfaEnabled: boolean;
@@ -16,21 +17,20 @@ interface Props {
   recoveryRemaining: number;
   isRequired?: boolean;
   magicLinkEnabled?: boolean;
+  lang: LanguageCode;
 }
-const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLinkEnabled = false } = Astro.props;
+const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLinkEnabled = false, lang } = Astro.props;
 ---
 
 <section class="s-card" id="security">
   <div class="s-card__head">
-    <h2 class="s-card__title">Sicherheit · 2FA</h2>
+    <h2 class="s-card__title">{bt('2fa.title', lang)}</h2>
     <span class="s-card__num">01</span>
   </div>
   <div class="s-card__body">
 
     {isRequired && !mfaEnabled && (
-      <div class="sec-enforcement">
-        <strong>Pflicht-Setup:</strong> Dein Hotel-Owner hat 2FA für das Team aktiviert. Bitte richte sie jetzt ein.
-      </div>
+      <div class="sec-enforcement" set:html={bt('2fa.enforce.required', lang)}></div>
     )}
 
     {mfaEnabled ? (
@@ -42,36 +42,34 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
           this.magicLink = val; this.mlBusy = true;
           fetch('/api/mfa/policy/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setting: 'magic_link', value: val }) })
             .then(r => r.json()).then(d => {
-              if (d.ok) { window.retahaToast && window.retahaToast('Gespeichert'); }
-              else { this.magicLink = !val; window.retahaToast && window.retahaToast(d.message || 'Änderung fehlgeschlagen.', 'error'); }
-            }).catch(() => { this.magicLink = !val; window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); })
+              if (d.ok) { window.retahaToast && window.retahaToast(${JSON.stringify(bt('common.savedshort', lang))}); }
+              else { this.magicLink = !val; window.retahaToast && window.retahaToast(d.message || ${JSON.stringify(bt('2fa.ml.fail', lang))}, 'error'); }
+            }).catch(() => { this.magicLink = !val; window.retahaToast && window.retahaToast(${JSON.stringify(bt('sec.reminder.neterr', lang))}, 'error'); })
             .finally(() => { this.mlBusy = false; });
         }
       }`}>
         <div class="sec-active-row">
-          <span class="sec-active-badge">✓ 2FA aktiv</span>
-          <span class="sec-active-meta">{recoveryRemaining} {recoveryRemaining === 1 ? 'Recovery-Code' : 'Recovery-Codes'} übrig</span>
+          <span class="sec-active-badge">{bt('2fa.active.badge', lang)}</span>
+          <span class="sec-active-meta">{bt('2fa.recovery.line', lang).replace('{count}', String(recoveryRemaining)).replace('{codes}', recoveryRemaining === 1 ? bt('2fa.recovery.one', lang) : bt('2fa.recovery.many', lang))}</span>
         </div>
         <p class="field__hint" style="margin: 6px 0 16px">
-          Dein retaha-Konto ist mit Zwei-Faktor-Authentifizierung geschützt.
+          {bt('2fa.active.desc', lang)}
         </p>
 
         <div class="sec-magiclink">
           <label class="toggle-row">
             <input type="checkbox" class="sr-only" x-bind:checked="magicLink" x-bind:disabled="mlBusy" x-on:change="toggleMagicLink($event)" />
             <span class="bt-visual" x-bind:class="{ 'is-checked': magicLink }"><span class="bt-knob"></span></span>
-            <span class="toggle-label">2FA auch beim Magic-Link-Login verlangen</span>
+            <span class="toggle-label">{bt('2fa.magiclink.label', lang)}</span>
           </label>
-          <p class="field__hint" style="margin-top:6px">Auch bei Anmeldung per E-Mail-Link nach dem 6-stelligen Code fragen — maximale Sicherheit.</p>
+          <p class="field__hint" style="margin-top:6px">{bt('2fa.magiclink.hint', lang)}</p>
         </div>
 
         {mfaRequired ? (
-          <div class="sec-enforcement">
-            <strong>Verpflichtend:</strong> 2FA ist für dein Team Pflicht — sie kann nicht deaktiviert werden.
-          </div>
+          <div class="sec-enforcement" set:html={bt('2fa.required.locked', lang)}></div>
         ) : (
           <div class="sec-disable">
-            <label class="field__label" for="disable-code">Zum Deaktivieren den aktuellen 6-stelligen Code eingeben</label>
+            <label class="field__label" for="disable-code">{bt('2fa.disable.label', lang)}</label>
             <div class="sec-disable-row">
               <input
                 type="text" id="disable-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
@@ -84,17 +82,17 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
                 type="button" class="v9-btn v9-btn--ghost sec-danger"
                 x-bind:disabled="busy || code.length !== 6"
                 x-bind:data-loading="busy ? 'true' : null"
-                x-on:click="
+                x-on:click={`
                   busy = true;
                   fetch('/api/mfa/unenroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) })
                     .then(r => r.json()).then(d => {
-                      if (d.ok) { sessionStorage.setItem('pr_flash', '2FA deaktiviert'); location.reload(); }
-                      else { busy = false; window.retahaToast && window.retahaToast(d.message || 'Code ungültig.', 'error'); }
-                    }).catch(() => { busy = false; window.retahaToast && window.retahaToast('Netzwerk-Fehler.', 'error'); })
-                "
-              >2FA deaktivieren</button>
+                      if (d.ok) { sessionStorage.setItem('pr_flash', ${JSON.stringify(bt('2fa.disabled.flash', lang))}); location.reload(); }
+                      else { busy = false; window.retahaToast && window.retahaToast(d.message || ${JSON.stringify(bt('2fa.err.code', lang))}, 'error'); }
+                    }).catch(() => { busy = false; window.retahaToast && window.retahaToast(${JSON.stringify(bt('sec.reminder.neterr', lang))}, 'error'); })
+                `}
+              >{bt('2fa.disable.btn', lang)}</button>
             </div>
-            <p class="field__hint" style="margin-top:8px">Sicherheitskritisch — daher mit Re-Authentifizierung über deinen Authenticator.</p>
+            <p class="field__hint" style="margin-top:8px">{bt('2fa.disable.hint', lang)}</p>
           </div>
         )}
       </div>
@@ -146,8 +144,8 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
             const res = await fetch('/api/mfa/setup-start', { method: 'POST' });
             const data = await res.json();
             if (res.ok && data.ok) { this.qrDataUrl = data.qr_data_url; this.secretForManualEntry = data.secret_for_manual_entry; }
-            else { this.errorMessage = data.message || 'Setup konnte nicht gestartet werden.'; }
-          } catch { this.errorMessage = 'Netzwerk-Fehler.'; }
+            else { this.errorMessage = data.message || ${JSON.stringify(bt('2fa.err.setupstart', lang))}; }
+          } catch { this.errorMessage = ${JSON.stringify(bt('sec.reminder.neterr', lang))}; }
           finally { this.isStarting = false; }
         },
 
@@ -158,28 +156,28 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
             const res = await fetch('/api/mfa/setup-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: this.code.join('') }) });
             const data = await res.json();
             if (res.ok && data.ok) { this.recoveryCodes = data.recovery_codes; this.step = 4; }
-            else { this.errorMessage = data.message || 'Code ungültig. Bitte erneut versuchen.'; this.code = ['', '', '', '', '', '']; setTimeout(() => this.$refs.input0?.focus(), 100); }
-          } catch { this.errorMessage = 'Netzwerk-Fehler.'; }
+            else { this.errorMessage = data.message || ${JSON.stringify(bt('2fa.err.coderetry', lang))}; this.code = ['', '', '', '', '', '']; setTimeout(() => this.$refs.input0?.focus(), 100); }
+          } catch { this.errorMessage = ${JSON.stringify(bt('sec.reminder.neterr', lang))}; }
           finally { this.isVerifying = false; }
         },
 
         async copyRecoveryCodes() {
-          try { await navigator.clipboard.writeText(this.recoveryCodes.join('\\n')); window.retahaToast && window.retahaToast('Codes kopiert.'); }
-          catch { window.retahaToast && window.retahaToast('Kopieren fehlgeschlagen — bitte manuell auswählen.', 'error'); }
+          try { await navigator.clipboard.writeText(this.recoveryCodes.join('\\n')); window.retahaToast && window.retahaToast(${JSON.stringify(bt('2fa.copied', lang))}); }
+          catch { window.retahaToast && window.retahaToast(${JSON.stringify(bt('2fa.copyfail', lang))}, 'error'); }
         },
         printRecoveryCodes() { window.print(); }
       }`}>
 
         <!-- Step indicator -->
-        <nav class="sec-step-indicator" aria-label="Setup-Fortschritt">
+        <nav class="sec-step-indicator" aria-label={bt('2fa.wizard.aria', lang)}>
           {[
-            { num: '01', title: 'Vorbereiten' },
-            { num: '02', title: 'QR-Code scannen' },
-            { num: '03', title: 'Code verifizieren' },
-            { num: '04', title: 'Recovery-Codes' },
+            { num: '01', title: bt('2fa.step1', lang) },
+            { num: '02', title: bt('2fa.step2', lang) },
+            { num: '03', title: bt('2fa.step3', lang) },
+            { num: '04', title: bt('2fa.step4', lang) },
           ].map((cell, i) => (
             <div class="sec-step-cell" x-bind:class={`{ 'is-active': step === ${i + 1}, 'is-complete': step > ${i + 1}, 'is-not-yet': step < ${i + 1} }`}>
-              <p class="sec-step-cell__label"><span class="sec-step-cell__num">{cell.num}</span>SCHRITT</p>
+              <p class="sec-step-cell__label"><span class="sec-step-cell__num">{cell.num}</span>{bt('2fa.step.label', lang)}</p>
               <p class="sec-step-cell__title">{cell.title}</p>
             </div>
           ))}
@@ -189,67 +187,61 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
 
         <!-- STEP 1 -->
         <div class="sec-panel" x-show="step === 1">
-          <p class="field__hint" style="margin-bottom:20px;">
-            Bevor wir starten — bereite eine <strong>Authenticator-App</strong> auf deinem Smartphone vor. Falls du noch keine hast, kein Problem:
-          </p>
+          <p class="field__hint" style="margin-bottom:20px;" set:html={bt('2fa.s1.intro', lang)}></p>
           <div class="sec-checklist">
             <div class="sec-checklist-item">
               <span class="sec-checklist-item__num">01</span>
               <div class="sec-checklist-item__content">
-                <h4>Authenticator-App installieren</h4>
-                <p>Empfohlen: <a href="https://apps.apple.com/de/app/google-authenticator/id388497605" target="_blank" rel="noopener">Google Authenticator</a>, <a href="https://1password.com" target="_blank" rel="noopener">1Password</a> oder der iCloud-Schlüsselbund.</p>
+                <h4>{bt('2fa.s1.item1.title', lang)}</h4>
+                <p set:html={bt('2fa.s1.item1.desc', lang).replace('{gauth}', '<a href="https://apps.apple.com/de/app/google-authenticator/id388497605" target="_blank" rel="noopener">Google Authenticator</a>').replace('{onepw}', '<a href="https://1password.com" target="_blank" rel="noopener">1Password</a>')}></p>
               </div>
             </div>
             <div class="sec-checklist-item">
               <span class="sec-checklist-item__num">02</span>
               <div class="sec-checklist-item__content">
-                <h4>Smartphone bereithalten</h4>
-                <p>Du brauchst es für den QR-Code-Scan im nächsten Schritt.</p>
+                <h4>{bt('2fa.s1.item2.title', lang)}</h4>
+                <p>{bt('2fa.s1.item2.desc', lang)}</p>
               </div>
             </div>
             <div class="sec-checklist-item">
               <span class="sec-checklist-item__num">03</span>
               <div class="sec-checklist-item__content">
-                <h4>Recovery-Codes notieren</h4>
-                <p>Am Ende bekommst du 8 Backup-Codes für den Notfall — falls du dein Phone verlierst. Halte einen Drucker oder Stift bereit.</p>
+                <h4>{bt('2fa.s1.item3.title', lang)}</h4>
+                <p>{bt('2fa.s1.item3.desc', lang)}</p>
               </div>
             </div>
           </div>
           <div class="sec-actions">
             <button class="v9-btn" x-on:click="advance()" x-bind:disabled="isStarting">
-              <span x-show="!isStarting">Ich bin bereit</span>
-              <span x-show="isStarting" x-cloak>Wird vorbereitet …</span>
+              <span x-show="!isStarting">{bt('2fa.s1.ready', lang)}</span>
+              <span x-show="isStarting" x-cloak>{bt('2fa.s1.preparing', lang)}</span>
             </button>
           </div>
         </div>
 
         <!-- STEP 2 -->
         <div class="sec-panel" x-show="step === 2" x-cloak>
-          <p class="field__hint" style="margin-bottom:20px;">
-            Öffne deine Authenticator-App und tippe auf <strong>„+ Hinzufügen"</strong>. Scanne dann den QR-Code mit der Kamera.
-          </p>
+          <p class="field__hint" style="margin-bottom:20px;" set:html={bt('2fa.s2.intro', lang)}></p>
           <div class="sec-qr-display">
-            <div class="sec-qr-code"><img x-bind:src="qrDataUrl" alt="QR-Code für Authenticator-App-Setup" x-show="qrDataUrl" /></div>
+            <div class="sec-qr-code"><img x-bind:src="qrDataUrl" alt={bt('2fa.s2.qralt', lang)} x-show="qrDataUrl" /></div>
             <div class="sec-qr-info">
-              <h4>retaha · 2FA Setup</h4>
-              <p>Falls dein Phone den QR-Code nicht scannen kann, kannst du den Setup-Schlüssel auch manuell eintippen:</p>
+              <h4>{bt('2fa.s2.qrtitle', lang)}</h4>
+              <p>{bt('2fa.s2.manual', lang)}</p>
               <button class="sec-secret-toggle" type="button" x-on:click="secretRevealed = !secretRevealed">
-                <span x-text="secretRevealed ? '← Schlüssel verbergen' : '→ Schlüssel anzeigen'"></span>
+                <span x-text={`secretRevealed ? ${JSON.stringify(bt('2fa.s2.hide', lang))} : ${JSON.stringify(bt('2fa.s2.show', lang))}`}></span>
               </button>
               <div x-show="secretRevealed" x-cloak class="sec-secret-value" x-text="secretForManualEntry"></div>
             </div>
           </div>
           <div class="sec-actions">
-            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
-            <button class="v9-btn" x-on:click="advance()">Weiter zur Verifizierung</button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">{bt('2fa.back', lang)}</button>
+            <button class="v9-btn" x-on:click="advance()">{bt('2fa.s2.next', lang)}</button>
           </div>
         </div>
 
         <!-- STEP 3 -->
         <div class="sec-panel" x-show="step === 3" x-cloak>
-          <p class="field__hint" style="margin-bottom:20px;">
-            Deine App zeigt jetzt einen <strong>6-stelligen Code</strong> der alle 30 Sekunden neu generiert wird. Gib den aktuellen Code hier ein:
-          </p>
+          <p class="field__hint" style="margin-bottom:20px;" set:html={bt('2fa.s3.intro', lang)}></p>
           <div class="sec-code-group">
             {Array.from({ length: 6 }).map((_, index) => (
               <input
@@ -261,15 +253,15 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
                 x-on:input={`onCodeInput(${index}, $event)`}
                 x-on:keydown={`onCodeKeydown(${index}, $event)`}
                 x-bind:disabled="isVerifying"
-                aria-label={`Ziffer ${index + 1} von 6`}
+                aria-label={bt('2fa.s3.digit', lang).replace('{n}', String(index + 1))}
               />
             ))}
           </div>
           <div class="sec-actions">
-            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">← Zurück</button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="back()">{bt('2fa.back', lang)}</button>
             <button class="v9-btn" x-bind:disabled="!isComplete() || isVerifying" x-on:click="verifySetup()">
-              <span x-show="!isVerifying">Code prüfen</span>
-              <span x-show="isVerifying" x-cloak>Wird geprüft …</span>
+              <span x-show="!isVerifying">{bt('2fa.s3.verify', lang)}</span>
+              <span x-show="isVerifying" x-cloak>{bt('2fa.s3.verifying', lang)}</span>
             </button>
           </div>
         </div>
@@ -277,33 +269,29 @@ const { mfaEnabled, mfaRequired, recoveryRemaining, isRequired = false, magicLin
         <!-- STEP 4 -->
         <div class="sec-panel" x-show="step === 4" x-cloak>
           <div class="sec-complete-indicator">
-            <TrianglePulse variant="sage" motion="once" label="Setup erfolgreich abgeschlossen" />
-            <span class="sec-complete-label">Erfolgreich aktiviert</span>
+            <TrianglePulse variant="sage" motion="once" label={bt('2fa.s4.tlabel', lang)} />
+            <span class="sec-complete-label">{bt('2fa.s4.activated', lang)}</span>
           </div>
-          <p class="field__hint" style="text-align:center;margin-bottom:20px;">
-            2FA ist jetzt aktiv. Hier sind deine <strong>8 Recovery-Codes</strong> — bewahre sie sicher auf. Jeder Code funktioniert nur einmal und ersetzt deine Authenticator-App im Notfall.
-          </p>
+          <p class="field__hint" style="text-align:center;margin-bottom:20px;" set:html={bt('2fa.s4.intro', lang)}></p>
           <div class="sec-recovery-grid">
             <template x-for="rcode in recoveryCodes" x-bind:key="rcode">
               <span class="sec-recovery-code" x-text="rcode"></span>
             </template>
           </div>
           <div class="sec-recovery-actions">
-            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="copyRecoveryCodes()">Codes kopieren</button>
-            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="printRecoveryCodes()">Drucken</button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="copyRecoveryCodes()">{bt('2fa.s4.copy', lang)}</button>
+            <button class="v9-btn v9-btn--ghost" type="button" x-on:click="printRecoveryCodes()">{bt('2fa.s4.print', lang)}</button>
           </div>
-          <div class="sec-recovery-warning">
-            <strong>Wichtig:</strong> Diese Codes werden dir NICHT erneut angezeigt. Bewahre sie an einem sicheren Ort auf — z.B. im Passwort-Manager oder gedruckt im Safe.
-          </div>
+          <div class="sec-recovery-warning" set:html={bt('2fa.s4.warning', lang)}></div>
           <div class="sec-recovery-checkbox">
             <input type="checkbox" id="confirm-saved" x-model="confirmedSaved" />
-            <label for="confirm-saved">Ich habe meine Recovery-Codes sicher gespeichert.</label>
+            <label for="confirm-saved">{bt('2fa.s4.confirm', lang)}</label>
           </div>
           <div class="sec-actions">
             <a class="v9-btn"
                x-bind:class="confirmedSaved ? '' : 'is-disabled'"
                x-bind:href="confirmedSaved ? '/profil' : '#'"
-               style="flex:1;text-decoration:none;justify-content:center;">fertig</a>
+               style="flex:1;text-decoration:none;justify-content:center;">{bt('2fa.s4.done', lang)}</a>
           </div>
         </div>
 

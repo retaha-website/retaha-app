@@ -49,7 +49,8 @@ Kontext: kurzer UI-Label in der ADMIN-/BACKOFFICE-Oberfläche einer Hotel-SaaS (
 Regeln:
 - Sehr kurz halten (UI-Constraint). NIE länger als das Original.
 - Sachlich-professioneller Software-Ton (kein Marketing-Sprech).
-- Platzhalter wie {name}, {n}, {email} EXAKT übernehmen.
+- Platzhalter wie {name}, {n}, {email}, {link} EXAKT übernehmen (auch Inhalt der geschweiften Klammern unverändert lassen).
+- HTML-Tags wie <strong>, </strong>, <a href="…">, </a> EXAKT und an gleicher Stelle übernehmen — NUR den sichtbaren Text dazwischen übersetzen, niemals Attribute (href, target) ändern.
 - Eigennamen/Marken NICHT übersetzen: retaha, WhatsApp, Apple/Google Wallet, Mews, Stripe, PMS, 2FA, Wi-Fi, NFC, Eve.
 - Etablierte Branchen-/Software-Begriffe der Zielsprache nutzen (Check-in, Check-out, Dashboard wo üblich).
 - Bei Höflichkeitsdistinktion: formelle/neutrale Software-Anrede.
