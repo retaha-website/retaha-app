@@ -8,6 +8,8 @@ import {
 } from '@retaha/auth';
 import { loadBreakfastItems, EU_ALLERGENS } from '@retaha/db';
 import { getMewsClientForHotel } from '../lib/mews/factory';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -28,13 +30,13 @@ if (Astro.request.method === 'POST') {
   if (action === 'mews_import') {
     const mews = await getMewsClientForHotel(hotel.id);
     if (!mews) {
-      message = { type: 'error', text: 'Mews-Integration nicht verbunden. Zuerst unter PMS verbinden.' };
+      message = { type: 'error', text: bt('bf.msg.mewsnotconnected', lang) };
     } else {
       try {
         const resp = await mews.getProducts({ Limitation: { Count: 100 } });
         const products = resp.Products ?? [];
         if (products.length === 0) {
-          message = { type: 'error', text: 'Mews hat keine Produkte zurückgegeben.' };
+          message = { type: 'error', text: bt('bf.msg.mewsnoproducts', lang) };
         } else {
           let imported = 0;
           let skipped = 0;
@@ -74,10 +76,12 @@ if (Astro.request.method === 'POST') {
               imported++;
             }
           }
-          message = { type: 'success', text: `Mews-Import: ${imported} Produkt${imported === 1 ? '' : 'e'} importiert${skipped > 0 ? `, ${skipped} übersprungen` : ''}.` };
+          const productsWord = imported === 1 ? bt('bf.msg.product.one', lang) : bt('bf.msg.product.many', lang);
+          const skippedTxt = skipped > 0 ? bt('bf.msg.mewsskipped', lang).replace('{n}', String(skipped)) : '';
+          message = { type: 'success', text: bt('bf.msg.mewsimport', lang).replace('{n}', String(imported)).replace('{products}', productsWord).replace('{skipped}', skippedTxt) };
         }
       } catch (err) {
-        message = { type: 'error', text: `Mews-Import fehlgeschlagen: ${(err as Error).message}` };
+        message = { type: 'error', text: `${bt('bf.msg.mewsfail', lang)}: ${(err as Error).message}` };
       }
     }
   }
@@ -143,16 +147,40 @@ const hasMews = !!mewsRow;
 
 const url = new URL(Astro.request.url);
 if (url.searchParams.get('deleted') === '1' && !message) {
-  message = { type: 'success', text: 'Speise gelöscht.' };
+  message = { type: 'success', text: bt('bf.js.itemdeleted', lang) };
 }
 
 const allergenInit = EU_ALLERGENS.map(a => ({ key: a.key, label_de: a.label_de }));
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+
+// Client-Strings für die Alpine-Komponenten
+const bfDayLabels = {
+  mon: bt('si.day.mon', lang), tue: bt('si.day.tue', lang), wed: bt('si.day.wed', lang),
+  thu: bt('si.day.thu', lang), fri: bt('si.day.fri', lang), sat: bt('si.day.sat', lang), sun: bt('si.day.sun', lang),
+};
+const bfHoursT = {
+  error: bt('bf.js.error', lang),
+  saved: bt('common.savedshort', lang),
+  netErr: bt('bf.js.neterr', lang),
+};
+const bfPageT = {
+  noCat: bt('bf.js.nocat', lang),
+  nameRequired: bt('bf.js.namerequired', lang),
+  saveFail: bt('bf.js.savefail', lang),
+  itemCreated: bt('bf.js.itemcreated', lang),
+  itemSaved: bt('bf.js.itemsaved', lang),
+  itemDeleted: bt('bf.js.itemdeleted', lang),
+  netErr: bt('bf.js.neterr', lang),
+  deleteConfirm: bt('bf.js.deleteconfirm', lang),
+  deleteFail: bt('bf.js.deletefail', lang),
+  orderFail: bt('bf.js.orderfail', lang),
+  sortErr: bt('bf.js.sorterr', lang),
+};
 ---
 
 <Layout title="Frühstück" activeTab="backoffice">
 
-<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, currency: hotelCurrency }, _hoursInit: { hours: initialHours, slotMinutes: String(slotMinutes) } }}>
+<script is:inline define:vars={{ _bfInit: { items, allergens: allergenInit, currency: hotelCurrency, t: bfPageT, lang }, _hoursInit: { hours: initialHours, slotMinutes: String(slotMinutes), dayLabels: bfDayLabels, t: bfHoursT } }}>
   window._bfInit = _bfInit;
   window._hoursInit = _hoursInit;
 </script>
@@ -258,15 +286,15 @@ textarea.s-input { resize: none; min-height: 72px; }
 <div class="settings-page" x-data="bfPage()">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Frühstück</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.breakfast', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">Frühstücksmodul</span>
-    <h1 class="settings-hero__title">Frühstücks-Einstellungen<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">Zeiten, Ort, Preis, Zimmerservice und Speisekarte — alles auf einer Seite.</p>
+    <span class="settings-hero__eyebrow">{bt('bf.hero.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('bf.hero.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('bf.hero.sub', lang)}</p>
   </section>
 
   {message && (
@@ -280,14 +308,14 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 01 Modul -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Frühstücksmodul</h2>
+          <h2 class="s-card__title">{bt('bf.hero.eyebrow', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint">Ein/Aus wird in der Gäste-App-Vorschau gesteuert.</p>
+          <p class="field__hint">{bt('si.mod.hint', lang)}</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
             <ModStatusLed on={breakfastOn} />
-            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">In der Gäste-App-Vorschau steuern →</a>
+            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
           </div>
         </div>
       </section>
@@ -295,12 +323,12 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 02 Zeiten (Wochentage) -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Frühstückszeiten</h2>
+          <h2 class="s-card__title">{bt('bf.hours.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
         <div x-data="hoursSection()">
           <div class="s-card__body">
-            <p class="field__hint">Buchbare Slots pro Wochentag — geschlossene Tage sind in der Gäste-App nicht buchbar.</p>
+            <p class="field__hint">{bt('bf.hours.hint', lang)}</p>
             <div class="bp-hours-grid">
               <template x-for="d in days" :key="d.key">
                 <div class="bp-hours-row" :class="{'bp-hours-row--closed': hours[d.key].closed}">
@@ -315,7 +343,7 @@ textarea.s-input { resize: none; min-height: 72px; }
                       x-show="!hours[d.key].closed"
                       :value="hours[d.key].end"
                       @change="hours[d.key].end = $event.target.value" />
-                    <span x-show="hours[d.key].closed" class="bp-hours-closed-txt">Geschlossen</span>
+                    <span x-show="hours[d.key].closed" class="bp-hours-closed-txt">{bt('si.hours.closed', lang)}</span>
                   </div>
                   <label class="toggle-row" style="margin:0;gap:6px">
                     <input type="checkbox"
@@ -325,35 +353,35 @@ textarea.s-input { resize: none; min-height: 72px; }
                     <span class="bt-visual" :class="{'is-checked': hours[d.key].closed}">
                       <span class="bt-knob"></span>
                     </span>
-                    <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">Zu</span>
+                    <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">{bt('si.hours.closetoggle', lang)}</span>
                   </label>
                 </div>
               </template>
             </div>
             <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <button type="button" @click="copyMonToAll()" class="v9-btn v9-btn--ghost" style="font-size:10px;padding:6px 12px">
-                Auf alle Tage übernehmen
+                {bt('si.hours.copyall', lang)}
               </button>
-              <span style="font-size:12px;color:var(--ink-muted)">Montag-Zeiten auf alle Tage</span>
+              <span style="font-size:12px;color:var(--ink-muted)">{bt('si.hours.copyallhint', lang)}</span>
             </div>
             <div class="field">
-              <label class="field__label" for="bf-slot">Slot-Länge (Min)</label>
+              <label class="field__label" for="bf-slot">{bt('conf.times.slot', lang)}</label>
               <div class="bp-slot-stepper">
                 <button type="button" class="bp-slot-step-btn"
                   @click="slotMinutes = Math.max(5, slotMinutes - 5)"
-                  aria-label="Weniger">−</button>
+                  aria-label={bt('bf.slot.less', lang)}>−</button>
                 <input type="number" id="bf-slot"
                   x-model.number="slotMinutes" min="5" max="120" step="5"
                   class="s-input" inputmode="numeric" />
                 <button type="button" class="bp-slot-step-btn"
                   @click="slotMinutes = Math.min(120, slotMinutes + 5)"
-                  aria-label="Mehr">+</button>
+                  aria-label={bt('bf.slot.more', lang)}>+</button>
               </div>
             </div>
-            <p class="field__hint" style="margin-top:8px">Slot-Länge bestimmt die Abstände (z.B. 30 = 07:30, 08:00, 08:30, …).</p>
+            <p class="field__hint" style="margin-top:8px">{bt('bf.slot.hint', lang)}</p>
           </div>
           <div class="s-card__footer">
-            <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+            <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
           </div>
         </div>
       </section>
@@ -361,7 +389,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 03 Ort -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Frühstücksort</h2>
+          <h2 class="s-card__title">{bt('bf.location.title', lang)}</h2>
           <span class="s-card__num">03</span>
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ location_de: locationDe })}, section: 'location' })`}>
@@ -369,11 +397,11 @@ textarea.s-input { resize: none; min-height: 72px; }
             <div class="field">
               <input type="text" id="bf-location" name="location_de" x-model="data.location_de"
                 placeholder="z.B. im Wintergarten" class="s-input" />
-              <span class="field__hint">Z. B. ‚im Wintergarten, EG' — Gäste sehen das auf der Frühstücksseite.</span>
+              <span class="field__hint">{bt('bf.location.hint', lang)}</span>
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+            <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
           </div>
         </div>
       </section>
@@ -381,7 +409,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 04 Inklusiv -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Was inkludiert ist</h2>
+          <h2 class="s-card__title">{bt('bf.included.title', lang)}</h2>
           <span class="s-card__num">04</span>
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ included_de: includedDe })}, section: 'included' })`}>
@@ -391,11 +419,11 @@ textarea.s-input { resize: none; min-height: 72px; }
                 placeholder="z.B. Frische Backwaren, regionaler Honig, Bio-Eier, …"
                 class="s-input"
                 @input="$el.style.height='auto';$el.style.height=$el.scrollHeight+'px'"></textarea>
-              <span class="field__hint">Was Gäste beim Frühstück erwartet — kurz und appetitlich.</span>
+              <span class="field__hint">{bt('bf.included.hint', lang)}</span>
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+            <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
           </div>
         </div>
       </section>
@@ -403,13 +431,13 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 05 Preis -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Pauschalpreis</h2>
+          <h2 class="s-card__title">{bt('bf.price.title', lang)}</h2>
           <span class="s-card__num">05</span>
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_price_cents: priceCents !== null ? (priceCents / 100).toFixed(2).replace('.', ',') : '' })}, section: 'price' })`}>
           <div class="s-card__body">
             <div class="field field--row">
-              <label class="field__label" for="bf-price">Preis</label>
+              <label class="field__label" for="bf-price">{bt('bf.price.label', lang)}</label>
               <div class="field__input-wrap">
                 <div style="display:flex;align-items:center;gap:8px">
                   <input type="text" id="bf-price" name="breakfast_price_cents"
@@ -418,12 +446,12 @@ textarea.s-input { resize: none; min-height: 72px; }
                     class="s-input" style="max-width:180px" />
                   <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">{currencySymbol}</span>
                 </div>
-                <span class="field__hint">z.B. 15 oder 15,50 · 0,00 = im Buffet enthalten · leer = kein Preis</span>
+                <span class="field__hint">{bt('bf.price.hint', lang)}</span>
               </div>
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+            <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
           </div>
         </div>
       </section>
@@ -431,12 +459,12 @@ textarea.s-input { resize: none; min-height: 72px; }
       <!-- 06 Zimmerservice -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Zimmerservice</h2>
+          <h2 class="s-card__title">{bt('bf.rs.title', lang)}</h2>
           <span class="s-card__num">06</span>
         </div>
         <div x-data={`sectionSave({ initial: ${JSON.stringify({ breakfast_room_service_enabled: roomServiceOn ? 'true' : 'false', breakfast_room_service_fee_cents: (roomServiceFee / 100).toFixed(2).replace('.', ',') })}, section: 'room_service' })`}>
           <div class="s-card__body">
-            <p class="field__hint">Wenn aktiv, können Gäste zwischen „Im Frühstücksraum" und „Aufs Zimmer" wählen.</p>
+            <p class="field__hint">{bt('bf.rs.hint', lang)}</p>
             <label class="toggle-row">
               <input type="checkbox"
                 :checked="data.breakfast_room_service_enabled === 'true'"
@@ -445,12 +473,12 @@ textarea.s-input { resize: none; min-height: 72px; }
               <span class="bt-visual" :class="{'is-checked': data.breakfast_room_service_enabled === 'true'}">
                 <span class="bt-knob"></span>
               </span>
-              <span class="toggle-label">Room-Service aktiv</span>
+              <span class="toggle-label">{bt('bf.rs.toggle', lang)}</span>
             </label>
             <div x-show="data.breakfast_room_service_enabled === 'true'" class="bp-fee-section"
                  style={roomServiceOn ? '' : 'display:none'}>
               <div class="field field--row">
-                <label class="field__label" for="rs-fee">Aufschlag</label>
+                <label class="field__label" for="rs-fee">{bt('bf.rs.fee', lang)}</label>
                 <div class="field__input-wrap">
                   <div style="display:flex;align-items:center;gap:8px">
                     <input type="text" id="rs-fee" name="breakfast_room_service_fee_cents"
@@ -459,13 +487,13 @@ textarea.s-input { resize: none; min-height: 72px; }
                       placeholder="0,00" />
                     <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-muted)">{currencySymbol}</span>
                   </div>
-                  <span class="field__hint">z.B. 3,00 · 0,00 = kein Aufschlag</span>
+                  <span class="field__hint">{bt('bf.rs.feehint', lang)}</span>
                 </div>
               </div>
             </div>
           </div>
           <div class="s-card__footer">
-            <button type="button" @click="save()" :disabled="saving" class="v9-btn">Speichern</button>
+            <button type="button" @click="save()" :disabled="saving" class="v9-btn">{bt('common.save', lang)}</button>
           </div>
         </div>
       </section>
@@ -476,29 +504,29 @@ textarea.s-input { resize: none; min-height: 72px; }
   <section class="s-card" id="speisekarte" style="margin-top:20px">
     <div class="s-card__head" style="align-items:center">
       <div>
-        <span class="s-card__num" style="display:block;margin-bottom:6px">Speisekarte</span>
-        <h2 class="s-card__title">Frühstücks-Items<span class="dot-pink">.</span></h2>
+        <span class="s-card__num" style="display:block;margin-bottom:6px">{bt('bf.menu.num', lang)}</span>
+        <h2 class="s-card__title" set:html={bt('bf.menu.title', lang)}></h2>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
         {hasMews && (
           <form method="POST" style="display:inline">
             <input type="hidden" name="_action" value="mews_import" />
             <button type="submit"
-              onclick="return confirm('Mews-Produkte importieren? Bestehende Items mit gleicher Mews-ID werden aktualisiert.')"
+              onclick={`return confirm(${JSON.stringify(bt('bf.menu.mewsconfirm', lang))})`}
               class="v9-btn v9-btn--ghost" style="font-size:10px;padding:8px 16px">
-              Aus Mews
+              {bt('bf.menu.frommews', lang)}
             </button>
           </form>
         )}
-        <button type="button" @click="openNew()" class="v9-btn">+ Neue Speise</button>
+        <button type="button" @click="openNew()" class="v9-btn">{bt('bf.menu.new', lang)}</button>
       </div>
     </div>
 
     <div class="s-card__body">
       <template x-if="groupedItems.length === 0">
         <div class="bp-empty">
-          <p>Noch keine Speisen angelegt.</p>
-          <button type="button" @click="openNew()" class="v9-btn" style="margin-top:14px">Erste Speise anlegen</button>
+          <p>{bt('bf.menu.empty', lang)}</p>
+          <button type="button" @click="openNew()" class="v9-btn" style="margin-top:14px">{bt('bf.menu.first', lang)}</button>
         </div>
       </template>
       <template x-if="groupedItems.length > 0">
@@ -514,7 +542,7 @@ textarea.s-input { resize: none; min-height: 72px; }
                     <span class="bp-drag-handle"
                       @click.stop
                       @pointerdown="dndPtrDown($event, item)"
-                      aria-label="Ziehen zum Sortieren">
+                      aria-label={bt('bf.menu.draghandle', lang)}>
                       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
                         <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
                         <circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/>
@@ -533,7 +561,7 @@ textarea.s-input { resize: none; min-height: 72px; }
                         <template x-if="item.is_organic"><span class="bp-badge">bio</span></template>
                         <span x-show="item.price_cents > 0" class="bp-item-price" x-text="formatEur(item.price_cents)"></span>
                       </div>
-                      <span class="bp-item-edit">bearbeiten →</span>
+                      <span class="bp-item-edit">{bt('bf.menu.edititem', lang)}</span>
                     </button>
                   </div>
                 </template>
@@ -551,7 +579,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         <line x1="12" y1="8" x2="12" y2="12"/>
         <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
       </svg>
-      <span><strong>Allergen-Angaben (LMIV Art. 9).</strong> Als Hotelbetreiber bist du für die Richtigkeit verantwortlich. Bei Rezeptur-Änderungen sofort aktualisieren.</span>
+      <span set:html={bt('bf.lmiv', lang)}></span>
     </div>
   </section>
 
@@ -560,8 +588,8 @@ textarea.s-input { resize: none; min-height: 72px; }
     <div class="bp-modal" role="dialog" aria-modal="true" @click.stop>
 
       <div class="bp-modal-head">
-        <h3 class="bp-modal-title" x-text="modalIsNew ? 'Neue Speise' : (modalItem.name_de || 'Speise bearbeiten')"></h3>
-        <button type="button" @click="closeModal()" class="bp-modal-x" aria-label="Schließen">✕</button>
+        <h3 class="bp-modal-title" x-text={`modalIsNew ? ${JSON.stringify(bt('bf.menu.new2', lang))} : (modalItem.name_de || ${JSON.stringify(bt('bf.modal.edit', lang))})`}></h3>
+        <button type="button" @click="closeModal()" class="bp-modal-x" aria-label={bt('common.close', lang)}>✕</button>
       </div>
 
       <div class="bp-modal-body">
@@ -574,16 +602,16 @@ textarea.s-input { resize: none; min-height: 72px; }
         <div class="bp-modal-section">
           <div class="bp-modal-grid-3">
             <div class="field">
-              <span class="field__label">Kategorie</span>
+              <span class="field__label">{bt('bf.modal.category', lang)}</span>
               <input type="text" x-model="modalItem.category" placeholder="z.B. Brot, Warm" class="s-input" />
             </div>
             <div class="field">
-              <span class="field__label">Preis (EUR)</span>
+              <span class="field__label">{bt('bf.modal.priceeur', lang)}</span>
               <input type="number" x-model="modalItem.price_eur" min="0" step="0.01" placeholder="0,00" class="s-input" inputmode="decimal" />
-              <span class="field__hint">0,00 = im Buffet</span>
+              <span class="field__hint">{bt('bf.modal.pricehint', lang)}</span>
             </div>
             <div class="field">
-              <span class="field__label">Aktiv</span>
+              <span class="field__label">{bt('bf.modal.active', lang)}</span>
               <label class="toggle-row" style="margin-top:2px">
                 <input type="checkbox" x-model="modalItem.is_active" class="sr-only" />
                 <span class="bt-visual" :class="{'is-checked': modalItem.is_active}">
@@ -597,20 +625,20 @@ textarea.s-input { resize: none; min-height: 72px; }
         <!-- Name -->
         <div class="bp-modal-section">
           <div class="field">
-            <span class="field__label">Name (Deutsch) *</span>
+            <span class="field__label">{bt('bf.modal.namede', lang)}</span>
             <input type="text" x-model="modalItem.name_de" placeholder="z.B. Roggen-Sauerteigbrot" class="s-input" />
-            <span class="field__hint">Wird automatisch in alle aktiven Sprachen übersetzt.</span>
+            <span class="field__hint">{bt('bf.modal.namehint', lang)}</span>
           </div>
         </div>
 
         <!-- Beschreibung -->
         <div class="bp-modal-section">
           <div class="field">
-            <span class="field__label">Beschreibung (optional)</span>
+            <span class="field__label">{bt('bf.modal.desc', lang)}</span>
             <textarea x-model="modalItem.description_de" rows="2"
               placeholder="z.B. Hausgemacht aus regionalen Zutaten"
               class="s-input"></textarea>
-            <span class="field__hint">Nur Deutsch — wird automatisch übersetzt.</span>
+            <span class="field__hint">{bt('bf.modal.deschint', lang)}</span>
           </div>
         </div>
 
@@ -623,7 +651,7 @@ textarea.s-input { resize: none; min-height: 72px; }
               <line x1="12" y1="8" x2="12" y2="12"/>
               <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
             </svg>
-            <span><strong>14 EU-Hauptallergene (LMIV Art. 9).</strong> Alle enthaltenen Allergene ankreuzen. Bei Rezeptur-Änderungen sofort aktualisieren.</span>
+            <span set:html={bt('bf.modal.allergenwarn', lang)}></span>
           </div>
           <div class="bp-allergen-grid">
             <template x-for="a in allergens" :key="a.key">
@@ -637,28 +665,28 @@ textarea.s-input { resize: none; min-height: 72px; }
 
         <!-- Diät-Flags -->
         <div class="bp-modal-section">
-          <span class="field__label" style="display:block;margin-bottom:8px">Diät-Flags</span>
+          <span class="field__label" style="display:block;margin-bottom:8px">{bt('bf.modal.dietflags', lang)}</span>
           <div class="bp-diet-flags">
             <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_vegetarian" class="sr-only" />
               <span class="bt-visual" :class="{'is-checked': modalItem.is_vegetarian}">
                 <span class="bt-knob"></span>
               </span>
-              <span class="toggle-label">Vegetarisch</span>
+              <span class="toggle-label">{bt('bf.diet.vegetarian', lang)}</span>
             </label>
             <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_vegan" class="sr-only" />
               <span class="bt-visual" :class="{'is-checked': modalItem.is_vegan}">
                 <span class="bt-knob"></span>
               </span>
-              <span class="toggle-label">Vegan</span>
+              <span class="toggle-label">{bt('bf.diet.vegan', lang)}</span>
             </label>
             <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_organic" class="sr-only" />
               <span class="bt-visual" :class="{'is-checked': modalItem.is_organic}">
                 <span class="bt-knob"></span>
               </span>
-              <span class="toggle-label">Bio</span>
+              <span class="toggle-label">{bt('bf.diet.organic', lang)}</span>
             </label>
           </div>
         </div>
@@ -668,13 +696,13 @@ textarea.s-input { resize: none; min-height: 72px; }
       <div class="bp-modal-foot">
         <div>
           <button type="button" x-show="!modalIsNew" x-cloak @click="deleteItem()"
-            :disabled="modalSaving" class="v9-btn v9-btn--burg">Löschen</button>
+            :disabled="modalSaving" class="v9-btn v9-btn--burg">{bt('nfc.delete', lang)}</button>
         </div>
         <div style="display:flex;gap:8px">
-          <button type="button" @click="closeModal()" class="v9-btn v9-btn--ghost">Abbrechen</button>
+          <button type="button" @click="closeModal()" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
           <button type="button" @click="saveItem()" :disabled="modalSaving" class="v9-btn">
-            <span x-show="!modalSaving">Speichern</span>
-            <span x-show="modalSaving" x-cloak>Speichert …</span>
+            <span x-show="!modalSaving">{bt('common.save', lang)}</span>
+            <span x-show="modalSaving" x-cloak>{bt('bf.modal.saving', lang)}</span>
           </button>
         </div>
       </div>
@@ -690,6 +718,8 @@ textarea.s-input { resize: none; min-height: 72px; }
 
     Alpine.data('hoursSection', () => {
       const init = window._hoursInit || {};
+      const dl = init.dayLabels || {};
+      const t = init.t || {};
       return {
         hours: init.hours || {},
         slotMinutes: parseInt(init.slotMinutes) || 30,
@@ -701,13 +731,13 @@ textarea.s-input { resize: none; min-height: 72px; }
         _beforeUnload: null,
 
         days: [
-          { key: 'mon', label: 'Mo' },
-          { key: 'tue', label: 'Di' },
-          { key: 'wed', label: 'Mi' },
-          { key: 'thu', label: 'Do' },
-          { key: 'fri', label: 'Fr' },
-          { key: 'sat', label: 'Sa' },
-          { key: 'sun', label: 'So' },
+          { key: 'mon', label: dl.mon || 'Mo' },
+          { key: 'tue', label: dl.tue || 'Di' },
+          { key: 'wed', label: dl.wed || 'Mi' },
+          { key: 'thu', label: dl.thu || 'Do' },
+          { key: 'fri', label: dl.fri || 'Fr' },
+          { key: 'sat', label: dl.sat || 'Sa' },
+          { key: 'sun', label: dl.sun || 'So' },
         ],
 
         init() {
@@ -751,11 +781,11 @@ textarea.s-input { resize: none; min-height: 72px; }
               }),
             });
             const d = await res.json();
-            if (!d.ok) { this.error = d.error || 'Fehler'; window.retahaToast?.(this.error, 'error'); return; }
+            if (!d.ok) { this.error = d.error || t.error; window.retahaToast?.(this.error, 'error'); return; }
             this._origStr = JSON.stringify({ hours: this.hours, slotMinutes: this.slotMinutes });
-            window.retahaToast?.('Gespeichert');
+            window.retahaToast?.(t.saved);
           } catch (err) {
-            this.error = 'Netzwerk-Fehler';
+            this.error = t.netErr;
           } finally {
             this.saving = false;
           }
@@ -766,6 +796,7 @@ textarea.s-input { resize: none; min-height: 72px; }
     Alpine.data('bfPage', () => ({
       items: (window._bfInit || {}).items || [],
       allergens: (window._bfInit || {}).allergens || [],
+      t: (window._bfInit || {}).t || {},
       modalOpen: false,
       modalIsNew: false,
       modalItem: {},
@@ -784,7 +815,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         const sorted = [...this.items].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
         const groups = {};
         for (const item of sorted) {
-          const cat = item.category || 'Ohne Kategorie';
+          const cat = item.category || this.t.noCat;
           if (!groups[cat]) groups[cat] = [];
           groups[cat].push(item);
         }
@@ -793,7 +824,8 @@ textarea.s-input { resize: none; min-height: 72px; }
 
       formatEur(cents) {
         const cur = (window._bfInit || {}).currency || 'EUR';
-        return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: cur });
+        const loc = (window._bfInit || {}).lang || 'de';
+        return (cents / 100).toLocaleString(loc, { style: 'currency', currency: cur });
       },
 
       openNew() {
@@ -824,7 +856,7 @@ textarea.s-input { resize: none; min-height: 72px; }
 
       async saveItem() {
         const nameDe = this.modalItem.name_de ? this.modalItem.name_de.trim() : '';
-        if (!nameDe) { this.modalError = 'Name (Deutsch) ist Pflichtfeld'; return; }
+        if (!nameDe) { this.modalError = this.t.nameRequired; return; }
         this.modalSaving = true;
         this.modalError = '';
         try {
@@ -850,7 +882,7 @@ textarea.s-input { resize: none; min-height: 72px; }
             body: JSON.stringify(payload),
           });
           const data = await res.json();
-          if (!data.ok) { this.modalError = data.error || 'Speichern fehlgeschlagen'; return; }
+          if (!data.ok) { this.modalError = data.error || this.t.saveFail; return; }
           if (this.modalIsNew) {
             this.items.push(data.item);
           } else {
@@ -859,16 +891,16 @@ textarea.s-input { resize: none; min-height: 72px; }
             else this.items.push(data.item);
           }
           this.closeModal();
-          this.showToast(this.modalIsNew ? 'Speise angelegt.' : 'Speise gespeichert.', 'ok');
+          this.showToast(this.modalIsNew ? this.t.itemCreated : this.t.itemSaved, 'ok');
         } catch (err) {
-          this.modalError = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+          this.modalError = this.t.netErr + ': ' + (err && err.message ? err.message : String(err));
         } finally {
           this.modalSaving = false;
         }
       },
 
       async deleteItem() {
-        if (!confirm('Speise wirklich löschen?')) return;
+        if (!confirm(this.t.deleteConfirm)) return;
         this.modalSaving = true;
         this.modalError = '';
         try {
@@ -878,12 +910,12 @@ textarea.s-input { resize: none; min-height: 72px; }
             body: JSON.stringify({ id: this.modalItem.id }),
           });
           const data = await res.json();
-          if (!data.ok) { this.modalError = data.error || 'Löschen fehlgeschlagen'; return; }
+          if (!data.ok) { this.modalError = data.error || this.t.deleteFail; return; }
           this.items = this.items.filter(i => i.id !== this.modalItem.id);
           this.closeModal();
-          this.showToast('Speise gelöscht.', 'ok');
+          this.showToast(this.t.itemDeleted, 'ok');
         } catch (err) {
-          this.modalError = 'Netzwerk-Fehler: ' + (err && err.message ? err.message : String(err));
+          this.modalError = this.t.netErr + ': ' + (err && err.message ? err.message : String(err));
         } finally {
           this.modalSaving = false;
         }
@@ -954,9 +986,9 @@ textarea.s-input { resize: none; min-height: 72px; }
             body: JSON.stringify({ ids }),
           });
           const d = await res.json();
-          if (!d.ok) this.showToast('Reihenfolge-Fehler: ' + (d.error || 'Unbekannt'), 'err');
+          if (!d.ok) this.showToast(this.t.orderFail + ': ' + (d.error || 'Unbekannt'), 'err');
         } catch {
-          this.showToast('Netzwerk-Fehler beim Sortieren', 'err');
+          this.showToast(this.t.sortErr, 'err');
         }
       },
 
