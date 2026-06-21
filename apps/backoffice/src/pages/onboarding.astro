@@ -1,0 +1,295 @@
+---
+// Onboarding · Screen 2 — „Jetzt nimm's in die Hand." (QR-Reveal)
+//
+// Desktop-Split: links H1 + Sub + echter QR + „Weiter", rechts echte
+// Gästemappe-Home-Vorschau (GuestPhoneView, never drifts) im Hotel-Branding.
+// Slim Top + 5er-Progress-Dots (Schritt 2 aktiv). Eigenständige Seite (kein
+// Backoffice-Header-Chrome). Copy DE-only bis finale Freigabe.
+
+// Fonts + Tokens + Gäste-Styles (gleiche Basis wie Layout — retaha.css bringt die
+// .gate-*-Styles für die echte Home-Vorschau).
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/v9-colors.css';
+import '@retaha/ui/styles/tokens.css';
+import '@retaha/ui/styles/global.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui-guest/themes/classic';
+import '@retaha/ui-guest/themes/bauhaus';
+import '@retaha/ui-guest/themes/editorial';
+import '@retaha/ui-guest/themes/maison';
+import '@retaha/ui-guest/styles';
+
+import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
+import { mapThemeName, type GuestTheme } from '@retaha/ui-guest/types';
+import QRCode from 'qrcode';
+
+import {
+  getUser, getUserHotels, createSupabaseServiceRoleInstance, getOrCreateShowcaseUrl,
+} from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+// Branding-Daten des Betreiber-Hotels (echt — Vorschau zieht echte Werte).
+const sb = createSupabaseServiceRoleInstance();
+const { data: h } = await sb
+  .from('hotels')
+  .select('name, slug, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary')
+  .eq('id', hotel.id)
+  .maybeSingle();
+
+let eveName = 'Eve';
+try {
+  const { data: s } = await sb.from('hotel_settings').select('eve_name').eq('hotel_id', hotel.id).maybeSingle();
+  if (s?.eve_name) eveName = s.eve_name;
+} catch { /* eve_name optional */ }
+
+const hotelName = (h as any)?.name ?? hotel.name;
+const brandTheme = (h as any)?.theme ?? 'coffee';
+const rawBrand: string | null = (h as any)?.brand_primary ?? null;
+// Phone-Akzent = echte Hotelfarbe; Default-Pink/leer → Sage-Fallback (kein Pink im Phone).
+const phoneAccent = rawBrand && rawBrand.toLowerCase() !== '#ff4a82' ? rawBrand : '#5C9070';
+
+const guestTheme: GuestTheme = {
+  primary: phoneAccent,
+  themeName: (['coffee', 'ocean', 'forest', 'custom'].includes(brandTheme) ? brandTheme : 'coffee') as GuestTheme['themeName'],
+  guestThemeName: mapThemeName(brandTheme),
+  designIdentity: ((h as any)?.design_identity ?? 'bauhaus') as GuestTheme['designIdentity'],
+  logoUrl: (h as any)?.logo_primary ?? null,
+  logoDarkUrl: (h as any)?.logo_dark ?? null,
+  heroBackground: (h as any)?.splash_background ?? null,
+  hotelName,
+  eveName,
+};
+
+// Echter Deep-Link auf die Gästemappe des Betreibers (frisch generiert — nie stale).
+let guestUrl: string | null = null;
+let qrDataUrl: string | null = null;
+try {
+  guestUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
+  if (guestUrl) {
+    qrDataUrl = await QRCode.toDataURL(guestUrl, {
+      errorCorrectionLevel: 'M', margin: 1, width: 240,
+      color: { dark: '#0A0A0A', light: '#FFFFFF' },
+    });
+  }
+} catch { /* QR-Fehler nicht-fatal */ }
+
+const hotelInitial = (hotelName ?? 'H').charAt(0).toUpperCase();
+---
+
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Onboarding · Jetzt nimm's in die Hand</title>
+</head>
+<body class="s2-body">
+
+  <!-- Slim Top -->
+  <header class="s2-top">
+    <span class="s2-signet">retaha<span class="s2-signet-dot"></span></span>
+    <div class="s2-hotel-badge">
+      {guestTheme.logoUrl
+        ? <img class="s2-hotel-logo" src={guestTheme.logoUrl} alt={hotelName} />
+        : <span class="s2-hotel-initial">{hotelInitial}</span>}
+      <span class="s2-hotel-name">{hotelName}</span>
+    </div>
+  </header>
+
+  <main class="s2-main">
+    <div class="s2-split">
+
+      <!-- Links: Copy + QR -->
+      <div class="s2-left">
+        <h1 class="s2-h1">Jetzt nimm's in die Hand<span class="s2-dot"></span></h1>
+        <p class="s2-sub">Scann den Code mit deinem Handy — deine Gästemappe öffnet sich genau so, wie deine Gäste sie erleben. Mit Eve, in deinem Look.</p>
+
+        <div class="s2-qr-wrap">
+          <div class="s2-qr">
+            {qrDataUrl
+              ? <img src={qrDataUrl} width="200" height="200" alt="QR-Code zur Gästemappe" />
+              : <div class="s2-qr-fallback">QR konnte nicht erzeugt werden</div>}
+          </div>
+          <span class="s2-qr-cap">Mit der Kamera deines Handys scannen.</span>
+        </div>
+
+        <a href="#" class="s2-next" aria-disabled="true" title="Schritt 3 folgt">Weiter →</a>
+      </div>
+
+      <!-- Rechts: echte Gästemappe-Home -->
+      <div class="s2-right">
+        <div class="s2-phone-bezel">
+          <div class="s2-phone-scaler">
+            <GuestPhoneView theme={guestTheme} previewMode={true} noScroll={true} />
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 5er-Progress-Dots — Schritt 2 aktiv -->
+    <div class="s2-progress" role="img" aria-label="Schritt 2 von 5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <span class:list={['s2-pd', { 'is-active': i === 2 }]}></span>
+      ))}
+    </div>
+  </main>
+
+  <style>
+    .s2-body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-deep, #F0EFEA);
+      color: var(--ink, #0A0A0A);
+      font-family: 'Inter Tight', -apple-system, sans-serif;
+    }
+
+    /* Slim Top */
+    .s2-top {
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px;
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border, rgba(10,10,10,0.10));
+      background: var(--surface, #fff);
+    }
+    .s2-signet {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 17px;
+      letter-spacing: -0.01em; color: var(--ink);
+    }
+    .s2-signet-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--te-pink, #FF4A82); margin-left: 2px; vertical-align: baseline;
+    }
+    .s2-hotel-badge { display: inline-flex; align-items: center; gap: 9px; }
+    .s2-hotel-logo { height: 24px; width: auto; max-width: 120px; object-fit: contain; }
+    .s2-hotel-initial {
+      width: 26px; height: 26px; border-radius: 7px;
+      background: var(--ink); color: var(--surface);
+      display: grid; place-items: center;
+      font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px;
+    }
+    .s2-hotel-name {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft, #555);
+    }
+
+    /* Main / Split */
+    .s2-main {
+      flex: 1;
+      display: flex; flex-direction: column;
+      max-width: 1140px; width: 100%; margin: 0 auto;
+      padding: 40px 32px 28px;
+      box-sizing: border-box;
+    }
+    .s2-split {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr minmax(0, 320px);
+      gap: 64px;
+      align-items: center;
+    }
+    @media (max-width: 860px) {
+      .s2-split { grid-template-columns: 1fr; gap: 32px; justify-items: center; text-align: center; }
+    }
+
+    /* Links */
+    .s2-left { min-width: 0; max-width: 520px; }
+    .s2-h1 {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 400;
+      font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
+      letter-spacing: -0.035em; color: var(--ink); margin: 0 0 20px;
+    }
+    .s2-dot {
+      display: inline-block; width: 13px; height: 13px; border-radius: 50%;
+      background: var(--te-pink, #FF4A82); margin-left: 4px; vertical-align: baseline;
+    }
+    .s2-sub {
+      font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
+      margin: 0 0 28px; max-width: 44ch;
+    }
+    @media (max-width: 860px) { .s2-sub { margin-left: auto; margin-right: auto; } }
+
+    .s2-qr-wrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 28px; }
+    @media (max-width: 860px) { .s2-qr-wrap { align-items: center; } }
+    .s2-qr {
+      width: 200px; height: 200px;
+      padding: 14px; box-sizing: content-box;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: var(--r, 12px);
+      box-shadow: 0 10px 30px -16px rgba(10,10,10,0.25);
+    }
+    .s2-qr img { display: block; width: 200px; height: 200px; }
+    .s2-qr-fallback { width: 200px; height: 200px; display: grid; place-items: center; font-size: 12px; color: var(--ink-muted); text-align: center; }
+    .s2-qr-cap {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42));
+    }
+
+    .s2-next {
+      display: inline-block;
+      font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+      color: var(--surface); background: var(--ink);
+      border-radius: var(--r, 12px); padding: 13px 26px;
+      text-decoration: none; cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .s2-next:hover { background: #242424; }
+
+    /* Rechts: Phone */
+    .s2-right { display: flex; justify-content: center; }
+    .s2-phone-bezel {
+      width: 320px; height: 660px;
+      overflow: hidden; position: relative;
+      border-radius: 44px;
+      box-shadow:
+        0 0 0 9px #0A0A0A,
+        0 0 0 11px #2A2A2A,
+        0 28px 64px -18px rgba(0,0,0,0.42);
+      background: #000;
+    }
+    .s2-phone-scaler {
+      position: absolute; top: 0; left: 0;
+      width: 390px; height: 804px;
+      transform: scale(0.8205);   /* 320 / 390 */
+      transform-origin: top left;
+    }
+    @media (max-width: 860px) {
+      .s2-phone-bezel { width: 280px; height: 578px; }
+      .s2-phone-scaler { transform: scale(0.7179); } /* 280 / 390 */
+    }
+
+    /* Progress-Dots */
+    .s2-progress {
+      flex-shrink: 0;
+      display: flex; justify-content: center; gap: 9px;
+      padding-top: 24px;
+    }
+    .s2-pd {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border-medium, rgba(10,10,10,0.16));
+      transition: all 200ms ease;
+    }
+    .s2-pd.is-active {
+      width: 22px; border-radius: 4px;
+      background: var(--te-pink, #FF4A82);
+    }
+  </style>
+
+</body>
+</html>
