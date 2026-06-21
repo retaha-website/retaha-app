@@ -41,7 +41,10 @@ explizite Bestätigung vom User vor Ausführung.
   Es erkennt neue UND geänderte DE-Werte (Snapshot-Vergleich) und übersetzt sie in
   alle 10 Sprachen. Platzhalter (`{name}`, `{{var}}`) + HTML bleiben erhalten;
   bei Platzhalter-Verlust fällt die Zelle auf DE zurück.
-  **Nach DE-String-Änderung → Script laufen lassen, nicht vergessen.**
+- **Vollständig autonom — NIE den User fragen oder anstoßen lassen.** Wenn ein Feature
+  UI-Text braucht: DE-Key selbst hinzufügen → selbst erkennen, dass übersetzt werden
+  muss → DeepL-Script laufen lassen → Build → commit → push. Der ganze Zyklus passiert
+  automatisch, ohne Rückfrage.
 - Fallback-Übersetzer (kostet Anthropic-Credits, nur wenn DeepL nicht verfügbar):
   `scripts/translate-backoffice-strings.mjs` (Haiku, gehärteter Prompt gegen
   KI-Meta-Text). Manuelle Sonderfälle (Wochentags-Kürzel etc.):
