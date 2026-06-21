@@ -34,11 +34,18 @@ explizite Bestätigung vom User vor Ausführung.
 - Sprache im Backoffice: Cookie `retaha_lang` (Picker im Account-Dropdown) → `getLang()`
   in `apps/backoffice/src/lib/i18n.ts`.
 - **WICHTIG — Übersetzungen sind NICHT automatisch.** Nach JEDER Änderung an einem
-  DE-String (neu **oder** geändert) muss das Translate-Script laufen:
-  `node --env-file=apps/backoffice/.env scripts/translate-backoffice-strings.mjs`
+  DE-String (neu **oder** geändert) muss das Translate-Script laufen. **Standard =
+  DeepL Free** (gratis, schont das Anthropic-Budget, das für Eve reserviert ist):
+  `node --env-file=apps/backoffice/.env scripts/translate-backoffice-deepl.mjs`
+  Braucht `DEEPL_API_KEY` (Free-Key endet auf `:fx`) in `apps/backoffice/.env`.
   Es erkennt neue UND geänderte DE-Werte (Snapshot-Vergleich) und übersetzt sie in
-  alle 10 Sprachen (Haiku). Ohne den Lauf bleiben die anderen Sprachen veraltet.
+  alle 10 Sprachen. Platzhalter (`{name}`, `{{var}}`) + HTML bleiben erhalten;
+  bei Platzhalter-Verlust fällt die Zelle auf DE zurück.
   **Nach DE-String-Änderung → Script laufen lassen, nicht vergessen.**
+- Fallback-Übersetzer (kostet Anthropic-Credits, nur wenn DeepL nicht verfügbar):
+  `scripts/translate-backoffice-strings.mjs` (Haiku, gehärteter Prompt gegen
+  KI-Meta-Text). Manuelle Sonderfälle (Wochentags-Kürzel etc.):
+  `scripts/patch-i18n-overrides.mjs`.
 - Fehlende Keys fallen via `bt()` sauber auf DE zurück (kein leerer String / Key-Leak).
 
 ## Architektur
