@@ -72,20 +72,20 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
           </div>
         </div>
         <div class="eve-message eve-message--assistant" data-step="2">
-          <div class="eve-message-bubble" data-sender="EVE">Täglich von 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich sonst noch etwas vorbereiten?</div>
+          <div class="eve-message-bubble" data-sender="EVE">Täglich von 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich euch einen Platz reservieren?</div>
+        </div>
+        <div class="eve-message eve-message--user" data-step="3">
+          <div class="eve-message-bubble">Ja, für zwei um 8 Uhr.</div>
+        </div>
+        <div class="eve-message eve-message--assistant" data-step="4">
+          <div class="eve-message-bubble" data-sender="EVE">Erledigt ✅ — Frühstück für 2 Personen, morgen um 8:00 Uhr im Wintergarten. Wir freuen uns auf euch! 🌿</div>
         </div>
       </div>
 
-      <!-- Beispielfrage-Hint mit Pfeil → Eingabe -->
-      <div class="eve-hint" data-eve-hint hidden>
-        <span class="eve-hint-arrow" aria-hidden="true">↳</span>
-        <button type="button" class="eve-hint-q" data-eve-example>Frag Eve: „Mir fehlt ein Handtuch"</button>
+      <div class="eve-sheet-input-row">
+        <input class="eve-sheet-input" type="text" placeholder="Frag Eve etwas über dein Hotel …" aria-label="Frag Eve etwas" readonly tabindex="-1" />
+        <button class="eve-sheet-send" type="button" aria-label="Senden" tabindex="-1">↑</button>
       </div>
-
-      <form class="eve-sheet-input-row" data-eve-form>
-        <input class="eve-sheet-input" data-eve-input type="text" placeholder="Frag Eve etwas über dein Hotel …" aria-label="Frag Eve etwas" autocomplete="off" />
-        <button class="eve-sheet-send" data-eve-send type="submit" aria-label="Senden">↑</button>
-      </form>
     </div>
 
   </div>
@@ -273,29 +273,7 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
   .eve-typing span:nth-child(3) { animation-delay: 0.3s; }
   @keyframes onb-typing-bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-4px);opacity:1} }
 
-  /* Beispielfrage-Hint */
-  .eve-hint {
-    flex-shrink: 0;
-    display: flex; align-items: center; gap: 8px;
-    padding: 0 16px 8px;
-  }
-  .eve-hint-arrow {
-    font-family: 'JetBrains Mono', monospace; font-size: 14px;
-    color: var(--onb-petrol); transform: rotate(90deg); line-height: 1;
-  }
-  .eve-hint-q {
-    border: 1px solid var(--onb-petrol);
-    background: var(--onb-petrol-soft);
-    color: var(--onb-petrol);
-    border-radius: 999px; padding: 6px 12px;
-    font-family: 'Inter Tight', system-ui, sans-serif; font-size: 12px;
-    cursor: pointer; text-align: left;
-    transition: background 0.15s ease, color 0.15s ease;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
-  }
-  .eve-hint-q:hover { background: var(--onb-petrol); color: #fff; }
-
-  /* Input */
+  /* Input (dekorativ — kein interaktiver Chat) */
   .eve-sheet-input-row {
     flex-shrink: 0; display: flex; gap: 8px; margin: 0;
     padding: 12px 16px;
@@ -361,101 +339,25 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     var typing = hero.querySelector('[data-eve-typing]');
     var avatar = hero.querySelector('[data-eve-avatar]');
     var msgArea = hero.querySelector('[data-eve-messages]');
-    var form = hero.querySelector('[data-eve-form]');
-    var input = hero.querySelector('[data-eve-input]');
-    var hint = hero.querySelector('[data-eve-hint]');
-    var exampleBtn = hero.querySelector('[data-eve-example]');
 
     function scrollDown() { if (msgArea) msgArea.scrollTop = msgArea.scrollHeight; }
-
-    // ── Eve-Antworten (Demo — wie in der Gäste-App, Stichwort-basiert) ──
-    var RULES = [
-      { k: ['handtuch', 'towel', 'bademantel'], a: 'Klar — ich sag dem Housekeeping Bescheid, ein frisches Handtuch ist gleich auf dem Weg zu deinem Zimmer. 🛁' },
-      { k: ['restaurant', 'essen', 'dinner', 'abendessen', 'küche'], a: 'Unser Restaurant hat täglich 18:00–22:30 Uhr geöffnet, Frühstück 7:00–10:30 Uhr. Soll ich einen Tisch für dich reservieren?' },
-      { k: ['spot', 'umgebung', 'empfehl', 'sehensw', 'café', 'cafe', 'in der nähe', 'tipps'], a: 'In 5 Gehminuten: das Café Morgentau (Frühstück & Kuchen), der Stadtpark mit See und die Altstadt-Gasse mit kleinen Boutiquen. Magst du eher Essen oder Natur?' },
-      { k: ['wlan', 'wifi', 'wi-fi', 'internet', 'passwort'], a: 'Das WLAN heißt „Gast-WLAN" — das Passwort lautet willkommen2024. Brauchst du sonst noch was? 📶' },
-      { k: ['frühstück', 'fruehstueck', 'breakfast', 'morgen'], a: 'Frühstück gibt’s täglich 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich einen Platz reservieren?' },
-      { k: ['checkout', 'check-out', 'auschecken', 'abreise'], a: 'Check-out ist bis 11:00 Uhr. Brauchst du einen späten Check-out? Ich frage gern an der Rezeption nach. 🕚' },
-      { k: ['spa', 'wellness', 'sauna', 'massage', 'pool'], a: 'Unser Spa ist täglich 8:00–21:00 Uhr geöffnet — Sauna, Dampfbad und Ruheraum. Soll ich dir eine Massage buchen?' },
-      { k: ['park', 'auto', 'garage', 'stellplatz'], a: 'Tiefgaragen-Parkplätze gibt’s direkt unter dem Hotel für 15 €/Nacht. Soll ich einen für dich reservieren?' },
-      { k: ['taxi', 'transfer', 'flughafen', 'bahnhof'], a: 'Ich rufe dir gern ein Taxi — es ist in etwa 5 Minuten an der Lobby. Wohin soll’s gehen?' },
-      { k: ['danke', 'thanks', 'merci'], a: 'Sehr gern! Ich bin rund um die Uhr für dich da. 🌿' }
-    ];
-    var FALLBACK = 'Das schaue ich dir gern nach. Magst du mir kurz sagen, ob es um dein Zimmer, ums Essen oder um Tipps in der Umgebung geht? Frag mich z. B. nach Frühstück, WLAN oder Check-out.';
-
-    function answerFor(text) {
-      var t = (text || '').toLowerCase();
-      for (var i = 0; i < RULES.length; i++) {
-        for (var j = 0; j < RULES[i].k.length; j++) {
-          if (t.indexOf(RULES[i].k[j]) !== -1) return RULES[i].a;
-        }
-      }
-      return FALLBACK;
+    function pulseOn()  { if (avatar) avatar.classList.add('is-typing'); }
+    function pulseOff() { if (avatar) avatar.classList.remove('is-typing'); }
+    function showTyping(beforeEl) {
+      if (!typing) return;
+      if (beforeEl && beforeEl.parentNode) beforeEl.parentNode.insertBefore(typing, beforeEl);
+      typing.hidden = false; void typing.offsetWidth; typing.classList.add('is-in');
+      pulseOn(); scrollDown();
     }
-
-    function addMsg(role, text) {
-      var wrap = document.createElement('div');
-      wrap.className = 'eve-message eve-message--' + role + ' is-in';
-      var bubble = document.createElement('div');
-      bubble.className = 'eve-message-bubble';
-      if (role === 'assistant') bubble.setAttribute('data-sender', 'EVE');
-      bubble.textContent = text;
-      wrap.appendChild(bubble);
-      msgArea.appendChild(wrap);
-      scrollDown();
+    function hideTyping() {
+      if (!typing) return;
+      typing.hidden = true; typing.classList.remove('is-in'); pulseOff();
     }
-
-    var busy = false;
-    function ask(text) {
-      text = (text || '').trim();
-      if (!text || busy) return;
-      busy = true;
-      addMsg('user', text);
-      if (input) input.value = '';
-      // Tipp-Punkte ans Ende + Avatar-Puls
-      msgArea.appendChild(typing);
-      typing.hidden = false; typing.classList.add('is-in'); scrollDown();
-      if (avatar) avatar.classList.add('is-typing');
-      var delay = 900 + Math.min(1600, text.length * 22);
-      setTimeout(function () {
-        typing.hidden = true;
-        if (avatar) avatar.classList.remove('is-typing');
-        addMsg('assistant', answerFor(text));
-        busy = false;
-      }, delay);
-    }
-
-    // Beispielfragen — rotieren im Hint-Chip
-    var EXAMPLES = [
-      'Mir fehlt ein Handtuch',
-      'Welche Spots gibt es in der Umgebung?',
-      'Wann hat euer Restaurant geöffnet?',
-      'Wie lautet das WLAN-Passwort?',
-      'Wann ist Check-out?'
-    ];
-    var exIdx = 0;
-    function renderExample() {
-      if (exampleBtn) exampleBtn.textContent = 'Frag Eve: „' + EXAMPLES[exIdx] + '"';
-    }
-    if (exampleBtn) {
-      exampleBtn.addEventListener('click', function () { ask(EXAMPLES[exIdx]); });
-    }
-
-    if (form) {
-      form.addEventListener('submit', function (e) { e.preventDefault(); if (input) ask(input.value); });
-    }
-
-    function enableChat() {
-      if (hint) hint.hidden = false;
-      renderExample();
-      setInterval(function () { exIdx = (exIdx + 1) % EXAMPLES.length; renderExample(); }, 3200);
-      if (input) input.focus({ preventScroll: true });
-    }
+    function showMsg(i) { if (msgs[i]) { msgs[i].classList.add('is-in'); scrollDown(); } }
 
     if (reduce) {
       reveals.forEach(function (el) { el.classList.add('is-in'); });
       msgs.forEach(function (el) { el.classList.add('is-in'); });
-      enableChat();
       return;
     }
 
@@ -465,23 +367,15 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
         setTimeout(function () { el.classList.add('is-in'); }, r * 90);
       });
 
-      var t = 750;
-      setTimeout(function () { msgs[0].classList.add('is-in'); scrollDown(); }, t);
-      t += 850;
-      setTimeout(function () { msgs[1].classList.add('is-in'); scrollDown(); }, t);
-      t += 550;
-      setTimeout(function () {
-        if (typing) { typing.hidden = false; void typing.offsetWidth; typing.classList.add('is-in'); scrollDown(); }
-        if (avatar) avatar.classList.add('is-typing');
-      }, t);
-      t += 1400;
-      setTimeout(function () {
-        if (typing) { typing.hidden = true; typing.classList.remove('is-in'); }
-        if (avatar) avatar.classList.remove('is-typing');
-        msgs[2].classList.add('is-in');
-        scrollDown();
-        enableChat(); // ab jetzt interaktiv
-      }, t);
+      // Demo-Chat: Greeting → Frage → Antwort → Folgefrage → Eve-Funktion (Reservierung)
+      var t = 700;
+      setTimeout(function () { showMsg(0); }, t);                                 // Eve-Greeting
+      t += 850;  setTimeout(function () { showMsg(1); }, t);                      // Gast: Frühstück?
+      t += 500;  setTimeout(function () { showTyping(msgs[2]); }, t);            // Tipp-Punkte
+      t += 1300; setTimeout(function () { hideTyping(); showMsg(2); }, t);       // Eve: Öffnungszeiten + Angebot
+      t += 750;  setTimeout(function () { showMsg(3); }, t);                      // Gast: Ja, für zwei um 8
+      t += 500;  setTimeout(function () { showTyping(msgs[4]); }, t);            // Tipp-Punkte
+      t += 1300; setTimeout(function () { hideTyping(); showMsg(4); }, t);       // Eve: Erledigt ✅ (Funktion)
     }
 
     if ('requestAnimationFrame' in window) requestAnimationFrame(function () { setTimeout(start, 120); });
