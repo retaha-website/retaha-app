@@ -3,6 +3,8 @@
 
 import Layout from '../../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -24,39 +26,39 @@ const { data: drips } = await sb
   .order('created_at', { ascending: false });
 
 const TRIGGER_LABELS: Record<string, string> = {
-  wallet_add: 'Wallet hinzugefügt',
-  first_visit: 'Erster Besuch',
-  checkout: 'Check-out',
-  anniversary: 'Jahrestag',
-  visit_count_milestone: 'Besuchs-Meilenstein',
-  seasonal: 'Saisonal',
+  wallet_add: bt('dr.trigger.wallet_add', lang),
+  first_visit: bt('dr.trigger.first_visit', lang),
+  checkout: bt('dr.trigger.checkout', lang),
+  anniversary: bt('dr.trigger.anniversary', lang),
+  visit_count_milestone: bt('dr.trigger.visit_count_milestone', lang),
+  seasonal: bt('dr.trigger.seasonal', lang),
 };
 ---
 
 <Layout title="Drip-Sequenzen" activeTab="backoffice" hotelName={hotel.name}>
   <div class="settings-page">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Drip-Sequenzen</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('dr.crumb', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Marketing</span>
-      <h1 class="settings-hero__title">Automatische Sequenzen<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Sendet nach Trigger-Event — Wallet-Add, Check-out, Jahrestag u.m.</p>
+      <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('dr.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('dr.sub', lang)}</p>
     </section>
 
     <div class="dl-bar">
-      <a href="/marketing/drips/new" class="dl-btn-primary">+ Neue Drip-Sequenz</a>
+      <a href="/marketing/drips/new" class="dl-btn-primary">+ {bt('dr.btn.new', lang)}</a>
     </div>
 
     {!drips || drips.length === 0 ? (
       <div class="dl-empty">
-        <p>Noch keine Drip-Sequenzen.</p>
-        <a href="/marketing/drips/new" class="dl-btn-primary">+ Erste Sequenz anlegen</a>
+        <p>{bt('dr.empty', lang)}</p>
+        <a href="/marketing/drips/new" class="dl-btn-primary">+ {bt('dr.btn.first', lang)}</a>
       </div>
     ) : (
       <div class="dl-grid">
@@ -67,15 +69,15 @@ const TRIGGER_LABELS: Record<string, string> = {
             <a href={`/marketing/drips/${d.id}`} class={`dl-card${d.is_active ? '' : ' dl-card--inactive'}`}>
               <div class="dl-card-head">
                 <span class={`dl-active-pill${d.is_active ? ' is-on' : ''}`}>
-                  {d.is_active ? 'aktiv' : 'inaktiv'}
+                  {d.is_active ? bt('dr.pill.active', lang) : bt('dr.pill.inactive', lang)}
                 </span>
                 <span class="dl-trigger">{TRIGGER_LABELS[d.trigger_type] ?? d.trigger_type}</span>
               </div>
               <h3 class="dl-card-name">{d.name}</h3>
               <div class="dl-card-meta">
-                <span><strong>{stepsCount}</strong> {stepsCount === 1 ? 'Step' : 'Steps'}</span>
+                <span><strong>{stepsCount}</strong> {stepsCount === 1 ? bt('dr.step.one', lang) : bt('dr.step.many', lang)}</span>
                 <span>·</span>
-                <span><strong>{stateCount}</strong> Pässe enqueuet</span>
+                <span><strong>{stateCount}</strong> {bt('dr.enqueued', lang)}</span>
               </div>
             </a>
           );

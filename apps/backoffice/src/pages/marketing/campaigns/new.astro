@@ -2,6 +2,8 @@
 import Layout from '../../../layouts/Layout.astro';
 import CampaignEditor from '../../../components/admin/CampaignEditor.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -74,19 +76,19 @@ const segmentCounts = {
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing/campaigns" class="breadcrumb__crumb">Kampagnen</a>
+      <a href="/marketing/campaigns" class="breadcrumb__crumb">{bt('cm.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Neue Kampagne</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('cm.new.crumb', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Marketing</span>
-      <h1 class="settings-hero__title">Neue Kampagne<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Wähle einen Anlass oder schreib Ad-hoc. Beim Speichern automatische Übersetzung in alle aktivierten Sprachen.</p>
+      <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('cm.new.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('cm.new.sub', lang)}</p>
     </section>
 
     <CampaignEditor

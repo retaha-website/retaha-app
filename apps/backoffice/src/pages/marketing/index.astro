@@ -1,6 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -104,7 +107,7 @@ function pickI18n(jsonb: any): string {
 }
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  return new Date(iso).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' });
 }
 function pct(n: number): string {
   return (n * 100).toFixed(1) + '%';
@@ -115,38 +118,38 @@ function pct(n: number): string {
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Marketing</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('mk.crumb', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Gäste-Marketing</span>
-      <h1 class="settings-hero__title">Marketing-Übersicht<span class="dot-pink">.</span></h1>
-      <p class="settings-hero__sub">Kampagnen, Drip-Sequenzen und Vorlagen — alles auf einen Blick.</p>
+      <span class="settings-hero__eyebrow">{bt('mk.hero.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('mk.hero.title', lang)}></h1>
+      <p class="settings-hero__sub">{bt('mk.hero.sub', lang)}</p>
     </section>
 
     <!-- Section 1: KPI-Cards -->
     <section class="md-kpis">
       <div class="md-kpi">
-        <div class="md-kpi-label">Wallet-Holder</div>
+        <div class="md-kpi-label">{bt('mk.kpi.holders', lang)}</div>
         <div class="md-kpi-value">{walletHoldersTotal ?? 0}</div>
-        <div class="md-kpi-sub">aktive Pässe</div>
+        <div class="md-kpi-sub">{bt('mk.kpi.holders.sub', lang)}</div>
       </div>
       <div class="md-kpi">
-        <div class="md-kpi-label">Marketing-Opt-In</div>
+        <div class="md-kpi-label">{bt('mk.kpi.optin', lang)}</div>
         <div class="md-kpi-value">{optInRate}%</div>
-        <div class="md-kpi-sub">{optInCount ?? 0} von {walletHoldersTotal ?? 0}</div>
+        <div class="md-kpi-sub">{optInCount ?? 0} {bt('mk.kpi.of', lang)} {walletHoldersTotal ?? 0}</div>
       </div>
       <div class="md-kpi">
-        <div class="md-kpi-label">Aktive Drips</div>
+        <div class="md-kpi-label">{bt('mk.kpi.drips', lang)}</div>
         <div class="md-kpi-value">{activeDrips ?? 0}</div>
-        <div class="md-kpi-sub">automatisierte Sequenzen</div>
+        <div class="md-kpi-sub">{bt('mk.kpi.drips.sub', lang)}</div>
       </div>
       <div class="md-kpi">
-        <div class="md-kpi-label">Sends diesen Monat</div>
+        <div class="md-kpi-label">{bt('mk.kpi.sends', lang)}</div>
         <div class="md-kpi-value">{sendsThisMonth}</div>
-        <div class="md-kpi-sub">aus Kampagnen + Drips</div>
+        <div class="md-kpi-sub">{bt('mk.kpi.sends.sub', lang)}</div>
       </div>
     </section>
 
@@ -154,8 +157,8 @@ function pct(n: number): string {
     <section class="md-chart-section">
       <div class="md-section-head">
         <div>
-          <p class="md-section-eyebrow">letzte 30 Tage</p>
-          <h2 class="md-section-title">Aktivität über Zeit</h2>
+          <p class="md-section-eyebrow">{bt('mk.chart.eyebrow', lang)}</p>
+          <h2 class="md-section-title">{bt('mk.chart.title', lang)}</h2>
         </div>
         <div class="md-chart-legend">
           <span class="md-legend-item"><i class="md-dot md-dot-burgundy"></i>Sends</span>
@@ -170,11 +173,11 @@ function pct(n: number): string {
 
     <!-- Section 3: Top-Performer -->
     <section class="md-top-section">
-      <p class="md-section-eyebrow">Top 3 nach Click-Rate</p>
-      <h2 class="md-section-title">Was kommt am besten an</h2>
+      <p class="md-section-eyebrow">{bt('mk.top.eyebrow', lang)}</p>
+      <h2 class="md-section-title">{bt('mk.top.title', lang)}</h2>
 
       {ranked.length === 0 ? (
-        <p class="md-empty">Noch keine versandten Kampagnen.</p>
+        <p class="md-empty">{bt('mk.top.empty', lang)}</p>
       ) : (
         <div class="md-top-grid">
           {ranked.map((c: any) => (
@@ -182,17 +185,17 @@ function pct(n: number): string {
               <div class="md-top-name">{c.name}</div>
               <div class="md-top-title">{pickI18n(c.title_i18n)}</div>
               <div class="md-top-meta">
-                <span>{c.recipients_count} Sends</span>
+                <span>{c.recipients_count} {bt('mk.unit.sends', lang)}</span>
                 <span>·</span>
                 <span>{fmtDate(c.sent_at)}</span>
               </div>
               <div class="md-bar-row">
-                <span class="md-bar-label">Open</span>
+                <span class="md-bar-label">{bt('mk.bar.open', lang)}</span>
                 <span class="md-bar-track"><span class="md-bar-fill md-bar-fill--anthrazit" style={`width: ${Math.round(c.open_rate * 100)}%`}></span></span>
                 <span class="md-bar-pct">{pct(c.open_rate)}</span>
               </div>
               <div class="md-bar-row">
-                <span class="md-bar-label">Click</span>
+                <span class="md-bar-label">{bt('mk.bar.click', lang)}</span>
                 <span class="md-bar-track"><span class="md-bar-fill md-bar-fill--gold" style={`width: ${Math.round(c.click_rate * 100)}%`}></span></span>
                 <span class="md-bar-pct">{pct(c.click_rate)}</span>
               </div>
@@ -205,35 +208,35 @@ function pct(n: number): string {
     <!-- Section 4: Quick-Actions -->
     {canWrite && (
       <section class="md-quick-section">
-        <p class="md-section-eyebrow">Quick Actions</p>
-        <h2 class="md-section-title">Was möchtest du tun</h2>
+        <p class="md-section-eyebrow">{bt('mk.quick.eyebrow', lang)}</p>
+        <h2 class="md-section-title">{bt('mk.quick.title', lang)}</h2>
         <div class="md-quick-grid">
           <a href="/marketing/campaigns/new" class="md-quick-card md-quick-card--primary">
-            <div class="md-quick-label">Neue Kampagne</div>
-            <div class="md-quick-sub">Einmaliger Versand</div>
+            <div class="md-quick-label">{bt('mk.quick.campaign', lang)}</div>
+            <div class="md-quick-sub">{bt('mk.quick.campaign.sub', lang)}</div>
           </a>
           <a href="/marketing/templates/new" class="md-quick-card">
-            <div class="md-quick-label">Neue Vorlage</div>
-            <div class="md-quick-sub">Wiederverwendbar</div>
+            <div class="md-quick-label">{bt('mk.quick.template', lang)}</div>
+            <div class="md-quick-sub">{bt('mk.quick.template.sub', lang)}</div>
           </a>
           <a href="/marketing/drips/new" class="md-quick-card">
-            <div class="md-quick-label">Neue Drip-Sequenz</div>
-            <div class="md-quick-sub">Automatisch nach Trigger</div>
+            <div class="md-quick-label">{bt('mk.quick.drip', lang)}</div>
+            <div class="md-quick-sub">{bt('mk.quick.drip.sub', lang)}</div>
           </a>
         </div>
       </section>
     )}
 
     <div class="md-sub-nav">
-      <a href="/marketing/campaigns" class="md-sub-link">→ Alle Kampagnen</a>
-      <a href="/marketing/templates" class="md-sub-link">→ Alle Vorlagen</a>
-      <a href="/marketing/drips" class="md-sub-link">→ Alle Drips</a>
-      <a href="/marketing/consent" class="md-sub-link">→ Abonnenten &amp; Consent</a>
+      <a href="/marketing/campaigns" class="md-sub-link">→ {bt('mk.nav.campaigns', lang)}</a>
+      <a href="/marketing/templates" class="md-sub-link">→ {bt('mk.nav.templates', lang)}</a>
+      <a href="/marketing/drips" class="md-sub-link">→ {bt('mk.nav.drips', lang)}</a>
+      <a href="/marketing/consent" class="md-sub-link">→ {bt('mk.nav.consent', lang)}</a>
     </div>
   </div>
 
-  <script is:inline define:vars={{ CHART_LABELS: chartLabels, CHART_SENDS: chartSends, CHART_OPENS: chartOpens, CHART_CLICKS: chartClicks }}>
-    window.__MD_CHART__ = { labels: CHART_LABELS, sends: CHART_SENDS, opens: CHART_OPENS, clicks: CHART_CLICKS };
+  <script is:inline define:vars={{ CHART_LABELS: chartLabels, CHART_SENDS: chartSends, CHART_OPENS: chartOpens, CHART_CLICKS: chartClicks, CHART_LOCALE: dateLocale }}>
+    window.__MD_CHART__ = { labels: CHART_LABELS, sends: CHART_SENDS, opens: CHART_OPENS, clicks: CHART_CLICKS, locale: CHART_LOCALE };
   </script>
   <script>
     import { Chart, registerables } from 'chart.js';
@@ -247,7 +250,7 @@ function pct(n: number): string {
         data: {
           labels: cfg.labels.map((iso: string) => {
             const d = new Date(iso);
-            return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+            return d.toLocaleDateString(cfg.locale || 'de-DE', { day: '2-digit', month: 'short' });
           }),
           datasets: [
             { label: 'Sends',  data: cfg.sends,  borderColor: '#8c2128', backgroundColor: 'rgba(140,33,40,.1)', tension: 0.2, borderWidth: 2, pointRadius: 2 },

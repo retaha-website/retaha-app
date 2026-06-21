@@ -1,6 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -50,7 +53,7 @@ const { data: recentConsents } = await sb.from('marketing_consents')
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 ---
 
@@ -72,92 +75,88 @@ function fmtDate(iso: string | null | undefined) {
 
 <div class="settings-page">
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+    <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Consent-Dashboard</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('mc.crumb', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">DSGVO</span>
-    <h1 class="settings-hero__title">Consent<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">Opt-in-Status deiner Gäste — Wallet-Push und E-Mail getrennt.</p>
+    <span class="settings-hero__eyebrow">{bt('mc.hero.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('mc.hero.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('mc.hero.sub', lang)}</p>
   </section>
 
   <div class="settings-sections" style="--settings-cols: 1;">
     <!-- Wallet-Push Opt-ins -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Wallet-Push Opt-ins</h2>
+        <h2 class="s-card__title">{bt('mc.wallet.title', lang)}</h2>
         <span class="s-card__num">01</span>
       </div>
       <div class="s-card__body">
         <div class="consent-grid">
           <div class="consent-kpi consent-kpi--green">
             <div class="consent-kpi__val">{walletActive ?? 0}</div>
-            <div class="consent-kpi__label">Aktive Push-Consent</div>
+            <div class="consent-kpi__label">{bt('mc.wallet.active', lang)}</div>
           </div>
           <div class="consent-kpi">
             <div class="consent-kpi__val">{walletOptInTotal ?? 0}</div>
-            <div class="consent-kpi__label">Gesamt Opt-in</div>
+            <div class="consent-kpi__label">{bt('mc.wallet.total', lang)}</div>
           </div>
         </div>
-        <p style="font-size:13px;color:var(--ink-muted);">
-          Gäste mit <code>marketing_consent_given = true</code> auf ihrem Wallet-Pass. Gesteuert via Double-Opt-in beim Pass-Add.
-        </p>
+        <p style="font-size:13px;color:var(--ink-muted);" set:html={bt('mc.wallet.note', lang)}></p>
       </div>
     </section>
 
     <!-- Email DOI -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">E-Mail Double-Opt-in</h2>
+        <h2 class="s-card__title">{bt('mc.email.title', lang)}</h2>
         <span class="s-card__num">02</span>
       </div>
       <div class="s-card__body">
         <div class="consent-grid">
           <div class="consent-kpi consent-kpi--green">
             <div class="consent-kpi__val">{wlConfirmed}</div>
-            <div class="consent-kpi__label">Bestätigt</div>
+            <div class="consent-kpi__label">{bt('mc.email.confirmed', lang)}</div>
           </div>
           <div class="consent-kpi consent-kpi--orange">
             <div class="consent-kpi__val">{wlPending}</div>
-            <div class="consent-kpi__label">Ausstehend (nicht bestätigt)</div>
+            <div class="consent-kpi__label">{bt('mc.email.pending', lang)}</div>
           </div>
           <div class="consent-kpi">
             <div class="consent-kpi__val">{wlUnsubscribed}</div>
-            <div class="consent-kpi__label">Abgemeldet</div>
+            <div class="consent-kpi__label">{bt('mc.email.unsub', lang)}</div>
           </div>
           <div class="consent-kpi">
             <div class="consent-kpi__val">{wlTotal}</div>
-            <div class="consent-kpi__label">Gesamt Einträge</div>
+            <div class="consent-kpi__label">{bt('mc.email.total', lang)}</div>
           </div>
         </div>
-        <p style="font-size:13px;color:var(--ink-muted);">
-          Nur Gäste-Emails dieses Hotels (Überschneidung mit Wallet-Pässen). E-Mail-Kampagnen gehen NUR an bestätigte Abonnenten.
-        </p>
+        <p style="font-size:13px;color:var(--ink-muted);">{bt('mc.email.note', lang)}</p>
       </div>
     </section>
 
     <!-- Recent Consents -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Letzte Consent-Ereignisse</h2>
+        <h2 class="s-card__title">{bt('mc.recent.title', lang)}</h2>
         <span class="s-card__num">03</span>
       </div>
       <div class="s-card__body">
         {(recentConsents?.length ?? 0) === 0 ? (
-          <p style="color:var(--ink-muted);font-size:14px;">Noch keine Consent-Ereignisse.</p>
+          <p style="color:var(--ink-muted);font-size:14px;">{bt('mc.recent.empty', lang)}</p>
         ) : (
           <table class="consent-table">
             <thead>
               <tr>
-                <th>Aktion</th>
-                <th>Quelle</th>
-                <th>Kanal</th>
-                <th>Policy</th>
-                <th>Datum</th>
+                <th>{bt('mc.th.action', lang)}</th>
+                <th>{bt('mc.th.source', lang)}</th>
+                <th>{bt('mc.th.channel', lang)}</th>
+                <th>{bt('mc.th.policy', lang)}</th>
+                <th>{bt('mc.th.date', lang)}</th>
               </tr>
             </thead>
             <tbody>
@@ -165,11 +164,11 @@ function fmtDate(iso: string | null | undefined) {
                 <tr>
                   <td>
                     <span class={`consent-badge consent-badge--${c.action}`}>
-                      {c.action === 'granted' ? '✓ Erteilt' : '× Widerrufen'}
+                      {c.action === 'granted' ? bt('mc.badge.granted', lang) : bt('mc.badge.revoked', lang)}
                     </span>
                   </td>
                   <td style="color:var(--ink-muted)">{c.source}</td>
-                  <td style="color:var(--ink-muted)">{c.wallet_pass_id ? 'Wallet' : 'E-Mail'}</td>
+                  <td style="color:var(--ink-muted)">{c.wallet_pass_id ? bt('mc.channel.wallet', lang) : bt('mc.channel.email', lang)}</td>
                   <td style="color:var(--ink-muted)">{c.policy_version}</td>
                   <td style="color:var(--ink-muted)">{fmtDate(c.created_at)}</td>
                 </tr>
