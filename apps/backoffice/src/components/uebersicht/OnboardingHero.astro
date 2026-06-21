@@ -1,22 +1,19 @@
 ---
 // Onboarding-Hero · Screen 1 — „Eve kennt dein Hotel schon."
 //
-// Airbnb-Split: links Copy, rechts der ECHTE Eve-Concierge im Bauhaus-Branding
-// (gelb) — 1:1 übernommen aus der Gäste-App / /branding-Vorschau
-// (EveChatSheet [data-theme="bauhaus"] + BauhausPreview-Tokens). Eve-Avatar-SVG
-// inline aus apps/guest/src/assets/eve-avatar.svg. Tokens lokal gescopt → kein
-// Backoffice-Leak, identischer Look.
-//
-// Demo-Konversation (kein echtes Eve-Backend). Copy bewusst noch DE-only — i18n
-// folgt erst nach finaler Freigabe von Screen 1.
+// Airbnb-Split: links Copy, rechts der ECHTE Eve-Concierge im Bauhaus-Look
+// (Eve-Avatar-SVG inline aus apps/guest/src/assets/eve-avatar.svg). Akzentfarbe
+// Petrol (#14616E). Eve ist INTERAKTIV: man kann tippen und Eve antwortet wie in
+// der Gäste-App (Demo — Stichwort-basierte Antworten, kein Backend). Unten ein
+// cleaner Schritt-Balken. Copy DE-only.
 
 interface Props {
   hotelName?: string;
 }
 const { hotelName: _hotelName } = Astro.props;
 
-// Echte Sprachzahl aus der i18n-Config (LANGUAGES in @retaha/i18n) — nicht raten.
 const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
+const STEPS = 5;       // mehr Schritte kommen noch dazu
 ---
 
 <section class="onb-hero" data-onb-hero>
@@ -35,7 +32,7 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
       </div>
     </div>
 
-    <!-- ── Rechts: Eve-Concierge (Bauhaus-Branding) ────────────────── -->
+    <!-- ── Rechts: Eve-Concierge (interaktiv) ───────────────────────── -->
     <div class="onb-eve onb-reveal" data-r="1" data-onb-eve>
       <header class="eve-sheet-header">
         <div class="eve-sheet-avatar" data-eve-avatar role="img" aria-label="Eve, Concierge">
@@ -79,36 +76,46 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
         </div>
       </div>
 
-      <div class="eve-sheet-input-row">
-        <input class="eve-sheet-input" type="text" placeholder="Frag Eve selbst etwas über dein Hotel" aria-label="Frag Eve etwas" />
-        <button class="eve-sheet-send" type="button" aria-label="Senden">↑</button>
+      <!-- Beispielfrage-Hint mit Pfeil → Eingabe -->
+      <div class="eve-hint" data-eve-hint hidden>
+        <span class="eve-hint-arrow" aria-hidden="true">↳</span>
+        <button type="button" class="eve-hint-q" data-eve-example>Frag Eve: „Mir fehlt ein Handtuch"</button>
       </div>
+
+      <form class="eve-sheet-input-row" data-eve-form>
+        <input class="eve-sheet-input" data-eve-input type="text" placeholder="Frag Eve etwas über dein Hotel …" aria-label="Frag Eve etwas" autocomplete="off" />
+        <button class="eve-sheet-send" data-eve-send type="submit" aria-label="Senden">↑</button>
+      </form>
     </div>
 
+  </div>
+
+  <!-- ── Schritt-Balken (clean, ohne Schrift) ──────────────────────── -->
+  <div class="onb-steps" role="img" aria-label="Schritt 1">
+    {Array.from({ length: STEPS }, (_, i) => (
+      <span class:list={['onb-step', { 'is-active': i === 0 }]}></span>
+    ))}
   </div>
 </section>
 
 <style>
-  /* ── Bauhaus-Tokens (lokal gescopt — wie /branding-Vorschau) ────── */
+  /* ── Tokens (lokal gescopt) ────────────────────────────────────── */
   .onb-hero {
     --onb-bg: #FAFAF7;
     --onb-ink: #0A0A0A;
     --onb-ink-muted: #5C5C5C;
     --onb-ink-faint: #A3A3A3;
-    --onb-anthrazit: #1A1A1A;
     --onb-petrol: #14616E;
+    --onb-petrol-soft: rgba(20, 97, 110, 0.10);
     --onb-border: #E5E4DF;
     --onb-border-card: #E3E1DA;
     --onb-card-bg: #FAFAF6;
-    --onb-sage: #5C9070;
 
-    /* Breite/Ausrichtung exakt wie der Inhalt darunter (1400px · 32px padding) */
     max-width: 1400px;
     margin: 8px auto 12px;
-    padding: 32px 32px 48px;
+    padding: 32px 32px 40px;
     border-bottom: 1px solid var(--border);
   }
-  /* Rechts in Smartphone-Breite (≈ Phone), links nimmt den Rest */
   .onb-grid {
     display: grid;
     grid-template-columns: 1fr minmax(0, 380px);
@@ -119,12 +126,11 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
     .onb-grid { grid-template-columns: 1fr; gap: 32px; justify-items: center; }
   }
   @media (max-width: 768px) {
-    .onb-hero { padding: 24px 20px 36px; }
+    .onb-hero { padding: 24px 20px 32px; }
   }
 
-  /* ── Links: Copy (Bauhaus) ─────────────────────────────────────── */
+  /* ── Links: Copy ───────────────────────────────────────────────── */
   .onb-copy { min-width: 0; }
-  /* Großer Header — orientiert an HeroSection („Schöner Anfang.") */
   .onb-headline {
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 400;
@@ -144,8 +150,7 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
   }
   .onb-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
-    font-size: 16px;
-    line-height: 1.62;
+    font-size: 16px; line-height: 1.62;
     color: var(--onb-ink-muted);
     max-width: 48ch;
     margin: 0 0 28px;
@@ -155,57 +160,44 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
   .onb-cta-row { display: flex; gap: 12px; align-items: center; }
   .onb-cta {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--onb-bg);
-    background: var(--onb-ink);
-    border: none;
-    border-radius: var(--r, 12px);
-    padding: 13px 26px;
-    cursor: pointer;
+    font-size: 15px; font-weight: 500;
+    color: var(--onb-bg); background: var(--onb-ink);
+    border: none; border-radius: var(--r, 12px);
+    padding: 13px 26px; cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
   }
   .onb-cta:hover { background: var(--onb-petrol); color: #fff; }
   .onb-cta:active { transform: translateY(1px); }
 
-  /* ── Rechts: Eve-Panel (Bauhaus, 1:1 aus der Gäste-App) ────────── */
+  /* ── Rechts: Eve-Panel ─────────────────────────────────────────── */
   .onb-eve {
-    width: 100%;
-    max-width: 380px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
+    width: 100%; max-width: 380px; margin: 0 auto;
+    display: flex; flex-direction: column;
     height: 560px;
     background: var(--onb-card-bg);
     border: 1px solid var(--onb-border-card);
-    border-radius: 20px;
-    overflow: hidden;
+    border-radius: 20px; overflow: hidden;
     box-shadow: 0 22px 60px -26px rgba(10, 10, 10, 0.32);
   }
   @media (max-width: 880px) { .onb-eve { height: 500px; } }
 
-  /* Header — grid avatar · info · status */
   .eve-sheet-header {
     flex-shrink: 0;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
     padding: 14px 16px;
     background: var(--onb-card-bg);
     border-bottom: 1px solid var(--onb-border-card);
   }
   .eve-sheet-avatar {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--onb-anthrazit) 13%, var(--onb-card-bg));
-    color: var(--onb-anthrazit);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: color-mix(in srgb, var(--onb-petrol) 13%, var(--onb-card-bg));
+    color: var(--onb-petrol);
     display: grid; place-items: center;
-    justify-self: start;
-    overflow: visible;
+    justify-self: start; overflow: visible;
   }
   .eve-sheet-avatar svg { width: 38px; height: 38px; overflow: visible; }
 
-  /* ── Avatar: Wink-Sequenz (1×, beim Start) + Tipp-Puls — 1:1 aus der Gäste-App ── */
+  /* Avatar: Wink-Sequenz (1×, beim Start) + Tipp-Puls */
   .onb-eve { --onb-wave-total: 5900ms; }
   .onb-eve .ring-closed { opacity: 1; }
   .onb-eve .ring-open { opacity: 0; }
@@ -225,33 +217,22 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
   @keyframes onb-arm-vis         { 0%,48%{opacity:0} 53%,86%{opacity:1} 90%,100%{opacity:0} }
   @keyframes onb-hand-vis        { 0%,49%{opacity:0} 54%,86%{opacity:1} 90%,100%{opacity:0} }
   @keyframes onb-hand-swing {
-    0%,50%   { transform: rotate(0deg);  }
-    58%      { transform: rotate(16deg); }
-    66%      { transform: rotate(-13deg);}
-    74%      { transform: rotate(11deg); }
-    82%      { transform: rotate(-7deg); }
-    86%,100% { transform: rotate(0deg);  }
+    0%,50%{transform:rotate(0deg)} 58%{transform:rotate(16deg)} 66%{transform:rotate(-13deg)}
+    74%{transform:rotate(11deg)} 82%{transform:rotate(-7deg)} 86%,100%{transform:rotate(0deg)}
   }
-  @keyframes onb-eve-typing-pulse {
-    0%, 100% { transform: scale(1);    opacity: 1;   }
-    50%      { transform: scale(1.04); opacity: 0.8; }
-  }
+  @keyframes onb-eve-typing-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.04);opacity:0.8} }
+
   .eve-sheet-header-info { display: flex; flex-direction: column; gap: 2px; align-items: center; text-align: center; }
   .eve-sheet-header-eyebrow {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #6E6B64;
+    font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #6E6B64;
   }
-  .eve-sheet-header-eyebrow::before {
-    content: '● '; font-size: 6px; vertical-align: middle; color: var(--onb-anthrazit);
-  }
+  .eve-sheet-header-eyebrow::before { content: '● '; font-size: 6px; vertical-align: middle; color: var(--onb-petrol); }
   .eve-sheet-header-name {
-    margin: 0;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
-    color: var(--onb-ink);
+    margin: 0; font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--onb-ink);
   }
-  .eve-name-dot { color: var(--onb-anthrazit); font-style: normal; }
+  .eve-name-dot { color: var(--onb-petrol); font-style: normal; }
 
   /* Messages */
   .eve-sheet-messages { flex: 1; overflow-y: auto; padding: 18px 18px; scroll-behavior: smooth; }
@@ -259,79 +240,96 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
   .eve-message--user { justify-content: flex-end; }
   .eve-message--assistant { justify-content: flex-start; }
   .eve-message-bubble {
-    max-width: 88%;
-    padding: 16px 18px;
+    max-width: 88%; padding: 16px 18px;
     font-family: 'Inter Tight', system-ui, sans-serif;
     font-size: 15px; line-height: 1.55;
     white-space: pre-wrap; word-wrap: break-word;
   }
-  .eve-message--user .eve-message-bubble {
-    background: #0A0A0A; color: #FAFAF6; border-radius: 12px;
-  }
+  .eve-message--user .eve-message-bubble { background: #0A0A0A; color: #FAFAF6; border-radius: 12px; }
   .eve-message--assistant .eve-message-bubble {
     background: #FFFFFF; color: #0A0A0A;
     border: 1px solid var(--onb-border-card); border-radius: 12px;
   }
   .eve-message--assistant .eve-message-bubble::before {
-    content: attr(data-sender);
-    display: block;
+    content: attr(data-sender); display: block;
     font-family: 'JetBrains Mono', monospace;
     font-size: 7.5px; font-weight: 600; letter-spacing: 0.2em;
-    color: var(--onb-anthrazit); margin-bottom: 6px;
+    color: var(--onb-petrol); margin-bottom: 6px;
   }
 
   /* Typing */
   .eve-typing-wrap { display: flex; margin-bottom: 16px; }
   .eve-typing {
-    display: inline-flex; gap: 4px; align-items: center;
-    padding: 14px 18px;
+    display: inline-flex; gap: 4px; align-items: center; padding: 14px 18px;
     background: #FFFFFF; border: 1px solid var(--onb-border-card);
     border-radius: 12px; width: fit-content;
   }
   .eve-typing span {
     width: 7px; height: 7px; border-radius: 50%;
-    background: var(--onb-anthrazit);
+    background: var(--onb-petrol);
     animation: onb-typing-bounce 1.2s infinite ease-in-out;
   }
   .eve-typing span:nth-child(2) { animation-delay: 0.15s; }
   .eve-typing span:nth-child(3) { animation-delay: 0.3s; }
-  @keyframes onb-typing-bounce {
-    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-    30% { transform: translateY(-4px); opacity: 1; }
+  @keyframes onb-typing-bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-4px);opacity:1} }
+
+  /* Beispielfrage-Hint */
+  .eve-hint {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 16px 8px;
   }
+  .eve-hint-arrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+    color: var(--onb-petrol); transform: rotate(90deg); line-height: 1;
+  }
+  .eve-hint-q {
+    border: 1px solid var(--onb-petrol);
+    background: var(--onb-petrol-soft);
+    color: var(--onb-petrol);
+    border-radius: 999px; padding: 6px 12px;
+    font-family: 'Inter Tight', system-ui, sans-serif; font-size: 12px;
+    cursor: pointer; text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+  }
+  .eve-hint-q:hover { background: var(--onb-petrol); color: #fff; }
 
   /* Input */
   .eve-sheet-input-row {
-    flex-shrink: 0;
-    display: flex; gap: 8px;
+    flex-shrink: 0; display: flex; gap: 8px; margin: 0;
     padding: 12px 16px;
-    border-top: 1px solid var(--onb-border-card);
-    background: #FFFFFF;
+    border-top: 1px solid var(--onb-border-card); background: #FFFFFF;
   }
   .eve-sheet-input {
-    flex: 1;
-    padding: 12px 16px;
-    border: 1px solid var(--onb-border-card);
-    border-radius: 12px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 14px;
-    color: var(--onb-ink);
-    background: var(--onb-bg);
-    outline: none;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    flex: 1; padding: 12px 16px;
+    border: 1px solid var(--onb-border-card); border-radius: 12px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    color: var(--onb-ink); background: var(--onb-bg);
+    outline: none; transition: border-color 0.15s ease, background 0.15s ease;
   }
-  .eve-sheet-input:focus { border-color: var(--onb-anthrazit); background: #FFFFFF; }
+  .eve-sheet-input:focus { border-color: var(--onb-petrol); background: #FFFFFF; }
   .eve-sheet-input::placeholder { color: var(--onb-ink-faint); }
   .eve-sheet-send {
-    flex-shrink: 0;
-    width: 44px; height: 44px;
+    flex-shrink: 0; width: 44px; height: 44px;
     border: none; border-radius: 12px;
     background: #0A0A0A; color: #FAFAF6;
-    font-size: 22px; line-height: 1;
-    cursor: pointer;
+    font-size: 22px; line-height: 1; cursor: pointer;
     transition: background 0.15s ease;
   }
-  .eve-sheet-send:hover { background: var(--onb-anthrazit); }
+  .eve-sheet-send:hover { background: var(--onb-petrol); }
+
+  /* ── Schritt-Balken ────────────────────────────────────────────── */
+  .onb-steps {
+    display: flex; justify-content: center; gap: 8px;
+    margin: 28px auto 0; max-width: 320px;
+  }
+  .onb-step {
+    flex: 1; height: 5px; border-radius: 999px;
+    background: var(--border-medium, rgba(10,10,10,0.14));
+    transition: background 0.2s ease;
+  }
+  .onb-step.is-active { background: var(--onb-petrol); }
 
   /* ── Entrance-Animation ────────────────────────────────────────── */
   .onb-reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease; }
@@ -363,12 +361,101 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
     var typing = hero.querySelector('[data-eve-typing]');
     var avatar = hero.querySelector('[data-eve-avatar]');
     var msgArea = hero.querySelector('[data-eve-messages]');
+    var form = hero.querySelector('[data-eve-form]');
+    var input = hero.querySelector('[data-eve-input]');
+    var hint = hero.querySelector('[data-eve-hint]');
+    var exampleBtn = hero.querySelector('[data-eve-example]');
 
     function scrollDown() { if (msgArea) msgArea.scrollTop = msgArea.scrollHeight; }
+
+    // ── Eve-Antworten (Demo — wie in der Gäste-App, Stichwort-basiert) ──
+    var RULES = [
+      { k: ['handtuch', 'towel', 'bademantel'], a: 'Klar — ich sag dem Housekeeping Bescheid, ein frisches Handtuch ist gleich auf dem Weg zu deinem Zimmer. 🛁' },
+      { k: ['restaurant', 'essen', 'dinner', 'abendessen', 'küche'], a: 'Unser Restaurant hat täglich 18:00–22:30 Uhr geöffnet, Frühstück 7:00–10:30 Uhr. Soll ich einen Tisch für dich reservieren?' },
+      { k: ['spot', 'umgebung', 'empfehl', 'sehensw', 'café', 'cafe', 'in der nähe', 'tipps'], a: 'In 5 Gehminuten: das Café Morgentau (Frühstück & Kuchen), der Stadtpark mit See und die Altstadt-Gasse mit kleinen Boutiquen. Magst du eher Essen oder Natur?' },
+      { k: ['wlan', 'wifi', 'wi-fi', 'internet', 'passwort'], a: 'Das WLAN heißt „Gast-WLAN" — das Passwort lautet willkommen2024. Brauchst du sonst noch was? 📶' },
+      { k: ['frühstück', 'fruehstueck', 'breakfast', 'morgen'], a: 'Frühstück gibt’s täglich 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich einen Platz reservieren?' },
+      { k: ['checkout', 'check-out', 'auschecken', 'abreise'], a: 'Check-out ist bis 11:00 Uhr. Brauchst du einen späten Check-out? Ich frage gern an der Rezeption nach. 🕚' },
+      { k: ['spa', 'wellness', 'sauna', 'massage', 'pool'], a: 'Unser Spa ist täglich 8:00–21:00 Uhr geöffnet — Sauna, Dampfbad und Ruheraum. Soll ich dir eine Massage buchen?' },
+      { k: ['park', 'auto', 'garage', 'stellplatz'], a: 'Tiefgaragen-Parkplätze gibt’s direkt unter dem Hotel für 15 €/Nacht. Soll ich einen für dich reservieren?' },
+      { k: ['taxi', 'transfer', 'flughafen', 'bahnhof'], a: 'Ich rufe dir gern ein Taxi — es ist in etwa 5 Minuten an der Lobby. Wohin soll’s gehen?' },
+      { k: ['danke', 'thanks', 'merci'], a: 'Sehr gern! Ich bin rund um die Uhr für dich da. 🌿' }
+    ];
+    var FALLBACK = 'Das schaue ich dir gern nach. Magst du mir kurz sagen, ob es um dein Zimmer, ums Essen oder um Tipps in der Umgebung geht? Frag mich z. B. nach Frühstück, WLAN oder Check-out.';
+
+    function answerFor(text) {
+      var t = (text || '').toLowerCase();
+      for (var i = 0; i < RULES.length; i++) {
+        for (var j = 0; j < RULES[i].k.length; j++) {
+          if (t.indexOf(RULES[i].k[j]) !== -1) return RULES[i].a;
+        }
+      }
+      return FALLBACK;
+    }
+
+    function addMsg(role, text) {
+      var wrap = document.createElement('div');
+      wrap.className = 'eve-message eve-message--' + role + ' is-in';
+      var bubble = document.createElement('div');
+      bubble.className = 'eve-message-bubble';
+      if (role === 'assistant') bubble.setAttribute('data-sender', 'EVE');
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
+      msgArea.appendChild(wrap);
+      scrollDown();
+    }
+
+    var busy = false;
+    function ask(text) {
+      text = (text || '').trim();
+      if (!text || busy) return;
+      busy = true;
+      addMsg('user', text);
+      if (input) input.value = '';
+      // Tipp-Punkte ans Ende + Avatar-Puls
+      msgArea.appendChild(typing);
+      typing.hidden = false; typing.classList.add('is-in'); scrollDown();
+      if (avatar) avatar.classList.add('is-typing');
+      var delay = 900 + Math.min(1600, text.length * 22);
+      setTimeout(function () {
+        typing.hidden = true;
+        if (avatar) avatar.classList.remove('is-typing');
+        addMsg('assistant', answerFor(text));
+        busy = false;
+      }, delay);
+    }
+
+    // Beispielfragen — rotieren im Hint-Chip
+    var EXAMPLES = [
+      'Mir fehlt ein Handtuch',
+      'Welche Spots gibt es in der Umgebung?',
+      'Wann hat euer Restaurant geöffnet?',
+      'Wie lautet das WLAN-Passwort?',
+      'Wann ist Check-out?'
+    ];
+    var exIdx = 0;
+    function renderExample() {
+      if (exampleBtn) exampleBtn.textContent = 'Frag Eve: „' + EXAMPLES[exIdx] + '"';
+    }
+    if (exampleBtn) {
+      exampleBtn.addEventListener('click', function () { ask(EXAMPLES[exIdx]); });
+    }
+
+    if (form) {
+      form.addEventListener('submit', function (e) { e.preventDefault(); if (input) ask(input.value); });
+    }
+
+    function enableChat() {
+      if (hint) hint.hidden = false;
+      renderExample();
+      setInterval(function () { exIdx = (exIdx + 1) % EXAMPLES.length; renderExample(); }, 3200);
+      if (input) input.focus({ preventScroll: true });
+    }
 
     if (reduce) {
       reveals.forEach(function (el) { el.classList.add('is-in'); });
       msgs.forEach(function (el) { el.classList.add('is-in'); });
+      enableChat();
       return;
     }
 
@@ -385,14 +472,15 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
       t += 550;
       setTimeout(function () {
         if (typing) { typing.hidden = false; void typing.offsetWidth; typing.classList.add('is-in'); scrollDown(); }
-        if (avatar) avatar.classList.add('is-typing'); // Eve pulsiert beim Tippen
+        if (avatar) avatar.classList.add('is-typing');
       }, t);
       t += 1400;
       setTimeout(function () {
-        if (typing) typing.hidden = true;
+        if (typing) { typing.hidden = true; typing.classList.remove('is-in'); }
         if (avatar) avatar.classList.remove('is-typing');
         msgs[2].classList.add('is-in');
         scrollDown();
+        enableChat(); // ab jetzt interaktiv
       }, t);
     }
 
