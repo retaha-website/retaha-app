@@ -1,0 +1,366 @@
+---
+// Onboarding-Hero · Screen 1 — „Eve kennt dein Hotel schon."
+//
+// Airbnb-Split: links Copy, rechts das echte Eve-Chat-Design (Look 1:1 aus der
+// Gäste-App — EveChatSheet/EveMessage/EveTypingIndicator/GuestEveScreen). Die
+// Eve-Styles sind hier lokal & gescopt repliziert (--theme-* nur auf dem Panel),
+// damit der Backoffice-Style nicht leakt und der Look identisch bleibt.
+//
+// Demo-Konversation (kein echtes Eve-Backend). Copy bewusst noch DE-only — i18n
+// folgt erst nach finaler Freigabe von Screen 1.
+
+interface Props {
+  hotelName?: string;
+}
+const { hotelName: _hotelName } = Astro.props;
+
+// Echte Sprachzahl aus der i18n-Config (LANGUAGES in @retaha/i18n) — nicht raten.
+const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
+---
+
+<section class="onb-hero" data-onb-hero>
+  <div class="onb-grid">
+
+    <!-- ── Links: Copy ─────────────────────────────────────────────── -->
+    <div class="onb-copy">
+      <p class="onb-eyebrow onb-reveal" data-r="0">Schritt 1 · Dein Gast-Concierge</p>
+      <h1 class="onb-headline onb-reveal" data-r="1">Eve kennt dein Hotel schon.</h1>
+      <p class="onb-sub onb-reveal" data-r="2">
+        Aufgebaut aus eurer Website — ohne dass du etwas eingestellt hast. So
+        beantwortet Eve ab jetzt jede Gästefrage, rund um die Uhr, in
+        <strong>{LANG_COUNT} Sprachen</strong>.
+      </p>
+      <div class="onb-cta-row onb-reveal" data-r="3">
+        <button type="button" class="onb-cta">Weiter →</button>
+      </div>
+    </div>
+
+    <!-- ── Rechts: Eve-Panel (echtes Design) ───────────────────────── -->
+    <div class="onb-eve onb-reveal" data-r="2" data-onb-eve>
+      <div class="eve-sheet-header">
+        <div class="eve-sheet-header-info">
+          <span class="eve-sheet-header-eyebrow">concierge</span>
+          <h2 class="eve-sheet-header-name">Eve</h2>
+        </div>
+        <div class="eve-online-dot" aria-hidden="true"></div>
+      </div>
+
+      <div class="eve-sheet-messages" data-eve-messages>
+        <div class="eve-message eve-message--assistant" data-step="0">
+          <div class="eve-message-bubble">Hallo! Ich bin Eve, euer digitaler Concierge — rund um die Uhr für eure Gäste da.</div>
+        </div>
+        <div class="eve-message eve-message--user" data-step="1">
+          <div class="eve-message-bubble">Wann gibt es Frühstück?</div>
+        </div>
+        <div class="eve-typing-wrap" data-eve-typing hidden>
+          <div class="eve-typing" aria-label="Eve schreibt …" role="status">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="eve-message eve-message--assistant" data-step="2">
+          <div class="eve-message-bubble">Täglich von 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich sonst noch etwas vorbereiten?</div>
+        </div>
+      </div>
+
+      <div class="eve-sheet-input-row">
+        <input class="eve-sheet-input" type="text" placeholder="Frag Eve selbst etwas über dein Hotel" aria-label="Frag Eve etwas" />
+        <button class="eve-sheet-send" type="button" aria-label="Senden">↑</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  /* ── Layout: Airbnb-Split ──────────────────────────────────────── */
+  .onb-hero {
+    max-width: 1140px;
+    margin: 8px auto 12px;
+    padding: 32px 24px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .onb-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+  @media (max-width: 880px) {
+    .onb-grid { grid-template-columns: 1fr; gap: 32px; }
+    .onb-hero { padding: 24px 20px 36px; }
+  }
+
+  /* ── Links: Copy ───────────────────────────────────────────────── */
+  .onb-copy { min-width: 0; }
+  .onb-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--te-pink, #FF4A82);
+    margin: 0 0 18px;
+  }
+  .onb-headline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    font-size: clamp(30px, 4.4vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0 0 18px;
+  }
+  .onb-sub {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    color: var(--ink-soft);
+    max-width: 48ch;
+    margin: 0 0 28px;
+  }
+  .onb-sub strong { color: var(--ink); font-weight: 600; }
+
+  .onb-cta-row { display: flex; gap: 12px; align-items: center; }
+  .onb-cta {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    background: var(--te-pink, #FF4A82);
+    border: none;
+    border-radius: var(--r, 12px);
+    padding: 13px 26px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+  .onb-cta:hover { background: var(--te-yellow, #FFE600); color: var(--ink, #0A0A0A); }
+  .onb-cta:active { transform: translateY(1px); }
+
+  /* ── Rechts: Eve-Panel ─────────────────────────────────────────── */
+  /* Tokens LOKAL gesetzt (Gäste-App-Default „classic"), damit der Eve-Look
+     identisch bleibt und nichts ins Backoffice leakt. */
+  .onb-eve {
+    --theme-bg-primary: #FFFFFF;
+    --theme-bg-secondary: #FAFAF8;
+    --theme-bg-tertiary: #F4F4F2;
+    --theme-text-primary: #1A1A1A;
+    --theme-text-secondary: rgba(26, 26, 26, 0.70);
+    --theme-border: #E8E4DD;
+    --theme-accent: #FF4A82;
+    --theme-sage: #5C9070;
+    --accent: #FF4A82;
+
+    display: flex;
+    flex-direction: column;
+    height: 460px;
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 18px 50px -24px rgba(10, 10, 10, 0.28);
+  }
+  @media (max-width: 880px) {
+    .onb-eve { height: 420px; }
+  }
+
+  /* Header */
+  .eve-sheet-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--theme-border);
+    background: var(--theme-bg-primary);
+  }
+  .eve-sheet-header-info { display: flex; flex-direction: column; gap: 2px; }
+  .eve-sheet-header-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+  }
+  .eve-sheet-header-name {
+    margin: 0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--theme-text-primary);
+    letter-spacing: -0.01em;
+  }
+  .eve-online-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--theme-sage);
+    box-shadow: 0 0 0 3px rgba(92, 144, 112, 0.22);
+    animation: onb-led-pulse 2s ease-in-out infinite;
+  }
+  @keyframes onb-led-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(1.15); }
+  }
+
+  /* Messages */
+  .eve-sheet-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px;
+    scroll-behavior: smooth;
+  }
+  .eve-message { display: flex; margin-bottom: 12px; max-width: 100%; align-items: flex-end; }
+  .eve-message--user { justify-content: flex-end; }
+  .eve-message--assistant { justify-content: flex-start; }
+  .eve-message-bubble {
+    max-width: 82%;
+    padding: 10px 14px;
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .eve-message--user .eve-message-bubble {
+    background: var(--theme-accent);
+    color: #fff;
+    border-radius: 16px 16px 4px 16px;
+  }
+  .eve-message--assistant .eve-message-bubble {
+    background: var(--theme-bg-primary);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border);
+    border-radius: 16px 16px 16px 4px;
+  }
+
+  /* Typing-Indicator (3 Dots) */
+  .eve-typing-wrap { display: flex; margin-bottom: 12px; }
+  .eve-typing {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--theme-bg-primary);
+    border: 1px solid var(--theme-border);
+    border-radius: 16px 16px 16px 4px;
+    width: fit-content;
+  }
+  .eve-typing span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: color-mix(in srgb, var(--theme-text-primary) 45%, transparent);
+    animation: onb-typing-bounce 1.2s infinite ease-in-out;
+  }
+  .eve-typing span:nth-child(2) { animation-delay: 0.15s; }
+  .eve-typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes onb-typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* Input */
+  .eve-sheet-input-row {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--theme-border);
+    background: var(--theme-bg-primary);
+  }
+  .eve-sheet-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--theme-border);
+    border-radius: 22px;
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 14px;
+    color: var(--theme-text-primary);
+    background: var(--theme-bg-tertiary);
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .eve-sheet-input:focus { border-color: var(--accent); background: var(--theme-bg-primary); }
+  .eve-sheet-input::placeholder { color: color-mix(in srgb, var(--theme-text-primary) 45%, transparent); }
+  .eve-sheet-send {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  .eve-sheet-send:hover { transform: scale(1.05); }
+
+  /* ── Entrance-Animation ────────────────────────────────────────── */
+  /* Standard: Copy + Bubbles starten verborgen (kein Flash), Script spielt ein. */
+  .onb-reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .onb-reveal.is-in { opacity: 1; transform: none; }
+  .eve-message, .eve-typing-wrap { opacity: 0; transform: translateY(6px); transition: opacity 0.35s ease, transform 0.35s ease; }
+  .eve-message.is-in, .eve-typing-wrap.is-in { opacity: 1; transform: none; }
+
+  /* Reduced-Motion: alles sofort sichtbar, kein Typing-Playback */
+  @media (prefers-reduced-motion: reduce) {
+    .onb-reveal, .eve-message { opacity: 1 !important; transform: none !important; transition: none; }
+    .eve-typing-wrap { display: none !important; }
+  }
+</style>
+
+<noscript>
+  <style>
+    .onb-reveal, .eve-message { opacity: 1 !important; transform: none !important; }
+    .eve-typing-wrap { display: none !important; }
+  </style>
+</noscript>
+
+<script is:inline>
+  (function () {
+    var hero = document.querySelector('[data-onb-hero]');
+    if (!hero) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var reveals = Array.prototype.slice.call(hero.querySelectorAll('.onb-reveal'));
+    var msgs = Array.prototype.slice.call(hero.querySelectorAll('[data-step]'));
+    var typing = hero.querySelector('[data-eve-typing]');
+    var msgArea = hero.querySelector('[data-eve-messages]');
+
+    function scrollDown() { if (msgArea) msgArea.scrollTop = msgArea.scrollHeight; }
+
+    if (reduce) {
+      // Statisch: Copy + alle Bubbles sichtbar, kein Typing-Playback
+      reveals.forEach(function (el) { el.classList.add('is-in'); });
+      msgs.forEach(function (el) { el.classList.add('is-in'); });
+      return;
+    }
+
+    function start() {
+      // Entrance: gestaffelt nach data-r
+      reveals.forEach(function (el) {
+        var r = parseInt(el.getAttribute('data-r') || '0', 10);
+        setTimeout(function () { el.classList.add('is-in'); }, r * 90);
+      });
+
+      // Chat-Playback: Greeting → Gast → Tipp-Punkte → Eve-Antwort
+      var t = 750;
+      // 0: Eve-Greeting
+      setTimeout(function () { msgs[0].classList.add('is-in'); scrollDown(); }, t);
+      // 1: Gast-Frage
+      t += 850;
+      setTimeout(function () { msgs[1].classList.add('is-in'); scrollDown(); }, t);
+      // Tipp-Punkte (hidden-Attribut entfernen + einblenden)
+      t += 550;
+      setTimeout(function () {
+        if (typing) { typing.hidden = false; void typing.offsetWidth; typing.classList.add('is-in'); scrollDown(); }
+      }, t);
+      // 2: Eve-Antwort (Tipp-Punkte ausblenden)
+      t += 1400;
+      setTimeout(function () {
+        if (typing) typing.hidden = true;
+        msgs[2].classList.add('is-in');
+        scrollDown();
+      }, t);
+    }
+
+    if ('requestAnimationFrame' in window) requestAnimationFrame(function () { setTimeout(start, 120); });
+    else setTimeout(start, 200);
+  })();
+</script>
