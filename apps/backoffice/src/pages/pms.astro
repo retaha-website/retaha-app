@@ -10,6 +10,9 @@ import { encryptToken } from '@retaha/auth';
 import { MewsClient } from '../lib/mews/client';
 import { getMewsClientForHotel } from '../lib/mews/factory';
 import { getEnv } from '@retaha/db';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -32,9 +35,9 @@ if (Astro.request.method === 'POST') {
     const environment = form.get('environment')?.toString();
 
     if (!accessToken) {
-      message = { type: 'error', text: 'Access-Token ist Pflichtfeld.' };
+      message = { type: 'error', text: bt('pms.msg.tokenrequired', lang) };
     } else if (environment !== 'demo' && environment !== 'production') {
-      message = { type: 'error', text: 'Ungültiges Environment (nur demo/production erlaubt).' };
+      message = { type: 'error', text: bt('pms.msg.invalidenv', lang) };
     } else {
       // 1) ENV für Environment auflösen (ClientToken gehört uns als Integration-Provider,
       //    nicht dem Hotel — kommt aus ENV, nicht aus dem Formular)
@@ -48,7 +51,7 @@ if (Astro.request.method === 'POST') {
       if (!baseUrl || !clientToken) {
         message = {
           type: 'error',
-          text: `${environment === 'demo' ? 'Demo' : 'Production'}-Environment nicht konfiguriert (ENV fehlt).`,
+          text: bt('pms.msg.envnotconfigured', lang).replace('{env}', environment === 'demo' ? 'Demo' : 'Production'),
         };
       } else {
         try {
@@ -66,7 +69,7 @@ if (Astro.request.method === 'POST') {
           if (!enterpriseId) {
             message = {
               type: 'error',
-              text: 'Mews API antwortete ohne Enterprise.Id — Token möglicherweise ungültig oder Account ohne Enterprise.',
+              text: bt('pms.msg.noenterprise', lang),
             };
           } else {
             // 3) Default-Currency aus Enterprise.Currencies (IsDefault=true)
@@ -113,7 +116,7 @@ if (Astro.request.method === 'POST') {
               );
 
             if (error) {
-              message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+              message = { type: 'error', text: bt('pms.msg.savefail', lang).replace('{err}', error.message) };
             } else {
               return Astro.redirect(
                 `/pms?saved=connected${enterpriseName ? `&hotel=${encodeURIComponent(enterpriseName)}` : ''}`,
@@ -123,7 +126,7 @@ if (Astro.request.method === 'POST') {
         } catch (err) {
           message = {
             type: 'error',
-            text: `Mews-Verbindungstest fehlgeschlagen: ${(err as Error).message}`,
+            text: bt('pms.msg.conntestfail', lang).replace('{err}', (err as Error).message),
           };
         }
       }
@@ -137,7 +140,7 @@ if (Astro.request.method === 'POST') {
     const pricingSource = form.get('pricing_source')?.toString();
 
     if (pricingSource !== 'retaha' && pricingSource !== 'mews') {
-      message = { type: 'error', text: 'Ungültige Preis-Quelle.' };
+      message = { type: 'error', text: bt('pms.msg.invalidpricing', lang) };
     } else {
       // Bei Tax-Code-Set: Tax-Rate via taxations/getAll auflösen (Sprint D Phase 1).
       // Wir filtern manuell auf TaxationCode === TaxEnvironmentCode (Mews ignoriert
@@ -170,14 +173,14 @@ if (Astro.request.method === 'POST') {
               if (typeof numericRate === 'number' && numericRate >= 0 && numericRate < 1) {
                 resolvedTaxRate = numericRate;
               } else {
-                taxRateLookupError = `Tax-Code "${taxCode}" gefunden, aber kein numerischer Rate-Wert (Strategy=${JSON.stringify(match.Strategy?.Discriminator)})`;
+                taxRateLookupError = bt('pms.msg.taxnonum', lang).replace('{code}', taxCode).replace('{strategy}', JSON.stringify(match.Strategy?.Discriminator));
               }
             } else {
-              taxRateLookupError = `Tax-Code "${taxCode}" nicht in taxations/getAll für TaxEnvironment "${taxEnv}" gefunden`;
+              taxRateLookupError = bt('pms.msg.taxnotfound', lang).replace('{code}', taxCode).replace('{env}', String(taxEnv));
             }
           }
         } catch (err) {
-          taxRateLookupError = `taxations/getAll fehlgeschlagen: ${(err as Error).message}`;
+          taxRateLookupError = bt('pms.msg.taxlookupfail', lang).replace('{err}', (err as Error).message);
         }
       }
 
@@ -194,7 +197,7 @@ if (Astro.request.method === 'POST') {
         })
         .eq('hotel_id', hotel.id);
       if (error) {
-        message = { type: 'error', text: `Speichern fehlgeschlagen: ${error.message}` };
+        message = { type: 'error', text: bt('pms.msg.savefail', lang).replace('{err}', error.message) };
       } else if (taxRateLookupError && taxCode) {
         // Soft-Warning: gespeichert, aber Tax-Rate konnte nicht aufgelöst werden.
         // Bei Net-Hotels wirft pushBookingToMews dann PushSkipped(no_default_tax_rate).
@@ -221,7 +224,7 @@ if (Astro.request.method === 'POST') {
       .update(update)
       .eq('hotel_id', hotel.id);
     if (error) {
-      message = { type: 'error', text: `Charge-Konfig speichern fehlgeschlagen: ${error.message}` };
+      message = { type: 'error', text: bt('pms.msg.chargesavefail', lang).replace('{err}', error.message) };
     } else {
       return Astro.redirect('/pms?saved=charge_config');
     }
@@ -243,7 +246,7 @@ if (Astro.request.method === 'POST') {
       })
       .eq('hotel_id', hotel.id);
     if (error) {
-      message = { type: 'error', text: `Trennen fehlgeschlagen: ${error.message}` };
+      message = { type: 'error', text: bt('pms.msg.disconnectfail', lang).replace('{err}', error.message) };
     } else {
       return Astro.redirect('/pms?saved=disconnected');
     }
@@ -257,18 +260,18 @@ if (savedParam === 'connected' && !message) {
   message = {
     type: 'success',
     text: hotelName
-      ? `Verbunden mit „${hotelName}". Klicke „Jetzt synchronisieren" um Daten zu laden.`
-      : 'Mews-Integration verbunden. Klicke „Jetzt synchronisieren" um Daten zu laden.',
+      ? bt('pms.flash.connected', lang).replace('{name}', hotelName)
+      : bt('pms.flash.connectednoname', lang),
   };
 } else if (savedParam === 'disconnected' && !message) {
-  message = { type: 'success', text: 'Mews-Integration getrennt. Service-Mappings, Tax-Code und Sync-Daten bleiben für einen Reconnect erhalten.' };
+  message = { type: 'success', text: bt('pms.flash.disconnected', lang) };
 } else if (savedParam === 'sync' && !message) {
-  message = { type: 'success', text: 'Synchronisation erfolgreich abgeschlossen.' };
+  message = { type: 'success', text: bt('pms.flash.sync', lang) };
 } else if (savedParam === 'config' && !message) {
-  message = { type: 'success', text: 'Order-Konfiguration gespeichert.' };
+  message = { type: 'success', text: bt('pms.flash.config', lang) };
 } else if (savedParam === 'config_warn' && !message) {
-  const warn = Astro.url.searchParams.get('warn') ?? 'Tax-Rate konnte nicht aufgelöst werden.';
-  message = { type: 'error', text: `Konfiguration gespeichert mit Warnung — ${warn}. Bei Net-Hotels wird der Mews-Push fehlschlagen bis der Rate-Wert da ist.` };
+  const warn = Astro.url.searchParams.get('warn') ?? bt('pms.flash.taxratedefault', lang);
+  message = { type: 'error', text: bt('pms.flash.configwarn', lang).replace('{warn}', warn) };
 }
 
 // Integration via SSR-Client (RLS) — access_token_encrypted bewusst NICHT selektiert,
@@ -380,12 +383,12 @@ type ServiceMappingField = { name: string; label: string; current: string | null
 // (graceful skip wenn service_id_* NULL), UI ist nur klarer.
 const serviceMappingFields: ServiceMappingField[] = integration
   ? [
-      { name: 'service_id_breakfast', label: 'Frühstück-Buchungen', current: integration.service_id_breakfast ?? null },
+      { name: 'service_id_breakfast', label: bt('pms.field.breakfastbookings', lang), current: integration.service_id_breakfast ?? null },
     ]
   : [];
 
 const lastSyncLabel = integration?.last_sync_at
-  ? new Date(integration.last_sync_at).toLocaleString('de-DE', {
+  ? new Date(integration.last_sync_at).toLocaleString(dateLocale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -395,12 +398,12 @@ const lastSyncLabel = integration?.last_sync_at
   : null;
 
 const syncStatusLabels: Record<string, string> = {
-  idle: 'Bereit',
-  syncing: 'Läuft…',
-  error: 'Fehler',
+  idle: bt('pms.status.idle', lang),
+  syncing: bt('pms.status.syncing', lang),
+  error: bt('pms.status.error', lang),
 };
 const statusKey = integration?.sync_status ?? 'idle';
-const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
+const statusBadge = { label: syncStatusLabels[statusKey] ?? bt('pms.status.idle', lang) };
 ---
 
 <Layout title="PMS-Integration" activeTab="backoffice" hotelName={hotel.name}>
@@ -563,15 +566,15 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 <div class="settings-page">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">PMS-Integration</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('pms.crumb', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">Integrationen</span>
-    <h1 class="settings-hero__title">PMS-Integration<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">Verbinde dein Mews-Hotel mit retaha. Reservationen, Zimmer und Gäste-Daten werden automatisch synchronisiert.</p>
+    <span class="settings-hero__eyebrow">{bt('pms.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('pms.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('pms.hero.sub', lang)}</p>
   </section>
 
   {message && (
@@ -586,7 +589,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 01 Verbindungs-Status -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Mews verbunden</h2>
+          <h2 class="s-card__title">{bt('pms.connected.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
@@ -606,17 +609,17 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
             <div>
               <p class="pms-meta-item__label">Access-Token</p>
               <p class="pms-meta-item__value pms-meta-item__value--mono">••••••••••••</p>
-              <p class="pms-meta-item__hint">verschlüsselt (AES-256-GCM)</p>
+              <p class="pms-meta-item__hint">{bt('pms.meta.encrypted', lang)}</p>
             </div>
             <div>
-              <p class="pms-meta-item__label">Letzter Sync</p>
-              <p class="pms-meta-item__value">{lastSyncLabel ?? 'noch nie'}</p>
+              <p class="pms-meta-item__label">{bt('pms.meta.lastsync', lang)}</p>
+              <p class="pms-meta-item__value">{lastSyncLabel ?? bt('pms.meta.never', lang)}</p>
             </div>
           </div>
 
           {integration.sync_status === 'error' && integration.sync_error_message && (
             <div class="s-flash s-flash--err" style="margin-top:16px;">
-              <strong>Letzter Sync-Fehler:</strong><br />
+              <strong>{bt('pms.lastsyncerror', lang)}</strong><br />
               <span style="font-family:'JetBrains Mono',monospace;font-size:11px;word-break:break-all;">{integration.sync_error_message}</span>
             </div>
           )}
@@ -627,21 +630,21 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       {counts && (
         <section class="s-card">
           <div class="s-card__head">
-            <h2 class="s-card__title">Bisher synchronisiert</h2>
+            <h2 class="s-card__title">{bt('pms.synced.title', lang)}</h2>
             <span class="s-card__num">02</span>
           </div>
           <div class="s-card__body">
             <div class="pms-counts-grid">
               <div class="pms-count-cell">
-                <p class="pms-count-cell__label">Zimmer</p>
+                <p class="pms-count-cell__label">{bt('pms.count.rooms', lang)}</p>
                 <p class="pms-count-cell__num">{counts.rooms}</p>
               </div>
               <div class="pms-count-cell">
-                <p class="pms-count-cell__label">Aufenthalte</p>
+                <p class="pms-count-cell__label">{bt('pms.count.stays', lang)}</p>
                 <p class="pms-count-cell__num">{counts.stays}</p>
               </div>
               <div class="pms-count-cell">
-                <p class="pms-count-cell__label">Gäste</p>
+                <p class="pms-count-cell__label">{bt('pms.count.guests', lang)}</p>
                 <p class="pms-count-cell__num">{counts.guests}</p>
               </div>
             </div>
@@ -652,20 +655,16 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 03 Order-Konfiguration (Sprint C — Charge-to-Room) -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Order-Konfiguration</h2>
+          <h2 class="s-card__title">{bt('pms.order.title', lang)}</h2>
           <span class="s-card__num">{counts ? '03' : '02'}</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint" style="margin-bottom:16px;">
-            Wenn der Hotelier eine Buchung bestätigt, schickt retaha sie als Order
-            auf das Mews-Gast-Konto ("Charge to Room"). Damit das funktioniert,
-            ordne pro Buchungstyp einen Mews-Service zu und setze deinen Tax-Code.
-          </p>
+          <p class="field__hint" style="margin-bottom:16px;">{bt('pms.order.hint', lang)}</p>
 
           {servicesError && (
             <div class="s-flash s-flash--err" style="margin-bottom:16px;">
-              <strong>Services konnten nicht geladen werden:</strong> {servicesError}
-              <br />Trotzdem speicherbar — Dropdowns sind leer. Bei nächstem Page-Load nochmal probieren.
+              <strong>{bt('pms.order.serviceserror', lang)}</strong> {servicesError}
+              <br />{bt('pms.order.serviceserrornote', lang)}
             </div>
           )}
 
@@ -673,20 +672,16 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
             <input type="hidden" name="_action" value="save_config" />
 
             <!-- Service-Mapping (Sprint E1 Phase 3 — nur Frühstück) -->
-            <p class="pms-meta-item__hint" style="margin-bottom:16px;">
-              Charge-to-Room ist aktuell <strong>nur für Frühstück</strong> aktiv.
-              Service-Anfragen und Konferenz-Buchungen bleiben in retaha (Service ist meist
-              kostenfrei, Konferenz läuft über B2B-Vertrieb).
-            </p>
+            <p class="pms-meta-item__hint" style="margin-bottom:16px;" set:html={bt('pms.order.maphint', lang)}></p>
 
             {serviceMappingFields.map(field => (
               <div class="sp-field">
-                <label class="sp-label">Mews-Service für {field.label}</label>
+                <label class="sp-label">{bt('pms.order.mewsservicefor', lang).replace('{label}', field.label)}</label>
                 <select name={field.name} class="s-select">
-                  <option value="">nicht zugeordnet</option>
+                  <option value="">{bt('pms.order.unassigned', lang)}</option>
                   {orderableServices.map(s => (
                     <option value={s.Id} selected={field.current === s.Id}>
-                      {s.Name}{!s.IsActive ? ' (inaktiv)' : ''}
+                      {s.Name}{!s.IsActive ? bt('pms.order.inactive', lang) : ''}
                     </option>
                   ))}
                 </select>
@@ -695,10 +690,10 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 
             <!-- Tax-Code (Sprint E1 Phase 2 — Dropdown wenn Liste da, sonst Input-Fallback) -->
             <div class="sp-field">
-              <label class="sp-label">Tax-Code (Default)</label>
+              <label class="sp-label">{bt('pms.order.taxcode', lang)}</label>
               {taxRateOptions.length > 0 ? (
                 <select name="default_tax_code" class="s-select" style="font-family:'JetBrains Mono',monospace;">
-                  <option value="">bitte wählen</option>
+                  <option value="">{bt('pms.order.pleaseselect', lang)}</option>
                   {taxRateOptions.map(opt => (
                     <option value={opt.code} selected={integration.default_tax_code === opt.code}>
                       {opt.label}
@@ -719,10 +714,10 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
               )}
               <span class="sp-label-hint" style="font-size:11px;color:var(--ink-muted);font-style:italic;margin-top:2px;">
                 {taxRateOptions.length > 0
-                  ? <>Auswahl gefiltert auf Tax-Environment <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode}</span>. Löst auch den numerischen Rate-Wert auf (für Net-Pricing-Hotels).</>
-                  : <>Tax-Codes aus Mews konnten nicht geladen werden — bitte manuell eintragen. Tax-Environment: <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode ?? '?'}</span></>}
+                  ? <>{bt('pms.order.taxhint1pre', lang)} <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode}</span>{bt('pms.order.taxhint1post', lang)}</>
+                  : <>{bt('pms.order.taxhint2pre', lang)} <span style="font-family:'JetBrains Mono',monospace;">{taxEnvironmentCode ?? '?'}</span></>}
                 {integration.default_tax_rate != null && (
-                  <><br />Aktueller Rate: <span style="font-family:'JetBrains Mono',monospace;">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span></>
+                  <><br />{bt('pms.order.currentrate', lang)} <span style="font-family:'JetBrains Mono',monospace;">{(Number(integration.default_tax_rate) * 100).toFixed(2)}%</span></>
                 )}
               </span>
             </div>
@@ -730,20 +725,20 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
             <!-- Currency + Pricing-Mode (read-only Anzeige) -->
             <div class="pms-meta-grid" style="margin-bottom:20px;">
               <div>
-                <p class="pms-meta-item__label">Default-Currency</p>
-                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.default_currency ?? '(nicht gesetzt)'}</p>
-                <p class="pms-meta-item__hint">Aus configuration.Enterprise.Currencies (IsDefault=true).</p>
+                <p class="pms-meta-item__label">{bt('pms.order.currency', lang)}</p>
+                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.default_currency ?? bt('pms.order.notset', lang)}</p>
+                <p class="pms-meta-item__hint">{bt('pms.order.currencyhint', lang)}</p>
               </div>
               <div>
-                <p class="pms-meta-item__label">Pricing-Mode</p>
-                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.pricing_mode ?? '(nicht gesetzt)'}</p>
-                <p class="pms-meta-item__hint">Gross = GrossValue; Net = NetValue bei orders/add.</p>
+                <p class="pms-meta-item__label">{bt('pms.order.pricingmode', lang)}</p>
+                <p class="pms-meta-item__value pms-meta-item__value--mono">{integration.pricing_mode ?? bt('pms.order.notset', lang)}</p>
+                <p class="pms-meta-item__hint">{bt('pms.order.pricingmodehint', lang)}</p>
               </div>
             </div>
 
             <!-- Pricing-Source-Toggle -->
             <div class="sp-field" style="margin-bottom:20px;">
-              <span class="sp-label">Preis-Quelle</span>
+              <span class="sp-label">{bt('pms.order.pricesource', lang)}</span>
               <label class="pms-pricing-option">
                 <input
                   type="radio"
@@ -752,8 +747,8 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
                   checked={integration.pricing_source !== 'mews'}
                 />
                 <span>
-                  <span class="pms-pricing-option__title">Preise in retaha pflegen</span>
-                  <span class="pms-pricing-option__sub">Hotelier pflegt Preise direkt in den retaha-Modulen. Push als Custom-Items.</span>
+                  <span class="pms-pricing-option__title">{bt('pms.order.priceretaha', lang)}</span>
+                  <span class="pms-pricing-option__sub">{bt('pms.order.priceretahasub', lang)}</span>
                 </span>
               </label>
               <label class={`pms-pricing-option${!productsAvailable ? ' pms-pricing-option--disabled' : ''}`}>
@@ -766,13 +761,13 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
                 />
                 <span>
                   <span class="pms-pricing-option__title">
-                    Preise aus Mews-Products abrufen
-                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-muted);margin-left:6px;">({productsCount} Products)</span>
+                    {bt('pms.order.pricemews', lang)}
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-muted);margin-left:6px;">{bt('pms.order.pricemewscount', lang).replace('{n}', String(productsCount))}</span>
                   </span>
                   <span class="pms-pricing-option__sub">
                     {productsAvailable
-                      ? 'Verfügbar. Hinweis: Pfad C+ ist noch nicht implementiert (Backlog) — auswählbar, aber wird beim Push einen Fehler werfen.'
-                      : 'Nicht verfügbar — dein Mews-Hotel hat keine Products angelegt. Lege Products in Mews an und verbinde neu.'}
+                      ? bt('pms.order.pricemewssub.available', lang)
+                      : bt('pms.order.pricemewssub.unavailable', lang)}
                   </span>
                 </span>
               </label>
@@ -780,7 +775,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 
             <div class="s-card__footer">
               <button type="submit" class="v9-btn v9-btn--primary">
-                Order-Konfiguration speichern
+                {bt('pms.order.save', lang)}
               </button>
             </div>
           </form>
@@ -790,28 +785,24 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 04 Charge-Konfiguration (UX-017 P3) -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Charge-Konfiguration</h2>
+          <h2 class="s-card__title">{bt('pms.charge.title', lang)}</h2>
           <span class="s-card__num">{counts ? '04' : '03'}</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint" style="margin-bottom:16px;">
-            Pro Buchungs-Typ: Soll bei Bestätigung automatisch eine
-            Mews-Charge an das Gäste-Zimmer geschickt werden? Deaktiviere
-            für Reservation-only-Typen (z.B. Spa, wo Zahlung vor Ort erfolgt).
-          </p>
+          <p class="field__hint" style="margin-bottom:16px;">{bt('pms.charge.hint', lang)}</p>
 
           <form method="POST">
             <input type="hidden" name="_action" value="save_charge_config" />
 
             <div class="charge-toggle-grid" style="margin-bottom:20px;">
               {[
-                { type: 'breakfast',     label: 'Frühstück',     hint: 'Preis aus /admin/breakfast' },
-                { type: 'conference',    label: 'Konferenz',     hint: 'Preis aus /admin/conference' },
-                { type: 'service',       label: 'Service',       hint: 'Preis aus /admin/service' },
-                { type: 'restaurant',    label: 'Restaurant',    hint: 'Reservation-only — Zahlung vor Ort' },
-                { type: 'spa',           label: 'Spa',           hint: 'Reservation-only — Zahlung vor Ort' },
-                { type: 'late_checkout', label: 'Late Checkout', hint: 'Kostet meist extra' },
-                { type: 'housekeeping',  label: 'Housekeeping',  hint: 'Kostenfreier Service' },
+                { type: 'breakfast',     label: bt('pms.charge.breakfast', lang),     hint: bt('pms.charge.breakfast.hint', lang) },
+                { type: 'conference',    label: bt('pms.charge.conference', lang),     hint: bt('pms.charge.conference.hint', lang) },
+                { type: 'service',       label: bt('pms.charge.service', lang),       hint: bt('pms.charge.service.hint', lang) },
+                { type: 'restaurant',    label: bt('pms.charge.restaurant', lang),    hint: bt('pms.charge.restaurant.hint', lang) },
+                { type: 'spa',           label: bt('pms.charge.spa', lang),           hint: bt('pms.charge.spa.hint', lang) },
+                { type: 'late_checkout', label: bt('pms.charge.late_checkout', lang), hint: bt('pms.charge.late_checkout.hint', lang) },
+                { type: 'housekeeping',  label: bt('pms.charge.housekeeping', lang),  hint: bt('pms.charge.housekeeping.hint', lang) },
               ].map(({ type, label, hint }) => {
                 const colKey = `${type}_charge_enabled` as keyof typeof integration;
                 // null → fallback true (Backward-Compat fuer Rows ohne Default)
@@ -838,7 +829,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 
             <div class="s-card__footer">
               <button type="submit" class="v9-btn v9-btn--primary">
-                Charge-Konfiguration speichern
+                {bt('pms.charge.save', lang)}
               </button>
             </div>
           </form>
@@ -848,7 +839,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 05 Aktionen -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Aktionen</h2>
+          <h2 class="s-card__title">{bt('pms.actions.title', lang)}</h2>
           <span class="s-card__num">{counts ? '05' : '04'}</span>
         </div>
         <div class="s-card__body">
@@ -858,20 +849,16 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
               type="button"
               class="v9-btn v9-btn--primary"
             >
-              Jetzt synchronisieren
+              {bt('pms.actions.sync', lang)}
             </button>
             <form method="POST" id="disconnect-form" style="margin:0;">
               <input type="hidden" name="_action" value="disconnect" />
               <button type="submit" class="v9-btn v9-btn--ghost">
-                Verbindung trennen
+                {bt('pms.actions.disconnect', lang)}
               </button>
             </form>
           </div>
-          <p class="pms-footer-note" style="margin-top:16px;">
-            Sync läuft über getMewsClientForHotel(hotel_id) — der Access-Token wird beim
-            Sync server-seitig entschlüsselt und nie ans Frontend gesendet. Synchronisiert
-            werden Reservationen der letzten 30 Tage (rolling window).
-          </p>
+          <p class="pms-footer-note" style="margin-top:16px;">{bt('pms.actions.note', lang)}</p>
         </div>
       </section>
     </>
@@ -882,30 +869,19 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 01 Token-Hilfe -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Token-Generierung</h2>
+          <h2 class="s-card__title">{bt('pms.token.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
-          <p class="field__hint" style="margin-bottom:12px;">
-            Verbinde dein Mews-Property mit retaha. Du brauchst nur deinen
-            <strong>Access-Token</strong> für die Connector-API — die Enterprise-ID lesen
-            wir automatisch aus der Mews-API aus.
-          </p>
+          <p class="field__hint" style="margin-bottom:12px;" set:html={bt('pms.token.hint', lang)}></p>
           <div class="pms-info-box">
-            <p class="pms-info-box__eyebrow">So findest du deinen Access-Token in Mews Commander</p>
+            <p class="pms-info-box__eyebrow">{bt('pms.token.howto', lang)}</p>
             <ol>
-              <li>Mews Commander öffnen → <strong>Marketplace</strong></li>
-              <li>Eintrag "retaha" suchen und <strong>Connect</strong> klicken</li>
-              <li>Access-Token kopieren und hier einfügen</li>
+              <li set:html={bt('pms.token.step1', lang)}></li>
+              <li set:html={bt('pms.token.step2', lang)}></li>
+              <li set:html={bt('pms.token.step3', lang)}></li>
             </ol>
-            <p class="pms-info-box__note">
-              Falls retaha noch nicht im Marketplace ist: Mews-Support kontaktieren
-              ("Connector-API-Integration mit retaha") oder die offizielle
-              <a href="https://mews-systems.gitbook.io/connector-api/" target="_blank" rel="noopener" style="text-decoration:underline;">
-                Connector-API-Doku
-              </a>
-              öffnen.
-            </p>
+            <p class="pms-info-box__note" set:html={bt('pms.token.note', lang).replace('{link}', `<a href=\"https://mews-systems.gitbook.io/connector-api/\" target=\"_blank\" rel=\"noopener\" style=\"text-decoration:underline;\">${bt('pms.token.notelink', lang)}</a>`)}></p>
           </div>
         </div>
       </section>
@@ -913,7 +889,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       <!-- 02 Verbinden -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Mews verbinden</h2>
+          <h2 class="s-card__title">{bt('pms.connect.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
         <div class="s-card__body">
@@ -923,7 +899,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
             <div class="sp-field">
               <label class="sp-label">
                 Access-Token
-                <span class="sp-label-hint">(Pflichtfeld)</span>
+                <span class="sp-label-hint">{bt('pms.connect.required', lang)}</span>
               </label>
               <input
                 type="password"
@@ -936,7 +912,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
                 style="font-family:'JetBrains Mono',monospace;"
               />
               <span style="font-size:11px;color:var(--ink-muted);font-style:italic;">
-                Wird verschlüsselt gespeichert (AES-256-GCM) — niemals im Klartext in der Datenbank.
+                {bt('pms.connect.enchint', lang)}
               </span>
             </div>
 
@@ -947,13 +923,13 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
                 <option value="production">Production (api.mews.com)</option>
               </select>
               <span style="font-size:11px;color:var(--ink-muted);font-style:italic;">
-                Für erste Tests: Demo. Echte Reservationen: Production.
+                {bt('pms.connect.envhint', lang)}
               </span>
             </div>
 
             <div class="s-card__footer">
               <button type="submit" class="v9-btn v9-btn--primary">
-                Verbinden
+                {bt('pms.connect.submit', lang)}
               </button>
             </div>
           </form>
@@ -967,7 +943,13 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 
 </div><!-- /.settings-page -->
 
-<script is:inline>
+<script is:inline define:vars={{ PMS_T: {
+  syncing: bt('pms.js.syncing', lang),
+  syncfail: bt('pms.js.syncfail', lang),
+  unknownerror: bt('pms.js.unknownerror', lang),
+  neterr: bt('pms.js.neterr', lang),
+  disconnectconfirm: bt('pms.js.disconnectconfirm', lang),
+} }}>
   (function () {
     const syncBtn = document.getElementById('sync-button');
     const disconnectForm = document.getElementById('disconnect-form');
@@ -976,7 +958,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
       syncBtn.addEventListener('click', async () => {
         const originalText = syncBtn.textContent;
         syncBtn.disabled = true;
-        syncBtn.textContent = 'Synchronisiere…';
+        syncBtn.textContent = PMS_T.syncing;
         try {
           const resp = await fetch('/api/admin/mews/sync', {
             method: 'POST',
@@ -987,12 +969,12 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
           if (data.ok) {
             window.location.href = '/pms?saved=sync';
           } else {
-            alert('Sync fehlgeschlagen: ' + (data.error || 'unbekannter Fehler'));
+            alert(PMS_T.syncfail + ' ' + (data.error || PMS_T.unknownerror));
             syncBtn.disabled = false;
             syncBtn.textContent = originalText;
           }
         } catch (err) {
-          alert('Netzwerk-Fehler: ' + (err && err.message ? err.message : err));
+          alert(PMS_T.neterr + ' ' + (err && err.message ? err.message : err));
           syncBtn.disabled = false;
           syncBtn.textContent = originalText;
         }
@@ -1001,7 +983,7 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? 'Bereit' };
 
     if (disconnectForm) {
       disconnectForm.addEventListener('submit', (e) => {
-        if (!confirm('Mews-Verbindung wirklich trennen? Bisher synchronisierte Daten bleiben erhalten, der Sync stoppt aber sofort.')) {
+        if (!confirm(PMS_T.disconnectconfirm)) {
           e.preventDefault();
         }
       });
