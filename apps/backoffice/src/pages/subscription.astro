@@ -2,6 +2,9 @@
 import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, getUserRole, hasPermission } from '@retaha/auth';
 import { calculateTrialStatus } from '../lib/trial-status';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -19,68 +22,69 @@ if (!billingRole || !hasPermission(billingRole, 'hotel.billing')) {
 const currentPlan: string = (hotel as any).plan ?? 'lite';
 const currentAddons: string[] = (hotel as any).addons ?? [];
 const trial = calculateTrialStatus(hotel);
-const trialEndFormatted = trial.endsAt?.toLocaleDateString('de-DE', {
+const trialEndFormatted = trial.endsAt?.toLocaleDateString(dateLocale, {
   day: 'numeric', month: 'long', year: 'numeric',
 });
 
 const TIER_RANK: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
+const allIn = (planLabel: string) => bt('sub.mod.allin', lang).replace('{plan}', planLabel);
 
 const PLANS = [
   {
     key: 'lite',
     label: 'Lite',
-    tagline: 'Gäste-Basis',
+    tagline: bt('sub.plan.lite.tagline', lang),
     popular: false,
     price: '49',
     priceYear: '470,40',
     priceYearlyPerMonth: '39,20',
     modules: [
-      'Willkommens-Hub', 'WLAN-Info (QR)', 'Frühstück-Buchung',
-      'Service-Anfragen', 'Post-Stay Feedback', 'Action-Cards (5 Kacheln)',
+      bt('sub.mod.welcomehub', lang), bt('sub.mod.wifi', lang), bt('sub.mod.breakfast', lang),
+      bt('sub.mod.service', lang), bt('sub.mod.feedback', lang), bt('sub.mod.actioncards', lang),
     ],
   },
   {
     key: 'pro',
     label: 'Pro',
-    tagline: 'Smart & Reichweite',
+    tagline: bt('sub.plan.pro.tagline', lang),
     popular: false,
     price: '249',
     priceYear: '2.390,40',
     priceYearlyPerMonth: '199,20',
     modules: [
-      'Alles in Lite',
-      'Empfehlungen (Google Places)', '10 Sprachen automatisch',
-      'NFC-Tag Management', 'Pre-Stay Messaging', '9 Stay-Push-Trigger',
+      allIn('Lite'),
+      bt('sub.mod.places', lang), bt('sub.mod.langs', lang),
+      bt('sub.mod.nfc', lang), bt('sub.mod.prestay', lang), bt('sub.mod.staypush', lang),
     ],
   },
   {
     key: 'premium',
     label: 'Premium',
-    tagline: 'Volle Suite mit KI',
+    tagline: bt('sub.plan.premium.tagline', lang),
     price: '549',
     priceYear: '5.270,40',
     priceYearlyPerMonth: '439,20',
     popular: true,
     modules: [
-      'Alles in Pro',
-      'Eve KI-Concierge (inklusive)', 'Wallet-Pass + CRM',
-      'Marketing (Drips + Kampagnen)', 'Loyalty-Program',
-      'Referral-Program', 'Best-Price-Guarantee', 'Microsite-Builder',
+      allIn('Pro'),
+      bt('sub.mod.eve', lang), bt('sub.mod.wallet', lang),
+      bt('sub.mod.marketing', lang), bt('sub.mod.loyalty', lang),
+      bt('sub.mod.referral', lang), bt('sub.mod.bestprice', lang), bt('sub.mod.microsite', lang),
     ],
   },
   {
     key: 'enterprise',
     label: 'Enterprise',
-    tagline: 'Auf Anfrage',
+    tagline: bt('sub.plan.enterprise.tagline', lang),
     popular: false,
     price: null,
     priceYear: null,
     priceYearlyPerMonth: null,
     modules: [
-      'Alles in Premium',
-      'Multi-Property Management', 'White-Label App',
-      'API-Zugang (direkt)', 'Custom Email-Domain',
-      'Dedizierter Account Manager',
+      allIn('Premium'),
+      bt('sub.mod.multiprop', lang), bt('sub.mod.whitelabel', lang),
+      bt('sub.mod.api', lang), bt('sub.mod.emaildomain', lang),
+      bt('sub.mod.accountmgr', lang),
     ],
   },
 ];
@@ -94,11 +98,14 @@ const hasEveAddon  = currentAddons.includes('eve');
 ---
 
 <Layout
-  title="Plan & Pakete"
+  title={bt('sub.titleplain', lang)}
   activeTab="backoffice"
   hotelName={hotel.name}
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
 >
+  <script is:inline define:vars={{ SUB_ERR_CHECKOUT: bt('sub.err.checkout', lang) }}>
+    window.__SUB_T__ = { errCheckout: SUB_ERR_CHECKOUT };
+  </script>
   <div
     class="settings-page"
     x-data="{
@@ -113,7 +120,7 @@ const hasEveAddon  = currentAddons.includes('eve');
             body: JSON.stringify({ plan, interval: this.interval })
           });
           const data = await res.json();
-          if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
+          if (!res.ok || !data.url) throw new Error(data.error || window.__SUB_T__.errCheckout);
           window.location.href = data.url;
         } catch(e) {
           window.retahaToast?.(e.message, 'error');
@@ -129,7 +136,7 @@ const hasEveAddon  = currentAddons.includes('eve');
             body: JSON.stringify({ addon })
           });
           const data = await res.json();
-          if (!res.ok || !data.url) throw new Error(data.error || 'Checkout nicht verfügbar');
+          if (!res.ok || !data.url) throw new Error(data.error || window.__SUB_T__.errCheckout);
           window.location.href = data.url;
         } catch(e) {
           window.retahaToast?.(e.message, 'error');
@@ -140,18 +147,18 @@ const hasEveAddon  = currentAddons.includes('eve');
   >
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">Plan & Pakete</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('sub.crumb', lang)}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Abrechnung</span>
-      <h1 class="settings-hero__title">Wähle das richtige Paket<span class="dot-pink">.</span></h1>
+      <span class="settings-hero__eyebrow">{bt('sub.eyebrow', lang)}</span>
+      <h1 class="settings-hero__title" set:html={bt('sub.title', lang)}></h1>
       <p class="settings-hero__sub">
         {trial.isInTrial
-          ? `Du bist im Trial${trialEndFormatted ? ` — endet am ${trialEndFormatted}` : ''}. Alle Pakete enthalten monatliche Kündigung.`
-          : 'Alle Pakete monatlich kündbar. Jahresabo spart 20 %.'}
+          ? bt('sub.hero.trial', lang).replace('{ends}', trialEndFormatted ? bt('sub.hero.trialends', lang).replace('{date}', trialEndFormatted) : '')
+          : bt('sub.hero.notrial', lang)}
       </p>
     </section>
 
@@ -160,7 +167,7 @@ const hasEveAddon  = currentAddons.includes('eve');
       <!-- 01 Aktueller Plan -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Aktueller Plan</h2>
+          <h2 class="s-card__title">{bt('sub.current.title', lang)}</h2>
           <span class="s-card__num">01</span>
         </div>
         <div class="s-card__body">
@@ -169,7 +176,7 @@ const hasEveAddon  = currentAddons.includes('eve');
               {PLAN_LABEL[currentPlan] ?? currentPlan}
             </span>
             {trial.isInTrial && trialEndFormatted && (
-              <span class="sub-trial-note">Trial endet am {trialEndFormatted}</span>
+              <span class="sub-trial-note">{bt('sub.trialnote', lang).replace('{date}', trialEndFormatted)}</span>
             )}
           </div>
         </div>
@@ -178,7 +185,7 @@ const hasEveAddon  = currentAddons.includes('eve');
       <!-- 02 Pakete -->
       <section class="s-card">
         <div class="s-card__head">
-          <h2 class="s-card__title">Pakete vergleichen</h2>
+          <h2 class="s-card__title">{bt('sub.compare.title', lang)}</h2>
           <span class="s-card__num">02</span>
         </div>
         <div class="s-card__body">
@@ -190,14 +197,14 @@ const hasEveAddon  = currentAddons.includes('eve');
               @click="interval = 'monthly'"
               :class="interval === 'monthly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
             >
-              Monatlich
+              {bt('sub.monthly', lang)}
             </button>
             <button
               type="button"
               @click="interval = 'yearly'"
               :class="interval === 'yearly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
             >
-              Jährlich <span class="sub-discount-badge">−20 %</span>
+              {bt('sub.yearly', lang)} <span class="sub-discount-badge">−20 %</span>
             </button>
           </div>
 
@@ -220,10 +227,10 @@ const hasEveAddon  = currentAddons.includes('eve');
                 ].filter(Boolean).join(' ')}>
 
                   {plan.popular && !isCurrent && (
-                    <div class="sub-plan-card__bar sub-plan-card__bar--popular">Empfohlen</div>
+                    <div class="sub-plan-card__bar sub-plan-card__bar--popular">{bt('sub.recommended', lang)}</div>
                   )}
                   {isCurrent && (
-                    <div class="sub-plan-card__bar sub-plan-card__bar--current">Dein aktueller Plan</div>
+                    <div class="sub-plan-card__bar sub-plan-card__bar--current">{bt('sub.yourplan', lang)}</div>
                   )}
 
                   <div class="sub-plan-card__head">
@@ -236,21 +243,21 @@ const hasEveAddon  = currentAddons.includes('eve');
                       <>
                         <div x-show="interval === 'monthly'">
                           <span class="sub-plan-price-num">{plan.price} €</span>
-                          <span class="sub-plan-price-per">/Monat</span>
+                          <span class="sub-plan-price-per">{bt('sub.permonth', lang)}</span>
                           <div class="sub-plan-price-year">
-                            Jährlich: {plan.priceYear} € <span class="sub-discount-tag">−20 %</span>
+                            {bt('sub.yearlyprefix', lang)} {plan.priceYear} € <span class="sub-discount-tag">−20 %</span>
                           </div>
                         </div>
                         <div x-show="interval === 'yearly'" style="display:none">
                           <span class="sub-plan-price-num">{plan.priceYearlyPerMonth} €</span>
-                          <span class="sub-plan-price-per">/Monat</span>
+                          <span class="sub-plan-price-per">{bt('sub.permonth', lang)}</span>
                           <div class="sub-plan-price-year">
-                            {plan.priceYear} €/Jahr · <span class="sub-discount-tag">20 % gespart</span>
+                            {plan.priceYear} €{bt('sub.peryear', lang)} · <span class="sub-discount-tag">{bt('sub.saved20', lang)}</span>
                           </div>
                         </div>
                       </>
                     ) : (
-                      <span class="sub-plan-price-custom">Individuell</span>
+                      <span class="sub-plan-price-custom">{bt('sub.custom', lang)}</span>
                     )}
                   </div>
 
@@ -266,11 +273,11 @@ const hasEveAddon  = currentAddons.includes('eve');
                   <div class="sub-plan-card__cta">
                     {isCurrent ? (
                       <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--current" disabled>
-                        Aktueller Plan
+                        {bt('sub.btn.current', lang)}
                       </button>
                     ) : plan.key === 'enterprise' ? (
                       <a href="mailto:hallo@retaha.de" class="v9-btn v9-btn--ghost sub-plan-btn">
-                        Kontakt aufnehmen
+                        {bt('sub.btn.contact', lang)}
                       </a>
                     ) : isUpgrade ? (
                       <button
@@ -280,12 +287,12 @@ const hasEveAddon  = currentAddons.includes('eve');
                         :disabled="loading !== ''"
                         :class={`loading === '${plan.key}' ? 'v9-btn v9-btn--primary sub-plan-btn sub-plan-btn--loading' : 'v9-btn v9-btn--primary sub-plan-btn'`}
                       >
-                        <span x-show={`loading !== '${plan.key}'`}>Upgrade auf {plan.label}</span>
-                        <span x-show={`loading === '${plan.key}'`} style="display:none">Wird vorbereitet…</span>
+                        <span x-show={`loading !== '${plan.key}'`}>{bt('sub.btn.upgrade', lang).replace('{plan}', plan.label)}</span>
+                        <span x-show={`loading === '${plan.key}'`} style="display:none">{bt('sub.btn.preparing', lang)}</span>
                       </button>
                     ) : (
                       <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--downgrade" disabled>
-                        Downgrade auf {plan.label}
+                        {bt('sub.btn.downgrade', lang).replace('{plan}', plan.label)}
                       </button>
                     )}
                   </div>
@@ -301,7 +308,7 @@ const hasEveAddon  = currentAddons.includes('eve');
       {showEveAddon && (
         <section class="s-card">
           <div class="s-card__head">
-            <h2 class="s-card__title">Add-ons</h2>
+            <h2 class="s-card__title">{bt('sub.addons.title', lang)}</h2>
             <span class="s-card__num">03</span>
           </div>
           <div class="s-card__body">
@@ -314,19 +321,19 @@ const hasEveAddon  = currentAddons.includes('eve');
                   </svg>
                 </div>
                 <div>
-                  <p class="sub-addon-card__label">Eve KI-Concierge — Add-on</p>
+                  <p class="sub-addon-card__label">{bt('sub.addon.eve.label', lang)}</p>
                   <p class="sub-addon-card__desc">
-                    KI-Assistent für Gäste: Fragen, Buchungen, Empfehlungen — 24/7.
+                    {bt('sub.addon.eve.desc', lang)}
                     {hasEveAddon
-                      ? ' Bereits gebucht — Danke!'
-                      : ' Für Lite und Pro als monatliches Add-on buchbar.'}
+                      ? bt('sub.addon.booked', lang)
+                      : bt('sub.addon.available', lang)}
                   </p>
                 </div>
               </div>
               <div class="sub-addon-card__right">
-                <span class="sub-addon-price">89 € <span class="sub-addon-price-per">/Monat</span></span>
+                <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
                 {hasEveAddon ? (
-                  <span class="sub-addon-badge">Aktiv</span>
+                  <span class="sub-addon-badge">{bt('sub.addon.active', lang)}</span>
                 ) : (
                   <button
                     type="button"
@@ -335,8 +342,8 @@ const hasEveAddon  = currentAddons.includes('eve');
                     :disabled="loading !== ''"
                     :class="loading === 'eve' ? 'v9-btn v9-btn--primary sub-plan-btn--loading' : 'v9-btn v9-btn--primary'"
                   >
-                    <span x-show="loading !== 'eve'">Hinzufügen</span>
-                    <span x-show="loading === 'eve'" style="display:none">Wird vorbereitet…</span>
+                    <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
+                    <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.preparing', lang)}</span>
                   </button>
                 )}
               </div>
@@ -348,10 +355,9 @@ const hasEveAddon  = currentAddons.includes('eve');
       <!-- Footer-Notiz -->
       <div class="sub-footer-note">
         <p>
-          Sichere Zahlung via Stripe. Monatlich kündbar, keine versteckten Gebühren.
-          Fragen? <a href="mailto:hallo@retaha.de" class="sub-footer-link">hallo@retaha.de</a>
+          {bt('sub.footer.note', lang)} <a href="mailto:hallo@retaha.de" class="sub-footer-link">hallo@retaha.de</a>
         </p>
-        <a href="/uebersicht" class="v9-btn v9-btn--ghost">← Zurück zur Übersicht</a>
+        <a href="/uebersicht" class="v9-btn v9-btn--ghost">{bt('sub.footer.back', lang)}</a>
       </div>
 
     </div>
