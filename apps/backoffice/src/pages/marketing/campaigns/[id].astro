@@ -1,6 +1,9 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -28,7 +31,7 @@ function pickI18n(jsonb: any): string {
 }
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function pct(n: number, total: number): string {
   if (!total) return '—';
@@ -43,21 +46,21 @@ const skipReasons = (campaign.skip_reasons || {}) as Record<string, number>;
 const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + (b as number), 0);
 
 const CHANNEL_LABELS: Record<string, string> = {
-  wallet_push: 'Wallet-Push',
-  email: 'E-Mail',
+  wallet_push: bt('cm.ch.wallet_push', lang),
+  email: bt('cm.ch.email', lang),
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Entwurf', scheduled: 'Geplant', sending: 'Versand läuft', sent: 'Gesendet', cancelled: 'Abgebrochen', failed: 'Fehler',
+  draft: bt('cm.status.draft', lang), scheduled: bt('cm.status.scheduled', lang), sending: bt('cm.status.sending', lang), sent: bt('cm.status.sent', lang), cancelled: bt('cm.status.cancelled', lang), failed: bt('cm.status.failed', lang),
 };
 const SKIP_REASON_LABELS: Record<string, string> = {
-  marketing_opted_out:               'Marketing abbestellt',
-  marketing_consent_missing:         'Kein Marketing-Consent',
-  pass_expired:                      'Pass abgelaufen',
-  pass_not_synced_to_google:         'Pass noch nicht in Google',
-  filter_excluded:                   'Vom Filter ausgeschlossen',
-  service_push_contract_fulfillment: 'Service-Push',
-  marketing_consent_given:           'Marketing-Consent vorhanden',
+  marketing_opted_out:               bt('cd.skipreason.marketing_opted_out', lang),
+  marketing_consent_missing:         bt('cd.skipreason.marketing_consent_missing', lang),
+  pass_expired:                      bt('cd.skipreason.pass_expired', lang),
+  pass_not_synced_to_google:         bt('cd.skipreason.pass_not_synced_to_google', lang),
+  filter_excluded:                   bt('cd.skipreason.filter_excluded', lang),
+  service_push_contract_fulfillment: bt('cd.skipreason.service_push_contract_fulfillment', lang),
+  marketing_consent_given:           bt('cd.skipreason.marketing_consent_given', lang),
 };
 ---
 
@@ -65,17 +68,17 @@ const SKIP_REASON_LABELS: Record<string, string> = {
   <div class="settings-page">
 
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing/campaigns" class="breadcrumb__crumb">Kampagnen</a>
+      <a href="/marketing/campaigns" class="breadcrumb__crumb">{bt('cm.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
       <span class="breadcrumb__crumb breadcrumb__crumb--current">{campaign.name}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Kampagne</span>
+      <span class="settings-hero__eyebrow">{bt('cd.eyebrow', lang)}</span>
       <h1 class="settings-hero__title">{campaign.name}<span class="dot-pink">.</span></h1>
       <p class="settings-hero__sub">{pickI18n(campaign.title_i18n)}</p>
     </section>
@@ -83,7 +86,7 @@ const SKIP_REASON_LABELS: Record<string, string> = {
     <div class="cd-head-meta">
       <span class={`cd-status cd-status--${campaign.status}`}>{STATUS_LABELS[campaign.status] ?? campaign.status}</span>
       <div class="cd-meta-row">
-        <span class="cd-meta-label">{campaign.status === 'sent' ? 'Gesendet:' : campaign.status === 'scheduled' ? 'Geplant:' : 'Erstellt:'}</span>
+        <span class="cd-meta-label">{campaign.status === 'sent' ? bt('cm.status.sent', lang) + ':' : campaign.status === 'scheduled' ? bt('cm.status.scheduled', lang) + ':' : bt('cm.meta.created', lang) + ':'}</span>
         <span class="cd-meta-val">{fmtDate(campaign.sent_at || campaign.scheduled_at || campaign.created_at)}</span>
       </div>
       {Array.isArray(campaign.channels) && (
@@ -102,8 +105,8 @@ const SKIP_REASON_LABELS: Record<string, string> = {
             class="cd-btn-primary"
             type="button"
             :disabled="submitting"
-            @click={`submitting = true; fetch('/api/marketing/campaigns/${campaign.id}/send-now', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert('Fehler: ' + (d.error || 'unbekannt')); submitting = false; } })`}
-            x-text="submitting ? 'Wird gesendet …' : 'Jetzt versenden'"
+            @click={`submitting = true; fetch('/api/marketing/campaigns/${campaign.id}/send-now', { method: 'POST', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert(${JSON.stringify(bt('cd.err.prefix', lang) + ' ')} + (d.error || ${JSON.stringify(bt('cd.err.unknown', lang))})); submitting = false; } })`}
+            x-text={`submitting ? ${JSON.stringify(bt('cd.btn.sending', lang))} : ${JSON.stringify(bt('cd.btn.sendnow', lang))}`}
           ></button>
         )}
         {campaign.status === 'scheduled' && (
@@ -111,46 +114,46 @@ const SKIP_REASON_LABELS: Record<string, string> = {
             class="cd-btn-ghost"
             type="button"
             :disabled="submitting"
-            @click={`if (!confirm('Wirklich abbrechen?')) return; submitting = true; fetch('/api/marketing/campaigns/${campaign.id}/schedule', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert('Fehler: ' + (d.error || 'unbekannt')); submitting = false; } })`}
-          >Versand abbrechen</button>
+            @click={`if (!confirm(${JSON.stringify(bt('cd.confirm.cancel', lang))})) return; submitting = true; fetch('/api/marketing/campaigns/${campaign.id}/schedule', { method: 'DELETE', credentials: 'include' }).then(r => r.json()).then(d => { if (d.ok) location.reload(); else { alert(${JSON.stringify(bt('cd.err.prefix', lang) + ' ')} + (d.error || ${JSON.stringify(bt('cd.err.unknown', lang))})); submitting = false; } })`}
+          >{bt('cd.btn.cancel', lang)}</button>
         )}
       </div>
     )}
 
     {campaign.send_error && (
       <div class="cd-error">
-        <strong>Send-Fehler:</strong> {campaign.send_error}
+        <strong>{bt('cd.senderror', lang)}</strong> {campaign.send_error}
       </div>
     )}
 
     <!-- Stats Cards -->
     <section class="cd-stats">
       <div class="cd-stat">
-        <div class="cd-stat-label">Recipients</div>
+        <div class="cd-stat-label">{bt('cd.stat.recipients', lang)}</div>
         <div class="cd-stat-value">{recipients}</div>
-        <div class="cd-stat-sub">erfolgreich versendet</div>
+        <div class="cd-stat-sub">{bt('cd.stat.recipients.sub', lang)}</div>
       </div>
       <div class="cd-stat">
-        <div class="cd-stat-label">Opens</div>
+        <div class="cd-stat-label">{bt('cd.stat.opens', lang)}</div>
         <div class="cd-stat-value">{opens}</div>
-        <div class="cd-stat-sub">{pct(opens, recipients)} Rate</div>
+        <div class="cd-stat-sub">{pct(opens, recipients)} {bt('cd.stat.rate', lang)}</div>
       </div>
       <div class="cd-stat">
-        <div class="cd-stat-label">Clicks</div>
+        <div class="cd-stat-label">{bt('cd.stat.clicks', lang)}</div>
         <div class="cd-stat-value">{clicks}</div>
-        <div class="cd-stat-sub">{pct(clicks, recipients)} Rate</div>
+        <div class="cd-stat-sub">{pct(clicks, recipients)} {bt('cd.stat.rate', lang)}</div>
       </div>
       <div class="cd-stat">
-        <div class="cd-stat-label">Skipped</div>
+        <div class="cd-stat-label">{bt('cd.stat.skipped', lang)}</div>
         <div class="cd-stat-value">{skipped}</div>
-        <div class="cd-stat-sub">nicht eligible</div>
+        <div class="cd-stat-sub">{bt('cd.stat.skipped.sub', lang)}</div>
       </div>
     </section>
 
     {totalSkipped > 0 && (
       <section class="cd-skip-breakdown">
-        <p class="cd-section-eyebrow">Skip-Breakdown</p>
-        <h2 class="cd-section-title">Wer wurde übersprungen, warum</h2>
+        <p class="cd-section-eyebrow">{bt('cd.skip.eyebrow', lang)}</p>
+        <h2 class="cd-section-title">{bt('cd.skip.title', lang)}</h2>
         <div class="cd-skip-bars">
           {Object.entries(skipReasons).map(([reason, count]) => {
             const w = Math.round(((count as number) / totalSkipped) * 100);
@@ -167,14 +170,14 @@ const SKIP_REASON_LABELS: Record<string, string> = {
     )}
 
     <section class="cd-content-preview">
-      <p class="cd-section-eyebrow">Inhalt</p>
-      <h2 class="cd-section-title">Was wurde gesendet</h2>
+      <p class="cd-section-eyebrow">{bt('cd.content.eyebrow', lang)}</p>
+      <h2 class="cd-section-title">{bt('cd.content.title', lang)}</h2>
       <div class="cd-preview-block">
         <div class="cd-preview-title">{pickI18n(campaign.title_i18n)}</div>
         <div class="cd-preview-body" set:html={pickI18n(campaign.body_i18n)} />
         {campaign.cta_url && (
           <div class="cd-preview-cta">
-            <strong>{pickI18n(campaign.cta_label_i18n) || 'Link'}:</strong> {campaign.cta_url}
+            <strong>{pickI18n(campaign.cta_label_i18n) || bt('cd.cta.link', lang)}:</strong> {campaign.cta_url}
           </div>
         )}
       </div>

@@ -4,6 +4,8 @@
 import Layout from '../../../layouts/Layout.astro';
 import DripEditor from '../../../components/admin/DripEditor.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -61,12 +63,12 @@ for (const r of (stateRows ?? [])) {
 }
 
 const TRIGGER_LABELS: Record<string, string> = {
-  wallet_add: 'Wallet hinzugefügt',
-  first_visit: 'Erster Besuch',
-  checkout: 'Check-out',
-  anniversary: 'Jahrestag',
-  visit_count_milestone: 'Besuchs-Meilenstein',
-  seasonal: 'Saisonal',
+  wallet_add: bt('dr.trigger.wallet_add', lang),
+  first_visit: bt('dr.trigger.first_visit', lang),
+  checkout: bt('dr.trigger.checkout', lang),
+  anniversary: bt('dr.trigger.anniversary', lang),
+  visit_count_milestone: bt('dr.trigger.visit_count_milestone', lang),
+  seasonal: bt('dr.trigger.seasonal', lang),
 };
 
 const url = new URL(Astro.request.url);
@@ -77,11 +79,11 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
 <Layout title={drip.name} activeTab="backoffice" hotelName={hotel.name}>
   <div class="settings-page">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing/drips" class="breadcrumb__crumb">Drip-Sequenzen</a>
+      <a href="/marketing/drips" class="breadcrumb__crumb">{bt('dr.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
       <span class="breadcrumb__crumb breadcrumb__crumb--current">{drip.name}</span>
     </nav>
@@ -89,9 +91,9 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     {editMode ? (
       <>
         <section class="settings-hero">
-          <span class="settings-hero__eyebrow">Marketing</span>
+          <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
           <h1 class="settings-hero__title">{drip.name}<span class="dot-pink">.</span></h1>
-          <p class="settings-hero__sub">Drip bearbeiten — Trigger, Steps und Verzögerungen anpassen.</p>
+          <p class="settings-hero__sub">{bt('dd.edit.sub', lang)}</p>
         </section>
 
         <DripEditor
@@ -103,63 +105,63 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     ) : (
       <>
         <section class="settings-hero">
-          <span class="settings-hero__eyebrow">Marketing</span>
+          <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
           <h1 class="settings-hero__title">{drip.name}<span class="dot-pink">.</span></h1>
           <p class="settings-hero__sub">
-            Trigger: <strong>{TRIGGER_LABELS[drip.trigger_type] ?? drip.trigger_type}</strong>
+            {bt('dd.trigger.label', lang)} <strong>{TRIGGER_LABELS[drip.trigger_type] ?? drip.trigger_type}</strong>
           </p>
         </section>
 
         <div class="dd-head-actions">
           <span class={`dd-active-pill${drip.is_active ? ' is-on' : ''}`}>
-            {drip.is_active ? 'aktiv' : 'inaktiv'}
+            {drip.is_active ? bt('dr.pill.active', lang) : bt('dr.pill.inactive', lang)}
           </span>
-          <a href="?edit=1" class="dd-btn-edit">Bearbeiten</a>
+          <a href="?edit=1" class="dd-btn-edit">{bt('tm.edit', lang)}</a>
         </div>
 
         <section class="dd-stats">
           <div class="dd-stat">
-            <div class="dd-stat-label">Steps</div>
+            <div class="dd-stat-label">{bt('dr.step.many', lang)}</div>
             <div class="dd-stat-value">{steps?.length ?? 0}</div>
           </div>
           <div class="dd-stat">
-            <div class="dd-stat-label">Aktive Pässe</div>
+            <div class="dd-stat-label">{bt('dd.stat.active', lang)}</div>
             <div class="dd-stat-value">{totalActive}</div>
-            <div class="dd-stat-sub">noch in Sequenz</div>
+            <div class="dd-stat-sub">{bt('dd.stat.active.sub', lang)}</div>
           </div>
           <div class="dd-stat">
-            <div class="dd-stat-label">Abgeschlossen</div>
+            <div class="dd-stat-label">{bt('dd.stat.completed', lang)}</div>
             <div class="dd-stat-value">{totalCompleted}</div>
-            <div class="dd-stat-sub">Sequenz beendet</div>
+            <div class="dd-stat-sub">{bt('dd.stat.completed.sub', lang)}</div>
           </div>
         </section>
 
         <section class="dd-steps">
-          <p class="dd-section-eyebrow">Sequenz</p>
+          <p class="dd-section-eyebrow">{bt('dd.seq.eyebrow', lang)}</p>
           <h2 class="dd-section-title">
-            {steps?.length ?? 0} {steps?.length === 1 ? 'Step' : 'Steps'}
+            {steps?.length ?? 0} {steps?.length === 1 ? bt('dr.step.one', lang) : bt('dr.step.many', lang)}
           </h2>
           {!steps || steps.length === 0 ? (
             <div class="dd-empty">
-              <p>Keine Steps angelegt. <a href="?edit=1">Bearbeiten</a> um welche hinzuzufügen.</p>
+              <p set:html={bt('dd.empty', lang).replace('{link}', `<a href="?edit=1">${bt('tm.edit', lang)}</a>`)}></p>
             </div>
           ) : (
             <ol class="dd-step-list">
               {steps.map((s: any) => {
                 const c = stepCounts.get(s.step_order) ?? { active: 0, completed: 0 };
-                const tplName = (Array.isArray(s.templates) ? s.templates[0]?.name : s.templates?.name) || '(Template gelöscht)';
+                const tplName = (Array.isArray(s.templates) ? s.templates[0]?.name : s.templates?.name) || bt('dd.tpl.deleted', lang);
                 return (
                   <li class="dd-step">
                     <span class="dd-step-num">{s.step_order}</span>
                     <div class="dd-step-info">
                       <div class="dd-step-tpl">{tplName}</div>
                       <div class="dd-step-meta">
-                        {s.delay_days === 0 ? 'sofort' : `${s.delay_days} Tage nach Trigger`}
+                        {s.delay_days === 0 ? bt('dd.immediate', lang) : bt('dd.delay', lang).replace('{n}', String(s.delay_days))}
                       </div>
                     </div>
                     <div class="dd-step-stats">
-                      <div><strong>{c.active}</strong> warten</div>
-                      <div class="dd-step-stats-sub"><strong>{c.completed}</strong> abgeschlossen hier</div>
+                      <div><strong>{c.active}</strong> {bt('dd.waiting', lang)}</div>
+                      <div class="dd-step-stats-sub"><strong>{c.completed}</strong> {bt('dd.completedhere', lang)}</div>
                     </div>
                   </li>
                 );

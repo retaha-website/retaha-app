@@ -7,6 +7,8 @@
 import Layout from '../../../../layouts/Layout.astro';
 import MarketingEditor from '../../../../components/admin/MarketingEditor.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { getLang, bt } from '../../../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -44,22 +46,22 @@ const initialCtaLabel = pickDefault(template.cta_label_i18n);
 <Layout title={template.name} activeTab="backoffice" hotelName={hotel.name}>
   <div class="settings-page">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+      <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing" class="breadcrumb__crumb">Marketing</a>
+      <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
-      <a href="/marketing/templates" class="breadcrumb__crumb">Vorlagen</a>
+      <a href="/marketing/templates" class="breadcrumb__crumb">{bt('tm.crumb', lang)}</a>
       <span class="breadcrumb__sep">/</span>
       <span class="breadcrumb__crumb breadcrumb__crumb--current">{template.name}</span>
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">Marketing</span>
+      <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
       <h1 class="settings-hero__title">{template.name}<span class="dot-pink">.</span></h1>
     </section>
 
     {template.is_archived && (
-      <div class="s-flash s-flash--warn">Diese Vorlage ist archiviert.</div>
+      <div class="s-flash s-flash--warn">{bt('tm.archived', lang)}</div>
     )}
 
     <MarketingEditor
