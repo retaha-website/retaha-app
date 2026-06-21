@@ -8,6 +8,9 @@ import {
 import { signPairToken } from '@retaha/auth';
 import { getEnv } from '@retaha/db';
 import QRCode from 'qrcode';
+import { getLang, bt } from '../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user || !user.email) return Astro.redirect('/admin/login');
@@ -44,12 +47,6 @@ const { data: stays } = await supabase
   .limit(50);
 
 const baseUrl = getEnv('PUBLIC_SITE_URL') ?? `http://localhost:4321`;
-
-const CHIP_LABELS_DE: Record<string, string> = {
-  quiet_room: 'Ruhiges Zimmer', high_floor: 'Hohe Etage', extra_pillow: 'Extra Kissen',
-  late_arrival: 'Späte Anreise', crib: 'Babybett', accessible: 'Barrierefrei',
-  vegetarian: 'Vegetarisch', occasion: 'Anlass', allergies: 'Allergien',
-};
 
 interface StayRequest {
   id: string;
@@ -113,11 +110,11 @@ for (const s of stays ?? []) {
 
   prepared.push({
     id: s.id,
-    guestName: [g?.first_name, g?.last_name].filter(Boolean).join(' ').trim() || 'Gast',
+    guestName: [g?.first_name, g?.last_name].filter(Boolean).join(' ').trim() || bt('ci.guest.default', lang),
     roomLabel: r?.room_number ? `${r.room_number}${r.room_name ? ` (${r.room_name})` : ''}` : r?.room_name ?? '—',
     roomCode: r?.room_code ?? null,
     checkInLabel: checkIn
-      ? checkIn.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+      ? checkIn.toLocaleDateString(dateLocale, { weekday: 'short', day: '2-digit', month: '2-digit' })
       : '?',
     isToday,
     pairUrl,
@@ -247,15 +244,15 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
 <div class="settings-page">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/uebersicht" class="breadcrumb__crumb">Übersicht</a>
+    <a href="/uebersicht" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
-    <span class="breadcrumb__crumb breadcrumb__crumb--current">Check-ins</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('ci.crumb', lang)}</span>
   </nav>
 
   <section class="settings-hero">
-    <span class="settings-hero__eyebrow">Check-ins</span>
-    <h1 class="settings-hero__title">App-Pairing<span class="dot-pink">.</span></h1>
-    <p class="settings-hero__sub">Beim Check-in dem Gast den QR-Code mit dem Handy scannen lassen — App ist auf dem Phone gepairt, ohne Account, ohne Download.</p>
+    <span class="settings-hero__eyebrow">{bt('ci.hero.eyebrow', lang)}</span>
+    <h1 class="settings-hero__title" set:html={bt('ci.hero.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('ci.hero.sub', lang)}</p>
   </section>
 
   <div class="settings-sections">
@@ -263,29 +260,24 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
     <!-- 01 Anreisen -->
     <section class="s-card">
       <div class="s-card__head">
-        <h2 class="s-card__title">Anreisen (nächste 30 Tage)</h2>
+        <h2 class="s-card__title">{bt('ci.card.title', lang)}</h2>
         <span class="s-card__num">01</span>
       </div>
       <div class="s-card__body">
 
         {!tokenAvailable && prepared.length > 0 && (
-          <div class="s-flash s-flash--err" style="margin-bottom: 16px;">
-            <strong>STAY_SESSION_SECRET nicht konfiguriert</strong> — QR-Codes können nicht erzeugt werden.
-            Bitte in der .env setzen + Server neustarten.
-          </div>
+          <div class="s-flash s-flash--err" style="margin-bottom: 16px;" set:html={bt('ci.nosecret', lang)}></div>
         )}
 
         {prepared.length === 0 ? (
           <div class="ci-empty">
-            <p class="ci-empty__title">Keine Anreisen in den nächsten 30 Tagen</p>
-            <p class="ci-empty__sub">
-              Sobald Reservationen mit Status „Confirmed" im Sync gepullt werden, erscheinen sie hier.
-            </p>
+            <p class="ci-empty__title">{bt('ci.empty.title', lang)}</p>
+            <p class="ci-empty__sub">{bt('ci.empty.sub', lang)}</p>
           </div>
         ) : (
           <div>
             {todayCount > 0 && (
-              <p class="ci-today-badge">{todayCount} Anreise{todayCount === 1 ? '' : 'n'} heute</p>
+              <p class="ci-today-badge">{(todayCount === 1 ? bt('ci.today.one', lang) : bt('ci.today.many', lang)).replace('{n}', String(todayCount))}</p>
             )}
 
             <div class="ci-stay-list">
@@ -297,19 +289,19 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
                   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                     <div style="min-width:0;flex:1;">
                       <p class="ci-stay__meta">
-                        {p.checkInLabel}{p.isToday ? ' · heute' : ''}
+                        {p.checkInLabel}{p.isToday ? ` · ${bt('ci.today.word', lang)}` : ''}
                       </p>
                       <p class="ci-stay__name">
                         {p.guestName}
                         {p.visitCount >= 5 && (
-                          <span class="ci-badge ci-badge--vip">&#9733; Stammgast &middot; {p.visitCount}. Besuch</span>
+                          <span class="ci-badge ci-badge--vip">&#9733; {bt('ci.badge.regular', lang).replace('{n}', String(p.visitCount))}</span>
                         )}
                         {p.visitCount >= 2 && p.visitCount < 5 && (
-                          <span class="ci-badge ci-badge--returning">&#9733; {p.visitCount}. Besuch</span>
+                          <span class="ci-badge ci-badge--returning">&#9733; {bt('ci.badge.visit', lang).replace('{n}', String(p.visitCount))}</span>
                         )}
                       </p>
                       <p class="ci-stay__room">
-                        Zimmer {p.roomLabel}
+                        {bt('ci.room', lang)} {p.roomLabel}
                         {p.roomCode && (
                           <> &middot; <span style="font-family:'JetBrains Mono',monospace;font-size:11px;">{p.roomCode}</span></>
                         )}
@@ -322,8 +314,8 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
                         @click="open = !open"
                         class="v9-btn v9-btn--primary v9-btn--sm"
                       >
-                        <span x-show="!open">App-QR</span>
-                        <span x-show="open" x-cloak>Schließen</span>
+                        <span x-show="!open">{bt('ci.qr.open', lang)}</span>
+                        <span x-show="open" x-cloak>{bt('ci.qr.close', lang)}</span>
                       </button>
                     )}
                   </div>
@@ -332,18 +324,16 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
                     <div x-show="open" x-cloak x-transition class="ci-qr-panel">
                       <div class="ci-qr-panel__inner">
                         <div class="ci-qr-img">
-                          <img src={p.qrDataUrl} alt={`Pair-QR für ${p.guestName}`} width="280" height="280" />
+                          <img src={p.qrDataUrl} alt={bt('ci.qr.alt', lang).replace('{name}', p.guestName)} width="280" height="280" />
                         </div>
                         <div class="ci-qr-steps">
-                          <p class="ci-stay__meta">Anleitung für den Gast</p>
+                          <p class="ci-stay__meta">{bt('ci.qr.guide', lang)}</p>
                           <ol>
-                            <li>Phone-Kamera öffnen</li>
-                            <li>QR-Code scannen — der Link öffnet im Browser</li>
-                            <li>App ist auf dem Phone gepairt — kein Login, kein Download</li>
+                            <li>{bt('ci.qr.step1', lang)}</li>
+                            <li>{bt('ci.qr.step2', lang)}</li>
+                            <li>{bt('ci.qr.step3', lang)}</li>
                           </ol>
-                          <p class="ci-qr-note">
-                            QR-Code gültig 30 Minuten ab Anzeige. Bei Bedarf Seite neu laden für frischen Code.
-                          </p>
+                          <p class="ci-qr-note">{bt('ci.qr.note', lang)}</p>
                         </div>
                       </div>
                     </div>
@@ -356,24 +346,24 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
                     >
                       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                         <div style="flex:1;min-width:0;">
-                          <p class="ci-wishes__head">Wünsche vorab</p>
+                          <p class="ci-wishes__head">{bt('ci.wishes.head', lang)}</p>
 
                           {p.request.chips.filter(c => c !== 'allergies' && c !== 'occasion').length > 0 && (
                             <div class="ci-chips">
                               {p.request.chips.filter(c => c !== 'allergies' && c !== 'occasion').map(slug => (
-                                <span class="ci-chip">{(CHIP_LABELS_DE as any)[slug] ?? slug}</span>
+                                <span class="ci-chip">{bt('ci.chip.' + slug, lang)}</span>
                               ))}
                             </div>
                           )}
 
                           {p.request.allergies && (
                             <div class="ci-allergy">
-                              <strong>Allergien (Küche):</strong> {p.request.allergies}
+                              <strong>{bt('ci.wishes.allergy', lang)}</strong> {p.request.allergies}
                             </div>
                           )}
 
                           {p.request.occasion && (
-                            <p class="ci-occasion">Anlass: <strong>{p.request.occasion}</strong></p>
+                            <p class="ci-occasion">{bt('ci.wishes.occasion', lang)} <strong>{p.request.occasion}</strong></p>
                           )}
 
                           {p.request.note && (
@@ -387,19 +377,19 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
                             @click="setStatus('open')"
                             :class="status === 'open' ? 'v9-btn v9-btn--primary v9-btn--sm' : 'v9-btn v9-btn--ghost v9-btn--sm'"
                             :disabled="saving"
-                          >Offen</button>
+                          >{bt('ci.status.open', lang)}</button>
                           <button
                             type="button"
                             @click="setStatus('seen')"
                             :class="status === 'seen' ? 'v9-btn v9-btn--primary v9-btn--sm' : 'v9-btn v9-btn--ghost v9-btn--sm'"
                             :disabled="saving"
-                          >Gesehen</button>
+                          >{bt('ci.status.seen', lang)}</button>
                           <button
                             type="button"
                             @click="setStatus('done')"
                             :class="status === 'done' ? 'v9-btn v9-btn--primary v9-btn--sm' : 'v9-btn v9-btn--ghost v9-btn--sm'"
                             :disabled="saving"
-                          >Erledigt</button>
+                          >{bt('ci.status.done', lang)}</button>
                         </div>
                       </div>
                     </div>
@@ -412,12 +402,7 @@ const tokenAvailable = prepared.some(p => p.qrDataUrl !== null);
 
       </div>
       <div class="s-card__footer">
-        <p class="ci-arch-note">
-          Architektur-Hinweis: Der QR enthält einen kurzlebigen, signierten Pair-Token (30 Min).
-          Er setzt beim Scan einen HttpOnly-Cookie auf dem Phone, der bis Check-out + 6h gültig
-          bleibt. Holzkarten mit NFC/QR im Zimmer (statischer room_code) erkennen das gepairte
-          Phone automatisch — kein erneutes Scannen nötig.
-        </p>
+        <p class="ci-arch-note">{bt('ci.archnote', lang)}</p>
       </div>
     </section>
 
