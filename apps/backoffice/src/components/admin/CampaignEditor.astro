@@ -8,6 +8,8 @@
 // Hebel 5: Personalisierungs-Chips ersetzen Variable-Dropdown
 
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 interface Tpl {
   id: string;
@@ -96,6 +98,32 @@ const DEMO_CTX = {
   last_visit_date: '24.12.2025',
   first_visit_date: '15.07.2024',
 };
+
+// Client-Strings (Alpine) — via define:vars
+const ceT = {
+  editorPlaceholder: bt('ce.editor.placeholder', lang),
+  eveWriting: bt('ce.eve.writing', lang),
+  eveWrite: bt('ce.eve.write', lang),
+  errAiNotConf: bt('ce.err.ainotconf', lang),
+  errEve: bt('ce.err.eve', lang),
+  promptLink: bt('ce.prompt.link', lang),
+  alertUrl: bt('ce.alert.url', lang),
+  noTitle: bt('ce.preview.notitle', lang),
+  noText: bt('ce.preview.notext', lang),
+  noSubject: bt('ce.email.nosubject', lang),
+  errName: bt('ce.err.name', lang),
+  errTitle: bt('ce.err.title', lang),
+  errBody: bt('ce.err.body', lang),
+  errChannel: bt('ce.err.channel', lang),
+  errDate: bt('ce.err.date', lang),
+  errUnknownVars: bt('ce.err.unknownvars', lang),
+  errSave: bt('ce.err.save', lang),
+  errNet: bt('ce.err.net', lang),
+  errUnknown: bt('ce.err.unknown', lang),
+  saving: bt('ce.saving', lang),
+  saveCreate: bt('ce.save', lang),
+  toastSaved: bt('ce.toast.saved', lang),
+};
 ---
 
 <div class="ce-wrap" x-data="campaignEditor()" x-init="init()">
@@ -109,8 +137,8 @@ const DEMO_CTX = {
         :class={`form.anlass === '${tile.id}' ? 'is-on' : ''`}
         @click={`selectAnlass('${tile.id}')`}
       >
-        <span class="ce-tile-eyebrow">{tile.eyebrow}</span>
-        <span class="ce-tile-label">{tile.label}</span>
+        <span class="ce-tile-eyebrow">{bt('ce.anlass.' + tile.id + '.eyebrow', lang)}</span>
+        <span class="ce-tile-label">{bt('ce.anlass.' + tile.id + '.label', lang)}</span>
       </button>
     ))}
   </div>
@@ -121,41 +149,41 @@ const DEMO_CTX = {
     <!-- ── Spalte 1: Einstellungen ──────────────────────────────────────── -->
     <div class="ce-col ce-col-settings">
 
-      <p class="ce-col-eyebrow">Einstellungen</p>
+      <p class="ce-col-eyebrow">{bt('ce.col.settings', lang)}</p>
 
       <label class="ce-field">
-        <span class="ce-label">Kampagnen-Name</span>
-        <input type="text" x-model="form.name" placeholder="z.B. Sommerfest 2026" class="s-input" />
+        <span class="ce-label">{bt('ce.name', lang)}</span>
+        <input type="text" x-model="form.name" placeholder={bt('ce.name.ph', lang)} class="s-input" />
       </label>
 
       <!-- Kanal (Hebel 1) -->
       <div class="ce-field">
-        <span class="ce-label">Kanal</span>
+        <span class="ce-label">{bt('ce.channel', lang)}</span>
         <div class="ce-channel-row">
           <button type="button"
             class="ce-ch-chip"
             :class="form.channels.includes('wallet_push') ? 'is-on' : ''"
             @click="toggleChannel('wallet_push')"
-          >Wallet-Push</button>
+          >{bt('cm.ch.wallet_push', lang)}</button>
           <button type="button"
             class="ce-ch-chip"
             :class="form.channels.includes('email') ? 'is-on' : ''"
             @click="toggleChannel('email')"
-          >E-Mail</button>
+          >{bt('cm.ch.email', lang)}</button>
         </div>
-        <span class="ce-hint">Wallet = Pass-Holder · E-Mail = DOI-Opt-ins. Min. 1 Kanal.</span>
+        <span class="ce-hint">{bt('ce.channel.hint', lang)}</span>
       </div>
 
       <!-- Empfänger-Segmente (Hebel 4) -->
       <div class="ce-field">
-        <span class="ce-label">Empfänger</span>
+        <span class="ce-label">{bt('ce.recipients', lang)}</span>
         <div class="ce-seg-row">
           <button type="button"
             class="ce-seg-chip"
             :class="form.segment === 'all' ? 'is-on' : ''"
             @click="form.segment = 'all'"
           >
-            <span class="ce-seg-name">Alle</span>
+            <span class="ce-seg-name">{bt('ce.seg.all', lang)}</span>
             <span class="ce-seg-count" x-text="segAll"></span>
           </button>
           <button type="button"
@@ -163,7 +191,7 @@ const DEMO_CTX = {
             :class="form.segment === 'loyal' ? 'is-on' : ''"
             @click="form.segment = 'loyal'"
           >
-            <span class="ce-seg-name">Stammgäste</span>
+            <span class="ce-seg-name">{bt('ce.seg.loyal', lang)}</span>
             <span class="ce-seg-count" x-text="segLoyal"></span>
           </button>
           <button type="button"
@@ -171,31 +199,31 @@ const DEMO_CTX = {
             :class="form.segment === 'lapsed' ? 'is-on' : ''"
             @click="form.segment = 'lapsed'"
           >
-            <span class="ce-seg-name">Länger nicht da</span>
+            <span class="ce-seg-name">{bt('ce.seg.lapsed', lang)}</span>
             <span class="ce-seg-count" x-text="segLapsed"></span>
           </button>
         </div>
-        <span class="ce-hint">Stammgäste = ≥ 3 Besuche. Länger nicht da = &gt; 90 Tage.</span>
+        <span class="ce-hint" set:html={bt('ce.seg.hint', lang)}></span>
       </div>
 
       <label class="ce-field">
-        <span class="ce-label">Sprache</span>
+        <span class="ce-label">{bt('ce.lang', lang)}</span>
         <select x-model="form.target_lang" class="s-input ce-input-sm">
-          <option value="">Alle Sprachen</option>
+          <option value="">{bt('ce.lang.all', lang)}</option>
           {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
         </select>
       </label>
 
       <div class="ce-field">
-        <span class="ce-label">Versand</span>
+        <span class="ce-label">{bt('ce.send', lang)}</span>
         <div class="ce-radio-group">
           <label class="ce-radio">
             <input type="radio" x-model="form.schedule_mode" value="now" />
-            <span>Sofort</span>
+            <span>{bt('ce.send.now', lang)}</span>
           </label>
           <label class="ce-radio">
             <input type="radio" x-model="form.schedule_mode" value="later" />
-            <span>Geplant</span>
+            <span>{bt('ce.send.later', lang)}</span>
           </label>
         </div>
         <label x-show="form.schedule_mode === 'later'" x-cloak style="display:block;margin-top:8px">
@@ -208,8 +236,8 @@ const DEMO_CTX = {
     <!-- ── Spalte 2: Editor ──────────────────────────────────────────────── -->
     <div class="ce-col ce-col-editor">
 
-      <p class="ce-col-eyebrow">Inhalt ({p.hotelDefaultLang.toUpperCase()})</p>
-      <p class="ce-hint" style="margin-bottom:16px">Auto-Translation in alle aktivierten Sprachen beim Speichern.</p>
+      <p class="ce-col-eyebrow">{bt('ce.content', lang)} ({p.hotelDefaultLang.toUpperCase()})</p>
+      <p class="ce-hint" style="margin-bottom:16px">{bt('ce.content.hint', lang)}</p>
 
       <!-- Mit Eve schreiben (Hebel 3) -->
       <div class="ce-eve-row">
@@ -217,7 +245,7 @@ const DEMO_CTX = {
           type="text"
           x-model="eve.prompt"
           class="s-input ce-eve-input"
-          placeholder="Was ist der Anlass? z.B. «Wir haben ein neues Wellness-Angebot»"
+          placeholder={bt('ce.eve.ph', lang)}
           @keydown.enter.prevent="eveWrite()"
           :disabled="eve.loading"
         />
@@ -226,32 +254,32 @@ const DEMO_CTX = {
           class="v9-btn ce-eve-btn"
           @click="eveWrite()"
           :disabled="eve.loading || !eve.prompt.trim()"
-          x-text="eve.loading ? 'Eve schreibt …' : '✦ Mit Eve schreiben'"
+          x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"
         ></button>
       </div>
 
       <div class="ce-divider">
-        <span>oder selbst schreiben</span>
+        <span>{bt('ce.divider', lang)}</span>
       </div>
 
       <label class="ce-field">
-        <span class="ce-label">Titel / Betreff</span>
+        <span class="ce-label">{bt('ce.title', lang)}</span>
         <input
           type="text"
           x-model="form.title"
-          placeholder="z.B. Sommer im Garten — ab Juni"
+          placeholder={bt('ce.title.ph', lang)}
           class="s-input ce-input-title"
         />
       </label>
 
       <!-- Toolbar -->
       <div class="ce-toolbar">
-        <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title="Fett"><strong>B</strong></button>
-        <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title="Kursiv" class="ce-tb-i"><em>I</em></button>
-        <button type="button" @click="exec('toggleHeading', {level: 2})" :class="active.h2 ? 'is-on' : ''" title="Überschrift">H2</button>
-        <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title="Liste">•</button>
-        <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title="Nummernliste">1.</button>
-        <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title="Link">
+        <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title={bt('ce.tb.bold', lang)}><strong>B</strong></button>
+        <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title={bt('ce.tb.italic', lang)} class="ce-tb-i"><em>I</em></button>
+        <button type="button" @click="exec('toggleHeading', {level: 2})" :class="active.h2 ? 'is-on' : ''" title={bt('ce.tb.h2', lang)}>H2</button>
+        <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title={bt('ce.tb.bullet', lang)}>•</button>
+        <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title={bt('ce.tb.ordered', lang)}>1.</button>
+        <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title={bt('ce.tb.link', lang)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
       </div>
@@ -260,7 +288,7 @@ const DEMO_CTX = {
 
       <!-- Personalisierungs-Chips (Hebel 5) -->
       <div class="ce-var-chips">
-        <span class="ce-var-label">Personalisierung:</span>
+        <span class="ce-var-label">{bt('ce.var.label', lang)}</span>
         {VARIABLE_UI_DEFS.map(v => (
           <button type="button" class="ce-var-chip" @click={`insertVariable('${v.key}')`} :title="`Beispiel: ${v.example}`">
             {`{{${v.key}}}`}
@@ -269,9 +297,9 @@ const DEMO_CTX = {
       </div>
 
       <div class="ce-field" style="margin-top:16px">
-        <span class="ce-label">CTA-Button (optional)</span>
+        <span class="ce-label">{bt('ce.cta', lang)}</span>
         <div class="ce-cta-row">
-          <input type="text" x-model="form.cta_label" placeholder="z.B. Jetzt buchen" class="s-input" />
+          <input type="text" x-model="form.cta_label" placeholder={bt('ce.cta.labelph', lang)} class="s-input" />
           <input type="url" x-model="form.cta_url" placeholder="https://…" class="s-input" />
         </div>
       </div>
@@ -282,8 +310,8 @@ const DEMO_CTX = {
     <div class="ce-col ce-col-preview">
 
       <div class="ce-preview-head">
-        <p class="ce-col-eyebrow" style="margin:0">Vorschau</p>
-        <select x-model="previewLang" class="s-input ce-input-sm" aria-label="Vorschau-Sprache">
+        <p class="ce-col-eyebrow" style="margin:0">{bt('ce.preview', lang)}</p>
+        <select x-model="previewLang" class="s-input ce-input-sm" aria-label={bt('ce.preview.langaria', lang)}>
           {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
         </select>
       </div>
@@ -291,16 +319,16 @@ const DEMO_CTX = {
       <!-- Wallet-Push Mockup -->
       <template x-if="form.channels.includes('wallet_push')">
         <div>
-          <p class="ce-preview-eyebrow">WALLET-PUSH</p>
+          <p class="ce-preview-eyebrow">{bt('ce.preview.walletpush', lang)}</p>
           <div class="ce-mockup">
             <div class="ce-mockup-frame">
-              <div class="ce-mockup-status">retaha · Benachrichtigung</div>
+              <div class="ce-mockup-status">{bt('ce.mockup.notif', lang)}</div>
               <div class="ce-mockup-card">
                 <div class="ce-mockup-brand">
                   <span class="ce-mockup-logo">{p.hotelName.slice(0, 1).toUpperCase()}</span>
                   <div>
                     <div class="ce-mockup-hotel">{p.hotelName}</div>
-                    <div class="ce-mockup-now">jetzt</div>
+                    <div class="ce-mockup-now">{bt('ce.mockup.now', lang)}</div>
                   </div>
                 </div>
                 <div class="ce-mockup-title" x-text="previewTitle"></div>
@@ -310,7 +338,7 @@ const DEMO_CTX = {
                     <span class="ce-mockup-cta-label" x-text="previewCtaLabel"></span>
                   </div>
                 </template>
-                <div class="ce-mockup-footer">Abmelden</div>
+                <div class="ce-mockup-footer">{bt('ce.mockup.unsub', lang)}</div>
               </div>
             </div>
           </div>
@@ -320,7 +348,7 @@ const DEMO_CTX = {
       <!-- E-Mail Mockup (Hebel 1) -->
       <template x-if="form.channels.includes('email')">
         <div>
-          <p class="ce-preview-eyebrow" :style="form.channels.includes('wallet_push') ? 'margin-top:20px' : ''">E-MAIL</p>
+          <p class="ce-preview-eyebrow" :style="form.channels.includes('wallet_push') ? 'margin-top:20px' : ''">{bt('ce.preview.email', lang)}</p>
           <div class="ce-email-frame">
             <div class="ce-email-from">
               <div class="ce-email-avatar" style={`background:${p.brandPrimary}`}>
@@ -328,17 +356,17 @@ const DEMO_CTX = {
               </div>
               <div>
                 <div class="ce-email-sender">{p.hotelName}</div>
-                <div class="ce-email-addr">via retaha Marketing</div>
+                <div class="ce-email-addr">{bt('ce.email.via', lang)}</div>
               </div>
             </div>
-            <div class="ce-email-subject" x-text="previewTitle || '(kein Betreff)'"></div>
+            <div class="ce-email-subject" x-text={`previewTitle || ${JSON.stringify(bt('ce.email.nosubject', lang))}`}></div>
             <div class="ce-email-body" x-html="previewBody"></div>
             <template x-if="form.cta_label">
               <div class="ce-email-cta-wrap">
                 <span class="ce-email-cta-btn" style={`background:${p.brandPrimary}`} x-text="previewCtaLabel"></span>
               </div>
             </template>
-            <div class="ce-email-footer">Du erhältst diese E-Mail, weil du Marketing-Updates von {p.hotelName} abonniert hast. · <span style="text-decoration:underline">Abmelden</span></div>
+            <div class="ce-email-footer">{bt('ce.email.footer', lang).replace('{hotel}', p.hotelName)} · <span style="text-decoration:underline">{bt('ce.mockup.unsub', lang)}</span></div>
           </div>
         </div>
       </template>
@@ -354,13 +382,13 @@ const DEMO_CTX = {
 
   <!-- Actions -->
   <div class="ce-actions">
-    <a href="/marketing/campaigns" class="v9-btn ce-btn-ghost">Abbrechen</a>
+    <a href="/marketing/campaigns" class="v9-btn ce-btn-ghost">{bt('dre.cancel', lang)}</a>
     <button
       type="button"
       class="v9-btn ce-btn-primary"
       :disabled="submitting"
       @click="save()"
-      x-text="submitting ? 'Wird gespeichert …' : 'Kampagne anlegen'"
+      x-text="submitting ? cfg.T.saving : cfg.T.saveCreate"
     ></button>
   </div>
 
@@ -375,11 +403,12 @@ const DEMO_CTX = {
   BRAND_PRIMARY: p.brandPrimary,
   LOGO_URL: p.logoUrl,
   SEGMENT_COUNTS: p.segmentCounts,
+  CE_T: ceT,
 }}>
   window.__RETAHA_CE__ = {
     TEMPLATES, HOTEL_NAME, HOTEL_DEFAULT, DEMO_CTX,
     ANLASS: ANLASS_DEFS, BRAND_PRIMARY, LOGO_URL,
-    SEGMENT_COUNTS,
+    SEGMENT_COUNTS, T: CE_T,
   };
 </script>
 
@@ -437,7 +466,7 @@ const DEMO_CTX = {
           extensions: [
             StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
-            Placeholder.configure({ placeholder: 'Was möchtest du sagen? Variablen wie {{first_name}} werden beim Versand ersetzt.' }),
+            Placeholder.configure({ placeholder: this.cfg.T.editorPlaceholder }),
           ],
           content: '<p></p>',
           onUpdate: () => {
@@ -499,8 +528,8 @@ const DEMO_CTX = {
           const data = await res.json();
           if (!data.ok) {
             this.errorMsg = data.error === 'ai_not_configured'
-              ? 'KI nicht konfiguriert.'
-              : (data.error || 'Eve-Fehler');
+              ? this.cfg.T.errAiNotConf
+              : (data.error || this.cfg.T.errEve);
             return;
           }
           this.form.title = data.title;
@@ -510,7 +539,7 @@ const DEMO_CTX = {
           if (data.cta_label) this.form.cta_label = data.cta_label;
           this.form.anlass = 'adhoc';
         } catch (err: any) {
-          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+          this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
         } finally {
           this.eve.loading = false;
         }
@@ -534,13 +563,13 @@ const DEMO_CTX = {
 
       setLink() {
         if (!this.editor) return;
-        const url = window.prompt('Link-URL:', this.editor.getAttributes('link').href || 'https://');
+        const url = window.prompt(this.cfg.T.promptLink, this.editor.getAttributes('link').href || 'https://');
         if (url === null) return;
         if (url === '') {
           this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
           return;
         }
-        if (!/^(https?:|mailto:)/i.test(url)) { alert('Nur https:// oder mailto:'); return; }
+        if (!/^(https?:|mailto:)/i.test(url)) { alert(this.cfg.T.alertUrl); return; }
         this.editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
       },
 
@@ -550,10 +579,10 @@ const DEMO_CTX = {
       },
 
       get previewTitle() {
-        return renderVars(this.form.title || '(kein Titel)', this.cfg.DEMO_CTX);
+        return renderVars(this.form.title || this.cfg.T.noTitle, this.cfg.DEMO_CTX);
       },
       get previewBody() {
-        const html = this.form.body_html || '<p class="ce-empty">(kein Text)</p>';
+        const html = this.form.body_html || `<p class="ce-empty">${this.cfg.T.noText}</p>`;
         return renderVars(html, this.cfg.DEMO_CTX, { unsubscribe_link: '#' });
       },
       get previewCtaLabel() {
@@ -565,10 +594,10 @@ const DEMO_CTX = {
         this.errorMsg = '';
         const bodyHtml = this.editor ? this.editor.getHTML() : this.form.body_html;
 
-        if (!this.form.name?.trim()) { this.errorMsg = 'Bitte gib einen Namen an.'; return; }
-        if (!this.form.title?.trim()) { this.errorMsg = 'Bitte gib einen Titel an.'; return; }
-        if (!bodyHtml?.trim() || bodyHtml === '<p></p>') { this.errorMsg = 'Bitte schreib einen Text.'; return; }
-        if (this.form.channels.length === 0) { this.errorMsg = 'Bitte mindestens einen Kanal auswählen.'; return; }
+        if (!this.form.name?.trim()) { this.errorMsg = this.cfg.T.errName; return; }
+        if (!this.form.title?.trim()) { this.errorMsg = this.cfg.T.errTitle; return; }
+        if (!bodyHtml?.trim() || bodyHtml === '<p></p>') { this.errorMsg = this.cfg.T.errBody; return; }
+        if (this.form.channels.length === 0) { this.errorMsg = this.cfg.T.errChannel; return; }
 
         const target_filter: any = {};
         if (this.form.segment === 'loyal') target_filter.min_visit_count = 3;
@@ -585,7 +614,7 @@ const DEMO_CTX = {
           cta_url: this.form.cta_url?.trim() || null,
         };
         if (this.form.schedule_mode === 'later') {
-          if (!this.form.scheduled_at) { this.errorMsg = 'Bitte wähle ein Datum.'; return; }
+          if (!this.form.scheduled_at) { this.errorMsg = this.cfg.T.errDate; return; }
           payload.scheduled_at = new Date(this.form.scheduled_at).toISOString();
         }
 
@@ -599,14 +628,14 @@ const DEMO_CTX = {
           const data = await res.json();
           if (!data.ok) {
             this.errorMsg = data.error === 'invalid_variables'
-              ? `Unbekannte Variablen: ${(data.unknown || []).join(', ')}`
-              : (data.error || 'Speichern fehlgeschlagen.');
+              ? `${this.cfg.T.errUnknownVars} ${(data.unknown || []).join(', ')}`
+              : (data.error || this.cfg.T.errSave);
             return;
           }
-          window.retahaToastFlash && window.retahaToastFlash('Kampagne gespeichert');
+          window.retahaToastFlash && window.retahaToastFlash(this.cfg.T.toastSaved);
           window.location.href = `/marketing/campaigns/${data.id}`;
         } catch (err: any) {
-          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+          this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
         } finally {
           this.submitting = false;
         }

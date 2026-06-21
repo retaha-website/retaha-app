@@ -18,6 +18,8 @@
 // Variables: HOTELIER_ALLOWED_VARIABLES aus src/lib/marketing/variables.ts
 
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
 
 interface Props {
   templateId: string | null;
@@ -39,27 +41,48 @@ const apiUrl = isEdit
 const apiMethod = isEdit ? 'PUT' : 'POST';
 
 const CATEGORIES = [
-  { value: '',           label: 'keine' },
-  { value: 'newsletter', label: 'Newsletter' },
-  { value: 'event',      label: 'Event' },
-  { value: 'promotion',  label: 'Promotion' },
-  { value: 'seasonal',   label: 'Seasonal' },
+  { value: '',           label: bt('me.cat.none', lang) },
+  { value: 'newsletter', label: bt('tm.cat.newsletter', lang) },
+  { value: 'event',      label: bt('tm.cat.event', lang) },
+  { value: 'promotion',  label: bt('tm.cat.promotion', lang) },
+  { value: 'seasonal',   label: bt('tm.cat.seasonal', lang) },
 ];
+
+// Client-Strings (Alpine) — via define:vars
+const meT = {
+  saving: bt('me.saving', lang),
+  saveEdit: bt('dre.save.edit', lang),
+  saveCreate: bt('me.save.create', lang),
+  editorPlaceholder: bt('me.editor.placeholder', lang),
+  promptLink: bt('me.prompt.link', lang),
+  alertUrl: bt('me.alert.url', lang),
+  promptImage: bt('me.prompt.image', lang),
+  alertImageHttps: bt('me.alert.imagehttps', lang),
+  errName: bt('me.err.name', lang),
+  errTitle: bt('me.err.title', lang),
+  errBody: bt('me.err.body', lang),
+  errUnknownVars: bt('me.err.unknownvars', lang),
+  errForbiddenVars: bt('me.err.forbiddenvars', lang),
+  errSave: bt('me.err.save', lang),
+  errNet: bt('me.err.net', lang),
+  errUnknown: bt('me.err.unknown', lang),
+  toastSaved: bt('me.toast.saved', lang),
+};
 ---
 
 <div class="me-wrap" x-data="marketingEditor()" x-init="init()">
   <div class="me-header">
     <label class="me-field">
-      <span class="me-label">Interner Name</span>
+      <span class="me-label">{bt('me.name', lang)}</span>
       <input
         type="text"
         x-model="form.name"
-        placeholder="z.B. Sommerfest 2026"
+        placeholder={bt('me.name.ph', lang)}
         class="me-input"
       />
     </label>
     <label class="me-field">
-      <span class="me-label">Kategorie</span>
+      <span class="me-label">{bt('me.category', lang)}</span>
       <select x-model="form.category" class="me-input">
         {CATEGORIES.map(c => <option value={c.value}>{c.label}</option>)}
       </select>
@@ -68,22 +91,22 @@ const CATEGORIES = [
 
   <div class="me-section">
     <div class="me-label-row">
-      <span class="me-label">Titel ({p.hotelDefaultLang.toUpperCase()})</span>
-      <span class="me-hint">Hauptzeile der Push-Notification</span>
+      <span class="me-label">{bt('me.title.label', lang)} ({p.hotelDefaultLang.toUpperCase()})</span>
+      <span class="me-hint">{bt('me.title.hint', lang)}</span>
     </div>
     <input
       type="text"
       x-model="form.title"
-      placeholder="z.B. Sommer im Garten — bei dir, ab Juni"
+      placeholder={bt('me.title.ph', lang)}
       class="me-input me-input-title"
     />
   </div>
 
   <div class="me-section">
     <div class="me-label-row">
-      <span class="me-label">Inhalt ({p.hotelDefaultLang.toUpperCase()})</span>
+      <span class="me-label">{bt('me.content', lang)} ({p.hotelDefaultLang.toUpperCase()})</span>
       <div class="me-variable-menu">
-        <button type="button" class="me-vmenu-trigger" @click="varMenuOpen = !varMenuOpen">+ Variable einfügen</button>
+        <button type="button" class="me-vmenu-trigger" @click="varMenuOpen = !varMenuOpen">+ {bt('me.var.insert', lang)}</button>
         <div class="me-vmenu" x-show="varMenuOpen" x-cloak @click.outside="varMenuOpen = false">
           {VARIABLE_UI_DEFS.map(v => (
             <button type="button" class="me-vmenu-item" data-var={v.key} @click={`insertVariable('${v.key}'); varMenuOpen=false`}>
@@ -97,18 +120,18 @@ const CATEGORIES = [
     </div>
 
     <div class="me-toolbar">
-      <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''"   title="Fett (Strg+B)">B</button>
-      <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title="Kursiv (Strg+I)" class="me-tb-i">I</button>
-      <button type="button" @click="exec('toggleUnderline')" :class="active.underline ? 'is-on' : ''" title="Unterstrichen" class="me-tb-u">U</button>
+      <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''"   title={bt('me.tb.bold', lang)}>B</button>
+      <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title={bt('me.tb.italic', lang)} class="me-tb-i">I</button>
+      <button type="button" @click="exec('toggleUnderline')" :class="active.underline ? 'is-on' : ''" title={bt('me.tb.underline', lang)} class="me-tb-u">U</button>
       <span class="me-tb-sep"></span>
-      <button type="button" @click="exec('toggleHeading', { level: 2 })" :class="active.h2 ? 'is-on' : ''" title="Überschrift">H2</button>
-      <button type="button" @click="exec('toggleHeading', { level: 3 })" :class="active.h3 ? 'is-on' : ''" title="Zwischen-Überschrift">H3</button>
+      <button type="button" @click="exec('toggleHeading', { level: 2 })" :class="active.h2 ? 'is-on' : ''" title={bt('me.tb.h2', lang)}>H2</button>
+      <button type="button" @click="exec('toggleHeading', { level: 3 })" :class="active.h3 ? 'is-on' : ''" title={bt('me.tb.h3', lang)}>H3</button>
       <span class="me-tb-sep"></span>
-      <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title="Liste">•</button>
-      <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title="Nummerierte Liste">1.</button>
+      <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title={bt('me.tb.bullet', lang)}>•</button>
+      <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title={bt('me.tb.ordered', lang)}>1.</button>
       <span class="me-tb-sep"></span>
-      <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title="Link">🔗</button>
-      <button type="button" @click="setImage()" title="Bild einfügen">🖼</button>
+      <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title={bt('me.tb.link', lang)}>🔗</button>
+      <button type="button" @click="setImage()" title={bt('me.tb.image', lang)}>🖼</button>
     </div>
 
     <div id="me-tiptap-mount" class="me-editor"></div>
@@ -116,19 +139,19 @@ const CATEGORIES = [
 
   <div class="me-section">
     <div class="me-label-row">
-      <span class="me-label">CTA-Button (optional)</span>
-      <span class="me-hint">Wird unten in der Notification angezeigt</span>
+      <span class="me-label">{bt('me.cta.label', lang)}</span>
+      <span class="me-hint">{bt('me.cta.hint', lang)}</span>
     </div>
     <div class="me-cta-row">
-      <input type="text" x-model="form.ctaLabel" placeholder="Label (z.B. Jetzt buchen)" class="me-input" />
-      <input type="url"  x-model="form.ctaUrl"   placeholder="URL (https://…)"           class="me-input" />
+      <input type="text" x-model="form.ctaLabel" placeholder={bt('me.cta.labelph', lang)} class="me-input" />
+      <input type="url"  x-model="form.ctaUrl"   placeholder={bt('me.cta.urlph', lang)}   class="me-input" />
     </div>
   </div>
 
   <div class="me-section">
-    <span class="me-label">Hero-Bild-URL (optional)</span>
+    <span class="me-label">{bt('me.hero.label', lang)}</span>
     <input type="url" x-model="form.heroUrl" placeholder="https://…" class="me-input" />
-    <p class="me-hint">Wird im Wallet-Pass + Push-Vorschau angezeigt. Public HTTPS-URL.</p>
+    <p class="me-hint">{bt('me.hero.hint', lang)}</p>
   </div>
 
   <template x-if="errorMsg">
@@ -136,9 +159,9 @@ const CATEGORIES = [
   </template>
 
   <div class="me-actions">
-    <a href="/marketing/templates" class="me-btn-ghost">Abbrechen</a>
+    <a href="/marketing/templates" class="me-btn-ghost">{bt('dre.cancel', lang)}</a>
     <button type="button" class="me-btn-primary" :disabled="submitting" @click="save()">
-      <span x-text="submitting ? 'Speichern …' : (isEdit ? 'Änderungen speichern' : 'Vorlage anlegen')"></span>
+      <span x-text="submitting ? cfg.T.saving : (isEdit ? cfg.T.saveEdit : cfg.T.saveCreate)"></span>
     </button>
   </div>
 </div>
@@ -158,9 +181,10 @@ const CATEGORIES = [
       name: p.initialName,
       category: p.initialCategory ?? '',
     },
+    ME_T: meT,
   }}
 >
-  window.__RETAHA_ME__ = { API_URL, API_METHOD, IS_EDIT, INITIAL };
+  window.__RETAHA_ME__ = { API_URL, API_METHOD, IS_EDIT, INITIAL, T: ME_T };
 </script>
 
 <script>
@@ -207,7 +231,7 @@ const CATEGORIES = [
             }),
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
             Image.configure({}),
-            Placeholder.configure({ placeholder: 'Schreibe hier deine Nachricht … Variablen wie {{first_name}} werden beim Versand ersetzt.' }),
+            Placeholder.configure({ placeholder: this.cfg.T.editorPlaceholder }),
           ],
           content: initialBody,
           onUpdate: () => this._refreshActive(),
@@ -240,14 +264,14 @@ const CATEGORIES = [
       setLink() {
         if (!this.editor) return;
         const previous = this.editor.getAttributes('link').href;
-        const url = window.prompt('Link-URL:', previous || 'https://');
+        const url = window.prompt(this.cfg.T.promptLink, previous || 'https://');
         if (url === null) return;
         if (url === '') {
           this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
         } else {
           // Nur http(s)/mailto erlauben (Sanitize-Layer würde es sonst rauswerfen)
           if (!/^(https?:|mailto:)/i.test(url)) {
-            alert('Bitte gib eine vollständige URL mit https:// oder mailto: an.');
+            alert(this.cfg.T.alertUrl);
             return;
           }
           this.editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
@@ -257,10 +281,10 @@ const CATEGORIES = [
 
       setImage() {
         if (!this.editor) return;
-        const url = window.prompt('Bild-URL (HTTPS, z.B. Supabase Storage):', 'https://');
+        const url = window.prompt(this.cfg.T.promptImage, 'https://');
         if (!url) return;
         if (!/^https:\/\//i.test(url)) {
-          alert('Bild-URLs müssen HTTPS sein.');
+          alert(this.cfg.T.alertImageHttps);
           return;
         }
         this.editor.chain().focus().setImage({ src: url, alt: '' }).run();
@@ -286,9 +310,9 @@ const CATEGORIES = [
           hero_image_url: this.form.heroUrl?.trim() || null,
         };
 
-        if (!payload.name)  { this.errorMsg = 'Bitte gib einen internen Namen an.'; return; }
-        if (!payload.title_default) { this.errorMsg = 'Bitte gib einen Titel an.'; return; }
-        if (!bodyHtml.trim() || bodyHtml === '<p></p>') { this.errorMsg = 'Bitte schreib einen Text.'; return; }
+        if (!payload.name)  { this.errorMsg = this.cfg.T.errName; return; }
+        if (!payload.title_default) { this.errorMsg = this.cfg.T.errTitle; return; }
+        if (!bodyHtml.trim() || bodyHtml === '<p></p>') { this.errorMsg = this.cfg.T.errBody; return; }
 
         this.submitting = true;
         try {
@@ -302,18 +326,18 @@ const CATEGORIES = [
           if (!data.ok) {
             if (data.error === 'invalid_variables') {
               const parts: string[] = [];
-              if (data.unknown?.length)   parts.push('Unbekannte Variablen: ' + data.unknown.map((v: string) => `{{${v}}}`).join(', '));
-              if (data.forbidden?.length) parts.push('Verbotene Variablen (nur System): ' + data.forbidden.map((v: string) => `{{${v}}}`).join(', '));
+              if (data.unknown?.length)   parts.push(this.cfg.T.errUnknownVars + ' ' + data.unknown.map((v: string) => `{{${v}}}`).join(', '));
+              if (data.forbidden?.length) parts.push(this.cfg.T.errForbiddenVars + ' ' + data.forbidden.map((v: string) => `{{${v}}}`).join(', '));
               this.errorMsg = parts.join(' · ');
             } else {
-              this.errorMsg = data.error || 'Speichern fehlgeschlagen.';
+              this.errorMsg = data.error || this.cfg.T.errSave;
             }
             return;
           }
-          window.retahaToastFlash && window.retahaToastFlash('Vorlage gespeichert');
+          window.retahaToastFlash && window.retahaToastFlash(this.cfg.T.toastSaved);
           window.location.href = '/marketing/templates';
         } catch (err: any) {
-          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+          this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
         } finally {
           this.submitting = false;
         }

@@ -23,36 +23,56 @@ interface Props {
 const p = Astro.props as Props;
 const isEdit = !!p.drip;
 
+import { getLang, bt } from '../../lib/i18n';
+const lang = getLang(Astro.cookies, Astro.request);
+
 const TRIGGERS = [
-  { value: 'wallet_add',            label: 'Wallet hinzugefügt' },
-  { value: 'first_visit',           label: 'Erster Besuch' },
-  { value: 'checkout',              label: 'Check-out' },
-  { value: 'anniversary',           label: 'Jahrestag' },
-  { value: 'visit_count_milestone', label: 'Besuchs-Meilenstein' },
-  { value: 'seasonal',              label: 'Saisonal' },
+  { value: 'wallet_add',            label: bt('dr.trigger.wallet_add', lang) },
+  { value: 'first_visit',           label: bt('dr.trigger.first_visit', lang) },
+  { value: 'checkout',              label: bt('dr.trigger.checkout', lang) },
+  { value: 'anniversary',           label: bt('dr.trigger.anniversary', lang) },
+  { value: 'visit_count_milestone', label: bt('dr.trigger.visit_count_milestone', lang) },
+  { value: 'seasonal',              label: bt('dr.trigger.seasonal', lang) },
 ];
+
+// Client-Strings (Alpine) — via define:vars ins window-Objekt
+const dreT = {
+  saving: bt('dre.saving', lang),
+  saveEdit: bt('dre.save.edit', lang),
+  saveCreate: bt('dre.save.create', lang),
+  errName: bt('dre.err.name', lang),
+  errStep: bt('dre.err.step', lang),
+  errTpl: bt('dre.err.tpl', lang),
+  errMilestone: bt('dre.err.milestone', lang),
+  errUpdate: bt('dre.err.update', lang),
+  errStepsUpdate: bt('dre.err.stepsupdate', lang),
+  errSave: bt('dre.err.save', lang),
+  errNet: bt('dre.err.net', lang),
+  errUnknown: bt('dre.err.unknown', lang),
+  toastSaved: bt('dre.toast.saved', lang),
+};
 ---
 
 <div class="de-wrap" x-data="dripEditor()" x-init="init()">
 
   <!-- ── Section 1: Settings ─────────────────────────────────────── -->
   <section class="de-section">
-    <h3 class="de-section-title">Einstellungen</h3>
+    <h3 class="de-section-title">{bt('dre.settings', lang)}</h3>
 
     <label class="de-field">
-      <span class="de-label">Name</span>
-      <input type="text" x-model="form.name" placeholder="z.B. Willkommens-Sequenz" class="de-input" />
+      <span class="de-label">{bt('dre.name', lang)}</span>
+      <input type="text" x-model="form.name" placeholder={bt('dre.name.ph', lang)} class="de-input" />
     </label>
 
     <div class="de-row">
       <label class="de-field de-flex-1">
-        <span class="de-label">Trigger</span>
+        <span class="de-label">{bt('dre.trigger', lang)}</span>
         <select x-model="form.trigger_type" class="de-input">
           {TRIGGERS.map(t => <option value={t.value}>{t.label}</option>)}
         </select>
       </label>
       <label class="de-field de-flex-fixed">
-        <span class="de-label">Aktiv</span>
+        <span class="de-label">{bt('dre.active', lang)}</span>
         <div class="de-toggle">
           <input type="checkbox" x-model="form.is_active" id="de-active-toggle" />
           <label for="de-active-toggle"></label>
@@ -62,68 +82,63 @@ const TRIGGERS = [
 
     <!-- Trigger-Config: kontextbezogen -->
     <div x-show="form.trigger_type === 'visit_count_milestone'" x-cloak class="de-cfg-block">
-      <span class="de-label">Meilensteine (Komma-getrennt, z.B. 5, 10, 25)</span>
+      <span class="de-label">{bt('dre.milestones.label', lang)}</span>
       <input type="text" x-model="form.milestones_input" placeholder="5, 10, 25" class="de-input" />
-      <p class="de-hint">Drip feuert bei diesen Besuchs-Zahlen (UNIQUE-PK: pro Pass nur erster Match).</p>
+      <p class="de-hint">{bt('dre.milestones.hint', lang)}</p>
     </div>
 
     <div x-show="form.trigger_type === 'seasonal'" x-cloak class="de-cfg-block">
-      <span class="de-label">Saisonales Datum</span>
+      <span class="de-label">{bt('dre.seasonal.label', lang)}</span>
       <div class="de-row">
         <label class="de-flex-1">
-          <span class="de-label-small">Monat</span>
+          <span class="de-label-small">{bt('dre.month', lang)}</span>
           <select x-model.number="form.seasonal_month" class="de-input">
-            <option value="1">Januar</option><option value="2">Februar</option>
-            <option value="3">März</option><option value="4">April</option>
-            <option value="5">Mai</option><option value="6">Juni</option>
-            <option value="7">Juli</option><option value="8">August</option>
-            <option value="9">September</option><option value="10">Oktober</option>
-            <option value="11">November</option><option value="12">Dezember</option>
+            {Array.from({ length: 12 }, (_, i) => <option value={i + 1}>{bt('dre.month.' + (i + 1), lang)}</option>)}
           </select>
         </label>
         <label class="de-flex-1">
-          <span class="de-label-small">Tag</span>
+          <span class="de-label-small">{bt('dre.day', lang)}</span>
           <input type="number" min="1" max="31" x-model.number="form.seasonal_day" class="de-input" />
         </label>
       </div>
-      <p class="de-hint">Feuert einmal jährlich an diesem Datum für alle aktiven Pässe.</p>
+      <p class="de-hint">{bt('dre.seasonal.hint', lang)}</p>
     </div>
   </section>
 
   <!-- ── Section 2: Step-Builder ──────────────────────────────────── -->
   <section class="de-section">
     <div class="de-step-head">
-      <h3 class="de-section-title">Steps</h3>
-      <button type="button" class="de-btn-add" @click="addStep()">+ Step hinzufügen</button>
+      <h3 class="de-section-title">{bt('dr.step.many', lang)}</h3>
+      <button type="button" class="de-btn-add" @click="addStep()">+ {bt('dre.addstep', lang)}</button>
     </div>
-    <p class="de-hint">Reihenfolge per Drag-Drop am Griff ⋮⋮. <code>delay_days</code> ist absolut vom Trigger-Zeitpunkt — Step 1 mit 0 sendet sofort, Step 2 mit 3 sendet 3 Tage nach Trigger.</p>
+    <p class="de-hint" set:html={bt('dre.steps.hint', lang)}></p>
 
     <ul id="de-steps-list" class="de-steps-list">
       <template x-for="(step, idx) in form.steps" :key="step._key">
         <li class="de-step-card" :data-key="step._key">
-          <span class="de-step-grip" aria-label="Verschieben">⋮⋮</span>
+          <span class="de-step-grip" aria-label={bt('dre.move', lang)}>⋮⋮</span>
           <span class="de-step-num" x-text="(idx + 1)"></span>
           <div class="de-step-body">
             <label class="de-step-row">
-              <span class="de-label-small">Template</span>
+              <span class="de-label-small">{bt('dre.template', lang)}</span>
               <select x-model="step.template_id" class="de-input">
-                <option value="">wählen</option>
+                <option value="">{bt('dre.choose', lang)}</option>
                 {p.templates.map(t => <option value={t.id}>{t.name}</option>)}
               </select>
             </label>
             <label class="de-step-row">
-              <span class="de-label-small">Verzögerung (Tage ab Trigger)</span>
+              <span class="de-label-small">{bt('dre.delay.label', lang)}</span>
               <input type="number" min="0" x-model.number="step.delay_days" class="de-input de-input-narrow" />
             </label>
           </div>
-          <button type="button" class="de-step-remove" @click="removeStep(idx)" aria-label="Entfernen">×</button>
+          <button type="button" class="de-step-remove" @click="removeStep(idx)" aria-label={bt('dre.remove', lang)}>×</button>
         </li>
       </template>
     </ul>
 
     <template x-if="form.steps.length === 0">
       <div class="de-empty">
-        <p>Noch keine Steps. Füge mindestens einen Step hinzu.</p>
+        <p>{bt('dre.empty', lang)}</p>
       </div>
     </template>
   </section>
@@ -133,8 +148,8 @@ const TRIGGERS = [
   </template>
 
   <div class="de-actions">
-    <a href="/marketing/drips" class="de-btn-ghost">Abbrechen</a>
-    <button type="button" class="de-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? 'Wird gespeichert …' : (isEditMode ? 'Änderungen speichern' : 'Drip anlegen')"></button>
+    <a href="/marketing/drips" class="de-btn-ghost">{bt('dre.cancel', lang)}</a>
+    <button type="button" class="de-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? cfg.T.saving : (isEditMode ? cfg.T.saveEdit : cfg.T.saveCreate)"></button>
   </div>
 </div>
 
@@ -142,8 +157,9 @@ const TRIGGERS = [
   IS_EDIT: isEdit,
   DRIP: p.drip ?? null,
   INITIAL_STEPS: p.initialSteps ?? [],
+  DRE_T: dreT,
 }}>
-  window.__RETAHA_DE__ = { IS_EDIT, DRIP, INITIAL_STEPS };
+  window.__RETAHA_DE__ = { IS_EDIT, DRIP, INITIAL_STEPS, T: DRE_T };
 </script>
 
 <script>
@@ -233,15 +249,15 @@ const TRIGGERS = [
         if (this.submitting) return;
         this.errorMsg = '';
 
-        if (!this.form.name?.trim()) { this.errorMsg = 'Bitte gib einen Namen an.'; return; }
-        if (this.form.steps.length === 0) { this.errorMsg = 'Mindestens ein Step erforderlich.'; return; }
+        if (!this.form.name?.trim()) { this.errorMsg = this.cfg.T.errName; return; }
+        if (this.form.steps.length === 0) { this.errorMsg = this.cfg.T.errStep; return; }
         for (const s of this.form.steps) {
-          if (!s.template_id) { this.errorMsg = 'Jeder Step braucht eine Vorlage.'; return; }
+          if (!s.template_id) { this.errorMsg = this.cfg.T.errTpl; return; }
         }
 
         const triggerConfig = this._buildTriggerConfig();
         if (this.form.trigger_type === 'visit_count_milestone' && (!triggerConfig.milestones || triggerConfig.milestones.length === 0)) {
-          this.errorMsg = 'Mindestens 1 Meilenstein nötig (z.B. "5, 10, 25").';
+          this.errorMsg = this.cfg.T.errMilestone;
           return;
         }
 
@@ -261,14 +277,14 @@ const TRIGGERS = [
               }),
             });
             const d1 = await r1.json();
-            if (!d1.ok) { this.errorMsg = d1.error || 'Update fehlgeschlagen.'; return; }
+            if (!d1.ok) { this.errorMsg = d1.error || this.cfg.T.errUpdate; return; }
             const r2 = await fetch(`/api/marketing/drips/${this.cfg.DRIP.id}/steps`, {
               method: 'POST', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ steps: stepsPayload }),
             });
             const d2 = await r2.json();
-            if (!d2.ok) { this.errorMsg = d2.error || 'Steps-Update fehlgeschlagen.'; return; }
+            if (!d2.ok) { this.errorMsg = d2.error || this.cfg.T.errStepsUpdate; return; }
             window.location.href = `/marketing/drips/${this.cfg.DRIP.id}`;
           } else {
             const res = await fetch('/api/marketing/drips/create', {
@@ -283,12 +299,12 @@ const TRIGGERS = [
               }),
             });
             const data = await res.json();
-            if (!data.ok) { this.errorMsg = data.error || 'Speichern fehlgeschlagen.'; return; }
-            window.retahaToastFlash && window.retahaToastFlash('Drip gespeichert');
+            if (!data.ok) { this.errorMsg = data.error || this.cfg.T.errSave; return; }
+            window.retahaToastFlash && window.retahaToastFlash(this.cfg.T.toastSaved);
             window.location.href = `/marketing/drips/${data.id}`;
           }
         } catch (err: any) {
-          this.errorMsg = 'Netzwerk-Fehler: ' + (err.message || 'unbekannt');
+          this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
         } finally {
           this.submitting = false;
         }
