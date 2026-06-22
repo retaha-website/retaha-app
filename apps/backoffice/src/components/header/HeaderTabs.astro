@@ -116,13 +116,13 @@ const tabs = [
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    height: 56px;
-    padding: 0 15px;
+    height: 32px;
+    padding: 0 9px;
     flex-shrink: 0;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 500;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     line-height: 1;
     color: var(--ink-muted);
     background: transparent;
@@ -140,8 +140,8 @@ const tabs = [
   .header-tabs__tab.is-active { color: #fff; border-color: transparent; }
 
   .header-tabs__tab svg {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
     color: var(--petrol);
   }
@@ -158,9 +158,9 @@ const tabs = [
                 margin-left 320ms cubic-bezier(0.5, 0, 0.2, 1),
                 opacity 220ms ease;
   }
-  /* Aktive Kachel zeigt ihren Namen immer; bei Hover über die Leiste alle */
+  /* Aktive Kachel zeigt ihren Namen immer; sonst nur die, über der man gerade ist */
   .header-tabs__tab.is-active .header-tabs__lbl,
-  .header-tabs.is-expanded .header-tabs__tab .header-tabs__lbl {
+  .header-tabs__tab:hover .header-tabs__lbl {
     max-width: 130px;
     margin-left: 8px;
     opacity: 1;
@@ -184,7 +184,7 @@ const tabs = [
   }
 
   @media (max-width: 900px) {
-    .header-tabs__tab { height: 50px; padding: 0 12px; }
+    .header-tabs__tab { height: 30px; padding: 0 8px; }
   }
 </style>
 
@@ -272,13 +272,12 @@ const tabs = [
       }
       trackRAF = requestAnimationFrame(step);
     }
-    nav.addEventListener('mouseenter', function () {
-      nav.classList.add('is-expanded');
-      if (reduce) place(activeTab()); else trackMarker();
-    });
-    nav.addEventListener('mouseleave', function () {
-      nav.classList.remove('is-expanded');
-      if (reduce) place(activeTab()); else trackMarker();
+    // Nur die Kachel, über der man sich befindet, öffnet ihren Namen (CSS :hover).
+    // Das kann die Position der aktiven Kachel verschieben → Markierung folgt.
+    function onHoverChange() { if (reduce) place(activeTab()); else trackMarker(); }
+    tabs.forEach(function (tab) {
+      tab.addEventListener('mouseenter', onHoverChange);
+      tab.addEventListener('mouseleave', onHoverChange);
     });
   })();
 </script>
