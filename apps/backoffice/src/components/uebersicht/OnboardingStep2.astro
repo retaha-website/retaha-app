@@ -55,19 +55,22 @@ function withDesign(url: string, id: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}design=${id}`;
 }
 
-const looks = [] as Array<{ id: string; label: string; desc: string; qrSvg: string | null }>;
+const looks = [] as Array<{ id: string; label: string; desc: string; url: string | null; qrSvg: string | null }>;
 for (const l of LOOKS) {
+  const url = guestUrl ? withDesign(guestUrl, l.id) : null;
   let qrSvg: string | null = null;
-  if (guestUrl) {
+  if (url) {
     try {
-      qrSvg = await QRCode.toString(withDesign(guestUrl, l.id), {
-        type: 'svg', errorCorrectionLevel: 'M', margin: 2,
-        color: { dark: '#14616E', light: '#0000' },
+      // Dunkel auf Hell wie DemoQrCard (gast-vorschau).
+      qrSvg = await QRCode.toString(url, {
+        type: 'svg', errorCorrectionLevel: 'M', margin: 1,
+        color: { dark: '#0A0A0A', light: '#FAFAF8' },
       });
     } catch { /* QR nicht-fatal */ }
   }
-  looks.push({ ...l, qrSvg });
+  looks.push({ ...l, url, qrSvg });
 }
+const defaultUrl = guestUrl ? withDesign(guestUrl, defaultLook) : null;
 ---
 
 <section class="lr" data-onb-step="2" style="display:none">
@@ -84,6 +87,7 @@ for (const l of LOOKS) {
             type="button"
             class:list={['di-card', { 'is-active': l.id === defaultLook }]}
             data-look={l.id}
+            data-look-url={l.url}
             role="radio"
             aria-checked={l.id === defaultLook ? 'true' : 'false'}
           >
@@ -102,6 +106,42 @@ for (const l of LOOKS) {
             </div>
           </button>
         ))}
+      </div>
+
+      <!-- QR-Karte unter den Auswahl-Feldern — Design wie DemoQrCard (/gast-vorschau) -->
+      <div class="lr-qrcard">
+        <div class="lr-qrcard__head">
+          <span class="lr-qrcard__eyebrow">Demo-Link</span>
+          <span class="lr-qrcard__badge">Nur Demo</span>
+        </div>
+        <div class="lr-qrcard__body">
+          <div class="lr-qrcard__qr">
+            <div class="lr-qr-stack">
+              {looks.map(l => (
+                <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
+                  {l.qrSvg ? <Fragment set:html={l.qrSvg} /> : <div class="lr-qr-fallback">QR n/v</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="lr-qrcard__info">
+            <p class="lr-qrcard__hint">Mit dem Handy scannen — deine Gästemappe im gewählten Look. Genau so erleben es deine Gäste.</p>
+            <a href={defaultUrl ?? '#'} target="_blank" rel="noopener" class="lr-qrcard__link" data-look-link>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              Demo öffnen
+            </a>
+            <button class="lr-qrcard__copy" data-look-copy data-copy-url={defaultUrl ?? ''} type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span data-copy-label>Link kopieren</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="lr-cta-row">
@@ -125,23 +165,6 @@ for (const l of LOOKS) {
               <MaisonPreview hotelName={hotelName} brandPrimary={brandPrimary} />
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- QR (klein) unter dem Mockup + Info daneben -->
-      <div class="lr-reveal">
-        <div class="lr-qr">
-          <div class="lr-qr-stack">
-            {looks.map(l => (
-              <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
-                {l.qrSvg ? <Fragment set:html={l.qrSvg} /> : <div class="lr-qr-fallback">QR n/v</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div class="lr-qr-info">
-          <span class="lr-qr-info-title">Nimm's in die Hand</span>
-          <span class="lr-qr-info-sub">Code scannen — dein Hotel im gewählten Look landet auf deinem Telefon.</span>
         </div>
       </div>
     </div>
@@ -218,11 +241,11 @@ for (const l of LOOKS) {
   }
   .lr-skip:hover { color: var(--ink); }
 
-  /* Rechts: Mockup + kleiner QR darunter */
-  .lr-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  /* Rechts: Mockup */
+  .lr-stage { display: flex; align-items: center; justify-content: center; }
 
   /* Auswahl: Look-Boxen (1:1 .di-card, Auswahl = Petrol-Kante, kein Fill), volle Breite links */
-  .lr-looks { display: flex; flex-direction: column; gap: 10px; max-width: 460px; margin: 0 0 26px; }
+  .lr-looks { display: flex; flex-direction: column; gap: 10px; max-width: 460px; margin: 0 0 24px; }
   @media (max-width: 1100px) { .lr-looks { margin-left: auto; margin-right: auto; } }
   .di-card {
     display: flex; align-items: center;
@@ -272,23 +295,54 @@ for (const l of LOOKS) {
   }
   .lr-view { position: absolute; top: 0; left: 0; width: 390px; height: 844px; }
 
-  /* QR (klein) + Info in einer Info-Box (Breite = Mockup-Außenkante ~280px) */
-  .lr-reveal {
-    width: 280px; box-sizing: border-box;
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 16px;
-    background: var(--bg-deep, #F0EFEA);
+  /* QR-Karte unter den Auswahl-Feldern — Design 1:1 wie DemoQrCard (/gast-vorschau) */
+  .lr-qrcard {
+    max-width: 460px; margin: 0 0 28px;
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--r, 12px);
+    border-radius: var(--r);
+    padding: 16px;
   }
-  .lr-qr { flex: 0 0 auto; }
-  .lr-qr-stack { position: relative; width: 84px; height: 84px; }
+  @media (max-width: 1100px) { .lr-qrcard { margin-left: auto; margin-right: auto; } }
+  .lr-qrcard__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .lr-qrcard__eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.18em; color: var(--ink-muted); text-transform: uppercase;
+  }
+  .lr-qrcard__badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    background: var(--te-yellow, #FFE600); color: #0A0A0A;
+    padding: 2px 8px; border-radius: 99px;
+  }
+  .lr-qrcard__body { display: flex; gap: 16px; align-items: flex-start; }
+  .lr-qrcard__qr {
+    flex-shrink: 0;
+    background: var(--bg-deep); border-radius: var(--r-sm);
+    padding: 8px; border: 1px solid var(--border);
+  }
+  .lr-qr-stack { position: relative; width: 116px; height: 116px; }
   .lr-qr-view { position: absolute; inset: 0; }
-  .lr-qr-view :global(svg) { display: block; width: 100%; height: 100%; }
+  .lr-qr-view :global(svg) { display: block; width: 100%; height: 100%; border-radius: 4px; }
   .lr-qr-fallback { width: 100%; height: 100%; display: grid; place-items: center; font-size: 10px; color: var(--ink-muted); text-align: center; }
-  .lr-qr-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .lr-qr-info-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
-  .lr-qr-info-sub { font-family: 'Inter Tight', -apple-system, sans-serif; font-size: 11.5px; line-height: 1.45; color: var(--ink-muted, rgba(10,10,10,0.5)); }
+  .lr-qrcard__info { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+  .lr-qrcard__hint {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    line-height: 1.5; color: var(--ink-muted); letter-spacing: 0.03em; margin: 0;
+  }
+  .lr-qrcard__link, .lr-qrcard__copy {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 14px; border-radius: var(--r-sm); width: 100%;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    transition: all 150ms ease; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+  }
+  .lr-qrcard__link { background: var(--ink); color: var(--bg, #FAFAF8); text-decoration: none; border: none; }
+  .lr-qrcard__link:hover { background: var(--petrol); color: #fff; }
+  .lr-qrcard__copy { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
+  .lr-qrcard__copy:hover { background: var(--bg-deep); color: var(--ink); border-color: var(--ink-faint); }
+  .lr-qrcard__copy.copied { color: var(--sage, #5C9070); border-color: var(--sage, #5C9070); background: var(--sage-soft, rgba(92,144,112,0.12)); }
 
   /* Schritt-Balken */
   .lr-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px auto 0; }
@@ -310,6 +364,13 @@ for (const l of LOOKS) {
     var cards = Array.prototype.slice.call(root.querySelectorAll('[data-look]'));
     var views = Array.prototype.slice.call(root.querySelectorAll('[data-look-view]'));
     var qrs = Array.prototype.slice.call(root.querySelectorAll('[data-look-qr]'));
+    var link = root.querySelector('[data-look-link]');
+    var copy = root.querySelector('[data-look-copy]');
+    function setUrl(url) {
+      if (!url) return;
+      if (link) link.setAttribute('href', url);
+      if (copy) copy.setAttribute('data-copy-url', url);
+    }
     cards.forEach(function (card) {
       card.addEventListener('click', function () {
         var id = card.getAttribute('data-look');
@@ -320,7 +381,23 @@ for (const l of LOOKS) {
         });
         views.forEach(function (v) { v.style.display = v.getAttribute('data-look-view') === id ? '' : 'none'; });
         qrs.forEach(function (q) { q.style.display = q.getAttribute('data-look-qr') === id ? '' : 'none'; });
+        setUrl(card.getAttribute('data-look-url'));
       });
+    });
+
+    // „Link kopieren" — wie DemoQrCard
+    if (copy) copy.addEventListener('click', function () {
+      var url = copy.getAttribute('data-copy-url');
+      if (!url || !navigator.clipboard) return;
+      navigator.clipboard.writeText(url).then(function () {
+        var label = copy.querySelector('[data-copy-label]');
+        if (label) label.textContent = '✓ Kopiert';
+        copy.classList.add('copied');
+        setTimeout(function () {
+          if (label) label.textContent = 'Link kopieren';
+          copy.classList.remove('copied');
+        }, 2000);
+      }).catch(function () { /* clipboard n/v */ });
     });
   })();
 </script>
