@@ -130,12 +130,38 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         window.scrollTo({ top: 0 });
         requestAnimationFrame(function () { fit(target); enter(target); });
       }
-      // „Setup überspringen" → Flow ganz weg, Dashboard darunter kommt hoch.
+      // „Setup überspringen" → Flow slidet schrumpfend nach oben rechts zum
+      // Account-Icon (wie in den Papierkorb), danach erscheinen Punkte am Avatar
+      // und am Benachrichtigungen-Eintrag.
       var dash = document.querySelector('[data-dashboard]');
-      function skip() {
+      function showDots() {
+        document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.add('is-on'); });
+      }
+      function finishSkip() {
         flow.style.display = 'none';
+        flow.style.transform = ''; flow.style.opacity = '';
+        flow.style.transition = ''; flow.style.willChange = '';
+        document.body.style.overflowX = '';
         window.scrollTo({ top: 0 });
-        requestAnimationFrame(function () { enter(dash); });
+        showDots();
+        enter(dash);
+      }
+      function skip() {
+        var target = document.getElementById('userAvatar');
+        if (reduce || !target) { finishSkip(); return; }
+        var fr = flow.getBoundingClientRect();
+        var tr = target.getBoundingClientRect();
+        var dx = (tr.left + tr.width / 2) - (fr.left + fr.width / 2);
+        var dy = (tr.top + tr.height / 2) - (fr.top + fr.height / 2);
+        document.body.style.overflowX = 'hidden';
+        flow.style.transformOrigin = 'center center';
+        flow.style.willChange = 'transform, opacity';
+        flow.style.transition = 'transform 0.62s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.62s ease';
+        requestAnimationFrame(function () {
+          flow.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(0.04)';
+          flow.style.opacity = '0';
+        });
+        setTimeout(finishSkip, 640);
       }
 
       // „Weiter" → Step 2.
