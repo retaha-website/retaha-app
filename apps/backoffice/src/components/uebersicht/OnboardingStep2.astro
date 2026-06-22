@@ -129,6 +129,9 @@ for (const l of LOOKS) {
           </div>
         </button>
       ))}
+      <button type="button" class="lr-close" data-onb-deselect aria-label="Auswahl aufheben">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
   </div>
 
@@ -170,7 +173,7 @@ for (const l of LOOKS) {
   .lr-copy { min-width: 0; }
   .lr-h1 {
     font-family: 'Space Grotesk', sans-serif; font-weight: 400;
-    font-size: clamp(44px, 6vw, 88px); line-height: 0.96;   /* = Step 1 */
+    font-size: clamp(40px, 5vw, 72px); line-height: 0.98;   /* etwas kleiner, damit größere Boxen passen */
     letter-spacing: -0.035em; color: var(--ink); margin: 0 0 22px;
     white-space: nowrap;   /* einzeilig */
   }
@@ -207,7 +210,7 @@ for (const l of LOOKS) {
   .lr-skip:hover { color: var(--ink); }
 
   /* Rechts: drei Designoptionen NEBENEINANDER — Theme oben, Vorschau unten, ohne Rahmen */
-  .lr-options { display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; }
+  .lr-options { position: relative; display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; }
   .lr-opt {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
@@ -215,6 +218,25 @@ for (const l of LOOKS) {
     border: none; background: transparent; cursor: pointer; text-align: center;
     -webkit-appearance: none; appearance: none;
   }
+  .lr-opt[hidden] { display: none; }
+  .lr-opt.is-leaving { animation: lr-opt-out 0.26s ease forwards; pointer-events: none; }
+  .lr-opt.is-entering { animation: lr-opt-in 0.34s ease both; }
+  .lr-options.is-focused .lr-opt.is-active { animation: lr-opt-in 0.34s ease both; }
+  @keyframes lr-opt-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.9); } }
+  @keyframes lr-opt-in  { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
+
+  /* Auswahl aufheben (×) — nur im Fokus-Modus, oben rechts an der gewählten Box */
+  .lr-close {
+    position: absolute; top: -8px; right: -8px; z-index: 6;
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
+    display: none; place-items: center; cursor: pointer;
+    box-shadow: 0 4px 14px -4px rgba(10,10,10,0.3);
+    transition: color 0.15s ease, border-color 0.15s ease;
+    -webkit-appearance: none; appearance: none;
+  }
+  .lr-close:hover { color: var(--ink); border-color: var(--ink-faint); }
+  .lr-options.is-focused .lr-close { display: grid; animation: lr-opt-in 0.34s ease both; }
   .lr-opt__meta { display: flex; flex-direction: column; gap: 1px; align-items: center; }
   .lr-opt__name { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
   .lr-opt.is-active .lr-opt__name { color: var(--petrol); }
@@ -226,22 +248,23 @@ for (const l of LOOKS) {
   /* Vorschau OHNE Mockup-Rahmen: nur Screen-Inhalt — Bezel (box-shadow) vom
      overflow:hidden geclippt, Notch + Statusbar oben weggecroppt (top-Offset). */
   .lr-opt__device {
-    position: relative; flex-shrink: 0; height: 240px;
+    position: relative; flex-shrink: 0; height: 282px;
     overflow: hidden; border-radius: var(--r-sm);
     outline: 2px solid transparent; outline-offset: 2px;
     transition: outline-color 0.15s ease;
   }
   .lr-opt.is-active .lr-opt__device { outline-color: var(--petrol); }
-  .lr-opt__device--phone { width: 128px; }
-  .lr-opt__device--tablet { width: 200px; display: none; }   /* breiter = Tablet */
-  .lr-opt.is-active .lr-opt__device--tablet { display: block; }
+  .lr-opt__device--phone { width: 150px; }
+  .lr-opt__device--tablet { width: 230px; display: none; }   /* breiter = Tablet */
+  .lr-opt.is-active .lr-opt__device--tablet { display: block; animation: lr-tablet-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  @keyframes lr-tablet-in { from { opacity: 0; transform: translateX(-16px) scale(0.95); } to { opacity: 1; transform: none; } }
   .lr-opt__scaler {
     position: absolute; left: 0;
     width: 390px; height: 844px;
     transform-origin: top left; pointer-events: none;
   }
-  .lr-opt__scaler--phone  { top: -18px; transform: scale(0.3282); }  /* 128 / 390 */
-  .lr-opt__scaler--tablet { top: -28px; transform: scale(0.5128); }  /* 200 / 390 */
+  .lr-opt__scaler--phone  { top: -21px; transform: scale(0.3846); }  /* 150 / 390 */
+  .lr-opt__scaler--tablet { top: -32px; transform: scale(0.5897); }  /* 230 / 390 */
   .lr-opt__check {
     position: absolute; top: 7px; right: 7px;
     width: 20px; height: 20px; border-radius: 50%;
@@ -296,16 +319,56 @@ for (const l of LOOKS) {
     if (!root) return;
     var cards = Array.prototype.slice.call(root.querySelectorAll('[data-look]'));
     var qrs = Array.prototype.slice.call(root.querySelectorAll('[data-look-qr]'));
+    var options = root.querySelector('.lr-options');
+    var closeBtn = root.querySelector('[data-onb-deselect]');
+    var leaveTimer = null;
+
+    function showQr(id) {
+      qrs.forEach(function (q) { q.style.display = q.getAttribute('data-look-qr') === id ? '' : 'none'; });
+    }
+
+    function select(card) {
+      var id = card.getAttribute('data-look');
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      cards.forEach(function (c) {
+        var on = c === card;
+        c.classList.toggle('is-active', on);
+        c.setAttribute('aria-checked', on ? 'true' : 'false');
+        c.hidden = false;
+        c.classList.remove('is-entering');
+        if (!on) c.classList.add('is-leaving'); else c.classList.remove('is-leaving');
+      });
+      options.classList.add('is-focused');
+      showQr(id);
+      // Nach der Fade-out-Animation die anderen Boxen ganz ausblenden
+      leaveTimer = setTimeout(function () {
+        cards.forEach(function (c) {
+          if (!c.classList.contains('is-active')) { c.hidden = true; c.classList.remove('is-leaving'); }
+        });
+        leaveTimer = null;
+      }, 260);
+    }
+
+    function deselect() {
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      options.classList.remove('is-focused');
+      cards.forEach(function (c) {
+        c.hidden = false;
+        c.classList.remove('is-active', 'is-leaving');
+        c.setAttribute('aria-checked', 'false');
+        void c.offsetWidth;            // Reflow → Enter-Animation greift
+        c.classList.add('is-entering');
+      });
+      showQr('bauhaus');               // QR zurück auf Default
+      setTimeout(function () { cards.forEach(function (c) { c.classList.remove('is-entering'); }); }, 360);
+    }
+
     cards.forEach(function (card) {
       card.addEventListener('click', function () {
-        var id = card.getAttribute('data-look');
-        cards.forEach(function (c) {
-          var on = c === card;
-          c.classList.toggle('is-active', on);
-          c.setAttribute('aria-checked', on ? 'true' : 'false');
-        });
-        qrs.forEach(function (q) { q.style.display = q.getAttribute('data-look-qr') === id ? '' : 'none'; });
+        if (card.classList.contains('is-active')) return;  // schon gewählt → x nutzen
+        select(card);
       });
     });
+    if (closeBtn) closeBtn.addEventListener('click', function (e) { e.preventDefault(); deselect(); });
   })();
 </script>
