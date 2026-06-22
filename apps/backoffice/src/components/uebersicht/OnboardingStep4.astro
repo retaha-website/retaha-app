@@ -1,0 +1,195 @@
+---
+// Onboarding · Screen 4 — „Mach's komplett." (die letzten 20 %)
+//
+// Vierte Sektion DERSELBEN /uebersicht-Seite. Links: das, was Eve schon aus der
+// Website gezogen hat (bestätigt) + die Felder, die nur der Hotelier kennt (WLAN,
+// Türcode, Check-in-Zeiten). Rechts: Live-Vorschau der Gäste-Info, die beim Tippen
+// mitwächst. Umgedeutet als „vervollständige, was schon läuft" — kein Hürden-Setup.
+// Eingaben sind Vorschau (kein Persist). Copy DE-only.
+
+import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+interface Props { hotelId: string; hotelName?: string; }
+const { hotelId, hotelName: hotelNameProp } = Astro.props;
+
+const sb = createSupabaseServiceRoleInstance();
+const { data: h } = await sb.from('hotels').select('name, city').eq('id', hotelId).maybeSingle();
+const hotelName = (h as any)?.name ?? hotelNameProp ?? 'Dein Hotel';
+const hotelCity = (h as any)?.city ?? null;
+---
+
+<section class="onb4" data-onb-step="4" style="display:none">
+  <div class="onb4-body">
+
+    <div class="onb4-head">
+      <h1 class="onb4-h1">Mach's <span class="onb4-nb">komplett<span class="onb4-dot"></span></span></h1>
+      <p class="onb4-sub">Die letzten 20 % — das, was nur du weißt: WLAN, Türcode, Check-in-Zeiten. Den Rest hat Eve schon aus eurer Website gezogen. Du vervollständigst nur, was längst läuft.</p>
+    </div>
+
+    <div class="onb4-grid">
+
+      <!-- Links: erkannt + die eigenen Felder -->
+      <div class="onb4-form">
+        <div class="onb4-known">
+          <span class="onb4-known__label">Aus eurer Website erkannt</span>
+          <div class="onb4-known__items">
+            <span class="onb4-known__item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>{hotelName}</span>
+            {hotelCity && <span class="onb4-known__item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>{hotelCity}</span>}
+            <span class="onb4-known__item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>Frühstück &amp; Eve-Antworten</span>
+          </div>
+        </div>
+
+        <div class="onb4-fields">
+          <label class="onb4-field"><span class="onb4-field__lbl">WLAN-Name</span><input type="text" data-prev="wifi" placeholder="z. B. GateGarden-Gast" autocomplete="off" /></label>
+          <label class="onb4-field"><span class="onb4-field__lbl">WLAN-Passwort</span><input type="text" data-prev="pw" placeholder="z. B. willkommen2025" autocomplete="off" /></label>
+          <div class="onb4-field-row">
+            <label class="onb4-field"><span class="onb4-field__lbl">Türcode</span><input type="text" data-prev="code" placeholder="z. B. 1974" autocomplete="off" /></label>
+            <label class="onb4-field"><span class="onb4-field__lbl">Check-in ab</span><input type="text" data-prev="cin" placeholder="15:00" autocomplete="off" /></label>
+            <label class="onb4-field"><span class="onb4-field__lbl">Check-out bis</span><input type="text" data-prev="cout" placeholder="11:00" autocomplete="off" /></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rechts: Live-Vorschau -->
+      <div class="onb4-preview">
+        <span class="onb4-preview__eyebrow">Live-Vorschau · so sehen es deine Gäste</span>
+        <div class="onb4-card">
+          <h3 class="onb4-card__title">Gut zu wissen<span class="onb4-dot onb4-dot--sm"></span></h3>
+          <div class="onb4-info"><span class="onb4-info__k">WLAN</span><span class="onb4-info__v" data-show="wifi">—</span></div>
+          <div class="onb4-info"><span class="onb4-info__k">Passwort</span><span class="onb4-info__v" data-show="pw">—</span></div>
+          <div class="onb4-info"><span class="onb4-info__k">Türcode</span><span class="onb4-info__v" data-show="code">—</span></div>
+          <div class="onb4-info"><span class="onb4-info__k">Check-in</span><span class="onb4-info__v" data-show="cin">ab —</span></div>
+          <div class="onb4-info"><span class="onb4-info__k">Check-out</span><span class="onb4-info__v" data-show="cout">bis —</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="onb4-cta-row">
+      <button type="button" class="onb4-next" data-onb-goto="5">Weiter →</button>
+      <button type="button" class="onb4-skip" data-onb-action="skip">Setup überspringen</button>
+    </div>
+
+  </div>
+
+  <div class="onb4-steps" role="group" aria-label="Onboarding-Schritte">
+    {[1, 2, 3, 4, 5].map(i => (
+      <button type="button" class:list={['onb4-step', { 'is-active': i === 4 }]} data-onb-goto={i} aria-label={`Schritt ${i}`}></button>
+    ))}
+  </div>
+</section>
+
+<style>
+  .onb4 {
+    --petrol: #14616E;
+    max-width: 1200px; width: 100%;
+    margin: 8px auto 12px;
+    padding: 32px 32px 40px;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+    min-height: calc(100svh - var(--onb-chrome, 190px));
+  }
+  .onb4-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
+
+  .onb4-head { max-width: 760px; }
+  .onb4-h1 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 400;
+    font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
+    letter-spacing: -0.035em; color: var(--ink); margin: 0 0 16px;
+  }
+  .onb4-nb { white-space: nowrap; }
+  .onb4-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--petrol); margin-left: 4px; vertical-align: baseline; }
+  .onb4-dot--sm { width: 8px; height: 8px; }
+  .onb4-sub {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0; max-width: 64ch;
+  }
+
+  .onb4-grid { display: grid; grid-template-columns: 1fr minmax(0, 340px); gap: 40px; align-items: start; }
+  @media (max-width: 880px) { .onb4-grid { grid-template-columns: 1fr; gap: 28px; } }
+
+  /* Erkannt */
+  .onb4-known {
+    background: var(--petrol-soft, rgba(20,97,110,0.06)); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 14px 16px; margin-bottom: 16px;
+  }
+  .onb4-known__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--petrol); }
+  .onb4-known__items { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
+  .onb4-known__item { display: inline-flex; align-items: center; gap: 6px; font-family: 'Inter Tight', sans-serif; font-size: 13px; color: var(--ink); }
+  .onb4-known__item svg { color: var(--petrol); flex-shrink: 0; }
+
+  /* Felder */
+  .onb4-fields { display: flex; flex-direction: column; gap: 12px; }
+  .onb4-field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .onb4-field-row { grid-template-columns: 1fr; } }
+  .onb4-field { display: flex; flex-direction: column; gap: 5px; }
+  .onb4-field__lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted, rgba(10,10,10,0.5)); }
+  .onb4-field input {
+    font-family: 'Inter Tight', sans-serif; font-size: 14px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 10px 12px; outline: none; transition: border-color 0.15s ease;
+    -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
+  }
+  .onb4-field input::placeholder { color: var(--ink-faint, rgba(10,10,10,0.4)); }
+  .onb4-field input:focus { border-color: var(--petrol); }
+
+  /* Live-Vorschau */
+  .onb4-preview { display: flex; flex-direction: column; gap: 10px; }
+  .onb4-preview__eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted, rgba(10,10,10,0.45)); }
+  .onb4-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 20px 20px 8px; box-shadow: 0 14px 40px -22px rgba(10,10,10,0.3);
+  }
+  .onb4-card__title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 17px; color: var(--ink); margin: 0 0 14px; }
+  .onb4-info { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 11px 0; border-top: 1px solid var(--border); }
+  .onb4-info:first-of-type { border-top: none; padding-top: 0; }
+  .onb4-info__k { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted, rgba(10,10,10,0.5)); flex-shrink: 0; }
+  .onb4-info__v { font-family: 'Inter Tight', sans-serif; font-size: 15px; font-weight: 500; color: var(--ink); text-align: right; word-break: break-word; }
+
+  /* CTA */
+  .onb4-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .onb4-next {
+    appearance: none; -webkit-appearance: none; border: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    color: var(--surface); background: var(--ink); border-radius: var(--r, 12px); padding: 13px 26px;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+  .onb4-next:hover { background: var(--petrol); }
+  .onb4-skip {
+    appearance: none; -webkit-appearance: none; border: none;
+    font-family: 'Inter Tight', -apple-system, sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink-muted, rgba(10,10,10,0.42)); background: transparent; cursor: pointer; transition: color 0.15s ease;
+  }
+  .onb4-skip:hover { color: var(--ink); }
+
+  /* Schritt-Balken */
+  .onb4-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px auto 0; }
+  .onb4-step {
+    appearance: none; -webkit-appearance: none; padding: 0; border: none;
+    flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
+    background: var(--border-medium, rgba(10,10,10,0.16)); cursor: pointer;
+    transition: width 0.3s ease, background 200ms ease, opacity 0.2s ease;
+  }
+  .onb4-step.is-active { width: 46px; background: var(--petrol); }
+  .onb4-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
+  .onb4-step:disabled { cursor: default; }
+</style>
+
+<script is:inline>
+  (function () {
+    var root = document.querySelector('[data-onb-step="4"]');
+    if (!root) return;
+    var inputs = Array.prototype.slice.call(root.querySelectorAll('[data-prev]'));
+    inputs.forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        var key = inp.getAttribute('data-prev');
+        var target = root.querySelector('[data-show="' + key + '"]');
+        if (!target) return;
+        var v = (inp.value || '').trim();
+        if (key === 'cin') target.textContent = v ? 'ab ' + v : 'ab —';
+        else if (key === 'cout') target.textContent = v ? 'bis ' + v : 'bis —';
+        else target.textContent = v || '—';
+      });
+    });
+  })();
+</script>

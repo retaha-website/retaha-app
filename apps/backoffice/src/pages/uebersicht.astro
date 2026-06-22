@@ -3,6 +3,8 @@ import Layout from '../layouts/Layout.astro';
 import OnboardingHero from '../components/uebersicht/OnboardingHero.astro';
 import OnboardingStep2 from '../components/uebersicht/OnboardingStep2.astro';
 import OnboardingStep3 from '../components/uebersicht/OnboardingStep3.astro';
+import OnboardingStep4 from '../components/uebersicht/OnboardingStep4.astro';
+import OnboardingStep5 from '../components/uebersicht/OnboardingStep5.astro';
 import HeroSection from '../components/uebersicht/HeroSection.astro';
 import RackBanner from '../components/uebersicht/RackBanner.astro';
 import SetupStatus from '../components/uebersicht/SetupStatus.astro';
@@ -72,6 +74,8 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     <OnboardingHero hotelName={hotel.name} />
     <OnboardingStep2 hotelId={hotel.id} hotelName={hotel.name} userId={user.id} />
     <OnboardingStep3 />
+    <OnboardingStep4 hotelId={hotel.id} hotelName={hotel.name} />
+    <OnboardingStep5 hotelId={hotel.id} userId={user.id} />
   </div>
 
   <div data-dashboard>
@@ -169,6 +173,15 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
       // „Setup überspringen".
       document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {
         b.addEventListener('click', function (e) { e.preventDefault(); skip(); });
+      });
+      // „Zum Dashboard" (Abschluss) → Flow weg, Dashboard kommt hoch (ohne Park-Punkte).
+      function finishFlow() {
+        flow.style.display = 'none';
+        window.scrollTo({ top: 0 });
+        requestAnimationFrame(function () { enter(dash); });
+      }
+      document.querySelectorAll('[data-onb-action="finish"]').forEach(function (b) {
+        b.addEventListener('click', function (e) { e.preventDefault(); finishFlow(); });
       });
       // „Weiter"-Buttons + Step-Balken-Segmente: zum Ziel-Step springen.
       // Nur gebaute Steps sind klickbar; auf noch nicht gebaute → disabled.

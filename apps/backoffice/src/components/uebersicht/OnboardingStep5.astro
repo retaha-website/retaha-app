@@ -1,0 +1,186 @@
+---
+// Onboarding · Screen 5 — „Du bist live." (der Abschluss)
+//
+// Fünfte und letzte Sektion DERSELBEN /uebersicht-Seite. Belohnender Live-
+// Abschluss: Bestätigung, dass die Gästemappe live ist, klarer nächster Schritt
+// (QR/Link an die Gäste bringen) + „wir melden uns persönlich". Ziel: Commit +
+// Übergang ins Dashboard. Copy DE-only.
+
+import QRCode from 'qrcode';
+import { getOrCreateShowcaseUrl } from '@retaha/auth';
+
+interface Props { hotelId: string; userId: string; }
+const { hotelId, userId } = Astro.props;
+
+let guestUrl: string | null = null;
+let qrSvg: string | null = null;
+try {
+  guestUrl = await getOrCreateShowcaseUrl(hotelId, userId);
+  if (guestUrl) {
+    qrSvg = await QRCode.toString(guestUrl, {
+      type: 'svg', errorCorrectionLevel: 'M', margin: 1,
+      color: { dark: '#0A0A0A', light: '#FAFAF8' },
+    });
+  }
+} catch { /* QR nicht-fatal */ }
+---
+
+<section class="onb5" data-onb-step="5" style="display:none">
+  <div class="onb5-body">
+
+    <span class="onb5-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+      Live
+    </span>
+
+    <h1 class="onb5-h1">Du bist <span class="onb5-nb">live<span class="onb5-dot"></span></span></h1>
+    <p class="onb5-sub">Deine Gästemappe ist online — Eve beantwortet ab jetzt jede Gästefrage, rund um die Uhr, in 11 Sprachen. Genau so, wie deine Gäste es erleben.</p>
+
+    <div class="onb5-share">
+      <div class="onb5-qr" role="img" aria-label="QR-Code zur Gästemappe">
+        {qrSvg ? <Fragment set:html={qrSvg} /> : <div class="onb5-qr-fallback">QR n/v</div>}
+      </div>
+      <div class="onb5-share__text">
+        <span class="onb5-share__title">Bring sie zu deinen Gästen</span>
+        <p class="onb5-share__desc">Häng den QR in die Zimmer und an die Rezeption — oder teil den Link direkt. Ein Scan, und die Gästemappe liegt auf dem Handy.</p>
+        <div class="onb5-share__actions">
+          <a href={guestUrl ?? '#'} target="_blank" rel="noopener" class="onb5-act onb5-act--primary">Gästemappe öffnen</a>
+          <button type="button" class="onb5-act onb5-act--ghost" data-copy-url={guestUrl ?? ''}>
+            <span data-copy-label>Link kopieren</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="onb5-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Wir melden uns in Kürze persönlich bei dir — für den Feinschliff und alle Fragen.
+    </p>
+
+    <div class="onb5-cta-row">
+      <button type="button" class="onb5-next" data-onb-action="finish">Zum Dashboard →</button>
+    </div>
+
+  </div>
+
+  <div class="onb5-steps" role="group" aria-label="Onboarding-Schritte">
+    {[1, 2, 3, 4, 5].map(i => (
+      <button type="button" class:list={['onb5-step', { 'is-active': i === 5 }]} data-onb-goto={i} aria-label={`Schritt ${i}`}></button>
+    ))}
+  </div>
+</section>
+
+<style>
+  .onb5 {
+    --petrol: #14616E;
+    max-width: 1200px; width: 100%;
+    margin: 8px auto 12px;
+    padding: 32px 32px 40px;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+    min-height: calc(100svh - var(--onb-chrome, 190px));
+  }
+  .onb5-body {
+    flex: 1 1 auto;
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    gap: 20px; max-width: 720px;
+  }
+
+  .onb5-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: #fff; background: var(--petrol); padding: 5px 11px; border-radius: 999px;
+  }
+
+  .onb5-h1 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 400;
+    font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
+    letter-spacing: -0.035em; color: var(--ink); margin: 0;
+  }
+  .onb5-nb { white-space: nowrap; }
+  .onb5-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--petrol); margin-left: 4px; vertical-align: baseline; }
+  .onb5-sub {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0; max-width: 60ch;
+  }
+
+  /* Teilen */
+  .onb5-share {
+    display: flex; align-items: center; gap: 20px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 18px 20px; width: 100%; box-sizing: border-box; margin-top: 4px;
+  }
+  @media (max-width: 600px) { .onb5-share { flex-direction: column; align-items: flex-start; } }
+  .onb5-qr {
+    flex-shrink: 0; width: 104px; height: 104px;
+    background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 8px; box-sizing: content-box;
+  }
+  .onb5-qr :global(svg) { display: block; width: 104px; height: 104px; border-radius: 4px; }
+  .onb5-qr-fallback { width: 104px; height: 104px; display: grid; place-items: center; font-size: 10px; color: var(--ink-muted); text-align: center; }
+  .onb5-share__text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .onb5-share__title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 16px; color: var(--ink); }
+  .onb5-share__desc { font-family: 'Inter Tight', sans-serif; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft, rgba(10,10,10,0.6)); margin: 0; }
+  .onb5-share__actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .onb5-act {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 8px 14px; border-radius: var(--r-sm); cursor: pointer; text-decoration: none;
+    transition: all 0.15s ease; -webkit-appearance: none; appearance: none;
+  }
+  .onb5-act--primary { background: var(--ink); color: var(--bg, #FAFAF8); border: none; }
+  .onb5-act--primary:hover { background: var(--petrol); color: #fff; }
+  .onb5-act--ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
+  .onb5-act--ghost:hover { background: var(--bg-deep); color: var(--ink); border-color: var(--ink-faint); }
+  .onb5-act--ghost.copied { color: var(--sage, #5C9070); border-color: var(--sage, #5C9070); background: var(--sage-soft, rgba(92,144,112,0.12)); }
+
+  .onb5-note {
+    display: flex; align-items: flex-start; gap: 9px; margin: 0;
+    font-family: 'Inter Tight', sans-serif; font-size: 13.5px; line-height: 1.5; color: var(--ink-muted, rgba(10,10,10,0.55));
+  }
+  .onb5-note svg { color: var(--petrol); flex-shrink: 0; margin-top: 1px; }
+
+  .onb5-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .onb5-next {
+    appearance: none; -webkit-appearance: none; border: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    color: var(--surface); background: var(--ink); border-radius: var(--r, 12px); padding: 13px 26px;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+  .onb5-next:hover { background: var(--petrol); }
+
+  /* Schritt-Balken */
+  .onb5-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px auto 0; }
+  .onb5-step {
+    appearance: none; -webkit-appearance: none; padding: 0; border: none;
+    flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
+    background: var(--border-medium, rgba(10,10,10,0.16)); cursor: pointer;
+    transition: width 0.3s ease, background 200ms ease, opacity 0.2s ease;
+  }
+  .onb5-step.is-active { width: 46px; background: var(--petrol); }
+  .onb5-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
+  .onb5-step:disabled { cursor: default; }
+</style>
+
+<script is:inline>
+  (function () {
+    var root = document.querySelector('[data-onb-step="5"]');
+    if (!root) return;
+    var copy = root.querySelector('[data-copy-url]');
+    if (copy) copy.addEventListener('click', function () {
+      var url = copy.getAttribute('data-copy-url');
+      if (!url || !navigator.clipboard) return;
+      navigator.clipboard.writeText(url).then(function () {
+        var label = copy.querySelector('[data-copy-label]');
+        if (label) label.textContent = '✓ Kopiert';
+        copy.classList.add('copied');
+        setTimeout(function () {
+          if (label) label.textContent = 'Link kopieren';
+          copy.classList.remove('copied');
+        }, 2000);
+      }).catch(function () { /* clipboard n/v */ });
+    });
+  })();
+</script>
