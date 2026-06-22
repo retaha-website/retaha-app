@@ -72,19 +72,19 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
           </div>
         </div>
         <div class="eve-message eve-message--assistant" data-step="2">
-          <div class="eve-message-bubble" data-sender="EVE">Täglich von 7:00–10:30 Uhr im Wintergarten — inklusive für alle Übernachtungsgäste. Soll ich euch einen Platz reservieren?</div>
+          <div class="eve-message-bubble" data-sender="EVE">Frühstück gibt’s täglich von 7:00 bis 10:30 Uhr im Wintergarten — frisch gebacken, mit Blick in den Garten. 🌿</div>
         </div>
         <div class="eve-message eve-message--user" data-step="3">
-          <div class="eve-message-bubble">Ja, für zwei um 8 Uhr.</div>
+          <div class="eve-message-bubble">Was gibt es in der Nähe?</div>
         </div>
         <div class="eve-message eve-message--assistant" data-step="4">
-          <div class="eve-message-bubble" data-sender="EVE">Erledigt ✅ — Frühstück für 2 Personen, morgen um 8:00 Uhr im Wintergarten. Wir freuen uns auf euch! 🌿</div>
+          <div class="eve-message-bubble" data-sender="EVE">Ganz in der Nähe, etwa 10 Minuten zu Fuß: das Museum für Naturkunde und der Hamburger Bahnhof – Museum der Gegenwart. Soll ich euch die Route schicken?</div>
         </div>
       </div>
 
       <div class="eve-sheet-input-row">
-        <input class="eve-sheet-input" type="text" placeholder="Frag Eve etwas über dein Hotel …" aria-label="Frag Eve etwas" readonly tabindex="-1" />
-        <button class="eve-sheet-send" type="button" aria-label="Senden" tabindex="-1">↑</button>
+        <input class="eve-sheet-input" data-eve-input type="text" placeholder="Frag Eve etwas über dein Hotel …" aria-label="Frag Eve etwas" readonly tabindex="-1" />
+        <button class="eve-sheet-send" data-eve-send type="button" aria-label="Senden" tabindex="-1">↑</button>
       </div>
     </div>
 
@@ -286,8 +286,10 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     color: var(--onb-ink); background: var(--onb-bg);
     outline: none; transition: border-color 0.15s ease, background 0.15s ease;
   }
-  .eve-sheet-input:focus { border-color: var(--onb-petrol); background: #FFFFFF; }
-  .eve-sheet-input::placeholder { color: var(--onb-ink-faint); }
+  .eve-sheet-input:focus,
+  .eve-sheet-input.is-active { border-color: var(--onb-petrol); background: #FFFFFF; }
+  .eve-sheet-input.is-active { caret-color: var(--onb-petrol); }
+  .eve-sheet-send.is-active { background: var(--onb-petrol); }
   .eve-sheet-send {
     flex-shrink: 0; width: 44px; height: 44px;
     border: none; border-radius: 12px;
@@ -339,6 +341,8 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     var typing = hero.querySelector('[data-eve-typing]');
     var avatar = hero.querySelector('[data-eve-avatar]');
     var msgArea = hero.querySelector('[data-eve-messages]');
+    var input = hero.querySelector('[data-eve-input]');
+    var sendBtn = hero.querySelector('[data-eve-send]');
 
     function scrollDown() { if (msgArea) msgArea.scrollTop = msgArea.scrollHeight; }
     function pulseOn()  { if (avatar) avatar.classList.add('is-typing'); }
@@ -355,6 +359,24 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     }
     function showMsg(i) { if (msgs[i]) { msgs[i].classList.add('is-in'); scrollDown(); } }
 
+    // Gast „tippt" die Frage Zeichen für Zeichen ins Feld (wirkt wie echtes Chatten)
+    function typeInto(text, done) {
+      if (!input) { done && done(); return; }
+      input.classList.add('is-active'); if (sendBtn) sendBtn.classList.add('is-active');
+      var i = 0;
+      (function tick() {
+        input.value = text.slice(0, i);
+        if (i++ < text.length) setTimeout(tick, 42 + Math.random() * 55);
+        else setTimeout(function () { done && done(); }, 380);
+      })();
+    }
+    // „Senden": Feld leeren + zugehörige Gast-Bubble einblenden
+    function sendUser(i) {
+      if (input) { input.value = ''; input.classList.remove('is-active'); }
+      if (sendBtn) sendBtn.classList.remove('is-active');
+      showMsg(i);
+    }
+
     if (reduce) {
       reveals.forEach(function (el) { el.classList.add('is-in'); });
       msgs.forEach(function (el) { el.classList.add('is-in'); });
@@ -367,15 +389,28 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
         setTimeout(function () { el.classList.add('is-in'); }, r * 90);
       });
 
-      // Demo-Chat: Greeting → Frage → Antwort → Folgefrage → Eve-Funktion (Reservierung)
-      var t = 700;
-      setTimeout(function () { showMsg(0); }, t);                                 // Eve-Greeting
-      t += 850;  setTimeout(function () { showMsg(1); }, t);                      // Gast: Frühstück?
-      t += 500;  setTimeout(function () { showTyping(msgs[2]); }, t);            // Tipp-Punkte
-      t += 1300; setTimeout(function () { hideTyping(); showMsg(2); }, t);       // Eve: Öffnungszeiten + Angebot
-      t += 750;  setTimeout(function () { showMsg(3); }, t);                      // Gast: Ja, für zwei um 8
-      t += 500;  setTimeout(function () { showTyping(msgs[4]); }, t);            // Tipp-Punkte
-      t += 1300; setTimeout(function () { hideTyping(); showMsg(4); }, t);       // Eve: Erledigt ✅ (Funktion)
+      // Demo-Chat — wirkt wie echtes Chatten: Gast tippt, Eve tippt + antwortet.
+      // Beat 1 (Erleichterung): „Wann gibt es Frühstück?" → Wintergarten, 7–10:30.
+      // Beat 2 (Überraschung): „Was gibt es in der Nähe?" → Museum für Naturkunde
+      //                         + Hamburger Bahnhof, ~10 Min.
+      setTimeout(function () { showMsg(0); }, 700);                       // Eve-Greeting
+
+      setTimeout(function () {
+        typeInto('Wann gibt es Frühstück?', function () {
+          sendUser(1);
+          setTimeout(function () { showTyping(msgs[2]); }, 450);
+          setTimeout(function () {
+            hideTyping(); showMsg(2);
+            setTimeout(function () {
+              typeInto('Was gibt es in der Nähe?', function () {
+                sendUser(3);
+                setTimeout(function () { showTyping(msgs[4]); }, 450);
+                setTimeout(function () { hideTyping(); showMsg(4); }, 1850);
+              });
+            }, 1000);
+          }, 1300);
+        });
+      }, 1600);
     }
 
     if ('requestAnimationFrame' in window) requestAnimationFrame(function () { setTimeout(start, 120); });
