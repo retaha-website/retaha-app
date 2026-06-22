@@ -33,20 +33,13 @@ const { data: h } = await sb
 const hotelName = (h as any)?.name ?? hotelNameProp ?? 'Dein Hotel';
 const brandPrimary: string | null = (h as any)?.brand_primary ?? null;
 
-// Default-Auswahl = aktuelle Identität des Hotels (gleiche Remap wie Guest-App).
-const IDENTITY_REMAP: Record<string, string> = {
-  classic: 'bauhaus', bauhaus_manufaktur: 'bauhaus', premium_anthrazit: 'maison', warmes_burgund: 'editorial',
-};
-const rawIdentity = (h as any)?.design_identity ?? null;
-const hotelIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : 'bauhaus';
-
 // Angebotene Look-Varianten = die bestehenden Guest-Themes / Design-Identitäten.
+// KEINE Vorauswahl — standardmäßig ist nichts gewählt.
 const LOOKS = [
   { id: 'bauhaus',   label: 'Bauhaus',   desc: 'Anti-Luxus · Selbstbewusst' },
   { id: 'editorial', label: 'Editorial', desc: 'Magazinhaft · Storytelling' },
   { id: 'maison',    label: 'Maison',    desc: 'Klassisch · Opulent' },
 ];
-const defaultLook = LOOKS.some(l => l.id === hotelIdentity) ? hotelIdentity : 'bauhaus';
 
 // Echter Showcase-Deep-Link (frisch — nie stale) + QR pro Look (?design=<id>).
 let guestUrl: string | null = null;
@@ -79,12 +72,13 @@ for (const l of LOOKS) {
     <div class="lr-copy">
       <h1 class="lr-h1">Wähle deinen <span class="lr-nb">Look<span class="lr-dot"></span></span></h1>
       <p class="lr-sub">Jeder Look gibt deiner Gästemappe einen eigenen Charakter — von schlicht und selbstbewusst bis klassisch und opulent. Wähl einen aus, und du kannst ihn dir direkt aufs Handy holen, genau so, wie ihn deine Gäste sehen werden.</p>
-      <!-- QR-Karte — reflektiert die rechts gewählte Designoption -->
-      <div class="lr-qrcard">
+      <!-- Vor Auswahl: ruhige Aufforderung; nach Auswahl die QR-Karte -->
+      <p class="lr-qr-prompt" data-qr-prompt>Wähl einen Look, um deinen QR-Code zu bekommen.</p>
+      <div class="lr-qrcard" data-qrcard hidden>
         <div class="lr-qrcard__qr">
           <div class="lr-qr-stack">
             {looks.map(l => (
-              <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
+              <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style="display:none">
                 {l.qrSvg ? <Fragment set:html={l.qrSvg} /> : <div class="lr-qr-fallback">QR n/v</div>}
               </div>
             ))}
@@ -104,10 +98,10 @@ for (const l of LOOKS) {
       {looks.map(l => (
         <button
           type="button"
-          class:list={['lr-opt', { 'is-active': l.id === defaultLook }]}
+          class="lr-opt"
           data-look={l.id}
           role="radio"
-          aria-checked={l.id === defaultLook ? 'true' : 'false'}
+          aria-checked="false"
         >
           <div class="lr-opt__meta">
             <span class="lr-opt__name">{l.label}</span>
@@ -258,7 +252,17 @@ for (const l of LOOKS) {
   }
   .lr-opt.is-active .lr-opt__check { display: grid; }
 
+  /* Vor Auswahl: ruhige Aufforderung statt QR-Karte */
+  .lr-qr-prompt {
+    margin: 0 0 28px; max-width: 600px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.06em; line-height: 1.5; color: var(--ink-muted, rgba(10,10,10,0.45));
+  }
+  @media (max-width: 1100px) { .lr-qr-prompt { text-align: center; margin-left: auto; margin-right: auto; } }
+  .lr-qr-prompt[hidden] { display: none; }
+
   /* QR-Karte unter den Auswahl-Feldern — nur QR + kurzer Text, horizontal länger */
+  .lr-qrcard[hidden] { display: none; }
   .lr-qrcard {
     width: 100%; max-width: 600px; box-sizing: border-box;
     margin: 0 0 28px;
@@ -303,6 +307,8 @@ for (const l of LOOKS) {
     if (!root) return;
     var cards = Array.prototype.slice.call(root.querySelectorAll('[data-look]'));
     var qrs = Array.prototype.slice.call(root.querySelectorAll('[data-look-qr]'));
+    var qrcard = root.querySelector('[data-qrcard]');
+    var qrPrompt = root.querySelector('[data-qr-prompt]');
     cards.forEach(function (card) {
       card.addEventListener('click', function () {
         var id = card.getAttribute('data-look');
@@ -312,6 +318,8 @@ for (const l of LOOKS) {
           c.setAttribute('aria-checked', on ? 'true' : 'false');
         });
         qrs.forEach(function (q) { q.style.display = q.getAttribute('data-look-qr') === id ? '' : 'none'; });
+        if (qrPrompt) qrPrompt.hidden = true;
+        if (qrcard) qrcard.hidden = false;
       });
     });
   })();
