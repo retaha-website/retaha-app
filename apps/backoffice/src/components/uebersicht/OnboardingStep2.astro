@@ -219,11 +219,11 @@ for (const l of LOOKS) {
     -webkit-appearance: none; appearance: none;
   }
   .lr-opt[hidden] { display: none; }
-  .lr-opt.is-leaving { animation: lr-opt-out 0.26s ease forwards; pointer-events: none; }
+  /* Leaving: löst sich an Ort und Stelle auf (Fade, kein Slide) */
+  .lr-opt.is-leaving { position: absolute; z-index: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+  /* Wieder erscheinen (nach ×) */
   .lr-opt.is-entering { animation: lr-opt-in 0.34s ease both; }
-  .lr-options.is-focused .lr-opt.is-active { animation: lr-opt-in 0.34s ease both; }
-  @keyframes lr-opt-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.9); } }
-  @keyframes lr-opt-in  { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
+  @keyframes lr-opt-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
 
   /* Auswahl aufheben (×) — nur im Fokus-Modus, oben rechts an der gewählten Box */
   .lr-close {
@@ -261,8 +261,8 @@ for (const l of LOOKS) {
   .lr-opt.is-active:hover .lr-opt__device { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--petrol), 0 12px 26px rgba(0,0,0,.06); }
   .lr-opt__device--phone { width: 150px; }
   .lr-opt__device--tablet { width: 230px; display: none; }   /* breiter = Tablet */
-  .lr-opt.is-active .lr-opt__device--tablet { display: block; animation: lr-tablet-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  @keyframes lr-tablet-in { from { opacity: 0; transform: translateX(-16px) scale(0.95); } to { opacity: 1; transform: none; } }
+  .lr-opt.is-active .lr-opt__device--tablet { display: block; animation: lr-fade-in 0.42s ease both; }
+  @keyframes lr-fade-in { from { opacity: 0; } to { opacity: 1; } }
   .lr-opt__scaler {
     position: absolute; left: 0;
     width: 390px; height: 844px;
@@ -335,23 +335,41 @@ for (const l of LOOKS) {
     function select(card) {
       var id = card.getAttribute('data-look');
       if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
-      cards.forEach(function (c) {
-        var on = c === card;
-        c.classList.toggle('is-active', on);
-        c.setAttribute('aria-checked', on ? 'true' : 'false');
-        c.hidden = false;
-        c.classList.remove('is-entering');
-        if (!on) c.classList.add('is-leaving'); else c.classList.remove('is-leaving');
+      var leaving = cards.filter(function (c) { return c !== card; });
+      // Positionen VOR dem Umbau erfassen (FLIP für die aktive Box, Einfrieren der anderen)
+      var first = card.getBoundingClientRect();
+      leaving.forEach(function (c) { c._l = c.offsetLeft; c._t = c.offsetTop; });
+      // Zustand setzen
+      card.classList.add('is-active');
+      card.classList.remove('is-leaving', 'is-entering');
+      card.setAttribute('aria-checked', 'true');
+      card.hidden = false;
+      leaving.forEach(function (c) {
+        c.style.left = c._l + 'px'; c.style.top = c._t + 'px';
+        c.classList.add('is-leaving'); c.classList.remove('is-entering');
+        c.setAttribute('aria-checked', 'false');
       });
       options.classList.add('is-focused');
+      // FLIP: aktive Box gleitet sanft zur zentrierten Position (kein Sprung)
+      var last = card.getBoundingClientRect();
+      var dx = first.left - last.left;
+      if (dx) {
+        card.style.transition = 'none';
+        card.style.transform = 'translateX(' + dx + 'px)';
+        requestAnimationFrame(function () {
+          card.style.transition = 'transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1)';
+          card.style.transform = '';
+        });
+      }
       showQr(id);
-      // Nach der Fade-out-Animation die anderen Boxen ganz ausblenden
+      // Nach der Fade-out-Zeit die anderen Boxen ganz ausblenden
       leaveTimer = setTimeout(function () {
-        cards.forEach(function (c) {
-          if (!c.classList.contains('is-active')) { c.hidden = true; c.classList.remove('is-leaving'); }
+        leaving.forEach(function (c) {
+          c.hidden = true; c.classList.remove('is-leaving');
+          c.style.left = ''; c.style.top = '';
         });
         leaveTimer = null;
-      }, 260);
+      }, 380);
     }
 
     function deselect() {
@@ -361,6 +379,7 @@ for (const l of LOOKS) {
         c.hidden = false;
         c.classList.remove('is-active', 'is-leaving');
         c.setAttribute('aria-checked', 'false');
+        c.style.left = ''; c.style.top = ''; c.style.transform = ''; c.style.transition = '';
         void c.offsetWidth;            // Reflow → Enter-Animation greift
         c.classList.add('is-entering');
       });
