@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import OnboardingHero from '../components/uebersicht/OnboardingHero.astro';
+import OnboardingStep2 from '../components/uebersicht/OnboardingStep2.astro';
 import HeroSection from '../components/uebersicht/HeroSection.astro';
 import RackBanner from '../components/uebersicht/RackBanner.astro';
 import SetupStatus from '../components/uebersicht/SetupStatus.astro';
@@ -66,10 +67,64 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
   userInitial={userInitial}
 >
-  <OnboardingHero hotelName={hotel.name} />
-  <HeroSection stage={stage} lang={lang} />
-  <RackBanner stage={stage} lang={lang} />
-  <SetupStatus stage={stage} lang={lang} />
-  <AppGrid stage={stage} lang={lang} />
-  <LiveTilesSection tiles={liveData} lang={lang} />
+  <div data-onboarding-flow>
+    <OnboardingHero hotelName={hotel.name} />
+    <OnboardingStep2 hotelId={hotel.id} hotelName={hotel.name} userId={user.id} />
+  </div>
+
+  <div data-dashboard>
+    <HeroSection stage={stage} lang={lang} />
+    <RackBanner stage={stage} lang={lang} />
+    <SetupStatus stage={stage} lang={lang} />
+    <AppGrid stage={stage} lang={lang} />
+    <LiveTilesSection tiles={liveData} lang={lang} />
+  </div>
+
+  <script is:inline>
+    (function () {
+      var flow  = document.querySelector('[data-onboarding-flow]');
+      if (!flow) return;
+      var step1 = flow.querySelector('[data-onb-step="1"]');
+      var step2 = flow.querySelector('[data-onb-step="2"]');
+
+      // Setup-Step füllt die volle Bildschirmhöhe — Step-Balken sitzt unten.
+      function fit(el) {
+        if (!el || el.style.display === 'none') return;
+        el.style.minHeight = '';
+        var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
+        el.style.minHeight = Math.max(520, window.innerHeight - top - 16) + 'px';
+      }
+      function visibleStep() {
+        if (step1 && step1.style.display !== 'none') return step1;
+        if (step2 && step2.style.display !== 'none') return step2;
+        return null;
+      }
+      function fitVisible() { fit(visibleStep()); }
+
+      fitVisible();
+      window.addEventListener('resize', fitVisible);
+
+      // „Weiter" (Step 1) → Step 1 raus, Step 2 rein. Rahmen bleibt identisch.
+      function goStep2() {
+        if (step1) step1.style.display = 'none';
+        if (step2) {
+          step2.style.display = 'flex';
+          requestAnimationFrame(function () { fit(step2); });
+        }
+        window.scrollTo({ top: 0 });
+      }
+      // „Setup überspringen" → Flow ganz weg, Dashboard darunter kommt hoch.
+      function skip() {
+        flow.style.display = 'none';
+        window.scrollTo({ top: 0 });
+      }
+
+      document.querySelectorAll('[data-onb-action="next"]').forEach(function (b) {
+        b.addEventListener('click', function (e) { e.preventDefault(); goStep2(); });
+      });
+      document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {
+        b.addEventListener('click', function (e) { e.preventDefault(); skip(); });
+      });
+    })();
+  </script>
 </Layout>

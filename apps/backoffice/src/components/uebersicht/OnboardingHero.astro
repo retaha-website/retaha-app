@@ -16,7 +16,7 @@ const LANG_COUNT = 11; // de en fr es it pt nl ru ar zh tr
 const STEPS = 5;       // mehr Schritte kommen noch dazu
 ---
 
-<section class="onb-hero" data-onb-hero>
+<section class="onb-hero" data-onb-hero data-onb-step="1">
   <div class="onb-grid">
 
     <!-- ── Links: Copy ─────────────────────────────────────────────── -->
@@ -28,8 +28,8 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
         <strong>{LANG_COUNT} verfügbaren Sprachen</strong>.
       </p>
       <div class="onb-cta-row onb-reveal" data-r="2">
-        <a href="/onboarding" class="onb-cta">Weiter →</a>
-        <button type="button" class="onb-skip" data-onb-skip>Setup überspringen</button>
+        <button type="button" class="onb-cta" data-onb-action="next">Weiter →</button>
+        <button type="button" class="onb-skip" data-onb-action="skip">Setup überspringen</button>
       </div>
     </div>
 
@@ -251,7 +251,9 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
 
   /* Messages */
   .eve-sheet-messages { flex: 1; overflow-y: auto; padding: 18px 18px; scroll-behavior: smooth; }
-  .eve-message { display: flex; margin-bottom: 16px; max-width: 100%; align-items: flex-end; }
+  /* flex-wrap explizit: GuestPhoneView (Step 2) lädt global guest-preview.css,
+     deren .eve-message flex-wrap:wrap setzt — hier neutralisiert. */
+  .eve-message { display: flex; flex-wrap: nowrap; margin-bottom: 16px; max-width: 100%; align-items: flex-end; }
   .eve-message--user { justify-content: flex-end; }
   .eve-message--assistant { justify-content: flex-start; }
   .eve-message-bubble {
@@ -406,22 +408,8 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
       showMsg(i);
     }
 
-    // Setup-Screen füllt die volle Bildschirmhöhe — Step-Balken sitzt dadurch unten.
-    function fitHeroHeight() {
-      hero.style.minHeight = '';
-      var top = hero.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
-      hero.style.minHeight = Math.max(520, window.innerHeight - top - 16) + 'px';
-    }
-    fitHeroHeight();
-    window.addEventListener('resize', fitHeroHeight);
-
-    // „Setup überspringen" → zum Dashboard-Inhalt unter dem Hero scrollen
-    var skip = hero.querySelector('[data-onb-skip]');
-    if (skip) skip.addEventListener('click', function () {
-      var next = hero.nextElementSibling;
-      if (next && next.scrollIntoView) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-    });
+    // Höhe + Step-Wechsel + „Setup überspringen" steuert der Flow-Controller
+    // in uebersicht.astro (gemeinsam für beide Steps).
 
     if (reduce) {
       reveals.forEach(function (el) { el.classList.add('is-in'); });

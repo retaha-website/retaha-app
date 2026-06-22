@@ -1,0 +1,219 @@
+---
+// Onboarding · Screen 2 — „Sieh es als dein Gast." (QR-Reveal)
+//
+// Läuft als zweite Sektion DERSELBEN /uebersicht-Seite (gleiches Backoffice-
+// Layout/Chrome wie Screen 1). Wird per JS ein-/ausgeblendet — kein Seitenwechsel,
+// damit sich am Rahmen nichts ändert. Links Copy + echter QR + „Weiter", rechts
+// echte Gästemappe-Home-Vorschau (GuestPhoneView) im Hotel-Branding. Copy DE-only.
+
+import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
+import { mapThemeName, type GuestTheme } from '@retaha/ui-guest/types';
+import QRCode from 'qrcode';
+import { createSupabaseServiceRoleInstance, getOrCreateShowcaseUrl } from '@retaha/auth';
+
+interface Props {
+  hotelId: string;
+  hotelName: string;
+  userId: string;
+}
+const { hotelId, hotelName: hotelNameProp, userId } = Astro.props;
+
+// Branding-Daten des Betreiber-Hotels (echt — Vorschau zieht echte Werte).
+const sb = createSupabaseServiceRoleInstance();
+const { data: h } = await sb
+  .from('hotels')
+  .select('name, slug, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary')
+  .eq('id', hotelId)
+  .maybeSingle();
+
+let eveName = 'Eve';
+try {
+  const { data: s } = await sb.from('hotel_settings').select('eve_name').eq('hotel_id', hotelId).maybeSingle();
+  if (s?.eve_name) eveName = s.eve_name;
+} catch { /* eve_name optional */ }
+
+const hotelName = (h as any)?.name ?? hotelNameProp;
+const brandTheme = (h as any)?.theme ?? 'coffee';
+const rawBrand: string | null = (h as any)?.brand_primary ?? null;
+// Phone-Akzent = echte Hotelfarbe; Default-Pink/leer → Sage-Fallback (kein Pink im Phone).
+const phoneAccent = rawBrand && rawBrand.toLowerCase() !== '#ff4a82' ? rawBrand : '#5C9070';
+
+const guestTheme: GuestTheme = {
+  primary: phoneAccent,
+  themeName: (['coffee', 'ocean', 'forest', 'custom'].includes(brandTheme) ? brandTheme : 'coffee') as GuestTheme['themeName'],
+  guestThemeName: mapThemeName(brandTheme),
+  designIdentity: ((h as any)?.design_identity ?? 'bauhaus') as GuestTheme['designIdentity'],
+  logoUrl: (h as any)?.logo_primary ?? null,
+  logoDarkUrl: (h as any)?.logo_dark ?? null,
+  heroBackground: (h as any)?.splash_background ?? null,
+  hotelName,
+  eveName,
+};
+
+// Echter Deep-Link auf die Gästemappe des Betreibers (frisch generiert — nie stale).
+let guestUrl: string | null = null;
+let qrDataUrl: string | null = null;
+try {
+  guestUrl = await getOrCreateShowcaseUrl(hotelId, userId);
+  if (guestUrl) {
+    qrDataUrl = await QRCode.toDataURL(guestUrl, {
+      errorCorrectionLevel: 'M', margin: 1, width: 240,
+      color: { dark: '#0A0A0A', light: '#FFFFFF' },
+    });
+  }
+} catch { /* QR-Fehler nicht-fatal */ }
+---
+
+<section class="onb2" data-onb-step="2" style="display:none">
+  <div class="onb2-split">
+
+    <!-- Links: Copy + QR -->
+    <div class="onb2-left">
+      <h1 class="onb2-h1">Sieh es als dein Gast<span class="onb2-dot"></span></h1>
+      <p class="onb2-sub">Vom Bildschirm in die Hand: Scann den Code — und dein eigenes Hotel liegt auf deinem Telefon. Gästemappe und Eve, in deinem Branding. Genau das, was deine Gäste erleben.</p>
+
+      <div class="onb2-qr-wrap">
+        <div class="onb2-qr">
+          {qrDataUrl
+            ? <img src={qrDataUrl} width="200" height="200" alt="QR-Code zur Gästemappe" />
+            : <div class="onb2-qr-fallback">QR konnte nicht erzeugt werden</div>}
+        </div>
+        <span class="onb2-qr-cap">Mit der Kamera deines Handys scannen.</span>
+      </div>
+
+      <div class="onb2-cta-row">
+        <a href="#" class="onb2-next" aria-disabled="true" title="Schritt 3 folgt">Weiter →</a>
+        <button type="button" class="onb2-skip" data-onb-action="skip">Setup überspringen</button>
+      </div>
+    </div>
+
+    <!-- Rechts: echte Gästemappe-Home -->
+    <div class="onb2-right">
+      <div class="onb2-phone-bezel">
+        <div class="onb2-phone-scaler">
+          <GuestPhoneView theme={guestTheme} previewMode={true} noScroll={true} />
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Schritt-Balken — Schritt 2 aktiv (segmentiert, wie Screen 1) -->
+  <div class="onb2-steps" role="img" aria-label="Schritt 2 von 5">
+    {[1, 2, 3, 4, 5].map(i => (
+      <span class:list={['onb2-step', { 'is-active': i === 2 }]}></span>
+    ))}
+  </div>
+</section>
+
+<style>
+  /* Volle Bildschirmhöhe wie Screen 1; JS verfeinert pro Header-Höhe. */
+  .onb2 {
+    --petrol: #14616E;
+    max-width: 1140px; width: 100%;
+    margin: 8px auto 12px;
+    padding: 32px 32px 40px;
+    box-sizing: border-box;
+    display: flex; flex-direction: column;
+    min-height: calc(100svh - var(--onb-chrome, 190px));
+  }
+  .onb2-split {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 320px);
+    gap: 64px;
+    align-items: center;
+  }
+  @media (max-width: 860px) {
+    .onb2-split { grid-template-columns: 1fr; gap: 32px; justify-items: center; text-align: center; }
+  }
+
+  /* Links */
+  .onb2-left { min-width: 0; max-width: 520px; }
+  .onb2-h1 {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 400;
+    font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
+    letter-spacing: -0.035em; color: var(--ink); margin: 0 0 20px;
+  }
+  .onb2-dot {
+    display: inline-block; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--petrol); margin-left: 4px; vertical-align: baseline;
+  }
+  .onb2-sub {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
+    margin: 0 0 28px; max-width: 44ch;
+  }
+  @media (max-width: 860px) { .onb2-sub { margin-left: auto; margin-right: auto; } }
+
+  .onb2-qr-wrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 28px; }
+  @media (max-width: 860px) { .onb2-qr-wrap { align-items: center; } }
+  .onb2-qr {
+    width: 200px; height: 200px;
+    padding: 14px; box-sizing: content-box;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r, 12px);
+    box-shadow: 0 10px 30px -16px rgba(10,10,10,0.25);
+  }
+  .onb2-qr img { display: block; width: 200px; height: 200px; }
+  .onb2-qr-fallback { width: 200px; height: 200px; display: grid; place-items: center; font-size: 12px; color: var(--ink-muted); text-align: center; }
+  .onb2-qr-cap {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42));
+  }
+
+  .onb2-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  @media (max-width: 860px) { .onb2-cta-row { justify-content: center; } }
+  .onb2-next {
+    display: inline-block;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    color: var(--surface); background: var(--ink);
+    border-radius: var(--r, 12px); padding: 13px 26px;
+    text-decoration: none; cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .onb2-next:hover { background: #242424; }
+  .onb2-skip {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--ink-muted, rgba(10,10,10,0.42));
+    background: transparent; border: none; text-decoration: none;
+    padding: 13px 8px; cursor: pointer; transition: color 0.15s ease;
+  }
+  .onb2-skip:hover { color: var(--ink); }
+
+  /* Rechts: Phone */
+  .onb2-right { display: flex; justify-content: center; }
+  .onb2-phone-bezel {
+    width: 320px; height: 660px;
+    overflow: hidden; position: relative;
+    border-radius: 44px;
+    box-shadow:
+      0 0 0 9px #0A0A0A,
+      0 0 0 11px #2A2A2A,
+      0 28px 64px -18px rgba(0,0,0,0.42);
+    background: #000;
+  }
+  .onb2-phone-scaler {
+    position: absolute; top: 0; left: 0;
+    width: 390px; height: 804px;
+    transform: scale(0.8205);   /* 320 / 390 */
+    transform-origin: top left;
+  }
+  @media (max-width: 860px) {
+    .onb2-phone-bezel { width: 280px; height: 578px; }
+    .onb2-phone-scaler { transform: scale(0.7179); } /* 280 / 390 */
+  }
+
+  /* Schritt-Balken (segmentiert, wie Screen 1) */
+  .onb2-steps {
+    display: flex; justify-content: center; align-items: center; gap: 8px;
+    margin: 28px auto 0;
+  }
+  .onb2-step {
+    flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
+    background: var(--border-medium, rgba(10,10,10,0.16));
+    transition: width 0.3s ease, background 200ms ease;
+  }
+  .onb2-step.is-active { width: 46px; background: var(--petrol); }
+</style>
