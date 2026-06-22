@@ -116,12 +116,17 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     margin: 8px auto 12px;
     padding: 32px 32px 40px;
     border-bottom: 1px solid var(--border);
+    /* Setup-Screen füllt die volle Bildschirmhöhe; JS verfeinert pro Header-Höhe. */
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100svh - var(--onb-chrome, 190px));
   }
   .onb-grid {
     display: grid;
     grid-template-columns: 1fr minmax(0, 380px);
     gap: 64px;
     align-items: center;
+    flex: 1 1 auto;   /* wächst → Inhalt mittig, Step-Balken sinkt nach unten */
   }
   @media (max-width: 880px) {
     .onb-grid { grid-template-columns: 1fr; gap: 32px; justify-items: center; }
@@ -312,15 +317,15 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
 
   /* ── Schritt-Balken ────────────────────────────────────────────── */
   .onb-steps {
-    display: flex; justify-content: center; gap: 8px;
-    margin: 28px auto 0; max-width: 320px;
+    display: flex; justify-content: center; align-items: center; gap: 8px;
+    margin: 28px auto 0;
   }
   .onb-step {
-    flex: 1; height: 5px; border-radius: 999px;
+    flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
     background: var(--border-medium, rgba(10,10,10,0.14));
-    transition: background 0.2s ease;
+    transition: width 0.3s ease, background 0.2s ease;
   }
-  .onb-step.is-active { background: var(--onb-petrol); }
+  .onb-step.is-active { width: 46px; background: var(--onb-petrol); }
 
   /* ── Entrance-Animation ────────────────────────────────────────── */
   .onb-reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease; }
@@ -401,6 +406,15 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
       if (sendBtn) sendBtn.classList.remove('is-active');
       showMsg(i);
     }
+
+    // Setup-Screen füllt die volle Bildschirmhöhe — Step-Balken sitzt dadurch unten.
+    function fitHeroHeight() {
+      hero.style.minHeight = '';
+      var top = hero.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0);
+      hero.style.minHeight = Math.max(520, window.innerHeight - top - 16) + 'px';
+    }
+    fitHeroHeight();
+    window.addEventListener('resize', fitHeroHeight);
 
     // „Setup überspringen" → zum Dashboard-Inhalt unter dem Hero scrollen
     var skip = hero.querySelector('[data-onb-skip]');
