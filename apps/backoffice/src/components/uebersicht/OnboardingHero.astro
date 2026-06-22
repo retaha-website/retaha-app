@@ -315,18 +315,25 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
   /* ── Entrance-Animation ────────────────────────────────────────── */
   .onb-reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease; }
   .onb-reveal.is-in { opacity: 1; transform: none; }
-  .eve-message, .eve-typing-wrap { opacity: 0; transform: translateY(6px); transition: opacity 0.35s ease, transform 0.35s ease; }
-  .eve-message.is-in, .eve-typing-wrap.is-in { opacity: 1; transform: none; }
+
+  /* Chat-Bubbles: verborgen reservieren KEINEN Platz — sonst scrollt die App
+     sofort an der Begrüßung vorbei. Erscheinen einzeln mit sanftem Fade. */
+  .eve-message:not(.is-in), .eve-typing-wrap:not(.is-in) { display: none; }
+  .eve-message.is-in, .eve-typing-wrap.is-in { animation: onb-msg-in 0.4s ease both; }
+  @keyframes onb-msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
   @media (prefers-reduced-motion: reduce) {
-    .onb-reveal, .eve-message { opacity: 1 !important; transform: none !important; transition: none; }
+    .onb-reveal { opacity: 1 !important; transform: none !important; transition: none; }
+    .eve-message { display: flex !important; }
+    .eve-message.is-in { animation: none !important; }
     .eve-typing-wrap { display: none !important; }
   }
 </style>
 
 <noscript>
   <style>
-    .onb-reveal, .eve-message { opacity: 1 !important; transform: none !important; }
+    .onb-reveal { opacity: 1 !important; transform: none !important; }
+    .eve-message { display: flex !important; }
     .eve-typing-wrap { display: none !important; }
   </style>
 </noscript>
@@ -345,7 +352,14 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
     var input = hero.querySelector('[data-eve-input]');
     var sendBtn = hero.querySelector('[data-eve-send]');
 
-    function scrollDown() { if (msgArea) msgArea.scrollTop = msgArea.scrollHeight; }
+    function scrollDown() {
+      if (!msgArea) return;
+      // erst nach Layout scrollen (smooth via CSS scroll-behavior)
+      requestAnimationFrame(function () {
+        if (typeof msgArea.scrollTo === 'function') msgArea.scrollTo({ top: msgArea.scrollHeight, behavior: 'smooth' });
+        else msgArea.scrollTop = msgArea.scrollHeight;
+      });
+    }
     function pulseOn()  { if (avatar) avatar.classList.add('is-typing'); }
     function pulseOff() { if (avatar) avatar.classList.remove('is-typing'); }
     function showTyping(beforeEl) {
