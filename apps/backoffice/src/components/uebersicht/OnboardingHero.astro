@@ -29,6 +29,7 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
       </p>
       <div class="onb-cta-row onb-reveal" data-r="2">
         <a href="/onboarding" class="onb-cta">Weiter →</a>
+        <button type="button" class="onb-skip" data-onb-skip>Setup überspringen</button>
       </div>
     </div>
 
@@ -169,6 +170,15 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
   }
   .onb-cta:hover { background: var(--onb-petrol); color: #fff; }
   .onb-cta:active { transform: translateY(1px); }
+  .onb-skip {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--onb-ink-muted);
+    background: transparent; border: none;
+    padding: 13px 8px; cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .onb-skip:hover { color: var(--onb-ink); }
 
   /* ── Rechts: Eve-Panel ─────────────────────────────────────────── */
   .onb-eve {
@@ -391,6 +401,14 @@ const STEPS = 5;       // mehr Schritte kommen noch dazu
       if (sendBtn) sendBtn.classList.remove('is-active');
       showMsg(i);
     }
+
+    // „Setup überspringen" → zum Dashboard-Inhalt unter dem Hero scrollen
+    var skip = hero.querySelector('[data-onb-skip]');
+    if (skip) skip.addEventListener('click', function () {
+      var next = hero.nextElementSibling;
+      if (next && next.scrollIntoView) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+    });
 
     if (reduce) {
       reveals.forEach(function (el) { el.classList.add('is-in'); });
