@@ -1,18 +1,18 @@
 ---
 // Onboarding · Screen 2 — „Wähl deinen Look — und nimm ihn in die Hand."
 //
-// Verschmilzt die früheren Schritte „Sieh es als dein Gast" (QR) und „Wähl deinen
-// Look": EIN Screen, drei Teile.
-//   Links  — Look-Karten (bestehende Guest-Themes) zum Antippen. Ausgewählt =
-//            Petrol-Kante, kein Fill.
-//   Mitte  — echte Gästemappe-Home-Vorschau (GuestPhoneView); wechselt live auf
-//            den gewählten Look. Leise Gästeseite (Sage / Hotelfarbe, kein Petrol).
-//   Rechts — echter QR auf die Gästemappe; Link trägt ?design=<look> (showcase-
-//            only Override in /g/[token].astro) → scannt genau den gewählten Look.
-// Antippen schaltet Mitte + QR live um. Copy DE-only.
+// EIN Screen aus „Look wählen" + „QR-Reveal". Aufbau wie Step 1: links Copy
+// (H1 + Sub + CTA, gleiche Position), rechts die Bühne mit drei Teilen:
+//   Auswahl — Look-Karten (bestehende Themes). Ausgewählt = Petrol-Kante, kein Fill.
+//   Mockup  — ECHTES /branding-Preview (BauhausPreview/EditorialPreview/
+//             MaisonPreview im .bp-outer-Bezel). Wechselt live auf den Look.
+//   QR      — echter QR; Link trägt ?design=<look> (showcase-only Override in
+//             /g/[token].astro) → scannt genau den gewählten Look.
+// Antippen schaltet Mockup + QR live um. Copy DE-only.
 
-import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
-import { mapThemeName, type GuestTheme } from '@retaha/ui-guest/types';
+import BauhausPreview   from '../branding/previews/BauhausPreview.astro';
+import EditorialPreview from '../branding/previews/EditorialPreview.astro';
+import MaisonPreview    from '../branding/previews/MaisonPreview.astro';
 import QRCode from 'qrcode';
 import { createSupabaseServiceRoleInstance, getOrCreateShowcaseUrl } from '@retaha/auth';
 
@@ -26,50 +26,27 @@ const { hotelId, hotelName: hotelNameProp, userId } = Astro.props;
 const sb = createSupabaseServiceRoleInstance();
 const { data: h } = await sb
   .from('hotels')
-  .select('name, slug, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary')
+  .select('name, design_identity, brand_primary')
   .eq('id', hotelId)
   .maybeSingle();
 
-let eveName = 'Eve';
-try {
-  const { data: s } = await sb.from('hotel_settings').select('eve_name').eq('hotel_id', hotelId).maybeSingle();
-  if (s?.eve_name) eveName = s.eve_name;
-} catch { /* eve_name optional */ }
+const hotelName = (h as any)?.name ?? hotelNameProp ?? 'Dein Hotel';
+const brandPrimary: string | null = (h as any)?.brand_primary ?? null;
 
-const hotelName = (h as any)?.name ?? hotelNameProp;
-const brandTheme = (h as any)?.theme ?? 'coffee';
-const rawBrand: string | null = (h as any)?.brand_primary ?? null;
-// Phone-Akzent = echte Hotelfarbe; Default-Pink/leer → Sage-Fallback (kein Petrol).
-const phoneAccent = rawBrand && rawBrand.toLowerCase() !== '#ff4a82' ? rawBrand : '#5C9070';
-
-// Welche Identität hat das Hotel aktuell (Default-Auswahl) — gleiche Remap wie Guest.
+// Default-Auswahl = aktuelle Identität des Hotels (gleiche Remap wie Guest-App).
 const IDENTITY_REMAP: Record<string, string> = {
   classic: 'bauhaus', bauhaus_manufaktur: 'bauhaus', premium_anthrazit: 'maison', warmes_burgund: 'editorial',
 };
 const rawIdentity = (h as any)?.design_identity ?? null;
 const hotelIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : 'bauhaus';
 
-// Angebotene Look-Varianten = die bestehenden Guest-Themes (Design-Identitäten).
+// Angebotene Look-Varianten = die bestehenden Guest-Themes / Design-Identitäten.
 const LOOKS = [
   { id: 'bauhaus',   label: 'Bauhaus',   desc: 'Anti-Luxus · Selbstbewusst' },
   { id: 'editorial', label: 'Editorial', desc: 'Magazinhaft · Storytelling' },
   { id: 'maison',    label: 'Maison',    desc: 'Klassisch · Opulent' },
 ];
 const defaultLook = LOOKS.some(l => l.id === hotelIdentity) ? hotelIdentity : 'bauhaus';
-
-function themeFor(designIdentity: GuestTheme['designIdentity']): GuestTheme {
-  return {
-    primary: phoneAccent,
-    themeName: (['coffee', 'ocean', 'forest', 'custom'].includes(brandTheme) ? brandTheme : 'coffee') as GuestTheme['themeName'],
-    guestThemeName: mapThemeName(brandTheme),
-    designIdentity,
-    logoUrl: (h as any)?.logo_primary ?? null,
-    logoDarkUrl: (h as any)?.logo_dark ?? null,
-    heroBackground: (h as any)?.splash_background ?? null,
-    hotelName,
-    eveName,
-  };
-}
 
 // Echter Showcase-Deep-Link (frisch — nie stale) + QR pro Look (?design=<id>).
 let guestUrl: string | null = null;
@@ -78,7 +55,7 @@ function withDesign(url: string, id: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}design=${id}`;
 }
 
-const looks = [] as Array<{ id: string; label: string; desc: string; theme: GuestTheme; qrSvg: string | null }>;
+const looks = [] as Array<{ id: string; label: string; desc: string; qrSvg: string | null }>;
 for (const l of LOOKS) {
   let qrSvg: string | null = null;
   if (guestUrl) {
@@ -89,87 +66,89 @@ for (const l of LOOKS) {
       });
     } catch { /* QR nicht-fatal */ }
   }
-  looks.push({ ...l, theme: themeFor(l.id as GuestTheme['designIdentity']), qrSvg });
+  looks.push({ ...l, qrSvg });
 }
 ---
 
 <section class="lr" data-onb-step="2" style="display:none">
-  <div class="lr-head">
-    <h1 class="lr-h1">Wähl deinen Look — und nimm ihn in die <span class="lr-nb">Hand<span class="lr-dot"></span></span></h1>
-    <p class="lr-sub">Tippe einen Look, sieh ihn sofort, scann ihn aufs Telefon.</p>
-  </div>
+  <div class="lr-grid">
 
-  <div class="lr-stage">
+    <!-- Links: Copy (gleiche Position wie Step 1) -->
+    <div class="lr-copy">
+      <h1 class="lr-h1">Wähl deinen Look — und nimm ihn in die <span class="lr-nb">Hand<span class="lr-dot"></span></span></h1>
+      <p class="lr-sub">Tippe einen Look, sieh ihn sofort, scann ihn aufs Telefon.</p>
+      <div class="lr-cta-row">
+        <button type="button" class="lr-next" data-onb-goto="3">Weiter →</button>
+        <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
+      </div>
+    </div>
 
-    <!-- Links: Look-Karten (bestehende Themes) -->
-    <div class="lr-looks" role="radiogroup" aria-label="Gästemappen-Look wählen">
-      {looks.map(l => (
-        <button
-          type="button"
-          class:list={['di-card', { 'is-active': l.id === defaultLook }]}
-          data-look={l.id}
-          role="radio"
-          aria-checked={l.id === defaultLook ? 'true' : 'false'}
-        >
-          {l.id === 'bauhaus' && (
-            <div class="di-card__hint di-card__hint--bauhaus">
-              <span class="bh-initial">B</span><span class="bh-pink-dot"></span>
+    <!-- Rechts: Bühne — Auswahl | Mockup | QR -->
+    <div class="lr-stage">
+
+      <!-- Auswahl: Look-Karten -->
+      <div class="lr-looks" role="radiogroup" aria-label="Gästemappen-Look wählen">
+        {looks.map(l => (
+          <button
+            type="button"
+            class:list={['di-card', { 'is-active': l.id === defaultLook }]}
+            data-look={l.id}
+            role="radio"
+            aria-checked={l.id === defaultLook ? 'true' : 'false'}
+          >
+            {l.id === 'bauhaus' && (
+              <div class="di-card__hint di-card__hint--bauhaus"><span class="bh-initial">B</span><span class="bh-pink-dot"></span></div>
+            )}
+            {l.id === 'editorial' && (
+              <div class="di-card__hint di-card__hint--editorial"><span class="ed-name">Editorial</span></div>
+            )}
+            {l.id === 'maison' && (
+              <div class="di-card__hint di-card__hint--maison"><span class="ms-name">MAISON</span><span class="ms-rhombus"></span></div>
+            )}
+            <div class="di-card__body">
+              <div class:list={['di-card__title', `${l.id}-title`]}>{l.label}</div>
+              <div class="di-card__desc">{l.desc}</div>
             </div>
-          )}
-          {l.id === 'editorial' && (
-            <div class="di-card__hint di-card__hint--editorial"><span class="ed-name">Editorial</span></div>
-          )}
-          {l.id === 'maison' && (
-            <div class="di-card__hint di-card__hint--maison">
-              <span class="ms-name">MAISON</span><span class="ms-rhombus"></span>
+          </button>
+        ))}
+      </div>
+
+      <!-- Mockup: ECHTES /branding-Preview im .bp-outer-Bezel -->
+      <div class="lr-phone">
+        <div class="bp-outer">
+          <div class="bp-inner">
+            <div class="lr-view" data-look-view="bauhaus" style={defaultLook === 'bauhaus' ? '' : 'display:none'}>
+              <BauhausPreview hotelName={hotelName} brandPrimary={brandPrimary} />
             </div>
-          )}
-          <div class="di-card__body">
-            <div class:list={['di-card__title', `${l.id}-title`]}>{l.label}</div>
-            <div class="di-card__desc">{l.desc}</div>
+            <div class="lr-view" data-look-view="editorial" style={defaultLook === 'editorial' ? '' : 'display:none'}>
+              <EditorialPreview hotelName={hotelName} brandPrimary={brandPrimary} />
+            </div>
+            <div class="lr-view" data-look-view="maison" style={defaultLook === 'maison' ? '' : 'display:none'}>
+              <MaisonPreview hotelName={hotelName} brandPrimary={brandPrimary} />
+            </div>
           </div>
-        </button>
-      ))}
-    </div>
-
-    <!-- Mitte: echte Gästemappe-Home, live im gewählten Look -->
-    <div class="lr-phone">
-      <div class="lr-phone-bezel">
-        <div class="lr-phone-scaler">
-          {looks.map(l => (
-            <div class="lr-phone-view" data-look-view={l.id} style={l.id === defaultLook ? '' : 'display:none'}>
-              <GuestPhoneView theme={l.theme} previewMode={true} noScroll={true} />
-            </div>
-          ))}
         </div>
       </div>
-    </div>
 
-    <!-- Rechts: QR auf die Gästemappe im gewählten Look -->
-    <div class="lr-qr">
-      <div class="lr-qr-frame">
-        <span class="lr-corner tl"></span>
-        <span class="lr-corner tr"></span>
-        <span class="lr-corner bl"></span>
-        <span class="lr-corner br"></span>
-        <div class="lr-qr-stack">
-          {looks.map(l => (
-            <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
-              {l.qrSvg
-                ? <Fragment set:html={l.qrSvg} />
-                : <div class="lr-qr-fallback">QR n/v</div>}
-            </div>
-          ))}
+      <!-- QR: auf die Gästemappe im gewählten Look -->
+      <div class="lr-qr">
+        <div class="lr-qr-frame">
+          <span class="lr-corner tl"></span>
+          <span class="lr-corner tr"></span>
+          <span class="lr-corner bl"></span>
+          <span class="lr-corner br"></span>
+          <div class="lr-qr-stack">
+            {looks.map(l => (
+              <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
+                {l.qrSvg ? <Fragment set:html={l.qrSvg} /> : <div class="lr-qr-fallback">QR n/v</div>}
+              </div>
+            ))}
+          </div>
         </div>
+        <span class="lr-qr-cap">Mit der Kamera scannen.</span>
       </div>
-      <span class="lr-qr-cap">Mit der Kamera deines Handys scannen.</span>
+
     </div>
-
-  </div>
-
-  <div class="lr-cta-row">
-    <button type="button" class="lr-next" data-onb-goto="3">Weiter →</button>
-    <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
   </div>
 
   <!-- Schritt-Balken — Schritt 2 aktiv, klickbar -->
@@ -188,45 +167,72 @@ for (const l of LOOKS) {
 <style>
   .lr {
     --petrol: #14616E;
-    max-width: 1240px; width: 100%;
+    max-width: 1320px; width: 100%;
     margin: 8px auto 12px;
     padding: 28px 32px 36px;
     box-sizing: border-box;
     display: flex; flex-direction: column;
     min-height: calc(100svh - var(--onb-chrome, 190px));
   }
+  .lr-grid {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 48px; align-items: center;
+  }
+  @media (max-width: 1100px) {
+    .lr-grid { grid-template-columns: 1fr; gap: 32px; justify-items: center; text-align: center; }
+  }
 
-  /* Kopf (zentriert) */
-  .lr-head { text-align: center; max-width: 760px; margin: 0 auto 8px; }
+  /* Links: Copy — Headline-Stil wie Step 1 (.onb-headline) */
+  .lr-copy { min-width: 0; max-width: 560px; }
   .lr-h1 {
     font-family: 'Space Grotesk', sans-serif; font-weight: 400;
-    font-size: clamp(32px, 4.2vw, 56px); line-height: 1.0;
-    letter-spacing: -0.03em; color: var(--ink); margin: 0 0 14px;
+    font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
+    letter-spacing: -0.035em; color: var(--ink); margin: 0 0 22px;
   }
   .lr-nb { white-space: nowrap; }
   .lr-dot {
-    display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
     background: var(--petrol); margin-left: 4px; vertical-align: baseline;
   }
   .lr-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
-    font-size: 16px; line-height: 1.55; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0;
+    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
+    margin: 0 0 28px; max-width: 42ch;
   }
+  @media (max-width: 1100px) { .lr-sub { margin-left: auto; margin-right: auto; } }
+  .lr-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  @media (max-width: 1100px) { .lr-cta-row { justify-content: center; } }
+  .lr-next {
+    appearance: none; -webkit-appearance: none; border: none;
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    color: var(--surface); background: var(--ink);
+    border-radius: var(--r, 12px); padding: 13px 26px;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+  .lr-next:hover { background: var(--petrol); }
+  .lr-skip {
+    appearance: none; -webkit-appearance: none; border: none;
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--ink-muted, rgba(10,10,10,0.42));
+    background: transparent; cursor: pointer; transition: color 0.15s ease;
+  }
+  .lr-skip:hover { color: var(--ink); }
 
-  /* Bühne: drei Teile */
+  /* Rechts: Bühne — Auswahl | Mockup | QR */
   .lr-stage {
-    flex: 1 1 auto;
     display: grid;
-    grid-template-columns: 210px 1fr 260px;
-    gap: 36px; align-items: center;
+    grid-template-columns: 168px auto auto;
+    gap: 26px; align-items: center;
   }
-  @media (max-width: 1080px) {
-    .lr-stage { grid-template-columns: 1fr; gap: 28px; justify-items: center; }
-  }
+  @media (max-width: 1100px) { .lr-stage { justify-content: center; } }
+  @media (max-width: 720px) { .lr-stage { grid-template-columns: 1fr; justify-items: center; gap: 24px; } }
 
-  /* Links: Look-Karten (1:1 .di-card von /branding, Auswahl = Petrol-Kante) */
-  .lr-looks { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 210px; }
-  @media (max-width: 1080px) { .lr-looks { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: none; } }
+  /* Auswahl: Look-Karten (1:1 .di-card, Auswahl = Petrol-Kante, kein Fill) */
+  .lr-looks { display: flex; flex-direction: column; gap: 10px; width: 168px; }
+  @media (max-width: 720px) { .lr-looks { flex-direction: row; flex-wrap: wrap; justify-content: center; width: auto; } }
   .di-card {
     display: flex; align-items: center;
     width: 100%; text-align: left; padding: 0;
@@ -237,80 +243,59 @@ for (const l of LOOKS) {
     -webkit-appearance: none; appearance: none;
   }
   .di-card:hover { border-color: var(--ink-faint); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-  /* Ausgewählt: Petrol-Kante, KEIN Fill */
   .di-card.is-active { border-color: var(--petrol); box-shadow: inset 0 0 0 1px var(--petrol); }
   .di-card__hint {
-    width: 64px; min-height: 70px; flex-shrink: 0;
+    width: 56px; min-height: 62px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 6px; padding: 10px 6px;
+    gap: 6px; padding: 8px 6px;
   }
   .di-card__hint--bauhaus { background: #F5F5F3; }
   .di-card__hint--editorial { background: #FAF7F0; }
   .di-card__hint--maison { background: #1A1410; }
-  .bh-initial { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; color: #0A0A0A; letter-spacing: -.03em; line-height: 1; }
+  .bh-initial { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; color: #0A0A0A; letter-spacing: -.03em; line-height: 1; }
   .bh-pink-dot { width: 7px; height: 7px; background: #FF4A82; border-radius: 50%; }
-  .ed-name { font-family: 'Georgia', serif; font-size: 12px; font-style: italic; color: #2B2A28; border-bottom: 1px solid #4A5C2A; padding-bottom: 2px; }
-  .ms-name { font-family: 'Georgia', serif; font-size: 9px; color: #E8D9B5; letter-spacing: .1em; text-transform: uppercase; }
-  .ms-rhombus { width: 6px; height: 6px; background: #C9A36A; transform: rotate(45deg); }
-  .di-card__body { padding: 11px 12px; flex: 1; min-width: 0; }
-  .di-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+  .ed-name { font-family: 'Georgia', serif; font-size: 11px; font-style: italic; color: #2B2A28; border-bottom: 1px solid #4A5C2A; padding-bottom: 2px; }
+  .ms-name { font-family: 'Georgia', serif; font-size: 8px; color: #E8D9B5; letter-spacing: .1em; text-transform: uppercase; }
+  .ms-rhombus { width: 5px; height: 5px; background: #C9A36A; transform: rotate(45deg); }
+  .di-card__body { padding: 9px 11px; flex: 1; min-width: 0; }
+  .di-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
   .bauhaus-title::after { content: ''; display: inline-block; width: 6px; height: 6px; background: #FF4A82; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
   .editorial-title { font-family: 'Georgia', serif; font-style: italic; border-bottom: 1px solid #4A5C2A; display: inline-block; padding-bottom: 1px; font-weight: 400; }
   .maison-title { font-family: 'Georgia', serif; letter-spacing: .04em; }
   .maison-title::after { content: ''; display: inline-block; width: 5px; height: 5px; background: #C9A36A; transform: rotate(45deg); margin-left: 6px; vertical-align: middle; }
-  .di-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.5; }
+  .di-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.45; }
 
-  /* Mitte: Phone */
+  /* Mockup: 1:1 .bp-outer/.bp-inner aus /branding BrandMiniPreview */
   .lr-phone { display: flex; justify-content: center; }
-  .lr-phone-bezel {
-    width: 260px; height: 536px;
-    overflow: hidden; position: relative; border-radius: 38px;
-    background: #000;
-    box-shadow: 0 0 0 8px #0A0A0A, 0 0 0 10px #2A2A2A, 0 24px 56px -16px rgba(0,0,0,0.42);
+  .bp-outer {
+    width: 260px; height: 563px;
+    overflow: hidden; position: relative; border-radius: 36px;
+    box-shadow: 0 0 0 8px #0A0A0A, 0 0 0 10px #2A2A2A, 0 20px 48px -8px rgba(0,0,0,0.38);
   }
-  .lr-phone-scaler {
+  .bp-inner {
     position: absolute; top: 0; left: 0;
-    width: 390px; height: 804px;
+    width: 390px; height: 844px;
     transform: scale(0.6667); transform-origin: top left;
+    pointer-events: none;
   }
-  .lr-phone-view { position: absolute; top: 0; left: 0; width: 390px; height: 804px; }
+  .lr-view { position: absolute; top: 0; left: 0; width: 390px; height: 844px; }
 
-  /* Rechts: QR (transparent, Petrol, Scan-Rahmen) */
-  .lr-qr { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-  .lr-qr-frame { position: relative; width: 240px; height: 240px; display: grid; place-items: center; }
-  .lr-qr-stack { position: relative; width: 200px; height: 200px; }
+  /* QR: transparent, Petrol, Scan-Rahmen */
+  .lr-qr { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .lr-qr-frame { position: relative; width: 220px; height: 220px; display: grid; place-items: center; }
+  .lr-qr-stack { position: relative; width: 184px; height: 184px; }
   .lr-qr-view { position: absolute; inset: 0; }
   .lr-qr-view :global(svg) { display: block; width: 100%; height: 100%; }
   .lr-qr-fallback { width: 100%; height: 100%; display: grid; place-items: center; font-size: 11px; color: var(--ink-muted); text-align: center; }
-  .lr-corner { position: absolute; width: 28px; height: 28px; border: 2.5px solid var(--petrol); }
+  .lr-corner { position: absolute; width: 26px; height: 26px; border: 2.5px solid var(--petrol); }
   .lr-corner.tl { top: 0; left: 0;  border-right: none; border-bottom: none; border-top-left-radius: 9px; }
   .lr-corner.tr { top: 0; right: 0; border-left: none;  border-bottom: none; border-top-right-radius: 9px; }
   .lr-corner.bl { bottom: 0; left: 0;  border-right: none; border-top: none; border-bottom-left-radius: 9px; }
   .lr-corner.br { bottom: 0; right: 0; border-left: none;  border-top: none; border-bottom-right-radius: 9px; }
-  .lr-qr-cap { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42)); text-align: center; }
-
-  /* CTA */
-  .lr-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
-  .lr-next {
-    appearance: none; -webkit-appearance: none; border: none;
-    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
-    color: var(--surface); background: var(--ink);
-    border-radius: var(--r, 12px); padding: 13px 26px;
-    cursor: pointer; transition: background 0.15s ease;
-  }
-  .lr-next:hover { background: var(--petrol); }
-  .lr-next:disabled { opacity: 0.4; cursor: default; background: var(--ink); }
-  .lr-skip {
-    appearance: none; -webkit-appearance: none; border: none;
-    font-family: 'Inter Tight', -apple-system, sans-serif;
-    font-size: 14px; font-weight: 500;
-    color: var(--ink-muted, rgba(10,10,10,0.42));
-    background: transparent; cursor: pointer; transition: color 0.15s ease;
-  }
-  .lr-skip:hover { color: var(--ink); }
+  .lr-qr-cap { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42)); text-align: center; }
 
   /* Schritt-Balken */
-  .lr-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 22px auto 0; }
+  .lr-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px auto 0; }
   .lr-step {
     appearance: none; -webkit-appearance: none; padding: 0; border: none;
     flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
