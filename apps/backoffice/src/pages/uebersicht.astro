@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import OnboardingHero from '../components/uebersicht/OnboardingHero.astro';
 import OnboardingStep2 from '../components/uebersicht/OnboardingStep2.astro';
+import OnboardingStep3 from '../components/uebersicht/OnboardingStep3.astro';
 import HeroSection from '../components/uebersicht/HeroSection.astro';
 import RackBanner from '../components/uebersicht/RackBanner.astro';
 import SetupStatus from '../components/uebersicht/SetupStatus.astro';
@@ -70,6 +71,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   <div data-onboarding-flow>
     <OnboardingHero hotelName={hotel.name} />
     <OnboardingStep2 hotelId={hotel.id} hotelName={hotel.name} userId={user.id} />
+    <OnboardingStep3 hotelId={hotel.id} hotelName={hotel.name} />
   </div>
 
   <div data-dashboard>
@@ -84,8 +86,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     (function () {
       var flow  = document.querySelector('[data-onboarding-flow]');
       if (!flow) return;
-      var step1 = flow.querySelector('[data-onb-step="1"]');
-      var step2 = flow.querySelector('[data-onb-step="2"]');
+      var steps = Array.prototype.slice.call(flow.querySelectorAll('[data-onb-step]'));
 
       // Setup-Step füllt die volle Bildschirmhöhe — Step-Balken sitzt unten.
       function fit(el) {
@@ -95,8 +96,9 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         el.style.minHeight = Math.max(520, window.innerHeight - top - 16) + 'px';
       }
       function visibleStep() {
-        if (step1 && step1.style.display !== 'none') return step1;
-        if (step2 && step2.style.display !== 'none') return step2;
+        for (var i = 0; i < steps.length; i++) {
+          if (steps[i].style.display !== 'none') return steps[i];
+        }
         return null;
       }
       function fitVisible() { fit(visibleStep()); }
@@ -120,12 +122,12 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         }, 680);
       }
 
-      // Step per Nummer zeigen (1 + 2 gebaut; 3–5 folgen). Rahmen bleibt identisch.
+      // Step per Nummer zeigen (1–3 gebaut; weitere folgen). Rahmen bleibt identisch.
       function showStep(n) {
         var target = flow.querySelector('[data-onb-step="' + n + '"]');
         if (!target) return; // Step noch nicht gebaut
-        [step1, step2].forEach(function (s) {
-          if (s) s.style.display = (s === target ? 'flex' : 'none');
+        steps.forEach(function (s) {
+          s.style.display = (s === target ? 'flex' : 'none');
         });
         window.scrollTo({ top: 0 });
         requestAnimationFrame(function () { fit(target); enter(target); });
@@ -164,22 +166,19 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         setTimeout(finishSkip, 640);
       }
 
-      // „Weiter" → Step 2.
-      document.querySelectorAll('[data-onb-action="next"]').forEach(function (b) {
-        b.addEventListener('click', function (e) { e.preventDefault(); showStep(2); });
-      });
       // „Setup überspringen".
       document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {
         b.addEventListener('click', function (e) { e.preventDefault(); skip(); });
       });
-      // Step-Balken-Segmente: vor/zurück springen — nur gebaute Steps sind klickbar.
+      // „Weiter"-Buttons + Step-Balken-Segmente: zum Ziel-Step springen.
+      // Nur gebaute Steps sind klickbar; auf noch nicht gebaute → disabled.
       document.querySelectorAll('[data-onb-goto]').forEach(function (el) {
         var n = parseInt(el.getAttribute('data-onb-goto') || '0', 10);
         if (!flow.querySelector('[data-onb-step="' + n + '"]')) {
           el.setAttribute('disabled', '');
           return;
         }
-        el.addEventListener('click', function () { showStep(n); });
+        el.addEventListener('click', function (e) { e.preventDefault(); showStep(n); });
       });
     })();
   </script>
