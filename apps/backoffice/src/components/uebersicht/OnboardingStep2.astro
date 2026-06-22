@@ -1,75 +1,183 @@
 ---
-// Onboarding · Screen 2 — „Sieh es als dein Gast." (QR-Reveal)
+// Onboarding · Screen 2 — „Wähl deinen Look — und nimm ihn in die Hand."
 //
-// Läuft als zweite Sektion DERSELBEN /uebersicht-Seite (gleiches Backoffice-
-// Layout/Chrome wie Screen 1). Wird per JS ein-/ausgeblendet — kein Seitenwechsel.
-// Links Copy + „Weiter", rechts der echte QR (transparent, Petrol, Scan-Rahmen)
-// auf die Gästemappe des Betreibers. Copy DE-only.
+// Verschmilzt die früheren Schritte „Sieh es als dein Gast" (QR) und „Wähl deinen
+// Look": EIN Screen, drei Teile.
+//   Links  — Look-Karten (bestehende Guest-Themes) zum Antippen. Ausgewählt =
+//            Petrol-Kante, kein Fill.
+//   Mitte  — echte Gästemappe-Home-Vorschau (GuestPhoneView); wechselt live auf
+//            den gewählten Look. Leise Gästeseite (Sage / Hotelfarbe, kein Petrol).
+//   Rechts — echter QR auf die Gästemappe; Link trägt ?design=<look> (showcase-
+//            only Override in /g/[token].astro) → scannt genau den gewählten Look.
+// Antippen schaltet Mitte + QR live um. Copy DE-only.
 
+import GuestPhoneView from '@retaha/ui-guest/GuestPhoneView';
+import { mapThemeName, type GuestTheme } from '@retaha/ui-guest/types';
 import QRCode from 'qrcode';
-import { getOrCreateShowcaseUrl } from '@retaha/auth';
+import { createSupabaseServiceRoleInstance, getOrCreateShowcaseUrl } from '@retaha/auth';
 
 interface Props {
   hotelId: string;
   hotelName?: string;
   userId: string;
 }
-const { hotelId, userId } = Astro.props;
+const { hotelId, hotelName: hotelNameProp, userId } = Astro.props;
 
-// Echter Deep-Link auf die Gästemappe des Betreibers (frisch generiert — nie stale).
-// SVG statt PNG = auflösungsunabhängig (nie verpixelt, auch auf Retina/3x-Displays).
-// QR transparent (light: '#0000') + Petrol-Module ('#14616E') — keine weiße Fläche.
-let guestUrl: string | null = null;
-let qrSvg: string | null = null;
+const sb = createSupabaseServiceRoleInstance();
+const { data: h } = await sb
+  .from('hotels')
+  .select('name, slug, logo_primary, logo_dark, theme, design_identity, splash_background, brand_primary')
+  .eq('id', hotelId)
+  .maybeSingle();
+
+let eveName = 'Eve';
 try {
-  guestUrl = await getOrCreateShowcaseUrl(hotelId, userId);
+  const { data: s } = await sb.from('hotel_settings').select('eve_name').eq('hotel_id', hotelId).maybeSingle();
+  if (s?.eve_name) eveName = s.eve_name;
+} catch { /* eve_name optional */ }
+
+const hotelName = (h as any)?.name ?? hotelNameProp;
+const brandTheme = (h as any)?.theme ?? 'coffee';
+const rawBrand: string | null = (h as any)?.brand_primary ?? null;
+// Phone-Akzent = echte Hotelfarbe; Default-Pink/leer → Sage-Fallback (kein Petrol).
+const phoneAccent = rawBrand && rawBrand.toLowerCase() !== '#ff4a82' ? rawBrand : '#5C9070';
+
+// Welche Identität hat das Hotel aktuell (Default-Auswahl) — gleiche Remap wie Guest.
+const IDENTITY_REMAP: Record<string, string> = {
+  classic: 'bauhaus', bauhaus_manufaktur: 'bauhaus', premium_anthrazit: 'maison', warmes_burgund: 'editorial',
+};
+const rawIdentity = (h as any)?.design_identity ?? null;
+const hotelIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : 'bauhaus';
+
+// Angebotene Look-Varianten = die bestehenden Guest-Themes (Design-Identitäten).
+const LOOKS = [
+  { id: 'bauhaus',   label: 'Bauhaus',   desc: 'Anti-Luxus · Selbstbewusst' },
+  { id: 'editorial', label: 'Editorial', desc: 'Magazinhaft · Storytelling' },
+  { id: 'maison',    label: 'Maison',    desc: 'Klassisch · Opulent' },
+];
+const defaultLook = LOOKS.some(l => l.id === hotelIdentity) ? hotelIdentity : 'bauhaus';
+
+function themeFor(designIdentity: GuestTheme['designIdentity']): GuestTheme {
+  return {
+    primary: phoneAccent,
+    themeName: (['coffee', 'ocean', 'forest', 'custom'].includes(brandTheme) ? brandTheme : 'coffee') as GuestTheme['themeName'],
+    guestThemeName: mapThemeName(brandTheme),
+    designIdentity,
+    logoUrl: (h as any)?.logo_primary ?? null,
+    logoDarkUrl: (h as any)?.logo_dark ?? null,
+    heroBackground: (h as any)?.splash_background ?? null,
+    hotelName,
+    eveName,
+  };
+}
+
+// Echter Showcase-Deep-Link (frisch — nie stale) + QR pro Look (?design=<id>).
+let guestUrl: string | null = null;
+try { guestUrl = await getOrCreateShowcaseUrl(hotelId, userId); } catch { /* nicht-fatal */ }
+function withDesign(url: string, id: string): string {
+  return `${url}${url.includes('?') ? '&' : '?'}design=${id}`;
+}
+
+const looks = [] as Array<{ id: string; label: string; desc: string; theme: GuestTheme; qrSvg: string | null }>;
+for (const l of LOOKS) {
+  let qrSvg: string | null = null;
   if (guestUrl) {
-    qrSvg = await QRCode.toString(guestUrl, {
-      type: 'svg', errorCorrectionLevel: 'M', margin: 2,
-      color: { dark: '#14616E', light: '#0000' },
-    });
+    try {
+      qrSvg = await QRCode.toString(withDesign(guestUrl, l.id), {
+        type: 'svg', errorCorrectionLevel: 'M', margin: 2,
+        color: { dark: '#14616E', light: '#0000' },
+      });
+    } catch { /* QR nicht-fatal */ }
   }
-} catch { /* QR-Fehler nicht-fatal */ }
+  looks.push({ ...l, theme: themeFor(l.id as GuestTheme['designIdentity']), qrSvg });
+}
 ---
 
-<section class="onb2" data-onb-step="2" style="display:none">
-  <div class="onb2-split">
+<section class="lr" data-onb-step="2" style="display:none">
+  <div class="lr-head">
+    <h1 class="lr-h1">Wähl deinen Look — und nimm ihn in die <span class="lr-nb">Hand<span class="lr-dot"></span></span></h1>
+    <p class="lr-sub">Tippe einen Look, sieh ihn sofort, scann ihn aufs Telefon.</p>
+  </div>
 
-    <!-- Links: Copy -->
-    <div class="onb2-left">
-      <h1 class="onb2-h1">Sieh es als dein <span class="onb2-nb">Gast<span class="onb2-dot"></span></span></h1>
-      <p class="onb2-sub">Vom Bildschirm in die Hand: Scann den Code — und dein eigenes Hotel liegt auf deinem Telefon. Gästemappe und Eve, in deinem Branding. Genau das, was deine Gäste erleben.</p>
+  <div class="lr-stage">
 
-      <div class="onb2-cta-row">
-        <button type="button" class="onb2-next" data-onb-goto="3">Weiter →</button>
-        <button type="button" class="onb2-skip" data-onb-action="skip">Setup überspringen</button>
+    <!-- Links: Look-Karten (bestehende Themes) -->
+    <div class="lr-looks" role="radiogroup" aria-label="Gästemappen-Look wählen">
+      {looks.map(l => (
+        <button
+          type="button"
+          class:list={['di-card', { 'is-active': l.id === defaultLook }]}
+          data-look={l.id}
+          role="radio"
+          aria-checked={l.id === defaultLook ? 'true' : 'false'}
+        >
+          {l.id === 'bauhaus' && (
+            <div class="di-card__hint di-card__hint--bauhaus">
+              <span class="bh-initial">B</span><span class="bh-pink-dot"></span>
+            </div>
+          )}
+          {l.id === 'editorial' && (
+            <div class="di-card__hint di-card__hint--editorial"><span class="ed-name">Editorial</span></div>
+          )}
+          {l.id === 'maison' && (
+            <div class="di-card__hint di-card__hint--maison">
+              <span class="ms-name">MAISON</span><span class="ms-rhombus"></span>
+            </div>
+          )}
+          <div class="di-card__body">
+            <div class:list={['di-card__title', `${l.id}-title`]}>{l.label}</div>
+            <div class="di-card__desc">{l.desc}</div>
+          </div>
+        </button>
+      ))}
+    </div>
+
+    <!-- Mitte: echte Gästemappe-Home, live im gewählten Look -->
+    <div class="lr-phone">
+      <div class="lr-phone-bezel">
+        <div class="lr-phone-scaler">
+          {looks.map(l => (
+            <div class="lr-phone-view" data-look-view={l.id} style={l.id === defaultLook ? '' : 'display:none'}>
+              <GuestPhoneView theme={l.theme} previewMode={true} noScroll={true} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
 
-    <!-- Rechts: echter QR (transparent, Petrol, Scan-Rahmen) -->
-    <div class="onb2-right">
-      <div class="onb2-qr-frame">
-        <span class="onb2-corner tl"></span>
-        <span class="onb2-corner tr"></span>
-        <span class="onb2-corner bl"></span>
-        <span class="onb2-corner br"></span>
-        <div class="onb2-qr" role="img" aria-label="QR-Code zur Gästemappe">
-          {qrSvg
-            ? <Fragment set:html={qrSvg} />
-            : <div class="onb2-qr-fallback">QR konnte nicht erzeugt werden</div>}
+    <!-- Rechts: QR auf die Gästemappe im gewählten Look -->
+    <div class="lr-qr">
+      <div class="lr-qr-frame">
+        <span class="lr-corner tl"></span>
+        <span class="lr-corner tr"></span>
+        <span class="lr-corner bl"></span>
+        <span class="lr-corner br"></span>
+        <div class="lr-qr-stack">
+          {looks.map(l => (
+            <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
+              {l.qrSvg
+                ? <Fragment set:html={l.qrSvg} />
+                : <div class="lr-qr-fallback">QR n/v</div>}
+            </div>
+          ))}
         </div>
       </div>
-      <span class="onb2-qr-cap">Mit der Kamera deines Handys scannen.</span>
+      <span class="lr-qr-cap">Mit der Kamera deines Handys scannen.</span>
     </div>
 
   </div>
 
-  <!-- Schritt-Balken — Schritt 2 aktiv, klickbar (vor/zurück) -->
-  <div class="onb2-steps" role="group" aria-label="Onboarding-Schritte">
-    {[1, 2, 3, 4, 5].map(i => (
+  <div class="lr-cta-row">
+    <button type="button" class="lr-next" data-onb-goto="3">Weiter →</button>
+    <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
+  </div>
+
+  <!-- Schritt-Balken — Schritt 2 aktiv, klickbar -->
+  <div class="lr-steps" role="group" aria-label="Onboarding-Schritte">
+    {[1, 2, 3, 4].map(i => (
       <button
         type="button"
-        class:list={['onb2-step', { 'is-active': i === 2 }]}
+        class:list={['lr-step', { 'is-active': i === 2 }]}
         data-onb-goto={i}
         aria-label={`Schritt ${i}`}
       ></button>
@@ -78,107 +186,160 @@ try {
 </section>
 
 <style>
-  /* Volle Bildschirmhöhe wie Screen 1; JS verfeinert pro Header-Höhe. */
-  .onb2 {
+  .lr {
     --petrol: #14616E;
-    max-width: 1140px; width: 100%;
+    max-width: 1240px; width: 100%;
     margin: 8px auto 12px;
-    padding: 32px 32px 40px;
+    padding: 28px 32px 36px;
     box-sizing: border-box;
     display: flex; flex-direction: column;
     min-height: calc(100svh - var(--onb-chrome, 190px));
   }
-  .onb2-split {
-    flex: 1 1 auto;
-    display: grid;
-    grid-template-columns: 1fr minmax(0, 360px);
-    gap: 64px;
-    align-items: center;
-  }
-  @media (max-width: 860px) {
-    .onb2-split { grid-template-columns: 1fr; gap: 40px; justify-items: center; text-align: center; }
-  }
 
-  /* Links — Headline identisch zu Screen 1 (.onb-headline) */
-  .onb2-left { min-width: 0; max-width: 560px; }
-  .onb2-h1 {
+  /* Kopf (zentriert) */
+  .lr-head { text-align: center; max-width: 760px; margin: 0 auto 8px; }
+  .lr-h1 {
     font-family: 'Space Grotesk', sans-serif; font-weight: 400;
-    font-size: clamp(44px, 6vw, 88px); line-height: 0.96;
-    letter-spacing: -0.035em; color: var(--ink); margin: 0 0 24px;
+    font-size: clamp(32px, 4.2vw, 56px); line-height: 1.0;
+    letter-spacing: -0.03em; color: var(--ink); margin: 0 0 14px;
   }
-  .onb2-nb { white-space: nowrap; }
-  .onb2-dot {
-    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+  .lr-nb { white-space: nowrap; }
+  .lr-dot {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%;
     background: var(--petrol); margin-left: 4px; vertical-align: baseline;
   }
-  .onb2-sub {
+  .lr-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
-    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
-    margin: 0 0 28px; max-width: 44ch;
+    font-size: 16px; line-height: 1.55; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0;
   }
-  @media (max-width: 860px) { .onb2-sub { margin-left: auto; margin-right: auto; } }
 
-  .onb2-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  @media (max-width: 860px) { .onb2-cta-row { justify-content: center; } }
-  .onb2-next {
+  /* Bühne: drei Teile */
+  .lr-stage {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 210px 1fr 260px;
+    gap: 36px; align-items: center;
+  }
+  @media (max-width: 1080px) {
+    .lr-stage { grid-template-columns: 1fr; gap: 28px; justify-items: center; }
+  }
+
+  /* Links: Look-Karten (1:1 .di-card von /branding, Auswahl = Petrol-Kante) */
+  .lr-looks { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 210px; }
+  @media (max-width: 1080px) { .lr-looks { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: none; } }
+  .di-card {
+    display: flex; align-items: center;
+    width: 100%; text-align: left; padding: 0;
+    border: 1px solid var(--border); border-radius: var(--r);
+    background: var(--surface); cursor: pointer;
+    transition: border-color 200ms, box-shadow 200ms, transform 200ms;
+    overflow: hidden;
+    -webkit-appearance: none; appearance: none;
+  }
+  .di-card:hover { border-color: var(--ink-faint); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+  /* Ausgewählt: Petrol-Kante, KEIN Fill */
+  .di-card.is-active { border-color: var(--petrol); box-shadow: inset 0 0 0 1px var(--petrol); }
+  .di-card__hint {
+    width: 64px; min-height: 70px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 10px 6px;
+  }
+  .di-card__hint--bauhaus { background: #F5F5F3; }
+  .di-card__hint--editorial { background: #FAF7F0; }
+  .di-card__hint--maison { background: #1A1410; }
+  .bh-initial { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; color: #0A0A0A; letter-spacing: -.03em; line-height: 1; }
+  .bh-pink-dot { width: 7px; height: 7px; background: #FF4A82; border-radius: 50%; }
+  .ed-name { font-family: 'Georgia', serif; font-size: 12px; font-style: italic; color: #2B2A28; border-bottom: 1px solid #4A5C2A; padding-bottom: 2px; }
+  .ms-name { font-family: 'Georgia', serif; font-size: 9px; color: #E8D9B5; letter-spacing: .1em; text-transform: uppercase; }
+  .ms-rhombus { width: 6px; height: 6px; background: #C9A36A; transform: rotate(45deg); }
+  .di-card__body { padding: 11px 12px; flex: 1; min-width: 0; }
+  .di-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+  .bauhaus-title::after { content: ''; display: inline-block; width: 6px; height: 6px; background: #FF4A82; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
+  .editorial-title { font-family: 'Georgia', serif; font-style: italic; border-bottom: 1px solid #4A5C2A; display: inline-block; padding-bottom: 1px; font-weight: 400; }
+  .maison-title { font-family: 'Georgia', serif; letter-spacing: .04em; }
+  .maison-title::after { content: ''; display: inline-block; width: 5px; height: 5px; background: #C9A36A; transform: rotate(45deg); margin-left: 6px; vertical-align: middle; }
+  .di-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.5; }
+
+  /* Mitte: Phone */
+  .lr-phone { display: flex; justify-content: center; }
+  .lr-phone-bezel {
+    width: 260px; height: 536px;
+    overflow: hidden; position: relative; border-radius: 38px;
+    background: #000;
+    box-shadow: 0 0 0 8px #0A0A0A, 0 0 0 10px #2A2A2A, 0 24px 56px -16px rgba(0,0,0,0.42);
+  }
+  .lr-phone-scaler {
+    position: absolute; top: 0; left: 0;
+    width: 390px; height: 804px;
+    transform: scale(0.6667); transform-origin: top left;
+  }
+  .lr-phone-view { position: absolute; top: 0; left: 0; width: 390px; height: 804px; }
+
+  /* Rechts: QR (transparent, Petrol, Scan-Rahmen) */
+  .lr-qr { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .lr-qr-frame { position: relative; width: 240px; height: 240px; display: grid; place-items: center; }
+  .lr-qr-stack { position: relative; width: 200px; height: 200px; }
+  .lr-qr-view { position: absolute; inset: 0; }
+  .lr-qr-view :global(svg) { display: block; width: 100%; height: 100%; }
+  .lr-qr-fallback { width: 100%; height: 100%; display: grid; place-items: center; font-size: 11px; color: var(--ink-muted); text-align: center; }
+  .lr-corner { position: absolute; width: 28px; height: 28px; border: 2.5px solid var(--petrol); }
+  .lr-corner.tl { top: 0; left: 0;  border-right: none; border-bottom: none; border-top-left-radius: 9px; }
+  .lr-corner.tr { top: 0; right: 0; border-left: none;  border-bottom: none; border-top-right-radius: 9px; }
+  .lr-corner.bl { bottom: 0; left: 0;  border-right: none; border-top: none; border-bottom-left-radius: 9px; }
+  .lr-corner.br { bottom: 0; right: 0; border-left: none;  border-top: none; border-bottom-right-radius: 9px; }
+  .lr-qr-cap { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42)); text-align: center; }
+
+  /* CTA */
+  .lr-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .lr-next {
     appearance: none; -webkit-appearance: none; border: none;
-    display: inline-block;
     font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
     color: var(--surface); background: var(--ink);
     border-radius: var(--r, 12px); padding: 13px 26px;
-    cursor: pointer;
-    transition: background 0.15s ease;
+    cursor: pointer; transition: background 0.15s ease;
   }
-  .onb2-next:hover { background: var(--petrol); }
-  .onb2-next:disabled { opacity: 0.4; cursor: default; background: var(--ink); }
-  .onb2-skip {
+  .lr-next:hover { background: var(--petrol); }
+  .lr-next:disabled { opacity: 0.4; cursor: default; background: var(--ink); }
+  .lr-skip {
+    appearance: none; -webkit-appearance: none; border: none;
     font-family: 'Inter Tight', -apple-system, sans-serif;
     font-size: 14px; font-weight: 500;
     color: var(--ink-muted, rgba(10,10,10,0.42));
-    background: transparent; border: none; text-decoration: none;
-    padding: 13px 8px; cursor: pointer; transition: color 0.15s ease;
+    background: transparent; cursor: pointer; transition: color 0.15s ease;
   }
-  .onb2-skip:hover { color: var(--ink); }
+  .lr-skip:hover { color: var(--ink); }
 
-  /* Rechts — QR transparent, Petrol-Module, Scan-Rahmen (Viewfinder-Ecken) */
-  .onb2-right { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-  .onb2-qr-frame {
-    position: relative;
-    width: 300px; height: 300px;
-    display: grid; place-items: center;
-  }
-  .onb2-qr { width: 248px; height: 248px; }
-  .onb2-qr :global(svg) { display: block; width: 100%; height: 100%; }
-  .onb2-qr-fallback {
-    width: 100%; height: 100%; display: grid; place-items: center;
-    font-size: 12px; color: var(--ink-muted); text-align: center;
-  }
-  .onb2-corner {
-    position: absolute; width: 30px; height: 30px;
-    border: 2.5px solid var(--petrol);
-  }
-  .onb2-corner.tl { top: 0; left: 0;  border-right: none; border-bottom: none; border-top-left-radius: 10px; }
-  .onb2-corner.tr { top: 0; right: 0; border-left: none;  border-bottom: none; border-top-right-radius: 10px; }
-  .onb2-corner.bl { bottom: 0; left: 0;  border-right: none; border-top: none; border-bottom-left-radius: 10px; }
-  .onb2-corner.br { bottom: 0; right: 0; border-left: none;  border-top: none; border-bottom-right-radius: 10px; }
-  .onb2-qr-cap {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42));
-  }
-
-  /* Schritt-Balken (segmentiert, wie Screen 1) */
-  .onb2-steps {
-    display: flex; justify-content: center; align-items: center; gap: 8px;
-    margin: 28px auto 0;
-  }
-  .onb2-step {
+  /* Schritt-Balken */
+  .lr-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 22px auto 0; }
+  .lr-step {
     appearance: none; -webkit-appearance: none; padding: 0; border: none;
     flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
     background: var(--border-medium, rgba(10,10,10,0.16));
-    cursor: pointer;
-    transition: width 0.3s ease, background 200ms ease, opacity 0.2s ease;
+    cursor: pointer; transition: width 0.3s ease, background 200ms ease, opacity 0.2s ease;
   }
-  .onb2-step.is-active { width: 46px; background: var(--petrol); }
-  .onb2-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
-  .onb2-step:disabled { cursor: default; }
+  .lr-step.is-active { width: 46px; background: var(--petrol); }
+  .lr-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
+  .lr-step:disabled { cursor: default; }
 </style>
+
+<script is:inline>
+  (function () {
+    var root = document.querySelector('[data-onb-step="2"]');
+    if (!root) return;
+    var cards = Array.prototype.slice.call(root.querySelectorAll('[data-look]'));
+    var views = Array.prototype.slice.call(root.querySelectorAll('[data-look-view]'));
+    var qrs = Array.prototype.slice.call(root.querySelectorAll('[data-look-qr]'));
+    cards.forEach(function (card) {
+      card.addEventListener('click', function () {
+        var id = card.getAttribute('data-look');
+        cards.forEach(function (c) {
+          var on = c === card;
+          c.classList.toggle('is-active', on);
+          c.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        views.forEach(function (v) { v.style.display = v.getAttribute('data-look-view') === id ? '' : 'none'; });
+        qrs.forEach(function (q) { q.style.display = q.getAttribute('data-look-qr') === id ? '' : 'none'; });
+      });
+    });
+  })();
+</script>

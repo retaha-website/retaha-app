@@ -395,7 +395,15 @@ const hotelDesignIdentity = (remappedIdentity && VALID_IDENTITIES.has(remappedId
   ? remappedIdentity
   : null;
 const legacyTheme = resolveTheme({ hotelTheme: (hotel as any).theme, requestUrl: Astro.url });
-const activeTheme = hotelDesignIdentity ?? (IDENTITY_REMAP[legacyTheme] ?? 'bauhaus');
+
+// Showcase-only Design-Vorschau (?design=) — wie persona NUR für showcase_-Tokens.
+// Erlaubt der Backoffice-„Look + Reveal"-Vorschau, einen Look per QR aufs Handy zu
+// bringen. Echte Gäste-Sessions bleiben unberührt (kein Override).
+const _designParam = new URL(Astro.request.url).searchParams.get('design');
+const _designRemapped = _designParam ? (IDENTITY_REMAP[_designParam] ?? _designParam) : null;
+const designOverride = (isShowcase && _designRemapped && VALID_IDENTITIES.has(_designRemapped)) ? _designRemapped : null;
+
+const activeTheme = designOverride ?? hotelDesignIdentity ?? (IDENTITY_REMAP[legacyTheme] ?? 'bauhaus');
 
 const brandPrimary: string | null = (hotel as any).brand_primary ?? null;
 const brandStyle = (() => {
