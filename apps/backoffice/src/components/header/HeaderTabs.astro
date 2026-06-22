@@ -106,25 +106,24 @@ const tabs = [
     animation: marker-bloom 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--bloom-delay, 0ms) both;
   }
 
-  /* Kompakte Kacheln: Icon oben, kleines Label darunter */
+  /* Kacheln: Ruhezustand = nur Icon. Die aktive Ansicht zeigt ihren Namen
+     (rechts vom Icon); beim Drüberfahren erscheinen die Namen der anderen. */
   .header-tabs__tab {
     position: relative;
     z-index: 1;
     box-sizing: border-box;
     display: inline-flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    width: 56px;
+    justify-content: flex-start;
     height: 56px;
-    padding: 6px 4px;
+    padding: 0 15px;
     flex-shrink: 0;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 7px;
+    font-size: 9px;
     font-weight: 500;
-    letter-spacing: 0.03em;
-    line-height: 1.1;
+    letter-spacing: 0.06em;
+    line-height: 1;
     color: var(--ink-muted);
     background: transparent;
     border: 1px solid var(--border);
@@ -132,22 +131,40 @@ const tabs = [
     cursor: pointer;
     transition: color 200ms ease, border-color 200ms ease;
     text-transform: uppercase;
-    text-align: center;
     text-decoration: none;
     white-space: nowrap;
+    overflow: hidden;
   }
   .header-tabs__tab:hover { color: var(--ink); border-color: var(--ink-faint); }
   /* Aktiv: Inhalt weiß über der Markierung, kein eigener Rahmen */
   .header-tabs__tab.is-active { color: #fff; border-color: transparent; }
 
   .header-tabs__tab svg {
-    width: 15px;
-    height: 15px;
+    width: 17px;
+    height: 17px;
     flex-shrink: 0;
     color: var(--petrol);
   }
   .header-tabs__tab.is-active svg { color: #fff; }
-  .header-tabs__lbl { display: block; }
+
+  /* Name rechts vom Icon — im Ruhezustand eingeklappt (max-width 0) */
+  .header-tabs__lbl {
+    display: block;
+    max-width: 0;
+    margin-left: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width 320ms cubic-bezier(0.5, 0, 0.2, 1),
+                margin-left 320ms cubic-bezier(0.5, 0, 0.2, 1),
+                opacity 220ms ease;
+  }
+  /* Aktive Kachel zeigt ihren Namen immer; bei Hover über die Leiste alle */
+  .header-tabs__tab.is-active .header-tabs__lbl,
+  .header-tabs.is-expanded .header-tabs__tab .header-tabs__lbl {
+    max-width: 130px;
+    margin-left: 8px;
+    opacity: 1;
+  }
 
   /* Erstes Login: Kacheln klappen gestaffelt aus der Marke (links) heraus */
   @keyframes tab-unfold {
@@ -163,10 +180,11 @@ const tabs = [
     .header-tabs__marker { transition: none; }
     .header-tabs__marker.is-blooming { animation: none; opacity: 1; }
     .header-tabs.is-unfolding .header-tabs__tab { animation: none; }
+    .header-tabs__lbl { transition: none; }
   }
 
   @media (max-width: 900px) {
-    .header-tabs__tab { width: 50px; height: 50px; padding: 5px 3px; }
+    .header-tabs__tab { height: 50px; padding: 0 12px; }
   }
 </style>
 
@@ -236,6 +254,31 @@ const tabs = [
         place(activeTab());
         requestAnimationFrame(function () { marker.style.transition = prev; });
       }, 120);
+    });
+
+    // Drüberfahren: Namen der anderen einblenden; die Markierung folgt der aktiven
+    // Kachel, während die Leiste auf-/zuklappt (frameweises Re-Tracking, da sich
+    // die Position der aktiven Kachel verschiebt).
+    var trackRAF = null;
+    function trackMarker() {
+      if (trackRAF) cancelAnimationFrame(trackRAF);
+      var start = null;
+      marker.style.transition = 'none';
+      function step(ts) {
+        if (start === null) start = ts;
+        place(activeTab());
+        if (ts - start < 380) { trackRAF = requestAnimationFrame(step); }
+        else { trackRAF = null; marker.style.transition = ''; }
+      }
+      trackRAF = requestAnimationFrame(step);
+    }
+    nav.addEventListener('mouseenter', function () {
+      nav.classList.add('is-expanded');
+      if (reduce) place(activeTab()); else trackMarker();
+    });
+    nav.addEventListener('mouseleave', function () {
+      nav.classList.remove('is-expanded');
+      if (reduce) place(activeTab()); else trackMarker();
     });
   })();
 </script>
