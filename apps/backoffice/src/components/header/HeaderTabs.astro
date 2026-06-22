@@ -231,6 +231,18 @@ const tabs = [
       marker.classList.add('is-blooming');
     });
 
+    // Schrift (JetBrains Mono) lädt evtl. nach → die aktive Kachel wird breiter.
+    // Markierung dann neu vermessen, sonst deckt sie die Kachel erst nach dem
+    // ersten Hover voll ab.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        marker.style.transition = 'none';
+        place(activeTab());
+        void marker.offsetWidth;
+        marker.style.transition = '';
+      });
+    }
+
     // Wechseln: Markierung gleitet zur angetippten Kachel, dann Navigation.
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function (e) {
