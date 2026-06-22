@@ -113,15 +113,26 @@ for (const l of LOOKS) {
             <span class="lr-opt__name">{l.label}</span>
             <span class="lr-opt__desc">{l.desc}</span>
           </div>
-          <div class="lr-opt__preview">
-            <div class="lr-opt__scaler">
-              {l.id === 'bauhaus'   && <BauhausPreview   hotelName={hotelName} brandPrimary={brandPrimary} />}
-              {l.id === 'editorial' && <EditorialPreview hotelName={hotelName} brandPrimary={brandPrimary} />}
-              {l.id === 'maison'    && <MaisonPreview    hotelName={hotelName} brandPrimary={brandPrimary} />}
+          <div class="lr-opt__views">
+            <!-- Smartphone (immer) -->
+            <div class="lr-opt__device lr-opt__device--phone">
+              <div class="lr-opt__scaler lr-opt__scaler--phone">
+                {l.id === 'bauhaus'   && <BauhausPreview   hotelName={hotelName} brandPrimary={brandPrimary} />}
+                {l.id === 'editorial' && <EditorialPreview hotelName={hotelName} brandPrimary={brandPrimary} />}
+                {l.id === 'maison'    && <MaisonPreview    hotelName={hotelName} brandPrimary={brandPrimary} />}
+              </div>
+              <span class="lr-opt__check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
             </div>
-            <span class="lr-opt__check" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
-            </span>
+            <!-- Tablet (erscheint bei Auswahl, breiter) -->
+            <div class="lr-opt__device lr-opt__device--tablet" aria-hidden="true">
+              <div class="lr-opt__scaler lr-opt__scaler--tablet">
+                {l.id === 'bauhaus'   && <BauhausPreview   hotelName={hotelName} brandPrimary={brandPrimary} />}
+                {l.id === 'editorial' && <EditorialPreview hotelName={hotelName} brandPrimary={brandPrimary} />}
+                {l.id === 'maison'    && <MaisonPreview    hotelName={hotelName} brandPrimary={brandPrimary} />}
+              </div>
+            </div>
           </div>
         </button>
       ))}
@@ -203,11 +214,11 @@ for (const l of LOOKS) {
   .lr-skip:hover { color: var(--ink); }
 
   /* Rechts: drei Designoptionen NEBENEINANDER — Theme oben, Vorschau unten, ohne Rahmen */
-  .lr-options { display: flex; flex-direction: row; flex-wrap: wrap; gap: 20px; justify-content: center; }
+  .lr-options { display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; }
   .lr-opt {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
-    width: 128px; padding: 0;
+    padding: 0;
     border: none; background: transparent; cursor: pointer; text-align: center;
     -webkit-appearance: none; appearance: none;
   }
@@ -216,22 +227,28 @@ for (const l of LOOKS) {
   .lr-opt.is-active .lr-opt__name { color: var(--petrol); }
   .lr-opt__desc { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-muted, rgba(10,10,10,0.45)); }
 
-  /* Vorschau OHNE Mockup-Rahmen: nur der Screen-Inhalt — Bezel (box-shadow) wird
-     vom overflow:hidden geclippt, Notch + Statusbar oben weggecroppt (top-Offset). */
-  .lr-opt__preview {
-    position: relative;
-    width: 128px; height: 240px;   /* höher = Smartphone-Hochformat, ohne untere Phone-Rundung */
+  /* Phone + Tablet nebeneinander; Tablet erscheint nur bei Auswahl (Phone rückt links). */
+  .lr-opt__views { display: flex; align-items: flex-start; justify-content: center; gap: 14px; }
+
+  /* Vorschau OHNE Mockup-Rahmen: nur Screen-Inhalt — Bezel (box-shadow) vom
+     overflow:hidden geclippt, Notch + Statusbar oben weggecroppt (top-Offset). */
+  .lr-opt__device {
+    position: relative; flex-shrink: 0; height: 240px;
     overflow: hidden; border-radius: var(--r-sm);
     outline: 2px solid transparent; outline-offset: 2px;
     transition: outline-color 0.15s ease;
   }
-  .lr-opt.is-active .lr-opt__preview { outline-color: var(--petrol); }
+  .lr-opt.is-active .lr-opt__device { outline-color: var(--petrol); }
+  .lr-opt__device--phone { width: 128px; }
+  .lr-opt__device--tablet { width: 200px; display: none; }   /* breiter = Tablet */
+  .lr-opt.is-active .lr-opt__device--tablet { display: block; }
   .lr-opt__scaler {
-    position: absolute; top: -18px; left: 0;            /* Notch + Statusbar oben croppen */
+    position: absolute; left: 0;
     width: 390px; height: 844px;
-    transform: scale(0.3282); transform-origin: top left;  /* 128 / 390 */
-    pointer-events: none;
+    transform-origin: top left; pointer-events: none;
   }
+  .lr-opt__scaler--phone  { top: -18px; transform: scale(0.3282); }  /* 128 / 390 */
+  .lr-opt__scaler--tablet { top: -28px; transform: scale(0.5128); }  /* 200 / 390 */
   .lr-opt__check {
     position: absolute; top: 7px; right: 7px;
     width: 20px; height: 20px; border-radius: 50%;
