@@ -104,19 +104,37 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
       fitVisible();
       window.addEventListener('resize', fitVisible);
 
+      // Gleiche „Bend-in"-Geste wie beim Laden (sanftes Fade-up).
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      function enter(el) {
+        if (!el || reduce) return;
+        el.style.transition = 'none';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(12px)';
+        void el.offsetWidth; // Reflow erzwingen
+        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        el.style.opacity = '1';
+        el.style.transform = 'none';
+        setTimeout(function () {
+          el.style.transition = ''; el.style.transform = ''; el.style.opacity = '';
+        }, 680);
+      }
+
       // „Weiter" (Step 1) → Step 1 raus, Step 2 rein. Rahmen bleibt identisch.
       function goStep2() {
         if (step1) step1.style.display = 'none';
         if (step2) {
           step2.style.display = 'flex';
-          requestAnimationFrame(function () { fit(step2); });
+          requestAnimationFrame(function () { fit(step2); enter(step2); });
         }
         window.scrollTo({ top: 0 });
       }
       // „Setup überspringen" → Flow ganz weg, Dashboard darunter kommt hoch.
+      var dash = document.querySelector('[data-dashboard]');
       function skip() {
         flow.style.display = 'none';
         window.scrollTo({ top: 0 });
+        requestAnimationFrame(function () { enter(dash); });
       }
 
       document.querySelectorAll('[data-onb-action="next"]').forEach(function (b) {
