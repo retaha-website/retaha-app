@@ -120,14 +120,15 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         }, 680);
       }
 
-      // „Weiter" (Step 1) → Step 1 raus, Step 2 rein. Rahmen bleibt identisch.
-      function goStep2() {
-        if (step1) step1.style.display = 'none';
-        if (step2) {
-          step2.style.display = 'flex';
-          requestAnimationFrame(function () { fit(step2); enter(step2); });
-        }
+      // Step per Nummer zeigen (1 + 2 gebaut; 3–5 folgen). Rahmen bleibt identisch.
+      function showStep(n) {
+        var target = flow.querySelector('[data-onb-step="' + n + '"]');
+        if (!target) return; // Step noch nicht gebaut
+        [step1, step2].forEach(function (s) {
+          if (s) s.style.display = (s === target ? 'flex' : 'none');
+        });
         window.scrollTo({ top: 0 });
+        requestAnimationFrame(function () { fit(target); enter(target); });
       }
       // „Setup überspringen" → Flow ganz weg, Dashboard darunter kommt hoch.
       var dash = document.querySelector('[data-dashboard]');
@@ -137,11 +138,22 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         requestAnimationFrame(function () { enter(dash); });
       }
 
+      // „Weiter" → Step 2.
       document.querySelectorAll('[data-onb-action="next"]').forEach(function (b) {
-        b.addEventListener('click', function (e) { e.preventDefault(); goStep2(); });
+        b.addEventListener('click', function (e) { e.preventDefault(); showStep(2); });
       });
+      // „Setup überspringen".
       document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {
         b.addEventListener('click', function (e) { e.preventDefault(); skip(); });
+      });
+      // Step-Balken-Segmente: vor/zurück springen — nur gebaute Steps sind klickbar.
+      document.querySelectorAll('[data-onb-goto]').forEach(function (el) {
+        var n = parseInt(el.getAttribute('data-onb-goto') || '0', 10);
+        if (!flow.querySelector('[data-onb-step="' + n + '"]')) {
+          el.setAttribute('disabled', '');
+          return;
+        }
+        el.addEventListener('click', function () { showStep(n); });
       });
     })();
   </script>

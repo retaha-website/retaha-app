@@ -64,10 +64,15 @@ try {
 
   </div>
 
-  <!-- Schritt-Balken — Schritt 2 aktiv (segmentiert, wie Screen 1) -->
-  <div class="onb2-steps" role="img" aria-label="Schritt 2 von 5">
+  <!-- Schritt-Balken — Schritt 2 aktiv, klickbar (vor/zurück) -->
+  <div class="onb2-steps" role="group" aria-label="Onboarding-Schritte">
     {[1, 2, 3, 4, 5].map(i => (
-      <span class:list={['onb2-step', { 'is-active': i === 2 }]}></span>
+      <button
+        type="button"
+        class:list={['onb2-step', { 'is-active': i === 2 }]}
+        data-onb-goto={i}
+        aria-label={`Schritt ${i}`}
+      ></button>
     ))}
   </div>
 </section>
@@ -164,9 +169,13 @@ try {
     margin: 28px auto 0;
   }
   .onb2-step {
+    appearance: none; -webkit-appearance: none; padding: 0; border: none;
     flex: 0 0 auto; width: 20px; height: 5px; border-radius: 999px;
     background: var(--border-medium, rgba(10,10,10,0.16));
-    transition: width 0.3s ease, background 200ms ease;
+    cursor: pointer;
+    transition: width 0.3s ease, background 200ms ease, opacity 0.2s ease;
   }
   .onb2-step.is-active { width: 46px; background: var(--petrol); }
+  .onb2-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
+  .onb2-step:disabled { cursor: default; }
 </style>
