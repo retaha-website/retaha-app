@@ -77,51 +77,36 @@ for (const l of LOOKS) {
     <div class="lr-copy">
       <h1 class="lr-h1">Wähle deinen <span class="lr-nb">Look<span class="lr-dot"></span></span></h1>
       <p class="lr-sub">Tippe einen Look, sieh ihn sofort, scann ihn aufs Telefon.</p>
-      <div class="lr-cta-row">
-        <button type="button" class="lr-next" data-onb-goto="3">Weiter →</button>
-        <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
-      </div>
-    </div>
+      <div class="lr-select">
+        <!-- Auswahl: Look-Boxen (länger gezogen) -->
+        <div class="lr-looks" role="radiogroup" aria-label="Gästemappen-Look wählen">
+          {looks.map(l => (
+            <button
+              type="button"
+              class:list={['di-card', { 'is-active': l.id === defaultLook }]}
+              data-look={l.id}
+              role="radio"
+              aria-checked={l.id === defaultLook ? 'true' : 'false'}
+            >
+              {l.id === 'bauhaus' && (
+                <div class="di-card__hint di-card__hint--bauhaus"><span class="bh-initial">B</span><span class="bh-pink-dot"></span></div>
+              )}
+              {l.id === 'editorial' && (
+                <div class="di-card__hint di-card__hint--editorial"><span class="ed-name">Editorial</span></div>
+              )}
+              {l.id === 'maison' && (
+                <div class="di-card__hint di-card__hint--maison"><span class="ms-name">MAISON</span><span class="ms-rhombus"></span></div>
+              )}
+              <div class="di-card__body">
+                <div class:list={['di-card__title', `${l.id}-title`]}>{l.label}</div>
+                <div class="di-card__desc">{l.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
 
-    <!-- Rechts: Bühne — links Auswahl + QR (untereinander), rechts das Mockup -->
-    <div class="lr-stage">
-
-      <div class="lr-controls">
-
-      <!-- Auswahl: Look-Karten -->
-      <div class="lr-looks" role="radiogroup" aria-label="Gästemappen-Look wählen">
-        {looks.map(l => (
-          <button
-            type="button"
-            class:list={['di-card', { 'is-active': l.id === defaultLook }]}
-            data-look={l.id}
-            role="radio"
-            aria-checked={l.id === defaultLook ? 'true' : 'false'}
-          >
-            {l.id === 'bauhaus' && (
-              <div class="di-card__hint di-card__hint--bauhaus"><span class="bh-initial">B</span><span class="bh-pink-dot"></span></div>
-            )}
-            {l.id === 'editorial' && (
-              <div class="di-card__hint di-card__hint--editorial"><span class="ed-name">Editorial</span></div>
-            )}
-            {l.id === 'maison' && (
-              <div class="di-card__hint di-card__hint--maison"><span class="ms-name">MAISON</span><span class="ms-rhombus"></span></div>
-            )}
-            <div class="di-card__body">
-              <div class:list={['di-card__title', `${l.id}-title`]}>{l.label}</div>
-              <div class="di-card__desc">{l.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <!-- QR: auf die Gästemappe im gewählten Look -->
-      <div class="lr-qr">
-        <div class="lr-qr-frame">
-          <span class="lr-corner tl"></span>
-          <span class="lr-corner tr"></span>
-          <span class="lr-corner bl"></span>
-          <span class="lr-corner br"></span>
+        <!-- QR (ohne Ecken), rechts neben der Auswahl -->
+        <div class="lr-qr">
           <div class="lr-qr-stack">
             {looks.map(l => (
               <div class="lr-qr-view" data-look-qr={l.id} role="img" aria-label="QR-Code zur Gästemappe" style={l.id === defaultLook ? '' : 'display:none'}>
@@ -129,13 +114,18 @@ for (const l of LOOKS) {
               </div>
             ))}
           </div>
+          <span class="lr-qr-cap">Mit der Kamera scannen.</span>
         </div>
-        <span class="lr-qr-cap">Mit der Kamera scannen.</span>
       </div>
 
-      </div><!-- /lr-controls -->
+      <div class="lr-cta-row">
+        <button type="button" class="lr-next" data-onb-goto="3">Weiter →</button>
+        <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
+      </div>
+    </div>
 
-      <!-- Mockup ganz rechts: ECHTES /branding-Preview im .bp-outer-Bezel -->
+    <!-- Rechts: Mockup — ECHTES /branding-Preview im .bp-outer-Bezel -->
+    <div class="lr-stage">
       <div class="lr-phone">
         <div class="bp-outer">
           <div class="bp-inner">
@@ -151,7 +141,6 @@ for (const l of LOOKS) {
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
@@ -189,7 +178,7 @@ for (const l of LOOKS) {
   }
 
   /* Links: Copy — Headline-Stil wie Step 1 (.onb-headline) */
-  .lr-copy { min-width: 0; max-width: 560px; }
+  .lr-copy { min-width: 0; max-width: 600px; }
   .lr-h1 {
     font-family: 'Space Grotesk', sans-serif; font-weight: 400;
     font-size: clamp(40px, 5vw, 72px); line-height: 0.98;
@@ -203,9 +192,15 @@ for (const l of LOOKS) {
   .lr-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
     font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
-    margin: 0 0 28px; max-width: 42ch;
+    margin: 0 0 22px; max-width: 42ch;
   }
   @media (max-width: 1100px) { .lr-sub { margin-left: auto; margin-right: auto; } }
+
+  /* Auswahl + QR nebeneinander, zwischen Sub und Button */
+  .lr-select { display: flex; align-items: center; gap: 24px; margin: 0 0 26px; }
+  @media (max-width: 1100px) { .lr-select { justify-content: center; } }
+  @media (max-width: 560px) { .lr-select { flex-direction: column; align-items: center; } }
+
   .lr-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   @media (max-width: 1100px) { .lr-cta-row { justify-content: center; } }
   .lr-next {
@@ -225,20 +220,13 @@ for (const l of LOOKS) {
   }
   .lr-skip:hover { color: var(--ink); }
 
-  /* Rechts: Bühne — links Controls (Auswahl + QR untereinander) | rechts Mockup */
-  .lr-stage {
-    display: grid;
-    grid-template-columns: auto auto;
-    gap: 40px; align-items: center;
-  }
-  @media (max-width: 1100px) { .lr-stage { justify-content: center; } }
-  @media (max-width: 720px) { .lr-stage { grid-template-columns: 1fr; justify-items: center; gap: 28px; } }
+  /* Rechts: Mockup */
+  .lr-stage { display: flex; align-items: center; justify-content: center; }
 
-  .lr-controls { display: flex; flex-direction: column; align-items: center; gap: 24px; }
-
-  /* Auswahl: Look-Karten (1:1 .di-card, Auswahl = Petrol-Kante, kein Fill) */
-  .lr-looks { display: flex; flex-direction: column; gap: 10px; width: 210px; }
-  @media (max-width: 720px) { .lr-looks { flex-direction: row; flex-wrap: wrap; justify-content: center; width: auto; } }
+  /* Auswahl: Look-Boxen (1:1 .di-card, Auswahl = Petrol-Kante, kein Fill).
+     Länger gezogen: füllen die Breite links neben dem QR. */
+  .lr-looks { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  @media (max-width: 560px) { .lr-looks { width: 100%; } }
   .di-card {
     display: flex; align-items: center;
     width: 100%; text-align: left; padding: 0;
@@ -251,9 +239,9 @@ for (const l of LOOKS) {
   .di-card:hover { border-color: var(--ink-faint); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
   .di-card.is-active { border-color: var(--petrol); box-shadow: inset 0 0 0 1px var(--petrol); }
   .di-card__hint {
-    width: 56px; min-height: 62px; flex-shrink: 0;
+    width: 66px; min-height: 68px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 6px; padding: 8px 6px;
+    gap: 6px; padding: 10px 6px;
   }
   .di-card__hint--bauhaus { background: #F5F5F3; }
   .di-card__hint--editorial { background: #FAF7F0; }
@@ -263,13 +251,13 @@ for (const l of LOOKS) {
   .ed-name { font-family: 'Georgia', serif; font-size: 11px; font-style: italic; color: #2B2A28; border-bottom: 1px solid #4A5C2A; padding-bottom: 2px; }
   .ms-name { font-family: 'Georgia', serif; font-size: 8px; color: #E8D9B5; letter-spacing: .1em; text-transform: uppercase; }
   .ms-rhombus { width: 5px; height: 5px; background: #C9A36A; transform: rotate(45deg); }
-  .di-card__body { padding: 9px 11px; flex: 1; min-width: 0; }
-  .di-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+  .di-card__body { padding: 11px 16px; flex: 1; min-width: 0; }
+  .di-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
   .bauhaus-title::after { content: ''; display: inline-block; width: 6px; height: 6px; background: #FF4A82; border-radius: 50%; margin-left: 5px; vertical-align: middle; }
   .editorial-title { font-family: 'Georgia', serif; font-style: italic; border-bottom: 1px solid #4A5C2A; display: inline-block; padding-bottom: 1px; font-weight: 400; }
   .maison-title { font-family: 'Georgia', serif; letter-spacing: .04em; }
   .maison-title::after { content: ''; display: inline-block; width: 5px; height: 5px; background: #C9A36A; transform: rotate(45deg); margin-left: 6px; vertical-align: middle; }
-  .di-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.45; }
+  .di-card__desc { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.45; }
 
   /* Mockup: 1:1 .bp-outer/.bp-inner aus /branding BrandMiniPreview */
   .lr-phone { display: flex; justify-content: center; }
@@ -286,18 +274,12 @@ for (const l of LOOKS) {
   }
   .lr-view { position: absolute; top: 0; left: 0; width: 390px; height: 844px; }
 
-  /* QR: transparent, Petrol, Scan-Rahmen */
-  .lr-qr { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .lr-qr-frame { position: relative; width: 220px; height: 220px; display: grid; place-items: center; }
-  .lr-qr-stack { position: relative; width: 184px; height: 184px; }
+  /* QR: transparent, Petrol — ohne Ecken-Rahmen */
+  .lr-qr { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .lr-qr-stack { position: relative; width: 156px; height: 156px; }
   .lr-qr-view { position: absolute; inset: 0; }
   .lr-qr-view :global(svg) { display: block; width: 100%; height: 100%; }
   .lr-qr-fallback { width: 100%; height: 100%; display: grid; place-items: center; font-size: 11px; color: var(--ink-muted); text-align: center; }
-  .lr-corner { position: absolute; width: 26px; height: 26px; border: 2.5px solid var(--petrol); }
-  .lr-corner.tl { top: 0; left: 0;  border-right: none; border-bottom: none; border-top-left-radius: 9px; }
-  .lr-corner.tr { top: 0; right: 0; border-left: none;  border-bottom: none; border-top-right-radius: 9px; }
-  .lr-corner.bl { bottom: 0; left: 0;  border-right: none; border-top: none; border-bottom-left-radius: 9px; }
-  .lr-corner.br { bottom: 0; right: 0; border-left: none;  border-top: none; border-bottom-right-radius: 9px; }
   .lr-qr-cap { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-muted, rgba(10,10,10,0.42)); text-align: center; }
 
   /* Schritt-Balken */
