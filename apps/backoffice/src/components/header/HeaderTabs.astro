@@ -20,10 +20,16 @@ const tabs = [
 ];
 ---
 
-<nav class="header-tabs" aria-label="Hauptnavigation">
-  {tabs.map(tab => (
+{/* Ansicht-Umschalter — sitzt als Einheit neben dem Hotel-Logo in der Kopfzeile.
+    Petrol-Markierung gleitet (kein harter Sprung); beim ersten Login klappen die
+    Kacheln gestaffelt aus der Marke heraus (einmal pro Gerät). */}
+<nav class="header-tabs" id="viewSwitcher" aria-label="Ansicht wechseln">
+  <span class="header-tabs__marker" data-marker aria-hidden="true"></span>
+  {tabs.map((tab, i) => (
     <a
       href={tab.href}
+      data-tab
+      style={`--i: ${i}`}
       class:list={['header-tabs__tab', { 'is-active': tab.key === active }]}
       title={tab.key === active ? bt('tab.here', lang) : `${bt('tab.switch', lang)} ${tab.label}`}
       aria-current={tab.key === active ? 'page' : undefined}
@@ -58,67 +64,158 @@ const tabs = [
           <rect x="3"  y="16" width="7" height="5"/>
         </svg>
       )}
-      <span>{tab.label}</span>
+      <span class="header-tabs__lbl">{tab.label}</span>
     </a>
   ))}
 </nav>
 
 <style>
   .header-tabs {
-    display: flex;
+    position: relative;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 32px;
-    border-top: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .header-tabs::-webkit-scrollbar { display: none; }
-
-  @media (max-width: 900px) {
-    .header-tabs { padding: 10px 20px; }
+    gap: 6px;
   }
 
-  /* Quadratische Tiles: Icon mittig oben, Text darunter */
+  /* Gleitende Petrol-Markierung (liegt hinter der aktiven Kachel) */
+  .header-tabs__marker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 0;
+    width: 0;
+    background: var(--petrol);
+    border-radius: var(--r-sm);
+    z-index: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 320ms cubic-bezier(0.5, 0, 0.2, 1),
+                width 320ms cubic-bezier(0.5, 0, 0.2, 1),
+                opacity 220ms ease;
+  }
+
+  /* Kompakte Kacheln: Icon oben, kleines Label darunter */
   .header-tabs__tab {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    width: 62px;
-    height: 62px;
+    gap: 4px;
+    height: 48px;
+    padding: 6px 11px;
     flex-shrink: 0;
-    padding: 6px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 7.5px;
+    font-size: 7px;
     font-weight: 500;
     letter-spacing: 0.08em;
-    line-height: 1.2;
+    line-height: 1.1;
     color: var(--ink-muted);
+    background: transparent;
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
     cursor: pointer;
-    transition: all 200ms ease;
+    transition: color 200ms ease, border-color 200ms ease;
     text-transform: uppercase;
     text-align: center;
     text-decoration: none;
+    white-space: nowrap;
   }
-  .header-tabs__tab:hover {
-    color: var(--ink);
-    background: var(--bg-deep);
-  }
-  /* Ausgewählt: voller Petrol-Block, Inhalt weiß, kein Outline */
-  .header-tabs__tab.is-active {
-    color: #fff;
-    background: var(--petrol);
-    border-color: var(--petrol);
-  }
+  .header-tabs__tab:hover { color: var(--ink); border-color: var(--ink-faint); }
+  /* Aktiv: Inhalt weiß über der Markierung, kein eigener Rahmen */
+  .header-tabs__tab.is-active { color: #fff; border-color: transparent; }
+
   .header-tabs__tab svg {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
-    color: var(--petrol);   /* Icon-Akzent der inaktiven Boxen in Petrol */
+    color: var(--petrol);
   }
   .header-tabs__tab.is-active svg { color: #fff; }
+  .header-tabs__lbl { display: block; }
+
+  /* Erstes Login: Kacheln klappen gestaffelt aus der Marke (links) heraus */
+  @keyframes tab-unfold {
+    from { opacity: 0; transform: translateX(-22px) scale(0.7); }
+    to   { opacity: 1; transform: none; }
+  }
+  .header-tabs.is-unfolding .header-tabs__tab {
+    animation: tab-unfold 400ms cubic-bezier(0.34, 1.3, 0.5, 1) backwards;
+    animation-delay: calc(var(--i) * 100ms + 90ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .header-tabs__marker { transition: opacity 220ms ease; }
+    .header-tabs.is-unfolding .header-tabs__tab { animation: none; }
+  }
+
+  @media (max-width: 900px) {
+    .header-tabs__tab { height: 44px; padding: 5px 9px; }
+  }
 </style>
+
+<script is:inline>
+  (function () {
+    var nav = document.getElementById('viewSwitcher');
+    if (!nav) return;
+    var marker = nav.querySelector('[data-marker]');
+    var tabs = Array.prototype.slice.call(nav.querySelectorAll('[data-tab]'));
+    if (!marker || !tabs.length) return;
+
+    function activeTab() { return nav.querySelector('[data-tab].is-active') || tabs[0]; }
+
+    function place(el) {
+      if (!el) return;
+      marker.style.width = el.offsetWidth + 'px';
+      marker.style.height = el.offsetHeight + 'px';
+      marker.style.transform = 'translateX(' + el.offsetLeft + 'px)';
+    }
+
+    // Stagger-Animation nur beim ersten Login (einmal pro Gerät).
+    var firstTime = false;
+    try {
+      if (!localStorage.getItem('retaha-switcher-seen')) {
+        firstTime = true;
+        localStorage.setItem('retaha-switcher-seen', '1');
+      }
+    } catch (e) {}
+    if (firstTime) nav.classList.add('is-unfolding');
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    requestAnimationFrame(function () {
+      place(activeTab());
+      // Markierung erst nach dem Platzieren einblenden (kein Sprung). Beim ersten
+      // Login wartet sie, bis die Kacheln ausgeklappt sind.
+      var delay = firstTime && !reduce ? 480 : 0;
+      setTimeout(function () { marker.style.opacity = '1'; }, delay);
+    });
+
+    // Wechseln: Markierung gleitet zur angetippten Kachel, dann Navigation.
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function (e) {
+        if (tab.classList.contains('is-active')) { e.preventDefault(); return; }
+        e.preventDefault();
+        var href = tab.getAttribute('href');
+        tabs.forEach(function (t) { t.classList.remove('is-active'); });
+        tab.classList.add('is-active');
+        place(tab);
+        setTimeout(function () { if (href) window.location.href = href; }, reduce ? 0 : 320);
+      });
+    });
+
+    // Bei Resize Markierung ohne Animation neu setzen.
+    var rt;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        var prev = marker.style.transition;
+        marker.style.transition = 'none';
+        place(activeTab());
+        requestAnimationFrame(function () { marker.style.transition = prev; });
+      }, 120);
+    });
+  })();
+</script>
