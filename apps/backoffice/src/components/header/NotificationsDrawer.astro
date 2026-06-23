@@ -1,0 +1,204 @@
+---
+// Benachrichtigungs-Drawer — öffnet seitlich (rechts) statt zu einer eigenen Seite
+// zu navigieren. Oben (falls Testphase aktiv) ein Testphasen-Banner, darunter die
+// Benachrichtigungen in breit. Getriggert vom „Benachrichtigungen"-Eintrag im
+// Account-Dropdown ([data-open-notifications]) via Event.
+import type { TrialStatus } from '../../lib/trial-status';
+import { TRIAL_DURATION_DAYS } from '../../lib/trial-status';
+
+interface Props { trial: TrialStatus; }
+const { trial } = Astro.props;
+
+const dayOf = trial.isInTrial
+  ? Math.min(TRIAL_DURATION_DAYS, Math.max(1, TRIAL_DURATION_DAYS - trial.daysRemaining + 1))
+  : 0;
+const pct = Math.min(100, Math.round((dayOf / TRIAL_DURATION_DAYS) * 100));
+const expired = trial.urgencyLevel === 'expired';
+---
+
+<div class="nd" id="notifDrawer" aria-hidden="true">
+  <div class="nd__backdrop" data-notif-close></div>
+  <aside class="nd__panel" role="dialog" aria-label="Benachrichtigungen" aria-modal="true">
+
+    <header class="nd__head">
+      <span class="nd__title">Benachrichtigungen</span>
+      <button type="button" class="nd__close" data-notif-close aria-label="Schließen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </header>
+
+    {trial.isInTrial && (
+      <div class:list={['nd__trial', { 'is-expired': expired, 'is-critical': trial.urgencyLevel === 'critical', 'is-warning': trial.urgencyLevel === 'warning' }]}>
+        <div class="nd__trial-top">
+          <span class="nd__trial-label">Testphase</span>
+          <span class="nd__trial-days">{expired ? 'abgelaufen' : `Tag ${dayOf} von ${TRIAL_DURATION_DAYS}`}</span>
+        </div>
+        <div class="nd__trial-bar"><span style={`width:${pct}%`}></span></div>
+        {!expired && (
+          <p class="nd__trial-sub">Noch {trial.daysRemaining} {trial.daysRemaining === 1 ? 'Tag' : 'Tage'} kostenlos testen.</p>
+        )}
+        {expired && (
+          <p class="nd__trial-sub">Deine Testphase ist vorbei — wähle deinen Plan, um weiterzumachen.</p>
+        )}
+      </div>
+    )}
+
+    <div class="nd__body">
+      <ul class="nd__list">
+        <!-- Geparkte QR-/NFC-Bestell-Benachrichtigung (nach „Mach's komplett"). -->
+        <li class="nd__item" data-notif="qr" hidden>
+          <a class="nd__item-link" href="https://retaha.de/shop" target="_blank" rel="noopener" data-notif-action>
+            <span class="nd__item-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </span>
+            <span class="nd__item-body">
+              <span class="nd__item-title">QR-Codes &amp; NFC-Karten bestellen</span>
+              <span class="nd__item-desc">Du möchtest gedruckte QR-Codes oder NFC-Karten aus Holz für die Zimmer? Klicke hier — direkt im Shop.</span>
+            </span>
+            <span class="nd__item-arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
+      </ul>
+      <p class="nd__empty" data-notif-empty>Keine neuen Benachrichtigungen.</p>
+    </div>
+
+  </aside>
+</div>
+
+<style>
+  .nd {
+    position: fixed; inset: 0; z-index: 200;
+    visibility: hidden; pointer-events: none;
+  }
+  .nd.is-open { visibility: visible; pointer-events: auto; }
+
+  .nd__backdrop {
+    position: absolute; inset: 0;
+    background: rgba(10, 10, 10, 0.28);
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  .nd.is-open .nd__backdrop { opacity: 1; }
+
+  .nd__panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: min(440px, 92vw);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -18px 0 50px rgba(10,10,10,0.16);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.5, 0, 0.2, 1);
+  }
+  .nd.is-open .nd__panel { transform: translateX(0); }
+  @media (prefers-reduced-motion: reduce) {
+    .nd__panel, .nd__backdrop { transition: none; }
+  }
+
+  .nd__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .nd__title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 17px; color: var(--ink); }
+  .nd__close {
+    appearance: none; -webkit-appearance: none; border: none; background: transparent;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: var(--r-sm); color: var(--ink-muted);
+    cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .nd__close:hover { background: var(--bg-deep); color: var(--ink); }
+
+  /* Testphasen-Banner */
+  .nd__trial {
+    margin: 16px 20px 0; padding: 14px 16px;
+    background: var(--petrol-soft, rgba(20,97,110,0.10));
+    border: 1px solid var(--petrol);
+    border-radius: var(--r);
+  }
+  .nd__trial.is-warning { border-color: var(--gold, #C9A227); background: var(--gold-soft, rgba(201,162,39,0.12)); }
+  .nd__trial.is-critical, .nd__trial.is-expired { border-color: var(--burgund, #8E2A3A); background: var(--burgund-soft, rgba(142,42,58,0.10)); }
+  .nd__trial-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .nd__trial-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+  }
+  .nd__trial-days { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .nd__trial-bar {
+    margin: 10px 0 8px; height: 5px; border-radius: 999px;
+    background: rgba(10,10,10,0.10); overflow: hidden;
+  }
+  .nd__trial-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--petrol); }
+  .nd__trial.is-warning .nd__trial-bar > span { background: var(--gold, #C9A227); }
+  .nd__trial.is-critical .nd__trial-bar > span, .nd__trial.is-expired .nd__trial-bar > span { background: var(--burgund, #8E2A3A); }
+  .nd__trial-sub { margin: 0; font-family: 'Inter Tight', sans-serif; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft, rgba(10,10,10,0.6)); }
+
+  .nd__body { flex: 1 1 auto; overflow-y: auto; padding: 16px 20px 24px; }
+  .nd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .nd__item { margin: 0; }
+  .nd__item-link {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; text-decoration: none;
+    background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--r);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .nd__item-link:hover { border-color: var(--petrol); box-shadow: 0 8px 22px rgba(0,0,0,.06); transform: translateY(-1px); }
+  .nd__item-icon {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--petrol-soft, rgba(20,97,110,0.10)); color: var(--petrol);
+  }
+  .nd__item-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .nd__item-title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14.5px; color: var(--ink); }
+  .nd__item-desc { font-family: 'Inter Tight', sans-serif; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft, rgba(10,10,10,0.6)); }
+  .nd__item-arrow { flex-shrink: 0; margin-left: auto; color: var(--ink-muted); font-size: 17px; }
+  .nd__item-link:hover .nd__item-arrow { color: var(--petrol); }
+
+  .nd__empty { margin: 8px 2px 0; font-family: 'Inter Tight', sans-serif; font-size: 14px; color: var(--ink-muted); }
+</style>
+
+<script is:inline>
+  (function () {
+    var drawer = document.getElementById('notifDrawer');
+    if (!drawer) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function open() {
+      drawer.classList.add('is-open');
+      drawer.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+    function close() {
+      drawer.classList.remove('is-open');
+      drawer.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    // Trigger: „Benachrichtigungen"-Eintrag im Account-Dropdown.
+    document.querySelectorAll('[data-open-notifications]').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        // Account-Dropdown schließen (bestehende Konvention).
+        document.dispatchEvent(new CustomEvent('retaha:menu-open', { detail: 'notifications' }));
+        open();
+      });
+    });
+    document.addEventListener('retaha:open-notifications', open);
+
+    drawer.querySelectorAll('[data-notif-close]').forEach(function (el) { el.addEventListener('click', close); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && drawer.classList.contains('is-open')) close();
+    });
+
+    // Geparkte QR-Benachrichtigung anzeigen.
+    var hasQr = false;
+    try { hasQr = localStorage.getItem('retaha-qr-notif') === '1'; } catch (e) {}
+    var qr = drawer.querySelector('[data-notif="qr"]');
+    var empty = drawer.querySelector('[data-notif-empty]');
+    if (hasQr && qr) { qr.hidden = false; if (empty) empty.hidden = true; }
+    // Anklicken = gelesen: Flag + Punkte entfernen.
+    var action = drawer.querySelector('[data-notif-action]');
+    if (action) action.addEventListener('click', function () {
+      try { localStorage.removeItem('retaha-qr-notif'); } catch (e) {}
+      document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.remove('is-on'); });
+    });
+  })();
+</script>
