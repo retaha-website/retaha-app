@@ -2,37 +2,91 @@
 import Layout from '../../layouts/Layout.astro';
 ---
 <Layout title="Benachrichtigungen" activeTab="backoffice">
-  <section class="stub-page">
-    <p class="stub-page__eyebrow">Account · Benachrichtigungen</p>
-    <h1 class="stub-page__title">Benachrichtigungen<span class="dot-pink">.</span></h1>
-    <p class="stub-page__sub">E-Mail, Push, WhatsApp — kommt in Sprint J.</p>
+  <section class="notif-page">
+    <p class="notif-page__eyebrow">Account · Benachrichtigungen</p>
+    <h1 class="notif-page__title">Benachrichtigungen<span class="notif-page__dot"></span></h1>
+
+    <ul class="notif-list">
+      <!-- Geparkte QR-/NFC-Bestell-Benachrichtigung — nur sichtbar, wenn nach
+           „Mach's komplett" gesetzt (localStorage). -->
+      <li class="notif-item" data-notif="qr" hidden>
+        <a class="notif-item__link" href="https://retaha.de/shop" target="_blank" rel="noopener" data-notif-action>
+          <span class="notif-item__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </span>
+          <span class="notif-item__body">
+            <span class="notif-item__title">QR-Codes &amp; NFC-Karten bestellen</span>
+            <span class="notif-item__desc">Du möchtest gedruckte QR-Codes oder NFC-Karten aus Holz für die Zimmer? Klicke hier — direkt im Shop.</span>
+          </span>
+          <span class="notif-item__arrow" aria-hidden="true">→</span>
+        </a>
+      </li>
+    </ul>
+
+    <p class="notif-empty" data-notif-empty>Keine neuen Benachrichtigungen.</p>
   </section>
 </Layout>
 
 <style>
-  .stub-page {
-    max-width: 800px;
-    margin: 64px auto;
-    padding: 0 32px;
+  .notif-page { max-width: 760px; margin: 56px auto; padding: 0 32px; }
+  .notif-page__eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+    color: var(--ink-muted); text-transform: uppercase; margin: 0 0 14px;
   }
-  .stub-page__eyebrow {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    color: var(--ink-muted);
-    text-transform: uppercase;
-    margin-bottom: 16px;
+  .notif-page__title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 44px; font-weight: 400;
+    letter-spacing: -0.025em; color: var(--ink); margin: 0 0 28px;
   }
-  .stub-page__title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 48px;
-    font-weight: 400;
-    letter-spacing: -0.025em;
-    margin-bottom: 16px;
+  .notif-page__dot {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--petrol); margin-left: 3px; vertical-align: baseline;
   }
-  .stub-page__sub {
-    font-size: 16px;
-    color: var(--ink-muted);
-    line-height: 1.5;
+
+  .notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .notif-item { margin: 0; }
+  .notif-item__link {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 18px; text-decoration: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .notif-item__link:hover {
+    border-color: var(--petrol);
+    box-shadow: 0 8px 22px rgba(0,0,0,.06);
+    transform: translateY(-1px);
+  }
+  .notif-item__icon {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--petrol-soft, rgba(20,97,110,0.10)); color: var(--petrol);
+  }
+  .notif-item__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .notif-item__title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 15px; color: var(--ink); }
+  .notif-item__desc { font-family: 'Inter Tight', sans-serif; font-size: 13px; line-height: 1.45; color: var(--ink-soft, rgba(10,10,10,0.6)); }
+  .notif-item__arrow { flex-shrink: 0; margin-left: auto; color: var(--ink-muted); font-size: 18px; }
+  .notif-item__link:hover .notif-item__arrow { color: var(--petrol); }
+
+  .notif-empty {
+    font-family: 'Inter Tight', sans-serif; font-size: 15px; color: var(--ink-muted);
+    margin: 4px 0 0;
   }
 </style>
+
+<script is:inline>
+  (function () {
+    var hasQr = false;
+    try { hasQr = localStorage.getItem('retaha-qr-notif') === '1'; } catch (e) {}
+    var qr = document.querySelector('[data-notif="qr"]');
+    var empty = document.querySelector('[data-notif-empty]');
+    if (hasQr && qr) {
+      qr.hidden = false;
+      if (empty) empty.hidden = true;
+    }
+    // Anklicken = gelesen: Flag entfernen + Punkte (Avatar/Dropdown) ausblenden.
+    var action = document.querySelector('[data-notif-action]');
+    if (action) action.addEventListener('click', function () {
+      try { localStorage.removeItem('retaha-qr-notif'); } catch (e) {}
+      document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.remove('is-on'); });
+    });
+  })();
+</script>

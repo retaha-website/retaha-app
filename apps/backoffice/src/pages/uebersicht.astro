@@ -88,6 +88,9 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     (function () {
       var flow  = document.querySelector('[data-onboarding-flow]');
       if (!flow) return;
+      // Setup bereits via „Mach's komplett" abgeschlossen? → Flow nicht mehr zeigen,
+      // direkt das Dashboard. (Ohne Abschluss erscheint das Setup bei jedem Besuch.)
+      try { if (localStorage.getItem('retaha-onboarding-done') === '1') { flow.style.display = 'none'; return; } } catch (e) {}
       var steps = Array.prototype.slice.call(flow.querySelectorAll('[data-onb-step]'));
 
       // Setup-Step füllt die volle Bildschirmhöhe — Step-Balken sitzt unten.
@@ -150,9 +153,9 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         showDots();
         enter(dash);
       }
-      function skip() {
+      function flyToAvatar(onDone) {
         var target = document.getElementById('userAvatar');
-        if (reduce || !target) { finishSkip(); return; }
+        if (reduce || !target) { onDone(); return; }
         var fr = flow.getBoundingClientRect();
         var tr = target.getBoundingClientRect();
         var dx = (tr.left + tr.width / 2) - (fr.left + fr.width / 2);
@@ -165,21 +168,26 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
           flow.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(0.04)';
           flow.style.opacity = '0';
         });
-        setTimeout(finishSkip, 640);
+        setTimeout(onDone, 640);
       }
+      function skip() { flyToAvatar(finishSkip); }
 
       // „Setup überspringen".
       document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {
         b.addEventListener('click', function (e) { e.preventDefault(); skip(); });
       });
-      // „Zum Dashboard" (Abschluss) → Flow weg, Dashboard kommt hoch (ohne Park-Punkte).
-      function finishFlow() {
-        flow.style.display = 'none';
-        window.scrollTo({ top: 0 });
-        requestAnimationFrame(function () { enter(dash); });
+      // „Mach's komplett" (Abschluss) → fliegt wie Skip zum Account-Icon, parkt die
+      // QR-Bestell-Benachrichtigung und merkt sich den Abschluss (Setup kommt nicht
+      // wieder). Die Einstellungen erledigt der Hotelier danach im Dashboard.
+      function complete() {
+        try {
+          localStorage.setItem('retaha-onboarding-done', '1');
+          localStorage.setItem('retaha-qr-notif', '1');
+        } catch (e) {}
+        flyToAvatar(finishSkip);
       }
       document.querySelectorAll('[data-onb-action="finish"]').forEach(function (b) {
-        b.addEventListener('click', function (e) { e.preventDefault(); finishFlow(); });
+        b.addEventListener('click', function (e) { e.preventDefault(); complete(); });
       });
       // „Weiter"-Buttons + Step-Balken-Segmente: zum Ziel-Step springen.
       // Nur gebaute Steps sind klickbar; auf noch nicht gebaute → disabled.
