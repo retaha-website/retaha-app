@@ -19,17 +19,26 @@ const NOT_IN_TRIAL: TrialStatus = {
 };
 
 export function calculateTrialStatus(hotel: {
-  trial_started_at: string | null;
-  subscription_status: string;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
+  subscription_status?: string;
 }): TrialStatus {
-  if (hotel.subscription_status !== 'trial' || !hotel.trial_started_at) {
-    return NOT_IN_TRIAL;
+  // Neues Modell (finale Spec): explizites trial_ends_at hat Vorrang — Trial aktiv
+  // solange now() < trial_ends_at. Fallback auf das alte Modell (subscription_status
+  // === 'trial' + trial_started_at + 14 Tage), solange trial_ends_at noch nicht
+  // überall gesetzt ist.
+  let endsAtMs: number | null = null;
+  if (hotel.trial_ends_at) {
+    const m = new Date(hotel.trial_ends_at).getTime();
+    if (!Number.isNaN(m)) endsAtMs = m;
+  } else if (hotel.subscription_status === 'trial' && hotel.trial_started_at) {
+    const startedAtMs = new Date(hotel.trial_started_at).getTime();
+    if (!Number.isNaN(startedAtMs)) {
+      endsAtMs = startedAtMs + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+    }
   }
+  if (endsAtMs == null) return NOT_IN_TRIAL;
 
-  const startedAtMs = new Date(hotel.trial_started_at).getTime();
-  if (Number.isNaN(startedAtMs)) return NOT_IN_TRIAL;
-
-  const endsAtMs = startedAtMs + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
   const msRemaining = endsAtMs - nowMs;
 
