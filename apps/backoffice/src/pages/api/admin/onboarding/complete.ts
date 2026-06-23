@@ -1,0 +1,30 @@
+import type { APIRoute } from 'astro';
+import { getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Markiert den Onboarding-Flow („Du bist live") als abgeschlossen — pro Hotel/Account.
+// Aufgerufen vom „Mach's komplett"-Button auf /uebersicht. Dadurch erscheint das
+// Setup auch auf anderen Geräten desselben Accounts nicht mehr.
+export const POST: APIRoute = async ({ cookies, request }) => {
+  const hotels = await getUserHotels(cookies, request);
+  const hotel = hotels?.[0]?.hotel;
+  if (!hotel) return json({ ok: false, error: 'Unauthorized' }, 401);
+
+  const supabase = createSupabaseServiceRoleInstance();
+  const { error } = await supabase
+    .from('hotels')
+    .update({ onboarding_done: true })
+    .eq('id', hotel.id);
+
+  if (error) {
+    console.error('[onboarding/complete]', error);
+    return json({ ok: false, error: error.message }, 500);
+  }
+  return json({ ok: true });
+};

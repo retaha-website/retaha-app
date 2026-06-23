@@ -26,13 +26,15 @@ const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
 
 // setup_progress laden + automatisch anpassen basierend auf konfigurierten Feldern
 let rawProgress: number | null = null;
+let onboardingDone = false;
 try {
   const { data } = await supabase
     .from('hotels')
-    .select('setup_progress, name, logo_primary, brand_primary, brand_theme')
+    .select('setup_progress, name, logo_primary, brand_primary, brand_theme, onboarding_done')
     .eq('id', hotel.id)
     .maybeSingle();
   rawProgress = (data as any)?.setup_progress ?? null;
+  onboardingDone = (data as any)?.onboarding_done === true;
 
   const hotelName    = (data as any)?.name;
   const logoSet      = !!((data as any)?.logo_primary);
@@ -69,7 +71,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
   userInitial={userInitial}
 >
-  <div data-onboarding-flow>
+  <div data-onboarding-flow data-done={onboardingDone ? '1' : undefined} style={onboardingDone ? 'display:none' : undefined}>
     <OnboardingHero hotelName={hotel.name} />
     <OnboardingStep2 hotelId={hotel.id} hotelName={hotel.name} userId={user.id} />
     <OnboardingStep3 />
@@ -88,8 +90,10 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     (function () {
       var flow  = document.querySelector('[data-onboarding-flow]');
       if (!flow) return;
-      // Setup bereits via „Mach's komplett" abgeschlossen? → Flow nicht mehr zeigen,
-      // direkt das Dashboard. (Ohne Abschluss erscheint das Setup bei jedem Besuch.)
+      // Setup bereits abgeschlossen? Pro Account in der DB (data-done) ODER lokal
+      // (localStorage) → Flow nicht mehr zeigen, direkt das Dashboard. (Ohne
+      // Abschluss erscheint das Setup bei jedem Besuch.)
+      if (flow.getAttribute('data-done') === '1') { flow.style.display = 'none'; return; }
       try { if (localStorage.getItem('retaha-onboarding-done') === '1') { flow.style.display = 'none'; return; } } catch (e) {}
       var steps = Array.prototype.slice.call(flow.querySelectorAll('[data-onb-step]'));
 
@@ -184,6 +188,8 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
           localStorage.setItem('retaha-onboarding-done', '1');
           localStorage.setItem('retaha-qr-notif', '1');
         } catch (e) {}
+        // Pro Account in der DB merken (cross-device) — best effort.
+        try { fetch('/api/admin/onboarding/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (e) {}
         flyToAvatar(finishSkip);
       }
       document.querySelectorAll('[data-onb-action="finish"]').forEach(function (b) {
