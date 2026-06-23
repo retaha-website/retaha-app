@@ -1,0 +1,318 @@
+---
+/**
+ * apps/auth/src/pages/trial.astro — Self-Serve-Trial-Landingpage.
+ *
+ * Öffentliche Seite (z. B. via LinkedIn verschickt). Formular legt Account + Hotel
+ * an und startet einen 14-Tage-Pro-Trial (Pro + Eve, keine Kreditkarte) via
+ * POST /api/auth/signup-trial → Magic-Link → eingeloggt im Backoffice.
+ *
+ * Brand wie /login (Anthrazit-Hero + weiße Form, Pink-Akzent). DE-only
+ * (Onboarding-/Marketing-Copy ist DE; i18n später).
+ */
+import Logo from '@retaha/ui/components/brand/Logo.astro';
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/tokens.css';
+import '@fontsource/space-grotesk/300.css';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/jetbrains-mono/400.css';
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme="bauhaus_manufaktur">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>14 Tage kostenlos testen · retaha</title>
+  </head>
+  <body>
+    <main
+      class="auth-layout"
+      x-data={`{
+        hotelName: '', firstName: '', lastName: '', email: '', company: '',
+        errorMessage: '', isSubmitting: false, successShown: false, sentEmail: '',
+        async submit(e) {
+          e?.preventDefault?.();
+          this.errorMessage = '';
+          if (!this.hotelName || this.hotelName.trim().length < 2) {
+            this.errorMessage = 'Bitte gib den Namen deines Hotels ein.'; return;
+          }
+          const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+          if (!re.test(this.email)) { this.errorMessage = 'Bitte gib eine gültige E-Mail-Adresse ein.'; return; }
+          this.isSubmitting = true;
+          try {
+            const res = await fetch('/api/auth/signup-trial', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: this.email, hotel_name: this.hotelName,
+                first_name: this.firstName, last_name: this.lastName, company: this.company,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data.ok) { this.sentEmail = this.email; this.successShown = true; return; }
+            this.errorMessage =
+              data.error === 'email_exists' ? 'Diese E-Mail ist schon registriert — melde dich stattdessen an.' :
+              data.error === 'rate_limited' ? 'Zu viele Anfragen. Versuche es in einer Stunde erneut.' :
+              data.error === 'invalid_hotel' ? 'Bitte gib den Namen deines Hotels ein.' :
+              'Etwas ist schiefgelaufen. Versuche es erneut.';
+          } catch (err) {
+            this.errorMessage = 'Netzwerk-Fehler. Versuche es erneut.';
+          } finally {
+            this.isSubmitting = false;
+          }
+        }
+      }`}
+    >
+
+      <!-- ─────────── HERO (Anthrazit) ─────────── -->
+      <aside class="auth-hero">
+        <Logo variant="light" size="md" href="https://retaha.de" ariaLabel="retaha · zur Startseite" class="brand-logo" />
+
+        <div class="hero-center">
+          <p class="hero-eyebrow">14 Tage · Pro · kostenlos</p>
+          <h1 class="hero-headline">Deine Gästemappe.<br />In Minuten live<span class="h-dot">.</span></h1>
+          <p class="hero-tagline">Starte mit dem vollen Pro-Umfang — zimmerspezifische QR-Codes, Eve inklusive. Keine Kreditkarte. Endet automatisch.</p>
+
+          <ul class="hero-points">
+            <li><span class="pt-dot" aria-hidden="true"></span>Pro-Umfang: pro Zimmer eine eigene URL &amp; QR</li>
+            <li><span class="pt-dot" aria-hidden="true"></span>Eve – deine KI-Gastgeberin – im Trial dabei</li>
+            <li><span class="pt-dot" aria-hidden="true"></span>Keine Kreditkarte, kein Risiko</li>
+          </ul>
+        </div>
+
+        <div class="hero-bottom">
+          <p class="hero-bauhaus">●&nbsp;&nbsp;■&nbsp;&nbsp;▲</p>
+          <p class="hero-meta">retaha hospitality · niedernhall</p>
+          <nav class="hero-legal" aria-label="Rechtliches">
+            <a href="https://app.retaha.de/impressum" target="_blank" rel="noopener">impressum</a>
+            <a href="https://app.retaha.de/datenschutz" target="_blank" rel="noopener">datenschutz</a>
+            <a href="https://app.retaha.de/agb" target="_blank" rel="noopener">agb</a>
+          </nav>
+          <p class="hero-trademark">retaha® ist eine eingetragene Marke der retaha GmbH.<br />© 2026 retaha GmbH. Alle Rechte vorbehalten.</p>
+        </div>
+      </aside>
+
+      <!-- ─────────── FORM-SIDE (weiß) ─────────── -->
+      <section class="auth-form-side">
+        <div class="form-container">
+
+          <!-- FORM -->
+          <div x-show="!successShown">
+            <header>
+              <h2 class="form-state-title">Trial starten<span class="h-dot">.</span></h2>
+              <p class="form-state-sub">Account + Hotel in einem Schritt. Wir schicken dir einen Login-Link — kein Passwort nötig.</p>
+            </header>
+
+            <div class="form-error" x-show="errorMessage" x-cloak x-text="errorMessage"></div>
+
+            <form @submit="submit($event)" novalidate>
+              <div class="field">
+                <label class="field-label" for="hotel-input">Hotelname</label>
+                <input id="hotel-input" type="text" autocomplete="organization" placeholder="z. B. Tahas Hotel" class="field-input" x-model="hotelName" @input="errorMessage = ''" />
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label class="field-label" for="first-input">Vorname</label>
+                  <input id="first-input" type="text" autocomplete="given-name" placeholder="optional" class="field-input" x-model="firstName" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="last-input">Nachname</label>
+                  <input id="last-input" type="text" autocomplete="family-name" placeholder="optional" class="field-input" x-model="lastName" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="email-input">E-Mail</label>
+                <input id="email-input" type="email" inputmode="email" autocomplete="email" placeholder="hotelier@example.com" class="field-input" x-model="email" @input="errorMessage = ''" />
+              </div>
+
+              <!-- Honeypot: für Menschen unsichtbar; Bots füllen es → serverseitig verworfen -->
+              <div class="hp-field" aria-hidden="true">
+                <label for="company-input">Firma (nicht ausfüllen)</label>
+                <input id="company-input" type="text" tabindex="-1" autocomplete="off" x-model="company" />
+              </div>
+
+              <button class="btn-primary" :class="isSubmitting ? 'is-loading' : ''" :disabled="isSubmitting" type="submit">
+                <span class="btn-text-wrap">
+                  <span class="btn-text" :class="{ 'is-visible': !isSubmitting }">
+                    <span class="btn-dot" aria-hidden="true"></span>
+                    <span>14 Tage kostenlos starten</span>
+                  </span>
+                  <span class="btn-text" :class="{ 'is-visible': isSubmitting }">
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                    <span>wird gestartet...</span>
+                  </span>
+                </span>
+              </button>
+            </form>
+
+            <div class="form-footer">
+              <p class="footer-support">
+                Schon ein Konto? <a href="/login">Anmelden</a><br />
+                Fragen? <a href="mailto:support@retaha.de">support@retaha.de</a>
+              </p>
+            </div>
+          </div>
+
+          <!-- SUCCESS -->
+          <div x-show="successShown" x-cloak class="success-wrap">
+            <div class="success-triangle"></div>
+            <p class="success-eyebrow">trial gestartet</p>
+            <h1 class="success-title">Check dein Postfach<span class="h-dot">.</span></h1>
+            <p class="success-message">Dein Hotel ist angelegt und der 14-Tage-Pro-Trial läuft. Wir haben dir einen Login-Link geschickt an</p>
+            <div class="success-email" x-text="sentEmail"></div>
+            <p class="success-validity">Klick den Link, um direkt loszulegen. Er ist 60 Minuten gültig.</p>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <script>
+      import Alpine from 'alpinejs';
+      // @ts-expect-error
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+
+    <style>
+      :root {
+        --color-pink-shock: #FF4A82;
+        --color-pink-glow: rgba(255, 74, 130, 0.18);
+        --color-pink-soft: rgba(255, 74, 130, 0.08);
+        --color-anthrazit: #1A1A1A;
+        --color-anthrazit-soft: #2A2A2A;
+        --color-white: #FFFFFF;
+        --radius: 3px;
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { background-color: var(--color-anthrazit); }
+      html, body { min-height: 100%; }
+      html[data-theme="bauhaus_manufaktur"] body {
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px; line-height: 1.5; color: var(--color-anthrazit);
+        background: var(--color-white); -webkit-font-smoothing: antialiased;
+      }
+      @media (max-width: 1023px) {
+        html[data-theme="bauhaus_manufaktur"] body { background: var(--color-anthrazit); }
+      }
+      [x-cloak] { display: none !important; }
+
+      .auth-layout { display: grid; grid-template-columns: 1fr; min-height: 100vh; min-height: 100dvh; }
+      @media (max-width: 1023px) { .auth-layout { background-color: var(--color-white); } }
+      @media (min-width: 1024px) { .auth-layout { grid-template-columns: 45% 55%; } }
+
+      /* HERO */
+      .auth-hero {
+        background: var(--color-anthrazit); color: var(--color-white);
+        padding: 48px 32px; display: flex; flex-direction: column; min-height: 380px; position: relative;
+      }
+      @media (min-width: 1024px) { .auth-hero { padding: 56px 64px; min-height: 100vh; min-height: 100dvh; } }
+      @media (max-width: 767px) { .auth-hero { padding: 32px 24px; min-height: auto; } }
+      .auth-hero :global(.brand-logo) { margin-bottom: 48px; transition: opacity 200ms ease; }
+      .auth-hero :global(.brand-logo:hover) { opacity: 0.7; }
+
+      .hero-center { margin-top: auto; margin-bottom: 32px; }
+      .hero-eyebrow {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em;
+        text-transform: uppercase; color: var(--color-pink-shock); margin-bottom: 18px;
+      }
+      .hero-headline { font-size: 38px; font-weight: 500; line-height: 1.12; letter-spacing: -0.02em; color: var(--color-white); margin-bottom: 16px; }
+      .hero-headline .h-dot { color: var(--color-pink-shock); }
+      .hero-tagline { font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.7); max-width: 400px; margin-bottom: 28px; }
+      .hero-points { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+      .hero-points li { display: flex; align-items: flex-start; gap: 12px; font-size: 13.5px; color: rgba(255,255,255,0.82); line-height: 1.45; }
+      .pt-dot { flex-shrink: 0; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--color-pink-shock); }
+
+      .hero-bottom { margin-top: auto; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); }
+      .hero-bauhaus { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5em; font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
+      .hero-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 12px; }
+      .hero-legal { display: flex; gap: 16px; margin-bottom: 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+      .hero-legal a { color: rgba(255,255,255,0.45); text-decoration: none; transition: color 200ms ease; }
+      .hero-legal a:hover { color: var(--color-pink-shock); }
+      .hero-trademark { font-family: 'Space Grotesk', sans-serif; font-size: 10px; line-height: 1.5; color: rgba(255,255,255,0.3); }
+
+      /* FORM-SIDE */
+      .auth-form-side {
+        position: relative; background: var(--color-white); padding: 48px 32px;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        min-height: 100vh; min-height: 100dvh;
+      }
+      @media (min-width: 768px) { .auth-form-side { padding: 64px; } }
+      @media (min-width: 1024px) { .auth-form-side { height: 100vh; height: 100dvh; overflow-y: auto; } }
+      @media (max-width: 767px) { .auth-form-side { min-height: auto; padding: 40px 24px; } }
+      .form-container { max-width: 420px; width: 100%; }
+
+      .form-state-title { font-size: 28px; font-weight: 500; letter-spacing: -0.018em; line-height: 1.2; color: var(--color-anthrazit); margin-bottom: 12px; }
+      .form-state-title .h-dot { color: var(--color-pink-shock); }
+      .form-state-sub { font-size: 14px; color: rgba(26,26,26,0.6); line-height: 1.55; margin-bottom: 28px; }
+
+      .field { margin-bottom: 16px; position: relative; }
+      .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      @media (max-width: 420px) { .field-row { grid-template-columns: 1fr; gap: 0; } }
+      .field-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(26,26,26,0.55); margin-bottom: 8px; transition: color 250ms ease; }
+      .field:focus-within .field-label { color: var(--color-pink-shock); }
+      .field-input {
+        width: 100%; padding: 12px 16px; border: 1px solid rgba(26,26,26,0.2); border-radius: var(--radius);
+        font-family: inherit; font-size: 14px; color: var(--color-anthrazit); background: var(--color-white);
+        transition: border-color 250ms var(--ease-out-expo), box-shadow 250ms var(--ease-out-expo); min-height: 44px;
+      }
+      .field-input::placeholder { color: rgba(26,26,26,0.3); }
+      .field-input:focus { outline: none; border-color: var(--color-pink-shock); box-shadow: 0 0 0 4px var(--color-pink-soft); }
+
+      /* Honeypot: komplett aus dem Blick (nicht display:none — manche Bots meiden das) */
+      .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+      .form-error { margin-bottom: 16px; padding: 12px 16px; background: var(--color-pink-soft); border-left: 3px solid var(--color-pink-shock); border-radius: 3px; font-size: 13px; color: var(--color-anthrazit); }
+
+      .btn-primary {
+        display: flex; align-items: center; justify-content: center; width: 100%; padding: 16px 24px;
+        border: none; border-radius: var(--radius); background: var(--color-anthrazit); color: var(--color-white);
+        font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;
+        transition: all 280ms var(--ease-out-quint); min-height: 48px; margin-top: 8px;
+      }
+      .btn-primary:hover:not(:disabled) { background: var(--color-anthrazit-soft); transform: translateY(-2px); box-shadow: 0 8px 24px var(--color-pink-glow); }
+      .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+      .btn-primary.is-loading { pointer-events: none; opacity: 0.85; }
+      .btn-text-wrap { position: relative; display: inline-block; min-width: 200px; height: 20px; line-height: 20px; }
+      .btn-text { position: absolute; top: 0; left: 0; right: 0; display: inline-flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 450ms var(--ease-out-expo); }
+      .btn-text.is-visible { opacity: 1; pointer-events: auto; }
+      .btn-dot { width: 5px; height: 5px; background: var(--color-pink-shock); border-radius: 50%; flex-shrink: 0; }
+      .btn-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.25); border-top-color: var(--color-pink-shock); border-radius: 50%; animation: spin 700ms linear infinite; flex-shrink: 0; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .form-footer { margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(26,26,26,0.08); }
+      .footer-support { font-size: 12px; color: rgba(26,26,26,0.5); line-height: 1.9; }
+      .footer-support a { color: var(--color-anthrazit); border-bottom: 1px solid rgba(26,26,26,0.2); text-decoration: none; transition: all 200ms ease; }
+      .footer-support a:hover { color: var(--color-pink-shock); border-bottom-color: var(--color-pink-shock); }
+
+      /* SUCCESS */
+      .success-wrap { text-align: center; animation: successEnter 800ms var(--ease-out-expo); }
+      @keyframes successEnter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      .success-triangle { display: flex; align-items: center; justify-content: center; margin: 0 auto 32px; width: 72px; height: 72px; }
+      .success-triangle::before { content: "▲"; font-family: 'JetBrains Mono', monospace; font-size: 64px; color: var(--color-pink-shock); line-height: 1; display: block; }
+      .success-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-pink-shock); margin-bottom: 16px; }
+      .success-title { font-size: 36px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; color: var(--color-anthrazit); margin-bottom: 16px; }
+      .success-title .h-dot { color: var(--color-pink-shock); }
+      .success-message { font-size: 15px; color: rgba(26,26,26,0.65); line-height: 1.6; margin-bottom: 8px; }
+      .success-email { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--color-anthrazit); padding: 8px 16px; background: rgba(26,26,26,0.04); border-radius: var(--radius); display: inline-block; margin: 8px 0 24px; letter-spacing: 0.02em; }
+      .success-validity { font-size: 13px; color: rgba(26,26,26,0.5); }
+
+      @media (max-width: 767px) {
+        .auth-hero { padding: 24px 24px 32px; }
+        .hero-bottom { display: none; }
+        .field-input { font-size: 16px; }
+        .btn-primary { min-height: 52px; font-size: 15px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </body>
+</html>
