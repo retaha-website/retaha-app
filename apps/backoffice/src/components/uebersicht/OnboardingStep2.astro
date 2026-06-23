@@ -168,7 +168,7 @@ for (const l of LOOKS) {
   .lr-grid {
     flex: 1 1 auto;
     display: grid;
-    grid-template-columns: auto 540px;   /* Options-Spalte fix (3 Boxen) → Text wandert nicht */
+    grid-template-columns: auto 498px;   /* Options-Spalte fix (3-Boxen-Breite) → Text wandert nicht */
     justify-content: center;       /* Gruppe mittig, konstante Breite */
     gap: 56px; align-items: center;
   }
@@ -193,7 +193,7 @@ for (const l of LOOKS) {
   .lr-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
     font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65));
-    margin: 0 0 22px; max-width: 42ch;
+    margin: 0 0 22px; max-width: 56ch;
   }
   @media (max-width: 1280px) { .lr-sub { margin-left: auto; margin-right: auto; } }
 
@@ -217,22 +217,14 @@ for (const l of LOOKS) {
   .lr-skip:hover { color: var(--ink); }
 
   /* Rechts: drei Designoptionen NEBENEINANDER — Theme oben, Vorschau unten, ohne Rahmen */
-  .lr-options { position: relative; display: flex; flex-direction: row; flex-wrap: wrap; gap: 18px; justify-content: center; align-items: flex-start; }
+  .lr-options { position: relative; display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; }
   .lr-opt {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
-    padding: 12px 8px 14px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    cursor: pointer; text-align: center;
+    padding: 0;
+    border: none; background: transparent; cursor: pointer; text-align: center;
     -webkit-appearance: none; appearance: none;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   }
-  /* Hover-Lift + Petrol-Auswahl auf der Box */
-  .lr-opt:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,.06); }
-  .lr-opt.is-active { border-color: var(--petrol); box-shadow: 0 0 0 2px var(--petrol); }
-  .lr-opt.is-active:hover { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--petrol), 0 12px 26px rgba(0,0,0,.06); }
   .lr-opt[hidden] { display: none; }
   /* Leaving: löst sich an Ort und Stelle auf (Fade, kein Slide) */
   .lr-opt.is-leaving { position: absolute; z-index: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
@@ -244,7 +236,7 @@ for (const l of LOOKS) {
   .lr-close {
     /* Options-Spalte ist 498px breit; die gewählte Box (Phone 150 + 14 + Tablet 230 = 394)
        ist mittig → × an ihrer oberen rechten Ecke. */
-    position: absolute; top: -8px; right: calc(50% - 214px); z-index: 6;
+    position: absolute; top: -8px; right: calc(50% - 205px); z-index: 6;
     width: 30px; height: 30px; border-radius: 50%;
     border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted);
     display: none; place-items: center; cursor: pointer;
@@ -267,9 +259,13 @@ for (const l of LOOKS) {
   .lr-opt__device {
     position: relative; flex-shrink: 0; height: 282px;
     overflow: hidden; border-radius: var(--r-sm);
+    box-shadow: 0 8px 22px rgba(0,0,0,.10);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
-  /* Hover-Lift + Petrol-Ring sind jetzt auf der Box (.lr-opt) — nicht mehr am Device */
+  /* Kein Box-Rahmen — nur Schatten am Device. Hover hebt + verstärkt, Auswahl = Petrol-Ring */
+  .lr-opt:hover .lr-opt__device { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0,0,0,.13); }
+  .lr-opt.is-active .lr-opt__device { box-shadow: 0 0 0 2px var(--petrol), 0 8px 22px rgba(0,0,0,.10); }
+  .lr-opt.is-active:hover .lr-opt__device { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--petrol), 0 14px 30px rgba(0,0,0,.13); }
   .lr-opt__device--phone { width: 150px; }
   .lr-opt__device--tablet { width: 230px; display: none; }   /* breiter = Tablet */
   .lr-opt.is-active .lr-opt__device--tablet { display: block; animation: lr-fade-in 0.42s ease both; }
