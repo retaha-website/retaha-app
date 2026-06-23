@@ -6,8 +6,8 @@
 import type { TrialStatus } from '../../lib/trial-status';
 import { TRIAL_DURATION_DAYS } from '../../lib/trial-status';
 
-interface Props { trial: TrialStatus; }
-const { trial } = Astro.props;
+interface Props { trial: TrialStatus; qrNotifPending?: boolean; }
+const { trial, qrNotifPending = false } = Astro.props;
 
 const dayOf = trial.isInTrial
   ? Math.min(TRIAL_DURATION_DAYS, Math.max(1, TRIAL_DURATION_DAYS - trial.daysRemaining + 1))
@@ -16,7 +16,7 @@ const pct = Math.min(100, Math.round((dayOf / TRIAL_DURATION_DAYS) * 100));
 const expired = trial.urgencyLevel === 'expired';
 ---
 
-<div class="nd" id="notifDrawer" aria-hidden="true">
+<div class="nd" id="notifDrawer" aria-hidden="true" data-qr-pending={qrNotifPending ? '1' : '0'}>
   <div class="nd__backdrop" data-notif-close></div>
   <aside class="nd__panel" role="dialog" aria-label="Benachrichtigungen" aria-modal="true">
 
@@ -46,7 +46,7 @@ const expired = trial.urgencyLevel === 'expired';
     <div class="nd__body">
       <ul class="nd__list">
         <!-- Geparkte QR-/NFC-Bestell-Benachrichtigung (nach „Mach's komplett"). -->
-        <li class="nd__item" data-notif="qr" hidden>
+        <li class="nd__item" data-notif="qr" hidden={!qrNotifPending}>
           <a class="nd__item-link" href="https://retaha.de/shop" target="_blank" rel="noopener" data-notif-action>
             <span class="nd__item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -59,7 +59,7 @@ const expired = trial.urgencyLevel === 'expired';
           </a>
         </li>
       </ul>
-      <p class="nd__empty" data-notif-empty>Keine neuen Benachrichtigungen.</p>
+      <p class="nd__empty" data-notif-empty hidden={qrNotifPending}>Keine neuen Benachrichtigungen.</p>
     </div>
 
   </aside>
@@ -188,17 +188,22 @@ const expired = trial.urgencyLevel === 'expired';
       if (e.key === 'Escape' && drawer.classList.contains('is-open')) close();
     });
 
-    // Geparkte QR-Benachrichtigung anzeigen.
-    var hasQr = false;
-    try { hasQr = localStorage.getItem('retaha-qr-notif') === '1'; } catch (e) {}
+    // Geparkte QR-Benachrichtigung anzeigen — DB-Flag (serverseitig gerendert)
+    // ODER localStorage (gleiche Session, sofort).
+    var hasQr = drawer.getAttribute('data-qr-pending') === '1';
+    try { hasQr = hasQr || localStorage.getItem('retaha-qr-notif') === '1'; } catch (e) {}
     var qr = drawer.querySelector('[data-notif="qr"]');
     var empty = drawer.querySelector('[data-notif-empty]');
-    if (hasQr && qr) { qr.hidden = false; if (empty) empty.hidden = true; }
-    // Anklicken = gelesen: Flag + Punkte entfernen.
+    if (qr) {
+      qr.hidden = !hasQr;
+      if (empty) empty.hidden = hasQr;
+    }
+    // Anklicken = gelesen: localStorage + Punkte entfernen + DB-Flag löschen (pro Account).
     var action = drawer.querySelector('[data-notif-action]');
     if (action) action.addEventListener('click', function () {
       try { localStorage.removeItem('retaha-qr-notif'); } catch (e) {}
       document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.remove('is-on'); });
+      try { fetch('/api/admin/notifications/qr-clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (e) {}
     });
   })();
 </script>

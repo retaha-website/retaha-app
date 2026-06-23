@@ -94,7 +94,10 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
       // (localStorage) → Flow nicht mehr zeigen, direkt das Dashboard. (Ohne
       // Abschluss erscheint das Setup bei jedem Besuch.)
       if (flow.getAttribute('data-done') === '1') { flow.style.display = 'none'; return; }
-      try { if (localStorage.getItem('retaha-onboarding-done') === '1') { flow.style.display = 'none'; return; } } catch (e) {}
+      // DB ist maßgeblich: sagt sie „nicht abgeschlossen" (data-done != '1'), zeigen
+      // wir den Flow — und löschen einen etwaigen alten localStorage-„done"-Marker,
+      // damit er den Flow nach einem Account-Reset auf Tag 1 nicht fälschlich versteckt.
+      try { localStorage.removeItem('retaha-onboarding-done'); } catch (e) {}
       var steps = Array.prototype.slice.call(flow.querySelectorAll('[data-onb-step]'));
 
       // Setup-Step füllt die volle Bildschirmhöhe — Step-Balken sitzt unten.

@@ -8,9 +8,8 @@ function json(data: unknown, status = 200) {
   });
 }
 
-// Markiert den Onboarding-Flow („Du bist live") als abgeschlossen — pro Hotel/Account.
-// Aufgerufen vom „Mach's komplett"-Button auf /uebersicht. Dadurch erscheint das
-// Setup auch auf anderen Geräten desselben Accounts nicht mehr.
+// Markiert die QR-/NFC-Bestell-Benachrichtigung als gelesen — pro Hotel/Account.
+// Aufgerufen, wenn der Hotelier im Benachrichtigungs-Drawer auf den Shop-Link klickt.
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
@@ -19,11 +18,11 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const supabase = createSupabaseServiceRoleInstance();
   const { error } = await supabase
     .from('hotels')
-    .update({ onboarding_done: true, qr_notif_pending: true })
+    .update({ qr_notif_pending: false })
     .eq('id', hotel.id);
 
   if (error) {
-    console.error('[onboarding/complete]', error);
+    console.error('[notifications/qr-clear]', error);
     return json({ ok: false, error: error.message }, 500);
   }
   return json({ ok: true });

@@ -33,6 +33,12 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Website normalisieren: leere bleibt leer; ohne Schema → https:// davor.
+function normalizeUrl(raw: string): string {
+  if (!raw) return '';
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 export const POST: APIRoute = async ({ request }) => {
   let body: any;
   try { body = await request.json(); }
@@ -42,6 +48,8 @@ export const POST: APIRoute = async ({ request }) => {
   const hotelName = (body.hotel_name ?? '').toString().trim();
   const firstName = (body.first_name ?? '').toString().trim();
   const lastName = (body.last_name ?? '').toString().trim();
+  const city = (body.city ?? '').toString().trim();
+  const website = normalizeUrl((body.website ?? '').toString().trim());
   const honeypot = (body.company ?? '').toString().trim();
 
   // Honeypot: echte Nutzer sehen das Feld nicht. Gefüllt = Bot → still „ok".
@@ -103,15 +111,19 @@ export const POST: APIRoute = async ({ request }) => {
   // 5. Hotel anlegen — Slug generiert trg_hotel_slug aus dem Namen.
   const nowIso = new Date().toISOString();
   const endsIso = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const hotelInsert: Record<string, unknown> = {
+    name: hotelName,
+    plan: 'pro',
+    subscription_status: 'trial',
+    trial_started_at: nowIso,
+    trial_ends_at: endsIso,
+  };
+  // Eve-Kontext: Website + Stadt (Eve liest beide; kein Auto-Scrape).
+  if (website) hotelInsert.website = website;
+  if (city) hotelInsert.city = city;
   const { data: hotel, error: hotelErr } = await admin
     .from('hotels')
-    .insert({
-      name: hotelName,
-      plan: 'pro',
-      subscription_status: 'trial',
-      trial_started_at: nowIso,
-      trial_ends_at: endsIso,
-    })
+    .insert(hotelInsert)
     .select('id')
     .single();
   if (hotelErr || !hotel) {
@@ -119,8 +131,11 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ ok: false, error: 'hotel_failed' }, 500);
   }
 
-  // 6a. hotel_settings-Zeile (kein Trigger legt sie an).
-  const { error: hsErr } = await admin.from('hotel_settings').insert({ hotel_id: hotel.id });
+  // 6a. hotel_settings-Zeile (kein Trigger legt sie an). Eve im Pro-Trial aktiv —
+  //     der Hotelier reichert Eve-Wissen (FAQs) im Onboarding an.
+  const { error: hsErr } = await admin
+    .from('hotel_settings')
+    .insert({ hotel_id: hotel.id, eve_enabled: true });
   if (hsErr) console.warn('[signup-trial] hotel_settings insert:', hsErr.message);
 
   // 6b. Owner verknüpfen (sofort akzeptiert — kein Invite).

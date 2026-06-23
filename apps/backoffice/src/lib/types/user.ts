@@ -15,6 +15,7 @@ export interface UserProfile {
   hotel_trial_ends_at: string | null;
   hotel_subscription_status: string;
   hotel_plan: string;
+  hotel_qr_notif_pending: boolean;
   hotel_theme: string | null;
   avatar_url: string | null;
   language: LanguageCode;
