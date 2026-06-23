@@ -6,8 +6,13 @@
 import type { TrialStatus } from '../../lib/trial-status';
 import { TRIAL_DURATION_DAYS } from '../../lib/trial-status';
 
-interface Props { trial: TrialStatus; qrNotifPending?: boolean; }
-const { trial, qrNotifPending = false } = Astro.props;
+interface Props { trial: TrialStatus; qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; }
+const { trial, qrNotifPending = false, setupIncomplete = false, plan = 'lite' } = Astro.props;
+
+// Shop-Mengenlogik: lite = 1 QR fürs ganze Haus, pro/premium/enterprise = 1 pro Zimmer.
+const qrQuantityHint = plan === 'lite'
+  ? 'Für deinen Plan reicht 1 QR-Code fürs ganze Haus.'
+  : 'Für deinen Plan: eine eigene Karte pro Zimmer.';
 
 const dayOf = trial.isInTrial
   ? Math.min(TRIAL_DURATION_DAYS, Math.max(1, TRIAL_DURATION_DAYS - trial.daysRemaining + 1))
@@ -45,6 +50,19 @@ const expired = trial.urgencyLevel === 'expired';
 
     <div class="nd__body">
       <ul class="nd__list">
+        <!-- Setup übersprungen, aber nicht abgeschlossen → weiter zum Onboarding. -->
+        <li class="nd__item" data-notif="setup" hidden={!setupIncomplete}>
+          <a class="nd__item-link" href="/uebersicht">
+            <span class="nd__item-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </span>
+            <span class="nd__item-body">
+              <span class="nd__item-title">Setup noch nicht vollständig</span>
+              <span class="nd__item-desc">Du hast das Setup übersprungen. Mach jetzt weiter, um deine Gästemappe live zu schalten.</span>
+            </span>
+            <span class="nd__item-arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
         <!-- Geparkte QR-/NFC-Bestell-Benachrichtigung (nach „Mach's komplett"). -->
         <li class="nd__item" data-notif="qr" hidden={!qrNotifPending}>
           <a class="nd__item-link" href="https://retaha.de/shop" target="_blank" rel="noopener" data-notif-action>
@@ -53,13 +71,13 @@ const expired = trial.urgencyLevel === 'expired';
             </span>
             <span class="nd__item-body">
               <span class="nd__item-title">QR-Codes &amp; NFC-Karten bestellen</span>
-              <span class="nd__item-desc">Du möchtest gedruckte QR-Codes oder NFC-Karten aus Holz für die Zimmer? Klicke hier — direkt im Shop.</span>
+              <span class="nd__item-desc">Du möchtest gedruckte QR-Codes oder NFC-Karten aus Holz? {qrQuantityHint} Klicke hier — direkt im Shop.</span>
             </span>
             <span class="nd__item-arrow" aria-hidden="true">→</span>
           </a>
         </li>
       </ul>
-      <p class="nd__empty" data-notif-empty hidden={qrNotifPending}>Keine neuen Benachrichtigungen.</p>
+      <p class="nd__empty" data-notif-empty hidden={qrNotifPending || setupIncomplete}>Keine neuen Benachrichtigungen.</p>
     </div>
 
   </aside>
@@ -107,29 +125,25 @@ const expired = trial.urgencyLevel === 'expired';
   }
   .nd__close:hover { background: var(--bg-deep); color: var(--ink); }
 
-  /* Testphasen-Banner */
+  /* Testphasen-Anzeige — keine Box, nur eine dezente Zeile mit dünner Trennlinie. */
   .nd__trial {
-    margin: 16px 20px 0; padding: 14px 16px;
-    background: var(--petrol-soft, rgba(20,97,110,0.10));
-    border: 1px solid var(--petrol);
-    border-radius: var(--r);
+    margin: 4px 20px 0; padding: 0 0 12px;
+    border-bottom: 1px solid var(--border);
   }
-  .nd__trial.is-warning { border-color: var(--gold, #C9A227); background: var(--gold-soft, rgba(201,162,39,0.12)); }
-  .nd__trial.is-critical, .nd__trial.is-expired { border-color: var(--burgund, #8E2A3A); background: var(--burgund-soft, rgba(142,42,58,0.10)); }
   .nd__trial-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .nd__trial-label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
-    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted, rgba(10,10,10,0.5));
   }
-  .nd__trial-days { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .nd__trial-days { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); }
   .nd__trial-bar {
-    margin: 10px 0 8px; height: 5px; border-radius: 999px;
-    background: rgba(10,10,10,0.10); overflow: hidden;
+    margin: 8px 0 0; height: 3px; border-radius: 999px;
+    background: rgba(10,10,10,0.08); overflow: hidden;
   }
   .nd__trial-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--petrol); }
   .nd__trial.is-warning .nd__trial-bar > span { background: var(--gold, #C9A227); }
   .nd__trial.is-critical .nd__trial-bar > span, .nd__trial.is-expired .nd__trial-bar > span { background: var(--burgund, #8E2A3A); }
-  .nd__trial-sub { margin: 0; font-family: 'Inter Tight', sans-serif; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft, rgba(10,10,10,0.6)); }
+  .nd__trial-sub { margin: 6px 0 0; font-family: 'Inter Tight', sans-serif; font-size: 12px; line-height: 1.4; color: var(--ink-soft, rgba(10,10,10,0.6)); }
 
   .nd__body { flex: 1 1 auto; overflow-y: auto; padding: 16px 20px 24px; }
   .nd__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -159,7 +173,6 @@ const expired = trial.urgencyLevel === 'expired';
   (function () {
     var drawer = document.getElementById('notifDrawer');
     if (!drawer) return;
-    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function open() {
       drawer.classList.add('is-open');
@@ -188,16 +201,20 @@ const expired = trial.urgencyLevel === 'expired';
       if (e.key === 'Escape' && drawer.classList.contains('is-open')) close();
     });
 
-    // Geparkte QR-Benachrichtigung anzeigen — DB-Flag (serverseitig gerendert)
-    // ODER localStorage (gleiche Session, sofort).
+    var qr = drawer.querySelector('[data-notif="qr"]');
+    var setup = drawer.querySelector('[data-notif="setup"]');
+    var empty = drawer.querySelector('[data-notif-empty]');
+
+    // QR-Benachrichtigung: DB-Flag (serverseitig) ODER localStorage (gleiche Session).
     var hasQr = drawer.getAttribute('data-qr-pending') === '1';
     try { hasQr = hasQr || localStorage.getItem('retaha-qr-notif') === '1'; } catch (e) {}
-    var qr = drawer.querySelector('[data-notif="qr"]');
-    var empty = drawer.querySelector('[data-notif-empty]');
-    if (qr) {
-      qr.hidden = !hasQr;
-      if (empty) empty.hidden = hasQr;
-    }
+    if (qr) qr.hidden = !hasQr;
+
+    // „Setup unvollständig" ist rein serverseitig gerendert.
+    var hasSetup = setup ? !setup.hidden : false;
+
+    // Leer-Hinweis nur wenn gar keine Benachrichtigung sichtbar ist.
+    if (empty) empty.hidden = hasQr || hasSetup;
     // Anklicken = gelesen: localStorage + Punkte entfernen + DB-Flag löschen (pro Account).
     var action = drawer.querySelector('[data-notif-action]');
     if (action) action.addEventListener('click', function () {

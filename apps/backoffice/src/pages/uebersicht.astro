@@ -177,7 +177,12 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         });
         setTimeout(onDone, 640);
       }
-      function skip() { flyToAvatar(finishSkip); }
+      function skip() {
+        // Übersprungen, aber nicht abgeschlossen → pro Account merken (DB), damit die
+        // „Setup unvollständig"-Benachrichtigung erscheint. Best effort.
+        try { fetch('/api/admin/onboarding/skip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (e) {}
+        flyToAvatar(finishSkip);
+      }
 
       // „Setup überspringen".
       document.querySelectorAll('[data-onb-action="skip"]').forEach(function (b) {

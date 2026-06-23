@@ -20,7 +20,7 @@ export async function getUserProfileForLayout(
       .maybeSingle(),
     supabase
       .from('hotel_users')
-      .select('role, hotels(id, name, logo_primary, logo_dark, trial_started_at, trial_ends_at, subscription_status, plan, theme, qr_notif_pending)')
+      .select('role, hotels(id, name, logo_primary, logo_dark, trial_started_at, trial_ends_at, subscription_status, plan, theme, qr_notif_pending, onboarding_done, setup_skipped)')
       .eq('user_id', user.id)
       .maybeSingle(),
   ]);
@@ -40,6 +40,8 @@ export async function getUserProfileForLayout(
       plan?: string;
       theme?: string | null;
       qr_notif_pending?: boolean;
+      onboarding_done?: boolean;
+      setup_skipped?: boolean;
     } | null;
   } | null;
 
@@ -58,6 +60,8 @@ export async function getUserProfileForLayout(
     hotel_subscription_status: h?.subscription_status ?? '',
     hotel_plan: h?.plan ?? 'lite',
     hotel_qr_notif_pending: h?.qr_notif_pending ?? false,
+    hotel_onboarding_done: h?.onboarding_done ?? false,
+    hotel_setup_skipped: h?.setup_skipped ?? false,
     hotel_theme: h?.theme ?? null,
     avatar_url: ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null,
     language: getLang(cookies, request),

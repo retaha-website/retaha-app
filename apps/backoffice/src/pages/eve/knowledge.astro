@@ -299,6 +299,15 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
         </div>
         <p class="s-card__sub" style="margin: -16px 0 20px;" set:html={bt('evk.faq.sub', lang).replace('{link}', `<a href="/eve/settings" class="s-btn-link">${bt('evk.faq.sublink', lang)}</a>`)}></p>
 
+        <!-- Eve aus der Hotel-Website lernen lassen (Auto-FAQ via Claude). -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 16px;margin:0 0 20px;background:var(--petrol-soft, rgba(20,97,110,0.08));border:1px solid var(--petrol);border-radius:var(--r);">
+          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14.5px;color:var(--ink);">Aus eurer Website lernen</span>
+            <span style="font-family:'Inter Tight',sans-serif;font-size:12.5px;line-height:1.45;color:var(--ink-soft, rgba(10,10,10,0.6));">Eve liest die hinterlegte Hotel-Website und schlägt automatisch FAQs vor — danach bearbeitbar.</span>
+          </div>
+          <button type="button" class="v9-btn" data-eve-learn-btn style="white-space:nowrap;">Aus Website lernen</button>
+        </div>
+
         <form method="POST">
           <input type="hidden" name="_action" value="faq_create" />
           <div class="s-card__body">
@@ -433,6 +442,34 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     </div>
   </div>
 </Layout>
+
+<script is:inline>
+  (function () {
+    var btn = document.querySelector('[data-eve-learn-btn]');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      var orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Eve liest die Website …';
+      try {
+        var res = await fetch('/api/admin/eve/learn-from-website', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (data.ok) {
+          if (window.retahaToast) window.retahaToast((data.count || 0) + ' FAQ(s) aus der Website übernommen.', 'success');
+          setTimeout(function () { window.location.reload(); }, 900);
+          return;
+        }
+        if (window.retahaToast) window.retahaToast(data.message || 'Konnte die Website nicht auswerten.', 'error');
+      } catch (e) {
+        if (window.retahaToast) window.retahaToast('Netzwerk-Fehler. Versuche es erneut.', 'error');
+      }
+      btn.disabled = false;
+      btn.textContent = orig;
+    });
+  })();
+</script>
 
 <style>
   [x-cloak] { display: none !important; }

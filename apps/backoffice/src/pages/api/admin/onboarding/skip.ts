@@ -8,9 +8,9 @@ function json(data: unknown, status = 200) {
   });
 }
 
-// Markiert den Onboarding-Flow („Du bist live") als abgeschlossen — pro Hotel/Account.
-// Aufgerufen vom „Mach's komplett"-Button auf /uebersicht. Dadurch erscheint das
-// Setup auch auf anderen Geräten desselben Accounts nicht mehr.
+// Markiert das Onboarding als „übersprungen, aber nicht abgeschlossen" — pro Account.
+// Aufgerufen vom „Setup überspringen"-Button auf /uebersicht. Erzeugt im
+// Benachrichtigungs-Drawer den Hinweis „Setup noch nicht vollständig".
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
@@ -19,11 +19,11 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const supabase = createSupabaseServiceRoleInstance();
   const { error } = await supabase
     .from('hotels')
-    .update({ onboarding_done: true, qr_notif_pending: true, setup_skipped: false })
+    .update({ setup_skipped: true })
     .eq('id', hotel.id);
 
   if (error) {
-    console.error('[onboarding/complete]', error);
+    console.error('[onboarding/skip]', error);
     return json({ ok: false, error: error.message }, 500);
   }
   return json({ ok: true });
