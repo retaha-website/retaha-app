@@ -12,7 +12,9 @@ export interface UserProfile {
   hotel_name: string;
   hotel_logo_url: string | null;
   hotel_trial_started_at: string | null;
+  hotel_trial_ends_at: string | null;
   hotel_subscription_status: string;
+  hotel_plan: string;
   hotel_theme: string | null;
   avatar_url: string | null;
   language: LanguageCode;
