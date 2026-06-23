@@ -36,9 +36,10 @@ const {
         <Logo variant="dark" size="sm" href="/uebersicht" ariaLabel="retaha – Zur Übersicht" class="head__brand-logo" />
       </div>
 
-      <!-- Logo + Ansicht-Umschalter als eine zentrierte Einheit -->
+      <!-- Logo + Trennstrich + Switcher als eine zentrierte Einheit -->
       <div class="head__nav">
         <HotelLogo name={hotelName} location={hotelLocation} stars={hotelStars} logoUrl={hotelLogoUrl} />
+        <span class="head__nav-divider" aria-hidden="true"></span>
         <HeaderTabs active={activeTab} lang={user.language} />
       </div>
 
@@ -93,39 +94,22 @@ const {
     display: flex;
     align-items: center;   /* Brand-Logo sauber vertikal mittig (statt Baseline) */
   }
+  /* Logo + Trennstrich + Switcher als eine zentrierte Einheit (eine Gruppe) */
   .head__nav {
-    position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     justify-self: center;
   }
-  /* Ab Desktop: Logo bleibt mittig (Grid-Mitte), die Kacheln hängen absolut rechts
-     daneben — sie verschieben das Logo nicht. */
-  @media (min-width: 901px) {
-    .head__nav { gap: 0; }
-    /* Senkrechter Trennstrich zwischen Logo und den drei Kacheln */
-    .head__nav::after {
-      content: "";
-      position: absolute;
-      left: 100%;
-      top: 50%;
-      transform: translateY(-50%);
-      margin-left: 16px;
-      width: 1px;
-      height: 26px;
-      background: var(--ink-muted, rgba(10, 10, 10, 0.42));
-    }
-    .head__nav > :global(.header-tabs) {
-      position: absolute;
-      left: 100%;
-      margin-left: 33px;
-      top: 0;
-      bottom: 0;
-    }
+  .head__nav-divider {
+    flex-shrink: 0;
+    width: 1px;
+    height: 26px;
+    background: var(--ink-muted, rgba(10, 10, 10, 0.42));
   }
   @media (max-width: 900px) {
     .head__nav { flex-wrap: wrap; justify-self: start; }
+    .head__nav-divider { display: none; }
   }
   .head__brand-logo.brand-logo--dark { color: var(--ink); --theme-accent: var(--petrol); }
   .head__controls {
