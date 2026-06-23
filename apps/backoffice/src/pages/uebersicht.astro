@@ -58,12 +58,15 @@ try {
   }
 } catch { /* Spalte existiert noch nicht — DB-Migration ausstehend */ }
 
-// „Setup unvollständig"-Benachrichtigung angeklickt (?resume=setup) → Flow wieder
-// zeigen und den Skip-Marker account-weit löschen (Benachrichtigung verschwindet).
-const resumeSetup = Astro.url.searchParams.get('resume') === 'setup';
-if (resumeSetup && setupSkipped) {
-  try { await supabase.from('hotels').update({ setup_skipped: false }).eq('id', hotel.id); } catch { /* noop */ }
-  setupSkipped = false;
+// „Setup unvollständig"-Benachrichtigung angeklickt (?resume=setup) → Skip-Marker
+// account-weit löschen und auf die SAUBERE URL umleiten. Ohne Redirect bliebe
+// ?resume=setup in der URL kleben → ein erneutes Überspringen + Refresh würde den
+// Marker bei jedem Laden wieder löschen (Flow käme zurück, Benachrichtigung weg).
+if (Astro.url.searchParams.get('resume') === 'setup') {
+  if (setupSkipped) {
+    try { await supabase.from('hotels').update({ setup_skipped: false }).eq('id', hotel.id); } catch { /* noop */ }
+  }
+  return Astro.redirect('/uebersicht');
 }
 // Flow ausblenden, wenn abgeschlossen ODER übersprungen. Übersprungen kommt nur
 // über die Benachrichtigung (?resume=setup) zurück — sonst bleibt er account-weit weg.
@@ -173,16 +176,25 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
       // Account-Icon (wie in den Papierkorb), danach erscheinen Punkte am Avatar
       // und am Benachrichtigungen-Eintrag.
       var dash = document.querySelector('[data-dashboard]');
-      function showDots() {
+      // Punkte (Avatar/Dropdown) + den passenden Drawer-Eintrag sofort aufdecken,
+      // damit die Benachrichtigung OHNE Refresh erscheint (serverseitiges Rendern
+      // greift beim nächsten Laden). which = 'setup' (übersprungen) | 'qr' (abgeschlossen).
+      function revealNotif(which) {
         document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.add('is-on'); });
+        var drawer = document.getElementById('notifDrawer');
+        if (!drawer) return;
+        var item = drawer.querySelector('[data-notif="' + which + '"]');
+        if (item) item.hidden = false;
+        var empty = drawer.querySelector('[data-notif-empty]');
+        if (empty) empty.hidden = true;
       }
-      function finishSkip() {
+      function finishSkip(which) {
         flow.style.display = 'none';
         flow.style.transform = ''; flow.style.opacity = '';
         flow.style.transition = ''; flow.style.willChange = '';
         document.body.style.overflowX = '';
         window.scrollTo({ top: 0 });
-        showDots();
+        revealNotif(which);
         enter(dash);
       }
       function flyToAvatar(onDone) {
@@ -206,7 +218,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         // Übersprungen, aber nicht abgeschlossen → pro Account merken (DB), damit die
         // „Setup unvollständig"-Benachrichtigung erscheint. Best effort.
         try { fetch('/api/admin/onboarding/skip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true }); } catch (e) {}
-        flyToAvatar(finishSkip);
+        flyToAvatar(function () { finishSkip('setup'); });
       }
 
       // „Setup überspringen".
@@ -223,7 +235,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
         } catch (e) {}
         // Pro Account in der DB merken (cross-device) — best effort.
         try { fetch('/api/admin/onboarding/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true }); } catch (e) {}
-        flyToAvatar(finishSkip);
+        flyToAvatar(function () { finishSkip('qr'); });
       }
       document.querySelectorAll('[data-onb-action="finish"]').forEach(function (b) {
         b.addEventListener('click', function (e) { e.preventDefault(); complete(); });
