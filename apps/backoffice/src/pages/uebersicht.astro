@@ -27,14 +27,16 @@ const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
 // setup_progress laden + automatisch anpassen basierend auf konfigurierten Feldern
 let rawProgress: number | null = null;
 let onboardingDone = false;
+let setupSkipped = false;
 try {
   const { data } = await supabase
     .from('hotels')
-    .select('setup_progress, name, logo_primary, brand_primary, brand_theme, onboarding_done')
+    .select('setup_progress, name, logo_primary, brand_primary, brand_theme, onboarding_done, setup_skipped')
     .eq('id', hotel.id)
     .maybeSingle();
   rawProgress = (data as any)?.setup_progress ?? null;
   onboardingDone = (data as any)?.onboarding_done === true;
+  setupSkipped = (data as any)?.setup_skipped === true;
 
   const hotelName    = (data as any)?.name;
   const logoSet      = !!((data as any)?.logo_primary);
@@ -56,6 +58,17 @@ try {
   }
 } catch { /* Spalte existiert noch nicht — DB-Migration ausstehend */ }
 
+// „Setup unvollständig"-Benachrichtigung angeklickt (?resume=setup) → Flow wieder
+// zeigen und den Skip-Marker account-weit löschen (Benachrichtigung verschwindet).
+const resumeSetup = Astro.url.searchParams.get('resume') === 'setup';
+if (resumeSetup && setupSkipped) {
+  try { await supabase.from('hotels').update({ setup_skipped: false }).eq('id', hotel.id); } catch { /* noop */ }
+  setupSkipped = false;
+}
+// Flow ausblenden, wenn abgeschlossen ODER übersprungen. Übersprungen kommt nur
+// über die Benachrichtigung (?resume=setup) zurück — sonst bleibt er account-weit weg.
+const flowHidden = onboardingDone || setupSkipped;
+
 const stage = normalizeStage(rawProgress);
 const liveData = await getLiveData(hotel.id);
 
@@ -71,7 +84,7 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
   userInitial={userInitial}
 >
-  <div data-onboarding-flow data-done={onboardingDone ? '1' : undefined} style={onboardingDone ? 'display:none' : undefined}>
+  <div data-onboarding-flow data-done={flowHidden ? '1' : undefined} style={flowHidden ? 'display:none' : undefined}>
     <OnboardingHero hotelName={hotel.name} />
     <OnboardingStep2 hotelId={hotel.id} hotelName={hotel.name} userId={user.id} />
     <OnboardingStep3 />
@@ -85,6 +98,18 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     <AppGrid stage={stage} lang={lang} />
     <LiveTilesSection tiles={liveData} lang={lang} />
   </div>
+
+  {!onboardingDone && (
+    <script is:inline>
+      // Eve einmalig aus der Hotel-Website lernen lassen (Hintergrund, idempotent via
+      // hotels.eve_seeded). Fire-and-forget — blockiert nichts, kein UI-Effekt.
+      (function () {
+        try {
+          fetch('/api/admin/eve/auto-seed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        } catch (e) { /* noop */ }
+      })();
+    </script>
+  )}
 
   <script is:inline>
     (function () {
