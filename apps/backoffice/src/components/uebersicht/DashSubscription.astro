@@ -1,0 +1,62 @@
+---
+// Dashboard-Kopf à la Surfshark: großer Titel + Abo-/Testphasen-Status mit
+// „X Tage übrig" (Akzent) + Subtitle (stage-abhängig).
+import { bt, type LanguageCode } from '@retaha/i18n';
+import type { TrialStatus } from '../../lib/trial-status';
+
+interface Props { trial: TrialStatus; stage: string | number; lang: LanguageCode; }
+const { trial, stage, lang } = Astro.props;
+
+const expired = trial.urgencyLevel === 'expired';
+const dayWord = trial.daysRemaining === 1 ? 'Tag' : 'Tage';
+---
+
+<section class="dsub">
+  <h1 class="dsub__title">Übersicht</h1>
+
+  {trial.isInTrial && !expired && (
+    <p class="dsub__status">
+      Deine Testphase · <span class="dsub__accent">{trial.daysRemaining} {dayWord} übrig</span>
+    </p>
+  )}
+  {trial.isInTrial && expired && (
+    <p class="dsub__status">
+      Deine Testphase · <span class="dsub__accent dsub__accent--warn">abgelaufen</span>
+    </p>
+  )}
+
+  <p class="dsub__sub">{bt(`hero.${stage}.sub`, lang)}</p>
+</section>
+
+<style>
+  .dsub {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 56px 32px 0;
+  }
+  @media (max-width: 768px) { .dsub { padding: 36px 20px 0; } }
+
+  .dsub__title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: clamp(28px, 3.4vw, 40px);
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .dsub__status {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    color: var(--ink);
+    margin: 14px 0 0;
+  }
+  .dsub__accent { color: var(--petrol); }
+  .dsub__accent--warn { color: var(--burgund, #8E2A3A); }
+  .dsub__sub {
+    font-family: 'Inter Tight', -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.55;
+    color: var(--ink-soft, rgba(10,10,10,0.6));
+    margin: 8px 0 0; max-width: 720px;
+  }
+</style>

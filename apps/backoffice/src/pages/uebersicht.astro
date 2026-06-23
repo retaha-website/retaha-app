@@ -4,13 +4,13 @@ import OnboardingHero from '../components/uebersicht/OnboardingHero.astro';
 import OnboardingStep2 from '../components/uebersicht/OnboardingStep2.astro';
 import OnboardingStep3 from '../components/uebersicht/OnboardingStep3.astro';
 import OnboardingStep5 from '../components/uebersicht/OnboardingStep5.astro';
-import HeroSection from '../components/uebersicht/HeroSection.astro';
+import DashSubscription from '../components/uebersicht/DashSubscription.astro';
+import DashToolkit from '../components/uebersicht/DashToolkit.astro';
+import DashFeatureCards from '../components/uebersicht/DashFeatureCards.astro';
 import QuickAccess from '../components/uebersicht/QuickAccess.astro';
-import RackBanner from '../components/uebersicht/RackBanner.astro';
-import SetupStatus from '../components/uebersicht/SetupStatus.astro';
-import AppGrid from '../components/uebersicht/AppGrid.astro';
 import LiveTilesSection from '../components/uebersicht/LiveTilesSection.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { calculateTrialStatus } from '../lib/trial-status';
 import { normalizeStage } from '../lib/uebersicht/setup-stage';
 import { getLiveData } from '../lib/uebersicht/live-data';
 import { getLang } from '../lib/i18n';
@@ -29,15 +29,23 @@ const supabase = createSupabaseServerInstance(Astro.cookies, Astro.request);
 let rawProgress: number | null = null;
 let onboardingDone = false;
 let setupSkipped = false;
+let hotelPlan = 'lite';
+let trialStartedAt: string | null = null;
+let trialEndsAt: string | null = null;
+let subStatus = '';
 try {
   const { data } = await supabase
     .from('hotels')
-    .select('setup_progress, name, logo_primary, brand_primary, brand_theme, onboarding_done, setup_skipped')
+    .select('setup_progress, name, logo_primary, brand_primary, brand_theme, onboarding_done, setup_skipped, plan, trial_started_at, trial_ends_at, subscription_status')
     .eq('id', hotel.id)
     .maybeSingle();
   rawProgress = (data as any)?.setup_progress ?? null;
   onboardingDone = (data as any)?.onboarding_done === true;
   setupSkipped = (data as any)?.setup_skipped === true;
+  hotelPlan = (data as any)?.plan ?? 'lite';
+  trialStartedAt = (data as any)?.trial_started_at ?? null;
+  trialEndsAt = (data as any)?.trial_ends_at ?? null;
+  subStatus = (data as any)?.subscription_status ?? '';
 
   const hotelName    = (data as any)?.name;
   const logoSet      = !!((data as any)?.logo_primary);
@@ -74,6 +82,11 @@ if (Astro.url.searchParams.get('resume') === 'setup') {
 const flowHidden = onboardingDone || setupSkipped;
 
 const stage = normalizeStage(rawProgress);
+const trial = calculateTrialStatus({
+  trial_started_at: trialStartedAt,
+  trial_ends_at: trialEndsAt,
+  subscription_status: subStatus,
+});
 const liveData = await getLiveData(hotel.id);
 
 // User-Initial für Avatar (erster Buchstabe der Email)
@@ -96,11 +109,10 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
   </div>
 
   <div data-dashboard>
-    <HeroSection stage={stage} lang={lang} />
+    <DashSubscription trial={trial} stage={stage} lang={lang} />
+    <DashToolkit lang={lang} />
+    <DashFeatureCards plan={hotelPlan} lang={lang} />
     <QuickAccess lang={lang} />
-    <RackBanner stage={stage} lang={lang} />
-    <SetupStatus stage={stage} lang={lang} />
-    <AppGrid stage={stage} lang={lang} />
     <LiveTilesSection tiles={liveData} lang={lang} />
   </div>
 
