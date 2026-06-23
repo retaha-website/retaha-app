@@ -321,7 +321,7 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'hero.15.title': 'Gut gemacht<span class="dot-pink">.</span><br><strong>Jetzt kommt das Branding.</strong>',
     'hero.15.sub': 'Hotel-Daten stehen. Jetzt Logo, Farben und Theme einrichten.',
     'hero.30.title': 'Schöner Anfang<span class="dot-pink">.</span><br><strong>Weiter geht es.</strong>',
-    'hero.30.sub': 'Hotel-Daten und Branding stehen. Fünf Bereiche noch.',
+    'hero.30.sub': 'Eve ist bereit. Jetzt nur noch einige Kleinigkeiten.',
     'hero.71.title': 'Noch wenige Schritte,<br><strong>dann ist dein Hotel bereit<span class="dot-pink">.</span></strong>',
     'hero.71.sub': 'Karten brauchen Inhalt, ein Team fehlt noch. Fast geschafft.',
     'hero.100.title': 'Dein Hotel<br><strong>läuft<span class="dot-pink">.</span></strong>',
