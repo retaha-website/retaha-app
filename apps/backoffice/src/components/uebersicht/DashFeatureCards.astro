@@ -74,21 +74,34 @@ const cards = [
       section.style.display = anyVisible ? '' : 'none';
     }
 
+    // Geparkte Karten (per X in die Benachrichtigungen verschoben) ausblenden.
     cards.forEach(function (card) {
       var id = card.getAttribute('data-dfc-card');
-      var dismissed = false;
-      try { dismissed = localStorage.getItem('retaha-dash-card-' + id) === '1'; } catch (e) {}
-      card.hidden = dismissed;
+      var parked = false;
+      try { parked = localStorage.getItem('retaha-card-' + id) === '1'; } catch (e) {}
+      card.hidden = parked;
     });
     syncSection();
+
+    // X = in den Benachrichtigungs-Drawer parken (statt verschwinden).
+    function parkInDrawer(id) {
+      document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.add('is-on'); });
+      var drawer = document.getElementById('notifDrawer');
+      if (!drawer) return;
+      var item = drawer.querySelector('[data-notif="card-' + id + '"]');
+      if (item) item.hidden = false;
+      var empty = drawer.querySelector('[data-notif-empty]');
+      if (empty) empty.hidden = true;
+    }
 
     section.querySelectorAll('[data-dfc-dismiss]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var id = btn.getAttribute('data-dfc-dismiss');
-        try { localStorage.setItem('retaha-dash-card-' + id, '1'); } catch (e) {}
+        try { localStorage.setItem('retaha-card-' + id, '1'); } catch (e) {}
         var card = section.querySelector('[data-dfc-card="' + id + '"]');
         if (card) card.hidden = true;
         syncSection();
+        parkInDrawer(id);
       });
     });
   })();
