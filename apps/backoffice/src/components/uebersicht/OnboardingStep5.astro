@@ -1,69 +1,48 @@
 ---
-// Onboarding · Screen 5 — „Du bist live." (der Abschluss)
+// Onboarding · letzte Sektion — „Du bist live."
 //
-// Fünfte und letzte Sektion DERSELBEN /uebersicht-Seite. Belohnender Live-
-// Abschluss: Bestätigung, dass die Gästemappe live ist, klarer nächster Schritt
-// (QR/Link an die Gäste bringen) + „wir melden uns persönlich". Ziel: Commit +
-// Übergang ins Dashboard. Copy DE-only.
-
-import QRCode from 'qrcode';
-import { getOrCreateShowcaseUrl } from '@retaha/auth';
+// Belohnender Abschluss, zweispaltig. LINKS (linksbündig): Live-Badge · Headline ·
+// Subtext · Trennstrich · Shop-Hinweis (gedruckte QR/NFC-Karten) · Support · CTA
+// „Mach's komplett". RECHTS: Beispielfoto der Karte auf dem Nachttisch (Radius
+// wie die Box). Copy DE-only.
 
 interface Props { hotelId: string; userId: string; }
-const { hotelId, userId } = Astro.props;
-
-let guestUrl: string | null = null;
-let qrSvg: string | null = null;
-try {
-  guestUrl = await getOrCreateShowcaseUrl(hotelId, userId);
-  if (guestUrl) {
-    qrSvg = await QRCode.toString(guestUrl, {
-      type: 'svg', errorCorrectionLevel: 'M', margin: 1,
-      color: { dark: '#0A0A0A', light: '#FAFAF8' },
-    });
-  }
-} catch { /* QR nicht-fatal */ }
 ---
 
 <section class="onb5" data-onb-step="4" style="display:none">
   <div class="onb5-body">
 
-    <span class="onb5-badge">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
-      Live
-    </span>
+    <!-- Links: Copy + Shop + Support + CTA (linksbündig) -->
+    <div class="onb5-main">
+      <span class="onb5-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        Live
+      </span>
 
-    <h1 class="onb5-h1">Du bist <span class="onb5-nb">live<span class="onb5-dot"></span></span></h1>
-    <p class="onb5-sub">Deine Gästemappe ist online — Eve beantwortet ab jetzt jede Gästefrage, rund um die Uhr, in 11 Sprachen. Genau so, wie deine Gäste es erleben.</p>
+      <h1 class="onb5-h1">Du bist <span class="onb5-nb">live<span class="onb5-dot"></span></span></h1>
+      <p class="onb5-sub">Deine Gästemappe ist online — Eve beantwortet ab jetzt jede Gästefrage, rund um die Uhr, in 11 Sprachen. Genau so, wie deine Gäste es erleben.</p>
 
-    <div class="onb5-share">
-      <div class="onb5-qr" role="img" aria-label="QR-Code zur Gästemappe">
-        {qrSvg ? <Fragment set:html={qrSvg} /> : <div class="onb5-qr-fallback">QR n/v</div>}
-      </div>
-      <div class="onb5-share__text">
-        <span class="onb5-share__title">Bring sie zu deinen Gästen</span>
-        <p class="onb5-share__desc">Häng den QR in die Zimmer und an die Rezeption — oder teil den Link direkt. Ein Scan, und die Gästemappe liegt auf dem Handy.</p>
-        <div class="onb5-share__actions">
-          <a href={guestUrl ?? '#'} target="_blank" rel="noopener" class="onb5-act onb5-act--primary">Gästemappe öffnen</a>
-          <button type="button" class="onb5-act onb5-act--ghost" data-copy-url={guestUrl ?? ''}>
-            <span data-copy-label>Link kopieren</span>
-          </button>
-        </div>
-        <p class="onb5-shop">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-          <span>Lieber gedruckte QR-Codes oder NFC-Karten aus Holz für die Zimmer? <a href="https://retaha.de/shop" target="_blank" rel="noopener" class="onb5-shop__link">Direkt im Shop bestellen</a></span>
-        </p>
+      <hr class="onb5-divider" />
+
+      <p class="onb5-shop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span>Lieber gedruckte QR-Codes oder NFC-Karten aus Holz für die Zimmer? <a href="https://retaha.de/shop" target="_blank" rel="noopener" class="onb5-shop__link">Direkt im Shop bestellen</a></span>
+      </p>
+
+      <p class="onb5-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span><strong>Fragen?</strong> Wir sind für dich da — hol dir jederzeit <a href="/hilfe" class="onb5-note__link">Support</a>.</span>
+      </p>
+
+      <div class="onb5-cta-row">
+        <button type="button" class="onb5-next" data-onb-action="finish">Mach's komplett →</button>
       </div>
     </div>
 
-    <p class="onb5-note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span><strong>Fragen?</strong> Wir sind für dich da — hol dir jederzeit <a href="/hilfe" class="onb5-note__link">Support</a>.</span>
-    </p>
-
-    <div class="onb5-cta-row">
-      <button type="button" class="onb5-next" data-onb-action="finish">Mach's komplett →</button>
-    </div>
+    <!-- Rechts: Beispielfoto (Karte auf dem Nachttisch) — Foto folgt -->
+    <figure class="onb5-photo">
+      <div class="onb5-photo__ph" aria-hidden="true">Beispielfoto folgt</div>
+    </figure>
 
   </div>
 
@@ -93,8 +72,20 @@ try {
   }
   .onb5-body {
     flex: 1 1 auto;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    gap: 20px; max-width: 720px; margin-left: auto; margin-right: auto; text-align: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+    gap: 56px;
+    align-items: center;
+    width: 100%;
+  }
+  @media (max-width: 900px) {
+    .onb5-body { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  /* Links — linksbündig */
+  .onb5-main {
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 16px; text-align: left; max-width: 600px;
   }
 
   .onb5-badge {
@@ -113,39 +104,20 @@ try {
   .onb5-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--petrol); margin-left: 4px; vertical-align: baseline; }
   .onb5-sub {
     font-family: 'Inter Tight', -apple-system, sans-serif;
-    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0; max-width: 60ch;
+    font-size: 16px; line-height: 1.6; color: var(--ink-soft, rgba(10,10,10,0.65)); margin: 0; max-width: 56ch;
   }
 
-  /* Teilen */
-  .onb5-share {
-    display: flex; align-items: center; gap: 20px; text-align: left;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
-    padding: 18px 20px; width: 100%; box-sizing: border-box; margin-top: 4px;
+  .onb5-divider {
+    width: 100%; height: 0; border: none; border-top: 1px solid var(--border);
+    margin: 8px 0;
   }
-  @media (max-width: 600px) { .onb5-share { flex-direction: column; align-items: flex-start; } }
-  .onb5-qr {
-    flex-shrink: 0; width: 104px; height: 104px;
-    background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--r-sm);
-    padding: 8px; box-sizing: content-box;
+
+  .onb5-shop {
+    display: flex; align-items: flex-start; gap: 9px; margin: 0;
+    font-family: 'Inter Tight', sans-serif; font-size: 13.5px; line-height: 1.5;
+    color: var(--ink-soft, rgba(10,10,10,0.6));
   }
-  .onb5-qr :global(svg) { display: block; width: 104px; height: 104px; border-radius: 4px; }
-  .onb5-qr-fallback { width: 104px; height: 104px; display: grid; place-items: center; font-size: 10px; color: var(--ink-muted); text-align: center; }
-  .onb5-share__text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .onb5-share__title { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 16px; color: var(--ink); }
-  .onb5-share__desc { font-family: 'Inter Tight', sans-serif; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft, rgba(10,10,10,0.6)); margin: 0; }
-  .onb5-share__actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-  .onb5-act {
-    display: inline-flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 8px 14px; border-radius: var(--r-sm); cursor: pointer; text-decoration: none;
-    transition: all 0.15s ease; -webkit-appearance: none; appearance: none;
-  }
-  .onb5-act--primary { background: var(--ink); color: var(--bg, #FAFAF8); border: none; }
-  .onb5-act--primary:hover { background: var(--petrol); color: #fff; }
-  .onb5-act--ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
-  .onb5-act--ghost:hover { background: var(--bg-deep); color: var(--ink); border-color: var(--ink-faint); }
-  .onb5-act--ghost.copied { color: var(--sage, #5C9070); border-color: var(--sage, #5C9070); background: var(--sage-soft, rgba(92,144,112,0.12)); }
+  .onb5-shop svg { color: var(--petrol); flex-shrink: 0; margin-top: 1px; }
 
   .onb5-note {
     display: flex; align-items: flex-start; gap: 9px; margin: 0;
@@ -159,15 +131,7 @@ try {
   }
   .onb5-note__link:hover, .onb5-shop__link:hover { text-decoration: none; }
 
-  /* Shop-Hinweis in der QR-Box */
-  .onb5-shop {
-    display: flex; align-items: flex-start; gap: 8px; margin: 14px 0 0;
-    font-family: 'Inter Tight', sans-serif; font-size: 12.5px; line-height: 1.5;
-    color: var(--ink-soft, rgba(10,10,10,0.6));
-  }
-  .onb5-shop svg { color: var(--petrol); flex-shrink: 0; margin-top: 1px; }
-
-  .onb5-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .onb5-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
   .onb5-next {
     appearance: none; -webkit-appearance: none; border: none;
     font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
@@ -175,6 +139,20 @@ try {
     cursor: pointer; transition: background 0.15s ease;
   }
   .onb5-next:hover { background: var(--petrol); }
+
+  /* Rechts — Beispielfoto: Karte auf dem Nachttisch (Radius wie die Box) */
+  .onb5-photo {
+    margin: 0; width: 100%;
+    border-radius: 24px; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+    aspect-ratio: 4 / 5;
+  }
+  .onb5-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .onb5-photo__ph {
+    width: 100%; height: 100%; display: grid; place-items: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-faint, rgba(10,10,10,0.35));
+  }
 
   /* Schritt-Balken */
   .onb5-steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px auto 0; }
@@ -198,24 +176,3 @@ try {
   .onb5-step:not(.is-active):not(:disabled):hover { background: var(--petrol); opacity: 0.45; }
   .onb5-step:disabled { cursor: default; }
 </style>
-
-<script is:inline>
-  (function () {
-    var root = document.querySelector('[data-onb-step="5"]');
-    if (!root) return;
-    var copy = root.querySelector('[data-copy-url]');
-    if (copy) copy.addEventListener('click', function () {
-      var url = copy.getAttribute('data-copy-url');
-      if (!url || !navigator.clipboard) return;
-      navigator.clipboard.writeText(url).then(function () {
-        var label = copy.querySelector('[data-copy-label]');
-        if (label) label.textContent = '✓ Kopiert';
-        copy.classList.add('copied');
-        setTimeout(function () {
-          if (label) label.textContent = 'Link kopieren';
-          copy.classList.remove('copied');
-        }, 2000);
-      }).catch(function () { /* clipboard n/v */ });
-    });
-  })();
-</script>
