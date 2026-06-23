@@ -8,11 +8,9 @@ import DashSubscription from '../components/uebersicht/DashSubscription.astro';
 import DashToolkit from '../components/uebersicht/DashToolkit.astro';
 import DashFeatureCards from '../components/uebersicht/DashFeatureCards.astro';
 import QuickAccess from '../components/uebersicht/QuickAccess.astro';
-import LiveTilesSection from '../components/uebersicht/LiveTilesSection.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
 import { calculateTrialStatus } from '../lib/trial-status';
 import { normalizeStage } from '../lib/uebersicht/setup-stage';
-import { getLiveData } from '../lib/uebersicht/live-data';
 import { getLang } from '../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
@@ -87,7 +85,6 @@ const trial = calculateTrialStatus({
   trial_ends_at: trialEndsAt,
   subscription_status: subStatus,
 });
-const liveData = await getLiveData(hotel.id);
 
 // User-Initial für Avatar (erster Buchstabe der Email)
 const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
@@ -113,7 +110,6 @@ const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
     <DashToolkit lang={lang} />
     <DashFeatureCards plan={hotelPlan} lang={lang} />
     <QuickAccess lang={lang} />
-    <LiveTilesSection tiles={liveData} lang={lang} />
   </div>
 
   {!onboardingDone && (
