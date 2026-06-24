@@ -104,6 +104,27 @@ const displayHotelLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : userProf
       }
     </script>
 
+    <script is:inline>
+      // Sprachcode (?lang=) an interne Links anhängen, damit er beim Navigieren
+      // erhalten bleibt. DE = Standard → keine URL-Verschmutzung.
+      (function () {
+        var qp = new URLSearchParams(location.search).get('lang');
+        var m = document.cookie.match(/(?:^|;\s*)retaha_lang=([^;]+)/);
+        var cookieLang = m ? decodeURIComponent(m[1]) : null;
+        var lang = qp || cookieLang;
+        if (!lang || lang === 'de') return;
+        // Cookie sicherstellen (z. B. geteilter ?lang=-Link ohne Cookie).
+        if (cookieLang !== lang) {
+          document.cookie = 'retaha_lang=' + lang + '; path=/; max-age=31536000; samesite=lax';
+        }
+        document.querySelectorAll('a[href^="/"]').forEach(function (a) {
+          var href = a.getAttribute('href');
+          if (!href || href.charAt(1) === '/' || /[?&]lang=/.test(href)) return;
+          a.setAttribute('href', href + (href.indexOf('?') === -1 ? '?' : '&') + 'lang=' + lang);
+        });
+      })();
+    </script>
+
     <script>
       // Alpine.js — für alle Pages (admin + V9)
       import Alpine from 'alpinejs';

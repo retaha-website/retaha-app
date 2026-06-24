@@ -162,7 +162,11 @@ const lang = user.language;
           const l = opt.getAttribute('data-lang');
           if (!l) return;
           document.cookie = `retaha_lang=${l}; path=/; max-age=31536000; samesite=lax`;
-          window.location.reload();
+          // Sprachcode in die URL (?lang=) — DE = Standard, daher ohne Param.
+          const url = new URL(window.location.href);
+          if (l === 'de') url.searchParams.delete('lang');
+          else url.searchParams.set('lang', l);
+          window.location.href = url.toString();
         });
       });
     }
