@@ -145,30 +145,6 @@ const showChecklist = !checklist.completed_at;
     </div>
   )}
 
-  {showChecklist && (
-    <section class="onboarding-widget">
-      <div class="onboarding-head">
-        <p class="onboarding-eyebrow themed-eyebrow-flank">Setup-Checkliste</p>
-        <h2 class="onboarding-title">{checklist.doneCount}/{checklist.totalCount} abgeschlossen</h2>
-        <p class="onboarding-sub">Ein paar Schritte noch — dann ist dein Hotel pilot-bereit.</p>
-        <div class="onboarding-progress">
-          <div class="onboarding-progress-bar" style={`width: ${Math.round((checklist.doneCount / checklist.totalCount) * 100)}%`}></div>
-        </div>
-      </div>
-      <ul class="onboarding-items">
-        {checklist.items.map(it => (
-          <li class={`onboarding-item${it.done ? ' is-done' : ''}${it.required ? '' : ' is-optional'}`}>
-            <span class="onboarding-item-check">{it.done ? '✓' : '○'}</span>
-            <div class="onboarding-item-body">
-              <a href={it.href} class="onboarding-item-link">{it.label}{!it.required && <span class="onboarding-item-optional"> (optional)</span>}</a>
-              <p class="onboarding-item-desc">{it.description}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )}
-
   <!-- Stat-Cards -->
   <section class="stat-grid">
     <div class="stat-card">
@@ -270,6 +246,31 @@ const showChecklist = !checklist.completed_at;
     <a href="/app/qr" class="app-quick-link">→ QR-Codes</a>
   </div>
 
+  {/* Setup-Checkliste ans Ende — „einstellen" steht hinter „steuern". Nur sichtbar bis Onboarding fertig. */}
+  {showChecklist && (
+    <section class="onboarding-widget">
+      <div class="onboarding-head">
+        <p class="onboarding-eyebrow themed-eyebrow-flank">Setup-Checkliste</p>
+        <h2 class="onboarding-title">{checklist.doneCount}/{checklist.totalCount} abgeschlossen</h2>
+        <p class="onboarding-sub">Ein paar Schritte noch — dann ist dein Hotel pilot-bereit.</p>
+        <div class="onboarding-progress">
+          <div class="onboarding-progress-bar" style={`width: ${Math.round((checklist.doneCount / checklist.totalCount) * 100)}%`}></div>
+        </div>
+      </div>
+      <ul class="onboarding-items">
+        {checklist.items.map(it => (
+          <li class={`onboarding-item${it.done ? ' is-done' : ''}${it.required ? '' : ' is-optional'}`}>
+            <span class="onboarding-item-check">{it.done ? '✓' : '○'}</span>
+            <div class="onboarding-item-body">
+              <a href={it.href} class="onboarding-item-link">{it.label}{!it.required && <span class="onboarding-item-optional"> (optional)</span>}</a>
+              <p class="onboarding-item-desc">{it.description}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
   <style>
     .app-page-header { margin-bottom: 28px; }
     .app-page-eyebrow {
@@ -277,7 +278,7 @@ const showChecklist = !checklist.completed_at;
       color: color-mix(in srgb, var(--theme-text-primary) 0.45, transparent); margin: 0 0 8px;
     }
     .app-page-title {
-      font-size: 26px; font-weight: 300; letter-spacing: -0.01em; line-height: 1.2;
+      font-size: 26px; font-weight: 400; letter-spacing: -0.015em; line-height: 1.2;
       margin: 0; color: var(--theme-text-primary);
     }
     @media (min-width: 768px) {
@@ -315,22 +316,24 @@ const showChecklist = !checklist.completed_at;
     .stat-card {
       background: var(--theme-bg-primary);
       border: 1px solid var(--theme-border);
-      padding: 20px;
-      transition: border-color 0.15s;
+      border-radius: 16px;
+      padding: 22px;
+      transition: box-shadow 0.16s ease, transform 0.16s ease;
     }
     .stat-card--link { display: block; text-decoration: none; color: inherit; cursor: pointer; }
-    .stat-card--link:hover { border-color: var(--theme-text-primary); }
-    .stat-card--link.stat-card--warning:hover { border-color: var(--theme-accent); background: rgba(var(--theme-accent-rgb), 0.08); }
+    .stat-card--link:hover { box-shadow: 0 10px 28px rgba(40,30,20,.08); transform: translateY(-2px); }
+    .stat-card--link.stat-card--warning:hover { box-shadow: 0 10px 28px rgba(20,97,110,.14); transform: translateY(-2px); }
     .stat-card--warning {
       border-color: var(--theme-accent);
-      background: rgba(var(--theme-accent-rgb), 0.04);
+      background: rgba(var(--theme-accent-rgb), 0.05);
     }
     .stat-card-label {
-      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
       color: color-mix(in srgb, var(--theme-text-primary) 0.5, transparent); margin: 0 0 12px;
     }
     .stat-card-value {
-      font-size: 36px; font-weight: 300; line-height: 1;
+      font-size: 36px; font-weight: 500; line-height: 1;
       color: var(--theme-text-primary); margin: 0 0 4px;
       font-variant-numeric: tabular-nums;
     }
@@ -341,7 +344,8 @@ const showChecklist = !checklist.completed_at;
     .app-section {
       background: var(--theme-bg-primary);
       border: 1px solid var(--theme-border);
-      padding: 20px;
+      border-radius: 16px;
+      padding: 22px;
       margin-bottom: 16px;
     }
     .app-section-title {
@@ -388,7 +392,7 @@ const showChecklist = !checklist.completed_at;
     }
     .inline { display: inline; }
     .btn-confirm, .btn-reject {
-      padding: 6px 12px; font-size: 12px; font-weight: 500;
+      padding: 7px 14px; font-size: 12px; font-weight: 500; border-radius: 8px;
       border: 1px solid; cursor: pointer; transition: background 0.15s, color 0.15s;
     }
     .btn-confirm { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
@@ -405,6 +409,7 @@ const showChecklist = !checklist.completed_at;
       padding: 12px 20px;
       background: transparent;
       border: 1px solid var(--theme-border);
+      border-radius: 10px;
       color: color-mix(in srgb, var(--theme-text-primary) 0.75, transparent);
       font-size: 14px;
       text-decoration: none;
@@ -417,13 +422,13 @@ const showChecklist = !checklist.completed_at;
     }
 
     /* Sprint Functional Modul B Phase 6 — Onboarding-Checkliste */
-    .onboarding-widget { background: rgba(var(--theme-accent-rgb), .04); border: 1px solid var(--theme-accent); padding: 18px 20px; margin-bottom: 24px; }
+    .onboarding-widget { background: rgba(var(--theme-accent-rgb), .04); border: 1px solid var(--theme-accent); border-radius: 16px; padding: 20px 22px; margin-top: 32px; }
     .onboarding-head { margin-bottom: 14px; }
     .onboarding-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--theme-accent); margin: 0 0 6px; }
     .onboarding-title { margin: 0 0 4px; font-size: 18px; font-weight: 500; color: var(--theme-text-primary); }
     .onboarding-sub { margin: 0 0 10px; font-size: 13px; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); }
-    .onboarding-progress { width: 100%; height: 4px; background: color-mix(in srgb, var(--theme-text-primary) .06, transparent); overflow: hidden; }
-    .onboarding-progress-bar { height: 100%; background: var(--theme-accent); transition: width 0.3s ease; }
+    .onboarding-progress { width: 100%; height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--theme-text-primary) .06, transparent); overflow: hidden; }
+    .onboarding-progress-bar { height: 100%; border-radius: 999px; background: var(--theme-accent); transition: width 0.3s ease; }
     .onboarding-items { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr; gap: 6px; }
     @media (min-width: 768px) { .onboarding-items { grid-template-columns: repeat(2, 1fr); } }
     .onboarding-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--theme-text-primary) .06, transparent); }
