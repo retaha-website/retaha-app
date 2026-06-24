@@ -91,7 +91,6 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     {editMode ? (
       <>
         <section class="settings-hero">
-          <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
           <h1 class="settings-hero__title">{drip.name}<span class="dot-pink">.</span></h1>
           <p class="settings-hero__sub">{bt('dd.edit.sub', lang)}</p>
         </section>
@@ -105,7 +104,6 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     ) : (
       <>
         <section class="settings-hero">
-          <span class="settings-hero__eyebrow">{bt('mk.crumb', lang)}</span>
           <h1 class="settings-hero__title">{drip.name}<span class="dot-pink">.</span></h1>
           <p class="settings-hero__sub">
             {bt('dd.trigger.label', lang)} <strong>{TRIGGER_LABELS[drip.trigger_type] ?? drip.trigger_type}</strong>
@@ -175,6 +173,8 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
 </Layout>
 
 <style>
+  /* Wie /marketing/campaigns: gerundete Karten, Petrol-Akzente, Space Grotesk — kein Gold/Grün/Burgund. */
+  .breadcrumb { padding-top: 36px; }
   .dd-head-actions {
     display: flex;
     align-items: center;
@@ -182,28 +182,32 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     margin-bottom: 24px;
   }
   .dd-active-pill {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    padding: 3px 8px;
+    padding: 3px 9px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    border-radius: 99px;
+    font-weight: 500;
     background: var(--bg-deep);
     color: var(--ink-muted);
   }
   .dd-active-pill.is-on {
-    background: #e8f5ec;
-    color: #145c2a;
-    border: 1px solid #a8d9b6;
+    background: rgba(20,97,110,0.12);
+    color: #14616E;
+    border: 1px solid rgba(20,97,110,0.24);
   }
   .dd-btn-edit {
     padding: 8px 16px;
-    background: #1f1812;
-    color: var(--surface);
+    background: var(--petrol);
+    color: #fff;
     text-decoration: none;
     font-size: 12px;
     font-family: inherit;
-    transition: background 0.15s ease;
+    border-radius: 8px;
+    transition: filter 0.15s ease;
   }
-  .dd-btn-edit:hover { background: #8c2128; }
+  .dd-btn-edit:hover { filter: brightness(1.08); }
 
   .dd-stats {
     display: grid;
@@ -215,35 +219,41 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
   .dd-stat {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-radius: 16px;
     padding: 16px;
   }
   .dd-stat-label {
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--ink-muted);
   }
   .dd-stat-value {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 28px;
-    font-weight: 300;
+    font-weight: 500;
     margin: 6px 0 2px;
     color: var(--ink);
   }
   .dd-stat-sub {
+    font-family: 'Inter Tight', sans-serif;
     font-size: 11px;
     color: var(--ink-muted);
   }
 
   .dd-section-eyebrow {
-    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--ink-muted);
     margin: 0 0 4px;
   }
   .dd-section-title {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 18px;
-    font-weight: 300;
+    font-weight: 500;
     margin: 0 0 16px;
     color: var(--ink);
   }
@@ -251,6 +261,7 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
   .dd-steps {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-radius: 16px;
     padding: 20px;
   }
   .dd-step-list {
@@ -268,7 +279,8 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     align-items: center;
     padding: 12px;
     background: var(--bg-deep);
-    border-left: 3px solid var(--ink);
+    border-left: 3px solid var(--petrol);
+    border-radius: 0 10px 10px 0;
   }
   @media (max-width: 600px) {
     .dd-step { grid-template-columns: 32px 1fr; }
@@ -277,15 +289,18 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
   .dd-step-num {
     width: 28px;
     height: 28px;
-    background: #1f1812;
-    color: var(--surface);
+    background: var(--petrol);
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 12px;
+    font-weight: 500;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
   }
   .dd-step-tpl {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 14px;
     font-weight: 500;
     color: var(--ink);
@@ -313,9 +328,10 @@ const initialSteps = (steps ?? []).map((s: any) => ({ template_id: s.template_id
     padding: 24px;
     background: var(--bg-deep);
     border: 1px dashed var(--border);
+    border-radius: 12px;
     text-align: center;
     color: var(--ink-muted);
     font-style: italic;
   }
-  .dd-empty a { color: var(--accent); }
+  .dd-empty a { color: var(--petrol); }
 </style>
