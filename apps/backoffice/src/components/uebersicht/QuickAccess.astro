@@ -64,7 +64,6 @@ const cards = [
 
   .qa__card {
     display: flex; flex-direction: column;
-    min-height: 196px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -78,7 +77,7 @@ const cards = [
     transform: translateY(-2px);
   }
 
-  .qa__card-head { padding: 18px 20px 14px; }
+  .qa__card-head { padding: 16px 18px 14px; }
   .qa__card-title {
     font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 16px;
     letter-spacing: -0.01em; color: var(--ink); margin: 0;
@@ -86,18 +85,20 @@ const cards = [
   .qa__card-desc {
     font-family: 'Inter Tight', sans-serif; font-size: 13px; line-height: 1.45;
     color: var(--ink-muted, rgba(10,10,10,0.55)); margin: 5px 0 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
 
-  /* Ruhige, dezent getönte Vorschau-Fläche mit Icon (var(--c) = Bereichs-Farbe). */
+  /* Festes, dezent getöntes Bild-Feld (var(--c) = Bereichs-Farbe). */
   .qa__card-preview {
     position: relative; overflow: hidden;
-    flex: 1 1 auto; min-height: 124px;
-    display: grid; place-items: center;
+    height: 162px;
     background: var(--bg-deep, #f3f4f6);
     background: color-mix(in srgb, var(--c, #14616E) 8%, #ffffff);
     border-top: 1px solid var(--border);
   }
+  /* Icon-Fallback: zentriert (nur sichtbar, wenn kein Screenshot da ist). */
   .qa__card-icon {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 52px; height: 52px; border-radius: 14px;
     display: grid; place-items: center;
     background: var(--surface);
@@ -106,11 +107,16 @@ const cards = [
   }
   .qa__card-icon :global(svg) { width: 26px; height: 26px; }
 
-  /* Seiten-Screenshot (liegt über dem Icon; bei 404 entfernt onerror das Bild → Icon). */
+  /* Seiten-Screenshot wie bei Vercel: seitlich eingerückt, oben gerundet, unten an
+     der Kartenkante verankert. Bei 404 entfernt onerror das Bild → Icon-Fallback. */
   .qa__card-shot {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
+    position: absolute; left: 16px; right: 16px; top: 18px; bottom: 0;
+    width: auto; height: auto;
     object-fit: cover; object-position: top center;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    box-shadow: 0 6px 18px rgba(10,10,10,0.10);
     display: block;
   }
 
