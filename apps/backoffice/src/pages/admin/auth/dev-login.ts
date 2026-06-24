@@ -64,5 +64,5 @@ export const POST: APIRoute = async ({ cookies, request, redirect }) => {
     cookies.delete('onboarding_locale', { path: '/' });
   }
 
-  return redirect('/uebersicht');
+  return redirect('/overview');
 };

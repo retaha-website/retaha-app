@@ -9,7 +9,7 @@ function json(data: unknown, status = 200) {
 }
 
 // Markiert den Onboarding-Flow („Du bist live") als abgeschlossen — pro Hotel/Account.
-// Aufgerufen vom „Mach's komplett"-Button auf /uebersicht. Dadurch erscheint das
+// Aufgerufen vom „Mach's komplett"-Button auf /overview. Dadurch erscheint das
 // Setup auch auf anderen Geräten desselben Accounts nicht mehr.
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);

@@ -9,7 +9,7 @@ function json(data: unknown, status = 200) {
 }
 
 // Markiert das Onboarding als „übersprungen, aber nicht abgeschlossen" — pro Account.
-// Aufgerufen vom „Setup überspringen"-Button auf /uebersicht. Erzeugt im
+// Aufgerufen vom „Setup überspringen"-Button auf /overview. Erzeugt im
 // Benachrichtigungs-Drawer den Hinweis „Setup noch nicht vollständig".
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);

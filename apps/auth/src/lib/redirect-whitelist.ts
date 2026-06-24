@@ -42,7 +42,7 @@ function getAllowedHosts(): string[] {
 }
 
 export function defaultRedirectTarget(): string {
-  return getEnv('DEFAULT_REDIRECT_TARGET') ?? 'https://backoffice.retaha.de/uebersicht';
+  return getEnv('DEFAULT_REDIRECT_TARGET') ?? 'https://backoffice.retaha.de/overview';
 }
 
 /**
