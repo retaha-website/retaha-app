@@ -55,6 +55,12 @@ function fmtDate(iso: string | null | undefined) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+// Roh-Quellwerte (doi_confirm_link …) → verständliche Labels (i18n), sonst Roh-Wert.
+const SOURCE_KEYS = new Set(['doi_confirm_link', 'email_unsubscribe_link', 'opt_out_link', 'guest_checkout', 'self_checkout', 'wallet_add']);
+function sourceLabel(s: string): string {
+  return s && SOURCE_KEYS.has(s) ? bt(`mc.source.${s}`, lang) : (s || '—');
+}
 ---
 
 <Layout title="Consent-Dashboard" activeTab="backoffice" hotelName={hotel.name}>
@@ -62,19 +68,28 @@ function fmtDate(iso: string | null | undefined) {
 /* Mehr Luft zwischen Header und Breadcrumb (war eingedrückt) — wie /marketing. */
 .breadcrumb { padding-top: 36px; }
 
-/* KPI-Karten im /marketing-/uebersicht-Stil: weich gerundet, Space Grotesk-Wert,
-   Mono-Label. Grün/Orange bleiben als semantische Status-Farben. */
+/* Freistehende Abschnitte wie /marketing: Titel + Inhalt direkt, keine nummerierte Box. */
+.consent-sections { display: flex; flex-direction: column; gap: 44px; }
+.consent-section-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 16px; }
+.consent-note { font-family: 'Inter Tight', sans-serif; font-size: 13px; color: var(--ink-soft, var(--ink-muted)); margin: 16px 0 0; }
+.consent-empty { padding: 24px; background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; color: var(--ink-muted); font-size: 14px; }
+
+/* KPI-Karten (freistehend) im /marketing-Stil; Akzente = Petrol-Töne des Charts. */
 .consent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
 .consent-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
 .consent-kpi__val { font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 500; color: var(--ink); line-height: 1; }
 .consent-kpi__label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-muted); margin-top: 8px; }
-.consent-kpi--green .consent-kpi__val { color: #145c2a; }
-.consent-kpi--orange .consent-kpi__val { color: #8c4a0e; }
+.consent-kpi--petrol .consent-kpi__val { color: #14616E; }
+.consent-kpi--petrol-light .consent-kpi__val { color: #4FB3C6; }
+
+/* Tabelle in eigener gerundeter Karte. */
+.consent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
 .consent-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.consent-table th { text-align: left; padding: 8px 12px; color: var(--ink-muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-.consent-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+.consent-table th { text-align: left; padding: 12px 16px; color: var(--ink-muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.consent-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--ink); }
+.consent-table tr:last-child td { border-bottom: none; }
 .consent-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-.consent-badge--granted { background: #e8f5ec; color: #145c2a; }
+.consent-badge--granted { background: rgba(20,97,110,0.10); color: #14616E; }
 .consent-badge--revoked { background: #fce8e8; color: #8c2128; }
 </style>
 
@@ -92,67 +107,54 @@ function fmtDate(iso: string | null | undefined) {
     <p class="settings-hero__sub">{bt('mc.hero.sub', lang)}</p>
   </section>
 
-  <div class="settings-sections" style="--settings-cols: 1;">
+  <div class="consent-sections">
     <!-- Wallet-Push Opt-ins -->
-    <section class="s-card">
-      <div class="s-card__head">
-        <h2 class="s-card__title">{bt('mc.wallet.title', lang)}</h2>
-        <span class="s-card__num">01</span>
-      </div>
-      <div class="s-card__body">
-        <div class="consent-grid">
-          <div class="consent-kpi consent-kpi--green">
-            <div class="consent-kpi__val">{walletActive ?? 0}</div>
-            <div class="consent-kpi__label">{bt('mc.wallet.active', lang)}</div>
-          </div>
-          <div class="consent-kpi">
-            <div class="consent-kpi__val">{walletOptInTotal ?? 0}</div>
-            <div class="consent-kpi__label">{bt('mc.wallet.total', lang)}</div>
-          </div>
+    <section class="consent-section">
+      <h2 class="consent-section-title">{bt('mc.wallet.title', lang)}</h2>
+      <div class="consent-grid">
+        <div class="consent-kpi consent-kpi--petrol">
+          <div class="consent-kpi__val">{walletActive ?? 0}</div>
+          <div class="consent-kpi__label">{bt('mc.wallet.active', lang)}</div>
         </div>
-        <p style="font-size:13px;color:var(--ink-muted);" set:html={bt('mc.wallet.note', lang)}></p>
+        <div class="consent-kpi">
+          <div class="consent-kpi__val">{walletOptInTotal ?? 0}</div>
+          <div class="consent-kpi__label">{bt('mc.wallet.total', lang)}</div>
+        </div>
       </div>
+      <p class="consent-note" set:html={bt('mc.wallet.note', lang)}></p>
     </section>
 
     <!-- Email DOI -->
-    <section class="s-card">
-      <div class="s-card__head">
-        <h2 class="s-card__title">{bt('mc.email.title', lang)}</h2>
-        <span class="s-card__num">02</span>
-      </div>
-      <div class="s-card__body">
-        <div class="consent-grid">
-          <div class="consent-kpi consent-kpi--green">
-            <div class="consent-kpi__val">{wlConfirmed}</div>
-            <div class="consent-kpi__label">{bt('mc.email.confirmed', lang)}</div>
-          </div>
-          <div class="consent-kpi consent-kpi--orange">
-            <div class="consent-kpi__val">{wlPending}</div>
-            <div class="consent-kpi__label">{bt('mc.email.pending', lang)}</div>
-          </div>
-          <div class="consent-kpi">
-            <div class="consent-kpi__val">{wlUnsubscribed}</div>
-            <div class="consent-kpi__label">{bt('mc.email.unsub', lang)}</div>
-          </div>
-          <div class="consent-kpi">
-            <div class="consent-kpi__val">{wlTotal}</div>
-            <div class="consent-kpi__label">{bt('mc.email.total', lang)}</div>
-          </div>
+    <section class="consent-section">
+      <h2 class="consent-section-title">{bt('mc.email.title', lang)}</h2>
+      <div class="consent-grid">
+        <div class="consent-kpi consent-kpi--petrol">
+          <div class="consent-kpi__val">{wlConfirmed}</div>
+          <div class="consent-kpi__label">{bt('mc.email.confirmed', lang)}</div>
         </div>
-        <p style="font-size:13px;color:var(--ink-muted);">{bt('mc.email.note', lang)}</p>
+        <div class="consent-kpi consent-kpi--petrol-light">
+          <div class="consent-kpi__val">{wlPending}</div>
+          <div class="consent-kpi__label">{bt('mc.email.pending', lang)}</div>
+        </div>
+        <div class="consent-kpi">
+          <div class="consent-kpi__val">{wlUnsubscribed}</div>
+          <div class="consent-kpi__label">{bt('mc.email.unsub', lang)}</div>
+        </div>
+        <div class="consent-kpi">
+          <div class="consent-kpi__val">{wlTotal}</div>
+          <div class="consent-kpi__label">{bt('mc.email.total', lang)}</div>
+        </div>
       </div>
+      <p class="consent-note">{bt('mc.email.note', lang)}</p>
     </section>
 
     <!-- Recent Consents -->
-    <section class="s-card">
-      <div class="s-card__head">
-        <h2 class="s-card__title">{bt('mc.recent.title', lang)}</h2>
-        <span class="s-card__num">03</span>
-      </div>
-      <div class="s-card__body">
-        {(recentConsents?.length ?? 0) === 0 ? (
-          <p style="color:var(--ink-muted);font-size:14px;">{bt('mc.recent.empty', lang)}</p>
-        ) : (
+    <section class="consent-section">
+      <h2 class="consent-section-title">{bt('mc.recent.title', lang)}</h2>
+      {(recentConsents?.length ?? 0) === 0 ? (
+        <p class="consent-empty">{bt('mc.recent.empty', lang)}</p>
+      ) : (
+        <div class="consent-card">
           <table class="consent-table">
             <thead>
               <tr>
@@ -171,7 +173,7 @@ function fmtDate(iso: string | null | undefined) {
                       {c.action === 'granted' ? bt('mc.badge.granted', lang) : bt('mc.badge.revoked', lang)}
                     </span>
                   </td>
-                  <td style="color:var(--ink-muted)">{c.source}</td>
+                  <td>{sourceLabel(c.source)}</td>
                   <td style="color:var(--ink-muted)">{c.wallet_pass_id ? bt('mc.channel.wallet', lang) : bt('mc.channel.email', lang)}</td>
                   <td style="color:var(--ink-muted)">{c.policy_version}</td>
                   <td style="color:var(--ink-muted)">{fmtDate(c.created_at)}</td>
@@ -179,8 +181,8 @@ function fmtDate(iso: string | null | undefined) {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   </div>
 </div>
