@@ -7,27 +7,24 @@ import type { LanguageCode } from '@retaha/i18n';
 interface Props { lang: LanguageCode; }
 const { lang: _lang } = Astro.props;
 
-const svg = (path: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
-
 const slides = [
   {
+    key: 'branding',
     title: 'Gästemappe live schalten',
     desc: 'QR ins Zimmer, fertig. Deine digitale Mappe ist in Minuten startklar.',
     href: '/branding',
-    icon: svg('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'),
   },
   {
+    key: 'eve',
     title: 'Eve – deine KI-Gastgeberin',
     desc: 'Beantwortet Gästefragen rund um die Uhr, in der Sprache deiner Gäste.',
     href: '/eve/knowledge',
-    icon: svg('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>'),
   },
   {
+    key: 'places',
     title: 'Empfehlungen aus der Region',
     desc: 'Zeig deinen Gästen die besten Orte rund um dein Haus.',
     href: '/places',
-    icon: svg('<circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>'),
   },
 ];
 ---
@@ -50,7 +47,17 @@ const slides = [
             <h3 class="dtk__slide-title" data-tk-title>{slides[0].title}</h3>
             <p class="dtk__slide-desc" data-tk-desc>{slides[0].desc}</p>
           </div>
-          <span class="dtk__slide-icon" data-tk-icon set:html={slides[0].icon}></span>
+          <span class="dtk__slide-icon">
+            <img
+              class="dtk__slide-shot"
+              data-tk-shot
+              src={`/previews/${slides[0].key}.png`}
+              alt=""
+              loading="lazy"
+              onload="this.classList.add('is-loaded')"
+              onerror="this.classList.remove('is-loaded')"
+            />
+          </span>
         </div>
         <div class="dtk__bar"><span data-tk-bar style="width: 33%"></span></div>
       </a>
@@ -68,7 +75,7 @@ const slides = [
     if (!root) return;
     var titleEl = root.querySelector('[data-tk-title]');
     var descEl  = root.querySelector('[data-tk-desc]');
-    var iconEl  = root.querySelector('[data-tk-icon]');
+    var shotEl  = root.querySelector('[data-tk-shot]');
     var linkEl  = root.querySelector('[data-tk-link]');
     var barEl   = root.querySelector('[data-tk-bar]');
     var nextBtn = root.querySelector('[data-tk-next]');
@@ -78,7 +85,7 @@ const slides = [
       var s = slides[i];
       if (titleEl) titleEl.textContent = s.title;
       if (descEl)  descEl.textContent  = s.desc;
-      if (iconEl)  iconEl.innerHTML    = s.icon;
+      if (shotEl) { shotEl.classList.remove('is-loaded'); shotEl.src = '/previews/' + s.key + '.png'; }
       if (linkEl)  linkEl.setAttribute('href', s.href);
       if (barEl)   barEl.style.width   = Math.round(((i + 1) / n) * 100) + '%';
     }
@@ -158,12 +165,18 @@ const slides = [
     font-family: 'Inter Tight', sans-serif; font-size: 14px; line-height: 1.5;
     color: var(--ink-soft, rgba(10,10,10,0.6)); margin: 0; max-width: 32ch;
   }
+  /* Screenshot-Slot (selbes Prinzip wie die Grids): neutraler Platzhalter, der
+     durch /previews/<key>.png ersetzt wird, sobald vorhanden. Keine SVGs. */
   .dtk__slide-icon {
-    flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
-    display: grid; place-items: center;
-    background: var(--petrol-soft, rgba(20,97,110,0.12)); color: var(--petrol);
+    position: relative; flex-shrink: 0;
+    width: 52px; height: 52px; border-radius: 14px; overflow: hidden;
+    background: var(--bg-deep, #f0efea);
   }
-  .dtk__slide-icon :global(svg) { width: 26px; height: 26px; }
+  .dtk__slide-shot {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: 0; transition: opacity 0.2s ease;
+  }
+  .dtk__slide-shot.is-loaded { opacity: 1; }
 
   .dtk__bar {
     margin-top: 22px; height: 4px; border-radius: 999px;
