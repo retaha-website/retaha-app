@@ -79,6 +79,7 @@ const langLabel = lang.toUpperCase();
 
   <!-- Allgemein -->
   <div class="ud__items">
+    <div class="ud__lang-wrap">
     <button type="button" class="ud__item" id="langBtn" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="langOptions">
       <svg class="ud__item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/>
@@ -100,6 +101,7 @@ const langLabel = lang.toUpperCase();
           {l === lang && <span class="ud__lang-check" aria-hidden="true">✓</span>}
         </button>
       ))}
+    </div>
     </div>
 
     <a href="/hilfe" class="ud__item" role="menuitem">
@@ -148,7 +150,7 @@ const langLabel = lang.toUpperCase();
     visibility: hidden;
     transform: translateY(-8px);
     transition: opacity 200ms ease, transform 200ms ease, visibility 0ms 200ms;
-    overflow: hidden;
+    overflow: visible;
   }
   :global([data-theme="dark"]) .user-dropdown {
     box-shadow: 0 0 0 1px rgba(255,255,255,0.07), 0 18px 50px rgba(0,0,0,0.55);
@@ -166,6 +168,7 @@ const langLabel = lang.toUpperCase();
     gap: 14px;
     padding: 18px;
     background: var(--bg-deep);
+    border-radius: var(--r) var(--r) 0 0;
   }
   .ud__avatar-big {
     width: 44px;
@@ -318,14 +321,26 @@ const langLabel = lang.toUpperCase();
   .ud__item--logout:hover .ud__item-icon { color: var(--burgund); }
   .ud__item--logout:hover .ud__item-label { color: var(--burgund); }
 
-  /* Sprach-Picker — inline (kein Clipping durch overflow:hidden des Dropdowns) */
+  /* Sprach-Picker — öffnet als eigene Box links neben dem Dropdown (Flyout). */
+  .ud__lang-wrap { position: relative; }
   .ud__item-chevron { color: var(--ink-faint); font-size: 10px; margin-left: 6px; transition: transform 200ms ease; }
-  #langBtn[aria-expanded="true"] .ud__item-chevron { transform: rotate(180deg); }
-  .ud__lang-options { display: none; flex-direction: column; background: var(--bg-deep); border-top: 1px solid var(--border); }
+  #langBtn[aria-expanded="true"] .ud__item-chevron { transform: rotate(90deg); }
+  .ud__lang-options {
+    display: none; flex-direction: column;
+    position: absolute; top: -6px; right: calc(100% + 10px);
+    width: 232px; max-height: min(440px, 70vh); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r);
+    box-shadow: 0 18px 50px rgba(10,10,10,0.16), 0 6px 16px rgba(10,10,10,0.08);
+    padding: 6px 0; z-index: 10;
+  }
+  :global([data-theme="dark"]) .ud__lang-options {
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.07), 0 18px 50px rgba(0,0,0,0.55);
+  }
   .ud__lang-options.is-open { display: flex; }
   .ud__lang-opt {
     display: flex; align-items: center; gap: 10px;
-    padding: 9px 18px 9px 52px; width: 100%;
+    padding: 9px 16px; width: 100%;
     background: transparent; border: none; cursor: pointer;
     font-family: inherit; font-size: 13px; color: var(--ink); text-align: left;
     transition: background 150ms ease;
