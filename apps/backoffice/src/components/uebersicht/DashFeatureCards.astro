@@ -2,39 +2,39 @@
 // Zwei schließbare Upsell-/Add-on-Karten (à la Surfshark): Icon + X, Kategorie,
 // Titel, Beschreibung, „Mehr erfahren" + CTA. Schließen bleibt pro Gerät
 // (localStorage) erhalten; sind beide weg, verschwindet die Sektion.
-import type { LanguageCode } from '@retaha/i18n';
+import { bt, type LanguageCode } from '@retaha/i18n';
 
 interface Props { plan: string; lang: LanguageCode; }
-const { plan, lang: _lang } = Astro.props;
+const { plan, lang } = Astro.props;
 
 const SHOP = 'https://retaha.de/shop';
 const svg = (path: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
 const qtyHint = plan === 'lite'
-  ? 'Für deinen Plan reicht 1 QR-Code fürs ganze Haus.'
-  : 'Für deinen Plan: eine eigene Karte pro Zimmer.';
+  ? bt('dash.dfc.qty.lite', lang)
+  : bt('dash.dfc.qty.room', lang);
 
 const cards = [
   {
     id: 'nfc',
-    cat: 'Add-on · Hardware',
-    title: 'QR-Codes & NFC-Karten bestellen',
-    desc: `Hochwertige NFC-Karten aus Holz fürs Zimmer — direkt im Shop. ${qtyHint}`,
+    cat: bt('dash.dfc.nfc.cat', lang),
+    title: bt('dash.dfc.nfc.title', lang),
+    desc: `${bt('dash.dfc.nfc.desc', lang)} ${qtyHint}`,
     learnHref: SHOP,
     ctaHref: SHOP,
-    cta: 'Im Shop ansehen',
+    cta: bt('dash.dfc.nfc.cta', lang),
     external: true,
     icon: svg('<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
   },
   {
     id: 'eve',
-    cat: 'Add-on · Eve',
-    title: 'Eve dauerhaft behalten',
-    desc: 'Im Trial ist Eve dabei. Sichere dir deine KI-Gastgeberin danach mit einem Upgrade auf Pro oder Premium.',
+    cat: bt('dash.dfc.eve.cat', lang),
+    title: bt('dash.dfc.eve.title', lang),
+    desc: bt('dash.dfc.eve.desc', lang),
     learnHref: '/subscription',
     ctaHref: '/subscription',
-    cta: 'Plan ansehen',
+    cta: bt('dash.dfc.eve.cta', lang),
     external: false,
     icon: svg('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>'),
   },
@@ -55,7 +55,7 @@ const cards = [
         <h3 class="dfc__title">{c.title}</h3>
         <p class="dfc__desc">{c.desc}</p>
         <div class="dfc__actions">
-          <a class="dfc__learn" href={c.learnHref} {...(c.external ? { target: '_blank', rel: 'noopener' } : {})}>Mehr erfahren</a>
+          <a class="dfc__learn" href={c.learnHref} {...(c.external ? { target: '_blank', rel: 'noopener' } : {})}>{bt('dash.dfc.learn', lang)}</a>
           <a class="dfc__cta" href={c.ctaHref} {...(c.external ? { target: '_blank', rel: 'noopener' } : {})}>{c.cta}</a>
         </div>
       </article>

@@ -8,22 +8,22 @@ interface Props { trial: TrialStatus; stage: string | number; lang: LanguageCode
 const { trial, stage, lang } = Astro.props;
 
 const expired = trial.urgencyLevel === 'expired';
-const dayWord = trial.daysRemaining === 1 ? 'Tag' : 'Tage';
+const daysLeftWord = bt(trial.daysRemaining === 1 ? 'dash.status.dayleft' : 'dash.status.daysleft', lang);
 ---
 
 <section class="dsub">
-  <h1 class="dsub__title">Backoffice – Dashboard<span class="dot-pink">.</span><br /><strong>Alles an einem Ort.</strong></h1>
+  <h1 class="dsub__title" set:html={bt('dash.title', lang)}></h1>
 
   <p class="dsub__sub">{bt(`hero.${stage}.sub`, lang)}</p>
 
   {trial.isInTrial && !expired && (
     <p class="dsub__status">
-      Deine Testphase · <span class="dsub__accent">{trial.daysRemaining} {dayWord} übrig</span>
+      {bt('dash.status.trial', lang)} · <span class="dsub__accent">{trial.daysRemaining} {daysLeftWord}</span>
     </p>
   )}
   {trial.isInTrial && expired && (
     <p class="dsub__status">
-      Deine Testphase · <span class="dsub__accent dsub__accent--warn">abgelaufen</span>
+      {bt('dash.status.trial', lang)} · <span class="dsub__accent dsub__accent--warn">{bt('dash.status.expired', lang)}</span>
     </p>
   )}
 </section>
