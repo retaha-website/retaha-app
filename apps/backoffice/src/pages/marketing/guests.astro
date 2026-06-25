@@ -7,6 +7,10 @@
 // Die „Opt-in"-Definition kommt aus @retaha/marketing/audience — DIESELBE Wahrheit,
 // die send.ts beim echten Versand nutzt. Versand-Empfänger werden NIE aus „Alle"
 // gezogen. Kein PMS-Voll-Verlauf (Zweckbindung). Alles explizit hotel-gescopt.
+//
+// Consent-KPIs (kanalgetrennt) oben. KEINE globale Consent-Ereignis-Abfrage:
+// die Pro-Kontakt-Einwilligungshistorie wird ON-DEMAND beim Öffnen des Detail-
+// Drawers geladen (GET /api/marketing/contacts/history) — datensparsam.
 
 import Layout from '../../layouts/Layout.astro';
 import {
@@ -35,18 +39,14 @@ if (!hasPermission(myRole, 'marketing.contacts')) {
 const sb = createSupabaseServiceRoleInstance();
 
 // ── Quellen laden (alle explizit hotel-gescopt; Service-Role bypassed RLS) ──
-const [passesRes, waitlistRes, consentsRes, staysRes] = await Promise.all([
+// marketing_consents wird hier NICHT global geladen — Historie kommt on-demand.
+const [passesRes, waitlistRes, staysRes] = await Promise.all([
   sb.from('wallet_passes')
     .select('id, guest_email, guest_first_name, guest_last_name, marketing_consent_given, marketing_consent_given_at, opted_out_at, state, visit_count, first_visit_at, last_visit_at')
     .eq('hotel_id', hotel.id),
   sb.from('marketing_waitlist')
     .select('id, email, confirmed_at, unsubscribed_at, pending_at, confirmation_sent_at, source')
     .eq('hotel_id', hotel.id),
-  sb.from('marketing_consents')
-    .select('id, action, source, policy_version, created_at, wallet_pass_id, waitlist_id')
-    .eq('hotel_id', hotel.id)
-    .order('created_at', { ascending: false })
-    .limit(5000),
   sb.from('stays')
     .select('wallet_pass_id, check_in, check_out')
     .eq('hotel_id', hotel.id)
@@ -55,11 +55,9 @@ const [passesRes, waitlistRes, consentsRes, staysRes] = await Promise.all([
 
 const passes = passesRes.data ?? [];
 const waitlist = waitlistRes.data ?? [];
-const consents = consentsRes.data ?? [];
 const stays = staysRes.data ?? [];
 
 type Status = 'optin' | 'pending' | 'unsubscribed' | 'none';
-interface HistEv { created_at: string; action: string; source: string; policy_version: string; channel: 'email' | 'wallet'; }
 interface Contact {
   email: string;          // lowercased canonical key
   displayEmail: string;   // wie erfasst
@@ -74,7 +72,6 @@ interface Contact {
   lastVisitAt: string | null;
   visitCount: number | null;
   stay: { check_in: string; check_out: string } | null;
-  history: HistEv[];
 }
 
 const byEmail = new Map<string, Contact>();
@@ -86,7 +83,7 @@ function ensure(emailRaw: string): Contact {
       email, displayEmail: emailRaw.trim(), name: '',
       viaWallet: false, viaEmail: false,
       emailOptIn: false, walletOptIn: false, pending: false, unsubscribed: false,
-      status: 'none', lastVisitAt: null, visitCount: null, stay: null, history: [],
+      status: 'none', lastVisitAt: null, visitCount: null, stay: null,
     };
     byEmail.set(email, c);
   }
@@ -104,11 +101,9 @@ for (const s of stays) {
 }
 
 // Wallet-Pässe → Kontakte
-const passIdToEmail = new Map<string, string>();
 for (const p of passes) {
   if (!p.guest_email) continue;
   const c = ensure(p.guest_email);
-  passIdToEmail.set(p.id, c.email);
   c.viaWallet = true;
   const nm = [p.guest_first_name, p.guest_last_name].filter(Boolean).join(' ').trim();
   if (nm && !c.name) c.name = nm;
@@ -121,27 +116,13 @@ for (const p of passes) {
 }
 
 // Waitlist → Kontakte
-const waitlistIdToEmail = new Map<string, string>();
 for (const w of waitlist) {
   if (!w.email) continue;
   const c = ensure(w.email);
-  waitlistIdToEmail.set(w.id, c.email);
   c.viaEmail = true;
   if (isEmailOptIn(w)) c.emailOptIn = true;
   if (w.unsubscribed_at) c.unsubscribed = true;
   if (!w.confirmed_at && !w.unsubscribed_at) c.pending = true;
-}
-
-// Einwilligungs-Historie pro Kontakt (consents sind bereits created_at DESC)
-for (const ev of consents) {
-  let email: string | undefined;
-  let channel: 'email' | 'wallet' | undefined;
-  if (ev.wallet_pass_id) { email = passIdToEmail.get(ev.wallet_pass_id); channel = 'wallet'; }
-  else if (ev.waitlist_id) { email = waitlistIdToEmail.get(ev.waitlist_id); channel = 'email'; }
-  if (!email || !channel) continue;
-  const c = byEmail.get(email);
-  if (!c) continue;
-  c.history.push({ created_at: ev.created_at, action: ev.action, source: ev.source, policy_version: ev.policy_version, channel });
 }
 
 // Status ableiten — sendefähig (irgendein Kanal opt-in) gewinnt
@@ -170,7 +151,8 @@ const truncated = totalCount > MAX_RENDER;
 const rendered = truncated ? allContacts.slice(0, MAX_RENDER) : allContacts;
 if (truncated) console.warn(`[marketing/guests] ${totalCount} Kontakte, gerendert ${MAX_RENDER}`);
 
-// Kompakte JSON-Insel für den Detail-Drawer (Owner-only-Seite → PII ok)
+// Kompakte JSON-Insel für den Detail-Drawer (Owner-only-Seite → PII ok).
+// Historie NICHT eingebettet — wird beim Öffnen on-demand geladen.
 const contactsJson = JSON.stringify(Object.fromEntries(rendered.map(c => [c.email, {
   email: c.displayEmail,
   name: c.name,
@@ -180,7 +162,6 @@ const contactsJson = JSON.stringify(Object.fromEntries(rendered.map(c => [c.emai
   viaEmail: c.viaEmail,
   status: c.status,
   stay: c.stay,
-  history: c.history,
 }])));
 
 function fmtDate(iso: string | null | undefined): string {
@@ -196,26 +177,12 @@ function sourceLabel(c: Contact): string {
 }
 function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
 
-// ── Consent-KPIs (zusammengeführt aus der früheren /marketing/consent-Seite) ──
-// Kanalgetrennt, aus den bereits geladenen Quellen berechnet (keine Extra-Queries).
+// ── Consent-KPIs (kanalgetrennt) — aus den bereits geladenen Quellen, keine Extra-Queries ──
 const walletActive = passes.filter(p => p.marketing_consent_given && p.state === 'active').length;
 const walletOptInTotal = passes.filter(p => p.marketing_consent_given).length;
 const emailConfirmed = waitlist.filter(w => isEmailOptIn(w)).length;
 const emailPending = waitlist.filter(w => !w.confirmed_at && !w.unsubscribed_at).length;
 const emailUnsub = waitlist.filter(w => w.unsubscribed_at).length;
-
-// ── Aktivität: letzte Consent-Ereignisse (Art.-7-Feed, aus geladenen consents) ──
-const RECENT_SOURCE_KEYS = new Set(['doi_confirm_link', 'email_unsubscribe_link', 'opt_out_link', 'guest_checkout', 'self_checkout', 'wallet_add', 'owner_unsubscribe']);
-function evSourceLabel(s: string): string {
-  return s && RECENT_SOURCE_KEYS.has(s) ? bt(`mc.source.${s}`, lang) : (s || '—');
-}
-function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-const recentEvents = consents.slice(0, 30);
 ---
 
 <Layout title={bt('mg.crumb', lang)} activeTab="backoffice" hotelName={hotel.name}>
@@ -230,7 +197,6 @@ const recentEvents = consents.slice(0, 30);
 .mg-kpi__val { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 500; color: var(--ink); line-height: 1; }
 .mg-kpi__val--petrol { color: #14616E; }
 .mg-kpi__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); margin-top: 8px; }
-#mg-view-activity[hidden], #mg-view-contacts[hidden] { display: none; }
 
 .mg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 8px 0 20px; }
 .mg-tabs { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
@@ -251,8 +217,6 @@ const recentEvents = consents.slice(0, 30);
 .mg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
 .mg-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .mg-table th { text-align: left; padding: 12px 16px; color: var(--ink-muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-/* Einheitliches Zellen-Styling für BEIDE Tabellen (Kontakte + Aktivität),
-   damit alle Tabs identisch rendern. Kontakt-Zeilen (.mg-row) zusätzlich klickbar. */
 .mg-table td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .mg-table tbody tr:last-child td { border-bottom: none; }
 .mg-row { cursor: pointer; }
@@ -341,14 +305,12 @@ const recentEvents = consents.slice(0, 30);
     <div class="mg-tabs" role="tablist">
       <button class="mg-tab is-active" data-view="all" role="tab">{bt('mg.tab.all', lang)}</button>
       <button class="mg-tab" data-view="optin" role="tab">{bt('mg.tab.optin', lang)}</button>
-      <button class="mg-tab" data-view="activity" role="tab">{bt('mg.tab.activity', lang)}</button>
     </div>
     <span class="mg-count">
       <strong>{totalCount}</strong> {bt('mg.count.contacts', lang)} · <strong>{optinCount}</strong> {bt('mg.count.optin', lang)}
     </span>
   </div>
 
-  <div id="mg-view-contacts">
   <div class="mg-controls">
     <div class="mg-search">
       <input type="search" id="mg-search" placeholder={bt('mg.search', lang)} autocomplete="off" />
@@ -408,42 +370,6 @@ const recentEvents = consents.slice(0, 30);
   )}
 
   {truncated && <p class="mg-note">{bt('mg.note.truncated', lang)} ({MAX_RENDER} / {totalCount})</p>}
-  </div><!-- /#mg-view-contacts -->
-
-  <div id="mg-view-activity" hidden>
-    {recentEvents.length === 0 ? (
-      <div class="mg-card"><div class="mg-empty">{bt('mc.recent.empty', lang)}</div></div>
-    ) : (
-      <div class="mg-card">
-        <table class="mg-table">
-          <thead>
-            <tr>
-              <th>{bt('mc.th.action', lang)}</th>
-              <th>{bt('mc.th.source', lang)}</th>
-              <th>{bt('mc.th.channel', lang)}</th>
-              <th>{bt('mc.th.policy', lang)}</th>
-              <th>{bt('mc.th.date', lang)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentEvents.map(ev => (
-              <tr>
-                <td>
-                  <span class={`mg-badge mg-badge--${ev.action === 'granted' ? 'optin' : 'unsubscribed'}`}>
-                    {ev.action === 'granted' ? bt('mc.badge.granted', lang) : bt('mc.badge.revoked', lang)}
-                  </span>
-                </td>
-                <td class="mg-meta">{evSourceLabel(ev.source)}</td>
-                <td class="mg-meta">{ev.wallet_pass_id ? bt('mc.channel.wallet', lang) : bt('mc.channel.email', lang)}</td>
-                <td class="mg-meta">{ev.policy_version}</td>
-                <td class="mg-meta">{fmtDateTime(ev.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div><!-- /#mg-view-activity -->
 </div>
 
 <!-- Detail-Drawer -->
@@ -495,14 +421,13 @@ const recentEvents = consents.slice(0, 30);
     unsubWallet: bt('mg.detail.unsub.wallet', lang),
     unsubConfirm: bt('mg.detail.unsub.confirm', lang),
     unsubError: bt('mg.detail.unsub.error', lang),
-    chanEmail: bt('mg.channel.email', lang),
     locale: dateLocale,
   })}
 ></script>
 
 <script>
   type Hist = { created_at: string; action: string; source: string; policy_version: string; channel: 'email' | 'wallet' };
-  type C = { email: string; name: string; emailOptIn: boolean; walletOptIn: boolean; viaWallet: boolean; viaEmail: boolean; status: string; stay: { check_in: string; check_out: string } | null; history: Hist[] };
+  type C = { email: string; name: string; emailOptIn: boolean; walletOptIn: boolean; viaWallet: boolean; viaEmail: boolean; status: string; stay: { check_in: string; check_out: string } | null };
 
   const dataEl = document.getElementById('mg-data');
   const i18nEl = document.getElementById('mg-i18n');
@@ -510,7 +435,7 @@ const recentEvents = consents.slice(0, 30);
   const T = i18nEl ? JSON.parse(i18nEl.textContent || '{}') : {};
 
   // ── Filter-State ──
-  let view: 'all' | 'optin' | 'activity' = 'all';
+  let view: 'all' | 'optin' = 'all';
   let status = 'all';
   let q = '';
 
@@ -540,17 +465,12 @@ const recentEvents = consents.slice(0, 30);
     if (noOptin) (noOptin as HTMLElement).hidden = !(visible === 0 && view === 'optin' && q === '');
   }
 
-  const viewContacts = document.getElementById('mg-view-contacts');
-  const viewActivity = document.getElementById('mg-view-activity');
   document.querySelectorAll<HTMLButtonElement>('.mg-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.mg-tab').forEach(b => b.classList.remove('is-active'));
       btn.classList.add('is-active');
-      view = (btn.dataset.view as 'all' | 'optin' | 'activity') || 'all';
-      const isActivity = view === 'activity';
-      if (viewContacts) (viewContacts as HTMLElement).hidden = isActivity;
-      if (viewActivity) (viewActivity as HTMLElement).hidden = !isActivity;
-      if (!isActivity) applyFilters();
+      view = (btn.dataset.view as 'all' | 'optin') || 'all';
+      applyFilters();
     });
   });
   document.querySelectorAll<HTMLButtonElement>('.mg-chip').forEach(btn => {
@@ -566,15 +486,36 @@ const recentEvents = consents.slice(0, 30);
 
   // ── Drawer ──
   const dw = document.getElementById('mg-drawer');
+  let currentEmail = '';
   function fmtD(iso: string | null): string {
     if (!iso) return '—';
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString(T.locale || 'de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
   }
+  function escapeHtml(s: string): string {
+    return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] as string));
+  }
+  function renderHistory(el: HTMLElement, events: Hist[]) {
+    el.innerHTML = '';
+    if (!events || events.length === 0) { el.innerHTML = `<p class="mg-dw__muted">${T.nohistory}</p>`; return; }
+    for (const h of events) {
+      const row = document.createElement('div');
+      row.className = 'mg-hist__row';
+      const actLabel = h.action === 'granted' ? T.granted : T.revoked;
+      const actClass = h.action === 'granted' ? 'mg-hist__act--granted' : 'mg-hist__act--revoked';
+      const chan = h.channel === 'email' ? T.chEmail : T.chWallet;
+      row.innerHTML = `<span class="mg-hist__date">${fmtD(h.created_at)}</span>`
+        + `<span><span class="mg-hist__act ${actClass}">${actLabel}</span> `
+        + `<span class="mg-hist__src">· ${chan} · ${escapeHtml(h.source)}</span></span>`;
+      el.appendChild(row);
+    }
+  }
+
   function openDrawer(email: string) {
     const c = CONTACTS[email];
     if (!c || !dw) return;
+    currentEmail = email;
     (document.getElementById('mg-dw-name') as HTMLElement).textContent = c.name || '—';
     (document.getElementById('mg-dw-email') as HTMLElement).textContent = c.email;
 
@@ -588,23 +529,17 @@ const recentEvents = consents.slice(0, 30);
     const stayEl = document.getElementById('mg-dw-stay') as HTMLElement;
     stayEl.textContent = c.stay ? `${fmtD(c.stay.check_in)} – ${fmtD(c.stay.check_out)}` : T.nostay;
 
+    // Einwilligungs-Historie ON-DEMAND laden (keine globale Vorab-Abfrage).
     const hist = document.getElementById('mg-dw-history') as HTMLElement;
-    hist.innerHTML = '';
-    if (!c.history || c.history.length === 0) {
-      hist.innerHTML = `<p class="mg-dw__muted">${T.nohistory}</p>`;
-    } else {
-      for (const h of c.history) {
-        const row = document.createElement('div');
-        row.className = 'mg-hist__row';
-        const actLabel = h.action === 'granted' ? T.granted : T.revoked;
-        const actClass = h.action === 'granted' ? 'mg-hist__act--granted' : 'mg-hist__act--revoked';
-        const chan = h.channel === 'email' ? T.chEmail : T.chWallet;
-        row.innerHTML = `<span class="mg-hist__date">${fmtD(h.created_at)}</span>`
-          + `<span><span class="mg-hist__act ${actClass}">${actLabel}</span> `
-          + `<span class="mg-hist__src">· ${chan} · ${escapeHtml(h.source)}</span></span>`;
-        hist.appendChild(row);
-      }
-    }
+    hist.innerHTML = `<p class="mg-dw__muted">…</p>`;
+    const reqEmail = email;
+    fetch(`/api/marketing/contacts/history?email=${encodeURIComponent(email)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('http_' + r.status)))
+      .then(data => {
+        if (currentEmail !== reqEmail) return; // Drawer wurde inzwischen gewechselt
+        renderHistory(hist, (data && data.ok && Array.isArray(data.events)) ? data.events : []);
+      })
+      .catch(() => { if (currentEmail === reqEmail) renderHistory(hist, []); });
 
     const actions = document.getElementById('mg-dw-actions') as HTMLElement;
     actions.innerHTML = '';
@@ -624,12 +559,10 @@ const recentEvents = consents.slice(0, 30);
   }
   function closeDrawer() {
     if (!dw) return;
+    currentEmail = '';
     dw.classList.remove('is-open');
     dw.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
-  }
-  function escapeHtml(s: string): string {
-    return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] as string));
   }
 
   async function unsubscribe(email: string, channel: 'email' | 'wallet', btn: HTMLButtonElement) {
