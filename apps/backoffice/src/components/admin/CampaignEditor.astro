@@ -197,7 +197,7 @@ const ceT = {
       </div>
       <div class="ce-editor-wrap">
         <div id="ce-tiptap-mount" class="ce-editor"></div>
-        <div class="ce-editor-ph" x-show="isEmpty" x-cloak>{bt('ce.editor.placeholder', lang)}</div>
+        <div class="ce-editor-ph" x-show="isEditorEmpty" x-cloak>{bt('ce.editor.placeholder', lang)}</div>
       </div>
 
       <div class="ce-var-chips">
@@ -285,7 +285,6 @@ const ceT = {
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
-      isEmpty: true,
       eve: { prompt: '', loading: false },
       form: {
         anlass: 'adhoc' as string, name: '', channels: ['wallet_push', 'email'] as string[],
@@ -303,7 +302,7 @@ const ceT = {
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
           ],
           content: '<p></p>',
-          onUpdate: () => { this.form.body_html = this.editor.getHTML(); this.isEmpty = this.editor.isEmpty; this._refreshActive(); },
+          onUpdate: () => { this.form.body_html = this.editor.getHTML(); this._refreshActive(); },
           onSelectionUpdate: () => this._refreshActive(),
         });
       },
@@ -317,7 +316,7 @@ const ceT = {
         this.form.segment = tile.segment;
         const body = tile.body || '<p></p>';
         this.form.body_html = body;
-        if (this.editor) { this.editor.commands.setContent(body); this.isEmpty = this.editor.isEmpty; }
+        if (this.editor) this.editor.commands.setContent(body);
       },
 
       toggleChannel(ch: string) {
@@ -348,6 +347,12 @@ const ceT = {
       get segLoyal() { const n = this.cfg.SEGMENT_COUNTS.loyal; return n > 0 ? n.toLocaleString('de') : '—'; },
       get segLapsed() { const n = this.cfg.SEGMENT_COUNTS.lapsed; return n > 0 ? n.toLocaleString('de') : '—'; },
 
+      // Editor leer? — aus form.body_html (via getHTML in onUpdate, reaktiv).
+      get isEditorEmpty() {
+        const txt = (this.form.body_html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+        return txt === '';
+      },
+
       fillPushFromEmail() {
         this.form.push_title = (this.form.title || '').slice(0, 80);
         this.form.push_body = stripHtmlToText(this.editor ? this.editor.getHTML() : this.form.body_html).slice(0, 240);
@@ -371,7 +376,7 @@ const ceT = {
           this.form.title = data.title;
           const body = data.body_html || '<p></p>';
           this.form.body_html = body;
-          if (this.editor) { this.editor.commands.setContent(body); this.isEmpty = this.editor.isEmpty; }
+          if (this.editor) this.editor.commands.setContent(body);
           if (data.cta_label) this.form.cta_label = data.cta_label;
           this.form.anlass = 'adhoc';
         } catch (err: any) {
