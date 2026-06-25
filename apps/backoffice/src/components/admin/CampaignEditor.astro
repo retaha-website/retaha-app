@@ -101,7 +101,7 @@ const ceT = {
       <div class="ce-send-row">
         <div class="ce-seg">
           <button type="button" :class="form.schedule_mode === 'now' ? 'is-on' : ''" @click="form.schedule_mode = 'now'">{bt('ce.send.now', lang)}</button>
-          <button type="button" :class="form.schedule_mode === 'later' ? 'is-on' : ''" @click="form.schedule_mode = 'later'">{bt('ce.send.later', lang)}</button>
+          <button type="button" :class="form.schedule_mode === 'later' ? 'is-on' : ''" @click="setScheduleLater()">{bt('ce.send.later', lang)}</button>
         </div>
         <input type="datetime-local" x-show="form.schedule_mode === 'later'" x-cloak x-model="form.scheduled_at" class="s-input s-input--sm s-input--auto" />
       </div>
@@ -321,6 +321,18 @@ const ceT = {
           if (this.form.channels.length > 1) this.form.channels = this.form.channels.filter((x: string) => x !== ch);
         } else {
           this.form.channels = [...this.form.channels, ch];
+        }
+      },
+
+      // „Geplant" gewählt → Datum-Feld als Beispiel mit heute vorbefüllen
+      // (nächste volle Stunde, damit es sicher in der Zukunft liegt).
+      setScheduleLater() {
+        this.form.schedule_mode = 'later';
+        if (!this.form.scheduled_at) {
+          const d = new Date(Date.now() + 60 * 60 * 1000);
+          d.setMinutes(0, 0, 0);
+          const pad = (n: number) => String(n).padStart(2, '0');
+          this.form.scheduled_at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
       },
 
