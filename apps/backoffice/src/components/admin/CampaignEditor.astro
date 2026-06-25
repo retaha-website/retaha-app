@@ -195,7 +195,10 @@ const ceT = {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
       </div>
-      <div id="ce-tiptap-mount" class="ce-editor"></div>
+      <div class="ce-editor-wrap">
+        <div id="ce-tiptap-mount" class="ce-editor"></div>
+        <div class="ce-editor-ph" x-show="isEmpty" x-cloak>{bt('ce.editor.placeholder', lang)}</div>
+      </div>
 
       <div class="ce-var-chips">
         <span class="ce-var-label">{bt('ce.var.label', lang)}</span>
@@ -255,7 +258,6 @@ const ceT = {
   import { Editor } from '@tiptap/core';
   import StarterKit from '@tiptap/starter-kit';
   import Link from '@tiptap/extension-link';
-  import Placeholder from '@tiptap/extension-placeholder';
 
   function renderVars(text: string, ctx: any, footer?: any): string {
     const REGEX = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
@@ -283,6 +285,7 @@ const ceT = {
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
+      isEmpty: true,
       eve: { prompt: '', loading: false },
       form: {
         anlass: 'adhoc' as string, name: '', channels: ['wallet_push', 'email'] as string[],
@@ -298,10 +301,9 @@ const ceT = {
           extensions: [
             StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
-            Placeholder.configure({ placeholder: this.cfg.T.editorPlaceholder, showOnlyCurrent: false }),
           ],
           content: '<p></p>',
-          onUpdate: () => { this.form.body_html = this.editor.getHTML(); this._refreshActive(); },
+          onUpdate: () => { this.form.body_html = this.editor.getHTML(); this.isEmpty = this.editor.isEmpty; this._refreshActive(); },
           onSelectionUpdate: () => this._refreshActive(),
         });
       },
@@ -315,7 +317,7 @@ const ceT = {
         this.form.segment = tile.segment;
         const body = tile.body || '<p></p>';
         this.form.body_html = body;
-        if (this.editor) this.editor.commands.setContent(body);
+        if (this.editor) { this.editor.commands.setContent(body); this.isEmpty = this.editor.isEmpty; }
       },
 
       toggleChannel(ch: string) {
@@ -369,7 +371,7 @@ const ceT = {
           this.form.title = data.title;
           const body = data.body_html || '<p></p>';
           this.form.body_html = body;
-          if (this.editor) this.editor.commands.setContent(body);
+          if (this.editor) { this.editor.commands.setContent(body); this.isEmpty = this.editor.isEmpty; }
           if (data.cta_label) this.form.cta_label = data.cta_label;
           this.form.anlass = 'adhoc';
         } catch (err: any) {
@@ -560,7 +562,10 @@ const ceT = {
 .ce-editor :global(.ProseMirror p) { margin: 0 0 10px; }
 .ce-editor :global(.ProseMirror h2) { font-size: 18px; font-weight: 500; margin: 14px 0 6px; }
 .ce-editor :global(.ProseMirror a) { color: var(--petrol); text-decoration: underline; }
-.ce-editor :global(.ProseMirror p.is-editor-empty:first-child::before) { content: attr(data-placeholder); color: var(--ink-faint, #C0BEB8); float: left; pointer-events: none; height: 0; }
+/* Placeholder als EINZELNES Overlay (Alpine-gesteuert) — kein TipTap-Placeholder
+   + kein CSS-::before mehr, das doppelte zu vermeiden. */
+.ce-editor-wrap { position: relative; }
+.ce-editor-ph { position: absolute; top: 14px; left: 14px; right: 14px; color: var(--ink-faint, #C0BEB8); font-size: 14px; line-height: 1.6; pointer-events: none; }
 
 /* Variable chips */
 .ce-var-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 9px 0 0; }
