@@ -24,8 +24,6 @@ interface Props {
 }
 const p = Astro.props as Props;
 
-const LANGS_DISPLAY = p.enabledLangs.length > 0 ? p.enabledLangs : [p.hotelDefaultLang];
-
 const ANLASS_DEFS = [
   { id: 'adhoc', eyebrow: 'Frei', label: 'Ad-hoc (leer)', title: '', body: '', cta_label: '', segment: 'all' },
   { id: 'zimmer', eyebrow: 'Auslastung', label: 'Zimmer füllen', title: 'Freie Zimmer – jetzt buchen & sparen', body: '<p>Wir haben noch wenige freie Zimmer verfügbar. Nutze deine Chance auf einen entspannten Aufenthalt – jetzt buchen und profitiere von unserem Kurzfrist-Angebot.</p>', cta_label: 'Jetzt buchen', segment: 'all' },
@@ -67,9 +65,9 @@ const ceT = {
 
 <div class="ce-wrap" x-data="campaignEditor()" x-init="init()">
 
-  <!-- ── Setup-Zeile ───────────────────────────────────────────────────────── -->
-  <div class="ce-setup">
-    <div class="ce-setup-field ce-setup-anlass">
+  <!-- ── Anlass + Name (zwei getrennte Boxen oben) ────────────────────────── -->
+  <div class="ce-top">
+    <div class="ce-box ce-box--anlass">
       <span class="ce-label">{bt('ce.anlass', lang)}</span>
       <div class="s-select-wrap">
         <select class="s-select" x-model="form.anlass" @change="selectAnlass(form.anlass)">
@@ -77,11 +75,15 @@ const ceT = {
         </select>
       </div>
     </div>
-    <div class="ce-setup-field ce-setup-name">
+    <div class="ce-box ce-box--name">
       <span class="ce-label">{bt('ce.name', lang)}</span>
       <input type="text" x-model="form.name" placeholder={bt('ce.name.ph', lang)} class="s-input" />
     </div>
-    <div class="ce-setup-field">
+  </div>
+
+  <!-- ── Empfänger · Kanal · Versand (eine Box mit Switchern) ─────────────── -->
+  <div class="ce-box ce-controls">
+    <div class="ce-ctrl-field">
       <span class="ce-label">{bt('ce.recipients', lang)}</span>
       <div class="ce-seg">
         <button type="button" :class="form.segment === 'all' ? 'is-on' : ''" @click="form.segment = 'all'">{bt('ce.seg.all', lang)}<span class="ce-seg-cnt" x-text="segAll"></span></button>
@@ -89,14 +91,14 @@ const ceT = {
         <button type="button" :class="form.segment === 'lapsed' ? 'is-on' : ''" @click="form.segment = 'lapsed'">{bt('ce.seg.lapsed', lang)}<span class="ce-seg-cnt" x-text="segLapsed"></span></button>
       </div>
     </div>
-    <div class="ce-setup-field">
+    <div class="ce-ctrl-field">
       <span class="ce-label">{bt('ce.channel', lang)}</span>
       <div class="ce-seg">
         <button type="button" :class="form.channels.includes('wallet_push') ? 'is-on' : ''" @click="toggleChannel('wallet_push')">{bt('cm.ch.wallet_push', lang)}</button>
         <button type="button" :class="form.channels.includes('email') ? 'is-on' : ''" @click="toggleChannel('email')">{bt('cm.ch.email', lang)}</button>
       </div>
     </div>
-    <div class="ce-setup-field">
+    <div class="ce-ctrl-field">
       <span class="ce-label">{bt('ce.send', lang)}</span>
       <div class="ce-send-row">
         <div class="ce-seg">
@@ -500,17 +502,16 @@ const ceT = {
 .ce-hint { display: block; font-size: 11px; color: var(--ink-muted, #666); margin-top: 5px; line-height: 1.4; }
 .ce-field { display: block; margin-bottom: 14px; }
 
-/* ── Setup-Zeile ───────────────────────────────────────────────────────── */
-.ce-setup {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 24px;
-  background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0); border-radius: 16px; padding: 18px 22px;
-}
-.ce-setup-field { display: flex; flex-direction: column; }
-.ce-setup-name { flex: 1 1 200px; min-width: 170px; }
-.ce-setup-name .s-input { width: 100%; box-sizing: border-box; }
-.ce-setup-anlass { flex: 1 1 200px; min-width: 170px; }
-.ce-setup-anlass .s-select-wrap, .ce-setup-anlass .s-select { width: 100%; }
-.ce-setup-lang .s-select-wrap { min-width: 150px; }
+/* ── Anlass + Name (zwei Boxen oben) ───────────────────────────────────── */
+.ce-box { background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0); border-radius: 16px; padding: 18px 22px; }
+.ce-top { display: flex; gap: 16px; flex-wrap: wrap; }
+.ce-top .ce-box { flex: 1 1 300px; min-width: 240px; display: flex; flex-direction: column; }
+.ce-box--anlass .s-select-wrap, .ce-box--anlass .s-select { width: 100%; }
+.ce-box--name .s-input { width: 100%; box-sizing: border-box; }
+
+/* ── Empfänger · Kanal · Versand (eine Box) ────────────────────────────── */
+.ce-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 32px; }
+.ce-ctrl-field { display: flex; flex-direction: column; }
 .ce-send-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ce-autolang { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-muted, #666); margin: -2px 2px 0; line-height: 1.4; }
 .ce-autolang svg { color: var(--petrol); flex-shrink: 0; }
