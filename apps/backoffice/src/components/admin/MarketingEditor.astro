@@ -111,11 +111,16 @@ const meT = {
       <span class="me-label">{bt('ce.title', lang)}</span>
       <div class="me-title-row">
         <input type="text" x-model="form.title" placeholder={bt('ce.title.ph', lang)} class="s-input" />
-        <button type="button" class="me-card-action me-eve-btn" @click="eve.open = true; errorMsg = ''"
+        <button type="button" class="me-card-action me-eve-btn" @click="openEve('title')"
           x-text="cfg.T.eveWrite"></button>
       </div>
     </div>
 
+    <div class="me-body-hd">
+      <span class="me-label">{bt('ce.content', lang)}</span>
+      <button type="button" class="me-card-action me-eve-btn" @click="openEve('body')"
+        x-text="cfg.T.eveWrite"></button>
+    </div>
     <div class="me-toolbar">
       <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title={bt('ce.tb.bold', lang)}><strong>B</strong></button>
       <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title={bt('ce.tb.italic', lang)} class="me-tb-i"><em>I</em></button>
@@ -189,7 +194,7 @@ const meT = {
     @keydown.escape.window="if(eve.open && !eve.loading) eve.open = false">
     <div class="me-eve-modal">
       <div class="me-eve-mhd">
-        <span class="me-eve-mhd-title" x-text="cfg.T.eveWrite"></span>
+        <span class="me-eve-mhd-title" x-text="eve.mode === 'title' ? '✦ Betreff formulieren' : '✦ Text formulieren'"></span>
         <button type="button" class="me-eve-close" @click="eve.open = false" :disabled="eve.loading">✕</button>
       </div>
       <textarea class="s-input me-eve-ta" x-model="eve.prompt"
@@ -258,7 +263,7 @@ const meT = {
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
-      eve: { prompt: '', loading: false, open: false },
+      eve: { prompt: '', loading: false, open: false, mode: 'title' as string },
       form: {
         name:     CFG.INITIAL.name     ?? '',
         category: CFG.INITIAL.category ?? '',
@@ -289,6 +294,7 @@ const meT = {
         if (this.editor) return;
         this._mountEditor(this.form.body_html);
       },
+      openEve(mode: string) { this.eve.mode = mode; this.eve.open = true; this.errorMsg = ''; },
 
       // Editor leer? — aus form.body_html (via getHTML in onUpdate, reaktiv).
       get isEditorEmpty() {
@@ -310,11 +316,13 @@ const meT = {
             this.errorMsg = data.error === 'ai_not_configured' ? this.cfg.T.errAiNotConf : (data.error || this.cfg.T.errEve);
             return;
           }
-          this.form.title = data.title;
-          const body = data.body_html || '<p></p>';
-          this.form.body_html = body;
-          if (data.cta_label) this.form.ctaLabel = data.cta_label;
-          setTimeout(() => { this._mountEditor(body); }, 0);
+          if (this.eve.mode !== 'body') this.form.title = data.title;
+          if (this.eve.mode !== 'title') {
+            const body = data.body_html || '<p></p>';
+            this.form.body_html = body;
+            if (data.cta_label) this.form.ctaLabel = data.cta_label;
+            setTimeout(() => { this._mountEditor(body); }, 0);
+          }
           this.eve.open = false;
         } catch (err: any) {
           this.errorMsg = this.cfg.T.errNet + ': ' + (err.message || this.cfg.T.errUnknown);
@@ -441,6 +449,8 @@ const meT = {
 /* Eve row */
 .me-title-row { display: flex; gap: 8px; align-items: center; }
 .me-title-row .s-input { flex: 1; min-width: 0; }
+.me-body-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.me-body-hd .me-label { margin-bottom: 0; }
 .me-eve-btn { white-space: nowrap; flex-shrink: 0; }
 .me-eve-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .me-eve-modal { background: var(--surface, #fff); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18); }
