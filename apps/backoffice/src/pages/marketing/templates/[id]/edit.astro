@@ -31,6 +31,12 @@ if (!template || template.hotel_id !== hotel.id) {
   return Astro.redirect('/marketing/templates');
 }
 
+const { data: hotelBranding } = await sb
+  .from('hotels')
+  .select('brand_primary, logo_primary')
+  .eq('id', hotel.id)
+  .maybeSingle();
+
 const hotelDefaultLang = (hotel as any).default_language || 'de';
 
 function pickDefault(jsonb: any): string {
@@ -73,6 +79,9 @@ const initialCtaLabel = pickDefault(template.cta_label_i18n);
       initialName={template.name}
       initialCategory={template.category ?? null}
       hotelDefaultLang={hotelDefaultLang}
+      hotelName={hotel.name}
+      brandPrimary={(hotelBranding as any)?.brand_primary ?? '#14616E'}
+      logoUrl={(hotelBranding as any)?.logo_primary ?? null}
     />
   </div>
 </Layout>
