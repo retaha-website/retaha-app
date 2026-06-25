@@ -1,0 +1,568 @@
+---
+// /marketing/guests — Gäste-/Kontaktliste (Inhaber-only, v1)
+//
+// Unifizierte, durchsuchbare Kontaktliste aus den ZWEI digitalen Quellen
+// (wallet_passes + marketing_waitlist), dedupliziert über lower(email), pro Hotel.
+// Zwei Ansichten: „Alle" (alle Kontakte mit Status) und „Opt-in" (nur sendefähige).
+// Die „Opt-in"-Definition kommt aus @retaha/marketing/audience — DIESELBE Wahrheit,
+// die send.ts beim echten Versand nutzt. Versand-Empfänger werden NIE aus „Alle"
+// gezogen. Kein PMS-Voll-Verlauf (Zweckbindung). Alles explizit hotel-gescopt.
+
+import Layout from '../../layouts/Layout.astro';
+import {
+  getUser, getUserHotels, getUserRole, hasPermission,
+  createSupabaseServiceRoleInstance,
+} from '@retaha/auth';
+import { isEmailOptIn, isWalletOptIn } from '@retaha/marketing';
+import { getLang, bt } from '../../lib/i18n';
+
+const lang = getLang(Astro.cookies, Astro.request);
+const dateLocale = lang === 'de' ? 'de-DE' : lang;
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+// Inhaber-only (v1): die ganze Gäste-Ansicht — Liste, Detail, E-Mail.
+const myRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
+if (!myRole) return Astro.redirect('/admin/login?error=no_membership');
+if (!hasPermission(myRole, 'marketing.contacts')) {
+  return Astro.redirect('/marketing?error=guests_owner_only');
+}
+
+const sb = createSupabaseServiceRoleInstance();
+
+// ── Quellen laden (alle explizit hotel-gescopt; Service-Role bypassed RLS) ──
+const [passesRes, waitlistRes, consentsRes, staysRes] = await Promise.all([
+  sb.from('wallet_passes')
+    .select('id, guest_email, guest_first_name, guest_last_name, marketing_consent_given, marketing_consent_given_at, opted_out_at, state, visit_count, first_visit_at, last_visit_at')
+    .eq('hotel_id', hotel.id),
+  sb.from('marketing_waitlist')
+    .select('id, email, confirmed_at, unsubscribed_at, pending_at, confirmation_sent_at, source')
+    .eq('hotel_id', hotel.id),
+  sb.from('marketing_consents')
+    .select('id, action, source, policy_version, created_at, wallet_pass_id, waitlist_id')
+    .eq('hotel_id', hotel.id)
+    .order('created_at', { ascending: false })
+    .limit(5000),
+  sb.from('stays')
+    .select('wallet_pass_id, check_in, check_out')
+    .eq('hotel_id', hotel.id)
+    .not('wallet_pass_id', 'is', null),
+]);
+
+const passes = passesRes.data ?? [];
+const waitlist = waitlistRes.data ?? [];
+const consents = consentsRes.data ?? [];
+const stays = staysRes.data ?? [];
+
+type Status = 'optin' | 'pending' | 'unsubscribed' | 'none';
+interface HistEv { created_at: string; action: string; source: string; policy_version: string; channel: 'email' | 'wallet'; }
+interface Contact {
+  email: string;          // lowercased canonical key
+  displayEmail: string;   // wie erfasst
+  name: string;
+  viaWallet: boolean;
+  viaEmail: boolean;
+  emailOptIn: boolean;
+  walletOptIn: boolean;
+  pending: boolean;
+  unsubscribed: boolean;
+  status: Status;
+  lastVisitAt: string | null;
+  visitCount: number | null;
+  stay: { check_in: string; check_out: string } | null;
+  history: HistEv[];
+}
+
+const byEmail = new Map<string, Contact>();
+function ensure(emailRaw: string): Contact {
+  const email = emailRaw.toLowerCase().trim();
+  let c = byEmail.get(email);
+  if (!c) {
+    c = {
+      email, displayEmail: emailRaw.trim(), name: '',
+      viaWallet: false, viaEmail: false,
+      emailOptIn: false, walletOptIn: false, pending: false, unsubscribed: false,
+      status: 'none', lastVisitAt: null, visitCount: null, stay: null, history: [],
+    };
+    byEmail.set(email, c);
+  }
+  return c;
+}
+
+// Jüngsten Stay pro Wallet-Pass behalten
+const stayByPass = new Map<string, { check_in: string; check_out: string }>();
+for (const s of stays) {
+  if (!s.wallet_pass_id || !s.check_in) continue;
+  const prev = stayByPass.get(s.wallet_pass_id);
+  if (!prev || new Date(s.check_in) > new Date(prev.check_in)) {
+    stayByPass.set(s.wallet_pass_id, { check_in: s.check_in, check_out: s.check_out });
+  }
+}
+
+// Wallet-Pässe → Kontakte
+const passIdToEmail = new Map<string, string>();
+for (const p of passes) {
+  if (!p.guest_email) continue;
+  const c = ensure(p.guest_email);
+  passIdToEmail.set(p.id, c.email);
+  c.viaWallet = true;
+  const nm = [p.guest_first_name, p.guest_last_name].filter(Boolean).join(' ').trim();
+  if (nm && !c.name) c.name = nm;
+  if (isWalletOptIn(p)) c.walletOptIn = true;
+  if (p.opted_out_at || p.state === 'opted_out') c.unsubscribed = true;
+  if (p.visit_count != null) c.visitCount = Math.max(c.visitCount ?? 0, p.visit_count);
+  if (p.last_visit_at && (!c.lastVisitAt || new Date(p.last_visit_at) > new Date(c.lastVisitAt))) c.lastVisitAt = p.last_visit_at;
+  const st = stayByPass.get(p.id);
+  if (st && (!c.stay || new Date(st.check_in) > new Date(c.stay.check_in))) c.stay = st;
+}
+
+// Waitlist → Kontakte
+const waitlistIdToEmail = new Map<string, string>();
+for (const w of waitlist) {
+  if (!w.email) continue;
+  const c = ensure(w.email);
+  waitlistIdToEmail.set(w.id, c.email);
+  c.viaEmail = true;
+  if (isEmailOptIn(w)) c.emailOptIn = true;
+  if (w.unsubscribed_at) c.unsubscribed = true;
+  if (!w.confirmed_at && !w.unsubscribed_at) c.pending = true;
+}
+
+// Einwilligungs-Historie pro Kontakt (consents sind bereits created_at DESC)
+for (const ev of consents) {
+  let email: string | undefined;
+  let channel: 'email' | 'wallet' | undefined;
+  if (ev.wallet_pass_id) { email = passIdToEmail.get(ev.wallet_pass_id); channel = 'wallet'; }
+  else if (ev.waitlist_id) { email = waitlistIdToEmail.get(ev.waitlist_id); channel = 'email'; }
+  if (!email || !channel) continue;
+  const c = byEmail.get(email);
+  if (!c) continue;
+  c.history.push({ created_at: ev.created_at, action: ev.action, source: ev.source, policy_version: ev.policy_version, channel });
+}
+
+// Status ableiten — sendefähig (irgendein Kanal opt-in) gewinnt
+for (const c of byEmail.values()) {
+  if (c.emailOptIn || c.walletOptIn) c.status = 'optin';
+  else if (c.pending) c.status = 'pending';
+  else if (c.unsubscribed) c.status = 'unsubscribed';
+  else c.status = 'none';
+}
+
+const STATUS_ORDER: Record<Status, number> = { optin: 0, pending: 1, none: 2, unsubscribed: 3 };
+const allContacts = Array.from(byEmail.values()).sort((a, b) => {
+  if (STATUS_ORDER[a.status] !== STATUS_ORDER[b.status]) return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+  const av = a.lastVisitAt ? new Date(a.lastVisitAt).getTime() : 0;
+  const bv = b.lastVisitAt ? new Date(b.lastVisitAt).getTime() : 0;
+  if (av !== bv) return bv - av;
+  return (a.name || a.email).localeCompare(b.name || b.email);
+});
+
+const totalCount = allContacts.length;
+const optinCount = allContacts.filter(c => c.status === 'optin').length;
+
+// Render-Cap (Defense gegen Riesen-Hotels; v1). Zähler bleiben vollständig.
+const MAX_RENDER = 1500;
+const truncated = totalCount > MAX_RENDER;
+const rendered = truncated ? allContacts.slice(0, MAX_RENDER) : allContacts;
+if (truncated) console.warn(`[marketing/guests] ${totalCount} Kontakte, gerendert ${MAX_RENDER}`);
+
+// Kompakte JSON-Insel für den Detail-Drawer (Owner-only-Seite → PII ok)
+const contactsJson = JSON.stringify(Object.fromEntries(rendered.map(c => [c.email, {
+  email: c.displayEmail,
+  name: c.name,
+  emailOptIn: c.emailOptIn,
+  walletOptIn: c.walletOptIn,
+  viaWallet: c.viaWallet,
+  viaEmail: c.viaEmail,
+  status: c.status,
+  stay: c.stay,
+  history: c.history,
+}])));
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function sourceLabel(c: Contact): string {
+  if (c.viaWallet && c.viaEmail) return bt('mg.src.both', lang);
+  if (c.viaWallet) return bt('mg.src.wallet', lang);
+  return bt('mg.src.email', lang);
+}
+function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
+---
+
+<Layout title={bt('mg.crumb', lang)} activeTab="backoffice" hotelName={hotel.name}>
+<style>
+.breadcrumb { padding-top: 36px; }
+
+.mg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 8px 0 20px; }
+.mg-tabs { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
+.mg-tab { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); padding: 8px 16px; border-radius: 9px; }
+.mg-tab.is-active { background: #14616E; color: #fff; }
+.mg-count { font-family: 'Inter Tight', sans-serif; font-size: 13px; color: var(--ink-muted); }
+.mg-count strong { color: var(--ink); font-weight: 600; }
+
+.mg-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+.mg-search { flex: 1 1 280px; max-width: 420px; }
+.mg-search input { width: 100%; box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-family: 'Inter Tight', sans-serif; font-size: 14px; color: var(--ink); }
+.mg-search input:focus { outline: none; border-color: #14616E; box-shadow: 0 0 0 3px rgba(20,97,110,0.10); }
+.mg-filters { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.mg-chip { appearance: none; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-family: 'Inter Tight', sans-serif; font-size: 12px; color: var(--ink-muted); padding: 7px 12px; border-radius: 20px; }
+.mg-chip.is-active { border-color: #14616E; color: #14616E; background: rgba(20,97,110,0.08); font-weight: 600; }
+.mg-filters[hidden] { display: none; }
+
+.mg-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.mg-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.mg-table th { text-align: left; padding: 12px 16px; color: var(--ink-muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.mg-row td { padding: 13px 16px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: middle; }
+.mg-row:last-child td { border-bottom: none; }
+.mg-row { cursor: pointer; }
+.mg-row:hover td { background: rgba(20,97,110,0.04); }
+.mg-name { font-weight: 600; }
+.mg-email { color: var(--ink-muted); font-size: 13px; }
+.mg-meta { color: var(--ink-muted); font-size: 13px; }
+
+.mg-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.mg-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.mg-badge--optin { background: rgba(20,97,110,0.10); color: #14616E; }
+.mg-badge--pending { background: rgba(79,179,198,0.14); color: #2C7A8A; }
+.mg-badge--unsubscribed { background: #fce8e8; color: #8c2128; }
+.mg-badge--none { background: rgba(0,0,0,0.05); color: var(--ink-muted); }
+.mg-chans { display: inline-flex; gap: 5px; margin-left: 8px; }
+.mg-chan { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+
+.mg-empty { padding: 40px 24px; text-align: center; color: var(--ink-muted); font-size: 14px; }
+.mg-note { font-family: 'Inter Tight', sans-serif; font-size: 12px; color: var(--ink-muted); margin: 14px 2px 0; }
+
+/* Detail-Drawer (rechts einfahrend, Vanilla-JS — Muster wie NotificationsDrawer) */
+.mg-dw { position: fixed; inset: 0; z-index: 200; visibility: hidden; }
+.mg-dw.is-open { visibility: visible; }
+.mg-dw__backdrop { position: absolute; inset: 0; background: rgba(10,10,10,0.28); opacity: 0; transition: opacity .25s ease; }
+.mg-dw.is-open .mg-dw__backdrop { opacity: 1; }
+.mg-dw__panel { position: absolute; top: 0; right: 0; height: 100%; width: min(460px, 94vw); background: var(--surface); border-left: 1px solid var(--border); box-shadow: -12px 0 40px rgba(40,30,20,.12); transform: translateX(100%); transition: transform .3s cubic-bezier(.5,0,.2,1); display: flex; flex-direction: column; overflow-y: auto; }
+.mg-dw.is-open .mg-dw__panel { transform: translateX(0); }
+.mg-dw__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 28px 28px 16px; }
+.mg-dw__eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-muted); margin: 0 0 8px; }
+.mg-dw__name { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500; color: var(--ink); margin: 0; line-height: 1.25; word-break: break-word; }
+.mg-dw__email { font-size: 13px; color: var(--ink-muted); margin: 4px 0 0; word-break: break-all; }
+.mg-dw__close { appearance: none; border: 1px solid var(--border); background: var(--surface); cursor: pointer; width: 34px; height: 34px; border-radius: 9px; color: var(--ink-muted); font-size: 18px; line-height: 1; flex-shrink: 0; }
+.mg-dw__sec { padding: 16px 28px; border-top: 1px solid var(--border); }
+.mg-dw__sec-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); margin: 0 0 12px; }
+.mg-dw__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.mg-dw__chip { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 20px; background: rgba(20,97,110,0.10); color: #14616E; }
+.mg-dw__muted { color: var(--ink-muted); font-size: 13px; margin: 0; }
+.mg-hist { display: flex; flex-direction: column; gap: 0; }
+.mg-hist__row { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mg-hist__row:last-child { border-bottom: none; }
+.mg-hist__date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); flex-shrink: 0; width: 96px; }
+.mg-hist__act { font-weight: 600; }
+.mg-hist__act--granted { color: #14616E; }
+.mg-hist__act--revoked { color: #8c2128; }
+.mg-hist__src { color: var(--ink-muted); }
+.mg-dw__actions { padding: 16px 28px 28px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.mg-dw__btn { appearance: none; cursor: pointer; width: 100%; box-sizing: border-box; padding: 11px 16px; border-radius: 12px; border: 1px solid #e3c2c2; background: #fff; color: #8c2128; font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 600; }
+.mg-dw__btn:hover { background: #fce8e8; }
+.mg-dw__btn:disabled { opacity: .5; cursor: default; }
+</style>
+
+<div class="settings-page">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/overview" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
+    <span class="breadcrumb__sep">/</span>
+    <a href="/marketing" class="breadcrumb__crumb">{bt('mk.crumb', lang)}</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('mg.crumb', lang)}</span>
+  </nav>
+
+  <section class="settings-hero">
+    <h1 class="settings-hero__title" set:html={bt('mg.hero.title', lang)}></h1>
+    <p class="settings-hero__sub">{bt('mg.hero.sub', lang)}</p>
+  </section>
+
+  <div class="mg-bar">
+    <div class="mg-tabs" role="tablist">
+      <button class="mg-tab is-active" data-view="all" role="tab">{bt('mg.tab.all', lang)}</button>
+      <button class="mg-tab" data-view="optin" role="tab">{bt('mg.tab.optin', lang)}</button>
+    </div>
+    <span class="mg-count">
+      <strong>{totalCount}</strong> {bt('mg.count.contacts', lang)} · <strong>{optinCount}</strong> {bt('mg.count.optin', lang)}
+    </span>
+  </div>
+
+  <div class="mg-controls">
+    <div class="mg-search">
+      <input type="search" id="mg-search" placeholder={bt('mg.search', lang)} autocomplete="off" />
+    </div>
+    <div class="mg-filters" id="mg-filters">
+      <button class="mg-chip is-active" data-status="all">{bt('mg.status.all', lang)}</button>
+      <button class="mg-chip" data-status="optin">{bt('mg.status.optin', lang)}</button>
+      <button class="mg-chip" data-status="pending">{bt('mg.status.pending', lang)}</button>
+      <button class="mg-chip" data-status="unsubscribed">{bt('mg.status.unsubscribed', lang)}</button>
+      <button class="mg-chip" data-status="none">{bt('mg.status.none', lang)}</button>
+    </div>
+  </div>
+
+  {totalCount === 0 ? (
+    <div class="mg-card"><div class="mg-empty">{bt('mg.empty.all', lang)}</div></div>
+  ) : (
+    <div class="mg-card">
+      <table class="mg-table">
+        <thead>
+          <tr>
+            <th>{bt('mg.col.name', lang)}</th>
+            <th>{bt('mg.col.email', lang)}</th>
+            <th>{bt('mg.col.status', lang)}</th>
+            <th>{bt('mg.col.source', lang)}</th>
+            <th>{bt('mg.col.lastvisit', lang)}</th>
+            <th>{bt('mg.col.stay', lang)}</th>
+          </tr>
+        </thead>
+        <tbody id="mg-tbody">
+          {rendered.map(c => (
+            <tr class="mg-row"
+                data-email={c.email}
+                data-name={(c.name || '').toLowerCase()}
+                data-status={c.status}
+                data-optin={c.status === 'optin' ? '1' : '0'}>
+              <td class="mg-name">{c.name || '—'}</td>
+              <td class="mg-email">{c.displayEmail}</td>
+              <td>
+                <span class={`mg-badge mg-badge--${c.status}`}>{statusLabel(c.status)}</span>
+                {c.status === 'optin' && (
+                  <span class="mg-chans">
+                    {c.emailOptIn && <span class="mg-chan">{bt('mg.channel.email', lang)}</span>}
+                    {c.walletOptIn && <span class="mg-chan">{bt('mg.channel.wallet', lang)}</span>}
+                  </span>
+                )}
+              </td>
+              <td class="mg-meta">{sourceLabel(c)}</td>
+              <td class="mg-meta">{fmtDate(c.lastVisitAt)}{c.visitCount ? ` · ${c.visitCount}×` : ''}</td>
+              <td class="mg-meta">{c.stay ? `${fmtDate(c.stay.check_in)} – ${fmtDate(c.stay.check_out)}` : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div class="mg-empty" id="mg-noresults" hidden>{bt('mg.empty.search', lang)}</div>
+      <div class="mg-empty" id="mg-nooptin" hidden>{bt('mg.empty.optin', lang)}</div>
+    </div>
+  )}
+
+  {truncated && <p class="mg-note">{bt('mg.note.truncated', lang)} ({MAX_RENDER} / {totalCount})</p>}
+</div>
+
+<!-- Detail-Drawer -->
+<div class="mg-dw" id="mg-drawer" aria-hidden="true">
+  <div class="mg-dw__backdrop" data-dw-close></div>
+  <div class="mg-dw__panel" role="dialog" aria-modal="true" aria-label={bt('mg.detail.title', lang)}>
+    <div class="mg-dw__head">
+      <div>
+        <p class="mg-dw__eyebrow">{bt('mg.detail.title', lang)}</p>
+        <h2 class="mg-dw__name" id="mg-dw-name"></h2>
+        <p class="mg-dw__email" id="mg-dw-email"></p>
+      </div>
+      <button class="mg-dw__close" data-dw-close aria-label={bt('mg.detail.close', lang)}>×</button>
+    </div>
+
+    <div class="mg-dw__sec">
+      <p class="mg-dw__sec-title">{bt('mg.detail.channels', lang)}</p>
+      <div class="mg-dw__chips" id="mg-dw-channels"></div>
+    </div>
+
+    <div class="mg-dw__sec">
+      <p class="mg-dw__sec-title">{bt('mg.detail.stay', lang)}</p>
+      <p class="mg-dw__muted" id="mg-dw-stay"></p>
+    </div>
+
+    <div class="mg-dw__sec">
+      <p class="mg-dw__sec-title">{bt('mg.detail.history', lang)}</p>
+      <div class="mg-hist" id="mg-dw-history"></div>
+      <p class="mg-dw__muted" style="margin-top:12px;font-size:11px;">{bt('mg.detail.history.note', lang)}</p>
+    </div>
+
+    <div class="mg-dw__actions" id="mg-dw-actions"></div>
+  </div>
+</div>
+
+<script type="application/json" id="mg-data" is:inline set:html={contactsJson}></script>
+<script
+  type="application/json"
+  id="mg-i18n"
+  is:inline
+  set:html={JSON.stringify({
+    nostay: bt('mg.detail.nostay', lang),
+    nohistory: bt('mg.detail.nohistory', lang),
+    chEmail: bt('mg.channel.email', lang),
+    chWallet: bt('mg.channel.wallet', lang),
+    granted: bt('mc.badge.granted', lang),
+    revoked: bt('mc.badge.revoked', lang),
+    unsubEmail: bt('mg.detail.unsub.email', lang),
+    unsubWallet: bt('mg.detail.unsub.wallet', lang),
+    unsubConfirm: bt('mg.detail.unsub.confirm', lang),
+    unsubError: bt('mg.detail.unsub.error', lang),
+    chanEmail: bt('mg.channel.email', lang),
+    locale: dateLocale,
+  })}
+></script>
+
+<script>
+  type Hist = { created_at: string; action: string; source: string; policy_version: string; channel: 'email' | 'wallet' };
+  type C = { email: string; name: string; emailOptIn: boolean; walletOptIn: boolean; viaWallet: boolean; viaEmail: boolean; status: string; stay: { check_in: string; check_out: string } | null; history: Hist[] };
+
+  const dataEl = document.getElementById('mg-data');
+  const i18nEl = document.getElementById('mg-i18n');
+  const CONTACTS: Record<string, C> = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+  const T = i18nEl ? JSON.parse(i18nEl.textContent || '{}') : {};
+
+  // ── Filter-State ──
+  let view: 'all' | 'optin' = 'all';
+  let status = 'all';
+  let q = '';
+
+  const tbody = document.getElementById('mg-tbody');
+  const rows = tbody ? Array.from(tbody.querySelectorAll<HTMLTableRowElement>('.mg-row')) : [];
+  const filtersEl = document.getElementById('mg-filters');
+  const noResults = document.getElementById('mg-noresults');
+  const noOptin = document.getElementById('mg-nooptin');
+
+  function applyFilters() {
+    let visible = 0;
+    for (const r of rows) {
+      const rStatus = r.dataset.status || '';
+      const isOptin = r.dataset.optin === '1';
+      const name = r.dataset.name || '';
+      const email = (r.dataset.email || '');
+      let show = true;
+      if (view === 'optin' && !isOptin) show = false;
+      if (show && view === 'all' && status !== 'all' && rStatus !== status) show = false;
+      if (show && q && !name.includes(q) && !email.includes(q)) show = false;
+      r.style.display = show ? '' : 'none';
+      if (show) visible++;
+    }
+    // Status-Filter nur in „Alle"-Ansicht sinnvoll
+    if (filtersEl) (filtersEl as HTMLElement).hidden = view === 'optin';
+    if (noResults) (noResults as HTMLElement).hidden = !(visible === 0 && (q !== '' || (view === 'all' && status !== 'all')));
+    if (noOptin) (noOptin as HTMLElement).hidden = !(visible === 0 && view === 'optin' && q === '');
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.mg-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mg-tab').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      view = (btn.dataset.view as 'all' | 'optin') || 'all';
+      applyFilters();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('.mg-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mg-chip').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      status = btn.dataset.status || 'all';
+      applyFilters();
+    });
+  });
+  const searchEl = document.getElementById('mg-search') as HTMLInputElement | null;
+  searchEl?.addEventListener('input', () => { q = searchEl.value.trim().toLowerCase(); applyFilters(); });
+
+  // ── Drawer ──
+  const dw = document.getElementById('mg-drawer');
+  function fmtD(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString(T.locale || 'de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function openDrawer(email: string) {
+    const c = CONTACTS[email];
+    if (!c || !dw) return;
+    (document.getElementById('mg-dw-name') as HTMLElement).textContent = c.name || '—';
+    (document.getElementById('mg-dw-email') as HTMLElement).textContent = c.email;
+
+    const chans = document.getElementById('mg-dw-channels') as HTMLElement;
+    chans.innerHTML = '';
+    const addChip = (label: string) => { const s = document.createElement('span'); s.className = 'mg-dw__chip'; s.textContent = label; chans.appendChild(s); };
+    if (c.emailOptIn) addChip(T.chEmail);
+    if (c.walletOptIn) addChip(T.chWallet);
+    if (!c.emailOptIn && !c.walletOptIn) { chans.innerHTML = `<span class="mg-dw__muted">—</span>`; }
+
+    const stayEl = document.getElementById('mg-dw-stay') as HTMLElement;
+    stayEl.textContent = c.stay ? `${fmtD(c.stay.check_in)} – ${fmtD(c.stay.check_out)}` : T.nostay;
+
+    const hist = document.getElementById('mg-dw-history') as HTMLElement;
+    hist.innerHTML = '';
+    if (!c.history || c.history.length === 0) {
+      hist.innerHTML = `<p class="mg-dw__muted">${T.nohistory}</p>`;
+    } else {
+      for (const h of c.history) {
+        const row = document.createElement('div');
+        row.className = 'mg-hist__row';
+        const actLabel = h.action === 'granted' ? T.granted : T.revoked;
+        const actClass = h.action === 'granted' ? 'mg-hist__act--granted' : 'mg-hist__act--revoked';
+        const chan = h.channel === 'email' ? T.chEmail : T.chWallet;
+        row.innerHTML = `<span class="mg-hist__date">${fmtD(h.created_at)}</span>`
+          + `<span><span class="mg-hist__act ${actClass}">${actLabel}</span> `
+          + `<span class="mg-hist__src">· ${chan} · ${escapeHtml(h.source)}</span></span>`;
+        hist.appendChild(row);
+      }
+    }
+
+    const actions = document.getElementById('mg-dw-actions') as HTMLElement;
+    actions.innerHTML = '';
+    const addUnsub = (channel: 'email' | 'wallet', label: string) => {
+      const b = document.createElement('button');
+      b.className = 'mg-dw__btn';
+      b.textContent = label;
+      b.addEventListener('click', () => unsubscribe(c.email, channel, b));
+      actions.appendChild(b);
+    };
+    if (c.emailOptIn) addUnsub('email', T.unsubEmail);
+    if (c.walletOptIn) addUnsub('wallet', T.unsubWallet);
+
+    dw.classList.add('is-open');
+    dw.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    if (!dw) return;
+    dw.classList.remove('is-open');
+    dw.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  function escapeHtml(s: string): string {
+    return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] as string));
+  }
+
+  async function unsubscribe(email: string, channel: 'email' | 'wallet', btn: HTMLButtonElement) {
+    if (!confirm(T.unsubConfirm)) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/marketing/contacts/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, channel }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        location.reload();
+      } else {
+        alert(T.unsubError);
+        btn.disabled = false;
+      }
+    } catch {
+      alert(T.unsubError);
+      btn.disabled = false;
+    }
+  }
+
+  rows.forEach(r => r.addEventListener('click', () => openDrawer(r.dataset.email || '')));
+  document.querySelectorAll('[data-dw-close]').forEach(el => el.addEventListener('click', closeDrawer));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  applyFilters();
+</script>
+</Layout>

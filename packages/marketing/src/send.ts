@@ -35,6 +35,7 @@ import { buildOptOutUrl } from '@retaha/wallet';
 import { getEnv } from '@retaha/db';
 import type { LanguageCode } from '@retaha/i18n';
 import { AcsEmailSender, buildMarketingEmailHtml } from './email-sender';
+import { applyEmailOptInFilter } from './audience';
 
 // Marketing-Campaign-Status — string literal types
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
@@ -345,13 +346,14 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
         const emailSender = new AcsEmailSender(acsConnString, acsMailFrom);
         const backofficeUrl = (getEnv('PUBLIC_BACKOFFICE_URL') || 'https://backoffice.retaha.de').replace(/\/$/, '');
 
-        // Bestätigte Abonnenten dieses Hotels laden (hotel_id-Filter = Single Source of Truth)
-        const { data: waitlistEntries } = await sb
-          .from('marketing_waitlist')
-          .select('id, email, confirmation_token')
-          .not('confirmed_at', 'is', null)
-          .is('unsubscribed_at', null)
-          .eq('hotel_id', campaign.hotel_id);
+        // Bestätigte Abonnenten dieses Hotels laden. Opt-in-Filter = GETEILTE Wahrheit
+        // (applyEmailOptInFilter aus ./audience) — exakt dieselbe Definition, die die
+        // Backoffice-Kontaktliste /marketing/guests in der „Opt-in"-Ansicht nutzt.
+        const { data: waitlistEntries } = await applyEmailOptInFilter(
+          sb.from('marketing_waitlist')
+            .select('id, email, confirmation_token')
+            .eq('hotel_id', campaign.hotel_id)
+        );
 
         // Email → Pass-Map für optionalen Gastname + Sprache (kein Pflicht-Match)
         const emailToPass = new Map<string, any>();

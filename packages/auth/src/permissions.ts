@@ -58,6 +58,9 @@ export const PERMISSIONS = {
   // Sensitive Data
   'data.export':        OM,
   'data.delete':        O,
+
+  // Marketing-Kontaktliste / Gäste-Ansicht (Inhaber-only, v1)
+  'marketing.contacts': O,
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
