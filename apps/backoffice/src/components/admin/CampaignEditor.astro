@@ -125,15 +125,23 @@ const ceT = {
         <button type="button" class="ce-card-action" x-show="form.channels.includes('email')" @click="fillPushFromEmail()">{bt('ce.push.fromemail', lang)}</button>
       </div>
 
-      <label class="ce-field">
+      <div class="ce-field">
         <span class="ce-label">{bt('ce.push.title', lang)}</span>
-        <input type="text" x-model="form.push_title" maxlength="80" placeholder={bt('ce.push.titleph', lang)} class="s-input" />
-      </label>
-      <label class="ce-field">
-        <span class="ce-label">{bt('ce.push.body', lang)}</span>
+        <div class="ce-title-infield">
+          <input type="text" x-model="form.push_title" maxlength="80" placeholder={bt('ce.push.titleph', lang)} class="s-input ce-title-input" />
+          <button type="button" class="ce-card-action ce-eve-btn ce-eve-infield-btn" @click="openEve('push_title')"
+            x-text="cfg.T.eveWrite"></button>
+        </div>
+      </div>
+      <div class="ce-field">
+        <div class="ce-push-body-hd">
+          <span class="ce-label">{bt('ce.push.body', lang)}</span>
+          <button type="button" class="ce-card-action ce-eve-btn" @click="openEve('push_body')"
+            x-text="cfg.T.eveWrite"></button>
+        </div>
         <textarea x-model="form.push_body" maxlength="240" rows="3" placeholder={bt('ce.push.bodyph', lang)} class="s-input ce-textarea"></textarea>
         <span class="ce-hint ce-count"><span x-text="(form.push_body || '').length"></span> / 240 {bt('ce.push.chars', lang)}</span>
-      </label>
+      </div>
       <label class="ce-field">
         <span class="ce-label">{bt('ce.push.deeplink', lang)}</span>
         <input type="url" x-model="form.cta_url" placeholder="https://…" class="s-input" />
@@ -246,7 +254,7 @@ const ceT = {
     @keydown.escape.window="if(eve.open && !eve.loading) eve.open = false">
     <div class="ce-eve-modal">
       <div class="ce-eve-mhd">
-        <span class="ce-eve-mhd-title" x-text="eve.mode === 'title' ? '✦ Betreff formulieren' : '✦ Text formulieren'"></span>
+        <span class="ce-eve-mhd-title" x-text="({title:'✦ Betreff formulieren', body:'✦ Text formulieren', push_title:'✦ Push-Titel formulieren', push_body:'✦ Push-Text formulieren'})[eve.mode] || cfg.T.eveWrite"></span>
         <button type="button" class="ce-eve-close" @click="eve.open = false" :disabled="eve.loading">✕</button>
       </div>
       <textarea class="s-input ce-eve-ta" x-model="eve.prompt"
@@ -404,12 +412,17 @@ const ceT = {
             this.errorMsg = data.error === 'ai_not_configured' ? this.cfg.T.errAiNotConf : (data.error || this.cfg.T.errEve);
             return;
           }
-          if (this.eve.mode !== 'body') this.form.title = data.title;
-          if (this.eve.mode !== 'title') {
+          if (this.eve.mode === 'title') {
+            this.form.title = data.title;
+          } else if (this.eve.mode === 'body') {
             const body = data.body_html || '<p></p>';
             this.form.body_html = body;
             if (data.cta_label) this.form.cta_label = data.cta_label;
             setTimeout(() => { this._mountEditor(body); }, 0);
+          } else if (this.eve.mode === 'push_title') {
+            this.form.push_title = (data.title || '').slice(0, 80);
+          } else if (this.eve.mode === 'push_body') {
+            this.form.push_body = stripHtmlToText(data.body_html || '').slice(0, 240);
           }
           this.form.anlass = 'adhoc';
           this.eve.open = false;
@@ -586,6 +599,8 @@ const ceT = {
 .ce-title-input { width: 100%; box-sizing: border-box; padding-right: 160px; }
 .ce-eve-infield-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 .ce-eve-btn { white-space: nowrap; flex-shrink: 0; }
+.ce-push-body-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.ce-push-body-hd .ce-label { margin-bottom: 0; }
 .ce-eve-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .ce-eve-modal { background: var(--surface, #fff); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18); }
 .ce-eve-mhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
