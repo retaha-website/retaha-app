@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ url }) => {
     const sb = createSupabaseServiceRoleInstance();
     const { data: entry } = await sb
       .from('marketing_waitlist')
-      .select('id, email, unsubscribed_at')
+      .select('id, email, unsubscribed_at, hotel_id')
       .eq('confirmation_token', token)
       .maybeSingle();
 
@@ -32,6 +32,7 @@ export const GET: APIRoute = async ({ url }) => {
     await sb.from('marketing_consents').insert({
       wallet_pass_id: null,
       waitlist_id: entry.id,
+      hotel_id: entry.hotel_id,
       action: 'revoked',
       source: 'email_unsubscribe_link',
       policy_version: '2026-v1',

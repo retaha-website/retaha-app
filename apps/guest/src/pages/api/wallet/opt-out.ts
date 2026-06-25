@@ -85,6 +85,7 @@ export const POST: APIRoute = async ({ request }) => {
   // 2. Audit-Eintrag
   const { error: auditErr } = await sb.from('marketing_consents').insert({
     wallet_pass_id: pass.id,
+    hotel_id: pass.hotel_id,
     action: 'revoked',
     source: 'opt_out_link',
     ip_hash: ipHash,

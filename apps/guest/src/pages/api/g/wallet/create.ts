@@ -309,6 +309,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     const ua = request.headers.get('user-agent')?.slice(0, 500) || null;
     const { error: auditErr } = await sb.from('marketing_consents').insert({
       wallet_pass_id: walletPassId,
+      hotel_id: stay.hotel_id,
       action: 'granted',
       source: 'wallet_add',
       ip_hash: ipHashAudit,
