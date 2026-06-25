@@ -34,8 +34,9 @@ import { asLanguageCode } from '@retaha/i18n';
 import { buildOptOutUrl } from '@retaha/wallet';
 import { getEnv } from '@retaha/db';
 import type { LanguageCode } from '@retaha/i18n';
-import { AcsEmailSender, buildMarketingEmailHtml } from './email-sender';
+import { buildMarketingEmailHtml } from './email-sender';
 import { applyEmailOptInFilter } from './audience';
+import { resolveMarketingEmailTransport } from './email-transport';
 
 // Marketing-Campaign-Status — string literal types
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
@@ -338,12 +339,17 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
     // ── 6b. Email-Kanal (wenn aktiviert) ──────────────────────────────────────────
     const channels = (campaign as any).channels as string[] ?? ['wallet_push'];
     if (channels.includes('email')) {
-      const acsConnString = getEnv('ACS_CONNECTION_STRING');
-      const acsMailFrom = getEnv('ACS_MAIL_FROM');
-      if (!acsConnString || !acsMailFrom) {
-        console.warn('[campaign-send] Email-Kanal aktiviert, aber ACS_CONNECTION_STRING/ACS_MAIL_FROM fehlen — Email-Send übersprungen');
+      // Hybrid-Routing: Provider pro Hotel auflösen (ACS-Standard ODER eigene
+      // verifizierte Resend-Domain). KEIN stiller Fallback — „eigene Domain
+      // gewählt, aber nicht verifiziert" blockiert den E-Mail-Kanal.
+      const transport = await resolveMarketingEmailTransport(sb, campaign.hotel_id, hotelName);
+      if (!transport.ok) {
+        const reason = `email_blocked_${transport.reason}`;
+        skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+        console.warn(`[campaign-send ${campaignId.slice(0, 8)}] E-Mail-Kanal blockiert: ${transport.reason}`);
       } else {
-        const emailSender = new AcsEmailSender(acsConnString, acsMailFrom);
+        const emailSender = transport.sender;
+        console.info(`[campaign-send ${campaignId.slice(0, 8)}] E-Mail-Provider=${transport.provider} from="${transport.from}"`);
         const backofficeUrl = (getEnv('PUBLIC_BACKOFFICE_URL') || 'https://backoffice.retaha.de').replace(/\/$/, '');
 
         // Bestätigte Abonnenten dieses Hotels laden. Opt-in-Filter = GETEILTE Wahrheit

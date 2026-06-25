@@ -88,6 +88,44 @@ export class AcsEmailSender implements EmailSender {
   }
 }
 
+// Resend Email-Sender für Hotels mit eigener verifizierter Domain.
+// Direkter fetch zu api.resend.com/emails (keine SDK-Dependency), gleiche
+// EmailSender-Signatur wie ACS. `from` = vollständige Absenderadresse inkl.
+// Display-Name, z.B. "Gate Garden Hotel <marketing@gategardenhotel.de>".
+export class ResendEmailSender implements EmailSender {
+  constructor(private apiKey: string, private from: string) {}
+
+  async send(p: EmailSendParams): Promise<EmailSendResult> {
+    const body = JSON.stringify({
+      from: this.from,
+      to: [p.to],
+      subject: p.subject,
+      html: p.html,
+      ...(p.replyTo ? { reply_to: p.replyTo } : {}),
+    });
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        console.error(`[ResendEmailSender] HTTP ${res.status}: ${text.slice(0, 300)}`);
+        return { ok: false, error: `resend_${res.status}: ${text.slice(0, 300)}` };
+      }
+      const json = JSON.parse(text) as { id?: string };
+      return { ok: true, id: json.id };
+    } catch (err) {
+      console.error('[ResendEmailSender] fetch exception:', (err as Error).message);
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+}
+
 // HTML-Builder für Marketing-Emails
 export function buildMarketingEmailHtml(p: {
   title: string;
