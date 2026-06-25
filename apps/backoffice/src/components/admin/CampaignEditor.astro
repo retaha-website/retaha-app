@@ -1,11 +1,13 @@
 ---
-// V9 Campaign-Editor — Hebel 1-5
+// V9 Campaign-Editor — Aufbau neu (Vorschlag A + C-Inhaltslogik)
 //
-// Hebel 1: Dual-Channel-Preview (Wallet + E-Mail)
-// Hebel 2: Anlass-Kacheln ersetzen Template-Dropdown
-// Hebel 3: "✦ Mit Eve schreiben" — AI-Generierung via Haiku
-// Hebel 4: Benannte Segmente mit echten Zählern
-// Hebel 5: Personalisierungs-Chips ersetzen Variable-Dropdown
+// Aufbau: Setup-Zeile oben (Anlass · Name · Empfänger · Kanal) → zweigeteilt
+// (Composer links mit Kanal-Inhalts-Tabs, sticky Live-Vorschau rechts mit
+// Kanal-Umschalter) → Versand + Aktionen unten.
+//
+// C-Full: getrennter Inhalt je Kanal. E-Mail = Betreff + Rich-Text + CTA
+// (title/body/cta, immer Primär-Inhalt). Wallet-Push = optionaler kurzer
+// Titel + Text (push_title/push_body) — leer → Versand kürzt den E-Mail-Text.
 
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
 import { getLang, bt } from '../../lib/i18n';
@@ -41,8 +43,17 @@ const p = Astro.props as Props;
 
 const LANGS_DISPLAY = p.enabledLangs.length > 0 ? p.enabledLangs : [p.hotelDefaultLang];
 
-// Anlass-Kacheln — server-side definition, passed to client via define:vars
+// Anlass = Vorlage. Auswahl füllt Inhalt + Empfänger-Empfehlung vor.
 const ANLASS_DEFS = [
+  {
+    id: 'adhoc',
+    eyebrow: 'Frei',
+    label: 'Ad-hoc (leer)',
+    title: '',
+    body: '',
+    cta_label: '',
+    segment: 'all',
+  },
   {
     id: 'zimmer',
     eyebrow: 'Auslastung',
@@ -77,15 +88,6 @@ const ANLASS_DEFS = [
     title: 'Einladung: Besonderes Event im {{hotel_name}}',
     body: '<p>Wir laden dich herzlich zu einem besonderen Abend bei uns ein. Freue dich auf ein unvergessliches Erlebnis in einzigartiger Atmosphäre.</p>',
     cta_label: 'Mehr erfahren',
-    segment: 'all',
-  },
-  {
-    id: 'adhoc',
-    eyebrow: 'Frei',
-    label: 'Ad-hoc (leer)',
-    title: '',
-    body: '',
-    cta_label: '',
     segment: 'all',
   },
 ];
@@ -123,254 +125,203 @@ const ceT = {
   saving: bt('ce.saving', lang),
   saveCreate: bt('ce.save', lang),
   toastSaved: bt('ce.toast.saved', lang),
+  pushChars: bt('ce.push.chars', lang),
 };
 ---
 
 <div class="ce-wrap" x-data="campaignEditor()" x-init="init()">
 
-  <!-- ── Anlass-Kacheln (Hebel 2) ──────────────────────────────────────── -->
-  <div class="ce-anlass-row">
-    {ANLASS_DEFS.map(tile => (
-      <button
-        type="button"
-        class="ce-anlass-tile"
-        :class={`form.anlass === '${tile.id}' ? 'is-on' : ''`}
-        @click={`selectAnlass('${tile.id}')`}
-      >
-        <span class="ce-tile-eyebrow">{bt('ce.anlass.' + tile.id + '.eyebrow', lang)}</span>
-        <span class="ce-tile-label">{bt('ce.anlass.' + tile.id + '.label', lang)}</span>
-      </button>
-    ))}
-  </div>
-
-  <!-- ── 3-Spalten-Grid ─────────────────────────────────────────────────── -->
-  <div class="ce-grid">
-
-    <!-- ── Spalte 1: Einstellungen ──────────────────────────────────────── -->
-    <div class="ce-col ce-col-settings">
-
-      <p class="ce-col-eyebrow">{bt('ce.col.settings', lang)}</p>
-
-      <label class="ce-field">
-        <span class="ce-label">{bt('ce.name', lang)}</span>
-        <input type="text" x-model="form.name" placeholder={bt('ce.name.ph', lang)} class="s-input" />
-      </label>
-
-      <!-- Kanal (Hebel 1) -->
-      <div class="ce-field">
-        <span class="ce-label">{bt('ce.channel', lang)}</span>
-        <div class="ce-channel-row">
-          <button type="button"
-            class="ce-ch-chip"
-            :class="form.channels.includes('wallet_push') ? 'is-on' : ''"
-            @click="toggleChannel('wallet_push')"
-          >{bt('cm.ch.wallet_push', lang)}</button>
-          <button type="button"
-            class="ce-ch-chip"
-            :class="form.channels.includes('email') ? 'is-on' : ''"
-            @click="toggleChannel('email')"
-          >{bt('cm.ch.email', lang)}</button>
-        </div>
-        <span class="ce-hint">{bt('ce.channel.hint', lang)}</span>
-      </div>
-
-      <!-- Empfänger-Segmente (Hebel 4) -->
-      <div class="ce-field">
-        <span class="ce-label">{bt('ce.recipients', lang)}</span>
-        <div class="ce-seg-row">
-          <button type="button"
-            class="ce-seg-chip"
-            :class="form.segment === 'all' ? 'is-on' : ''"
-            @click="form.segment = 'all'"
-          >
-            <span class="ce-seg-name">{bt('ce.seg.all', lang)}</span>
-            <span class="ce-seg-count" x-text="segAll"></span>
-          </button>
-          <button type="button"
-            class="ce-seg-chip"
-            :class="form.segment === 'loyal' ? 'is-on' : ''"
-            @click="form.segment = 'loyal'"
-          >
-            <span class="ce-seg-name">{bt('ce.seg.loyal', lang)}</span>
-            <span class="ce-seg-count" x-text="segLoyal"></span>
-          </button>
-          <button type="button"
-            class="ce-seg-chip"
-            :class="form.segment === 'lapsed' ? 'is-on' : ''"
-            @click="form.segment = 'lapsed'"
-          >
-            <span class="ce-seg-name">{bt('ce.seg.lapsed', lang)}</span>
-            <span class="ce-seg-count" x-text="segLapsed"></span>
-          </button>
-        </div>
-        <span class="ce-hint" set:html={bt('ce.seg.hint', lang)}></span>
-      </div>
-
-      <label class="ce-field">
-        <span class="ce-label">{bt('ce.lang', lang)}</span>
-        <select x-model="form.target_lang" class="s-input ce-input-sm">
-          <option value="">{bt('ce.lang.all', lang)}</option>
-          {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
-        </select>
-      </label>
-
-      <div class="ce-field">
-        <span class="ce-label">{bt('ce.send', lang)}</span>
-        <div class="ce-radio-group">
-          <label class="ce-radio">
-            <input type="radio" x-model="form.schedule_mode" value="now" />
-            <span>{bt('ce.send.now', lang)}</span>
-          </label>
-          <label class="ce-radio">
-            <input type="radio" x-model="form.schedule_mode" value="later" />
-            <span>{bt('ce.send.later', lang)}</span>
-          </label>
-        </div>
-        <label x-show="form.schedule_mode === 'later'" x-cloak style="display:block;margin-top:8px">
-          <input type="datetime-local" x-model="form.scheduled_at" class="s-input" />
-        </label>
-      </div>
-
+  <!-- ── Setup-Zeile (oben, volle Breite) ──────────────────────────────────── -->
+  <div class="ce-setup">
+    <div class="ce-setup-field ce-setup-anlass">
+      <span class="ce-label">{bt('ce.anlass', lang)}</span>
+      <select class="s-input ce-input-sm" x-model="form.anlass" @change="selectAnlass(form.anlass)">
+        {ANLASS_DEFS.map(t => <option value={t.id}>{bt('ce.anlass.' + t.id + '.label', lang)}</option>)}
+      </select>
     </div>
 
-    <!-- ── Spalte 2: Editor ──────────────────────────────────────────────── -->
-    <div class="ce-col ce-col-editor">
+    <div class="ce-setup-field ce-setup-name">
+      <span class="ce-label">{bt('ce.name', lang)}</span>
+      <input type="text" x-model="form.name" placeholder={bt('ce.name.ph', lang)} class="s-input" />
+    </div>
 
-      <p class="ce-col-eyebrow">{bt('ce.content', lang)} ({p.hotelDefaultLang.toUpperCase()})</p>
-      <p class="ce-hint" style="margin-bottom:16px">{bt('ce.content.hint', lang)}</p>
-
-      <!-- Mit Eve schreiben (Hebel 3) -->
-      <div class="ce-eve-row">
-        <input
-          type="text"
-          x-model="eve.prompt"
-          class="s-input ce-eve-input"
-          placeholder={bt('ce.eve.ph', lang)}
-          @keydown.enter.prevent="eveWrite()"
-          :disabled="eve.loading"
-        />
-        <button
-          type="button"
-          class="v9-btn ce-eve-btn"
-          @click="eveWrite()"
-          :disabled="eve.loading || !eve.prompt.trim()"
-          x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"
-        ></button>
-      </div>
-
-      <div class="ce-divider">
-        <span>{bt('ce.divider', lang)}</span>
-      </div>
-
-      <label class="ce-field">
-        <span class="ce-label">{bt('ce.title', lang)}</span>
-        <input
-          type="text"
-          x-model="form.title"
-          placeholder={bt('ce.title.ph', lang)}
-          class="s-input ce-input-title"
-        />
-      </label>
-
-      <!-- Toolbar -->
-      <div class="ce-toolbar">
-        <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title={bt('ce.tb.bold', lang)}><strong>B</strong></button>
-        <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title={bt('ce.tb.italic', lang)} class="ce-tb-i"><em>I</em></button>
-        <button type="button" @click="exec('toggleHeading', {level: 2})" :class="active.h2 ? 'is-on' : ''" title={bt('ce.tb.h2', lang)}>H2</button>
-        <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title={bt('ce.tb.bullet', lang)}>•</button>
-        <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title={bt('ce.tb.ordered', lang)}>1.</button>
-        <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title={bt('ce.tb.link', lang)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <div class="ce-setup-field ce-setup-seg">
+      <span class="ce-label">{bt('ce.recipients', lang)}</span>
+      <div class="ce-seg-row">
+        <button type="button" class="ce-seg-chip" :class="form.segment === 'all' ? 'is-on' : ''" @click="form.segment = 'all'">
+          <span class="ce-seg-name">{bt('ce.seg.all', lang)}</span>
+          <span class="ce-seg-count" x-text="segAll"></span>
+        </button>
+        <button type="button" class="ce-seg-chip" :class="form.segment === 'loyal' ? 'is-on' : ''" @click="form.segment = 'loyal'">
+          <span class="ce-seg-name">{bt('ce.seg.loyal', lang)}</span>
+          <span class="ce-seg-count" x-text="segLoyal"></span>
+        </button>
+        <button type="button" class="ce-seg-chip" :class="form.segment === 'lapsed' ? 'is-on' : ''" @click="form.segment = 'lapsed'">
+          <span class="ce-seg-name">{bt('ce.seg.lapsed', lang)}</span>
+          <span class="ce-seg-count" x-text="segLapsed"></span>
         </button>
       </div>
+    </div>
 
-      <div id="ce-tiptap-mount" class="ce-editor"></div>
+    <div class="ce-setup-field ce-setup-ch">
+      <span class="ce-label">{bt('ce.channel', lang)}</span>
+      <div class="ce-channel-row">
+        <button type="button" class="ce-ch-chip" :class="form.channels.includes('wallet_push') ? 'is-on' : ''" @click="toggleChannel('wallet_push')">{bt('cm.ch.wallet_push', lang)}</button>
+        <button type="button" class="ce-ch-chip" :class="form.channels.includes('email') ? 'is-on' : ''" @click="toggleChannel('email')">{bt('cm.ch.email', lang)}</button>
+      </div>
+    </div>
+  </div>
 
-      <!-- Personalisierungs-Chips (Hebel 5) -->
-      <div class="ce-var-chips">
-        <span class="ce-var-label">{bt('ce.var.label', lang)}</span>
-        {VARIABLE_UI_DEFS.map(v => (
-          <button type="button" class="ce-var-chip" @click={`insertVariable('${v.key}')`} :title="`Beispiel: ${v.example}`">
-            {`{{${v.key}}}`}
-          </button>
-        ))}
+  <!-- ── Zweigeteilt: Composer (links) + Vorschau (rechts, sticky) ─────────── -->
+  <div class="ce-main">
+
+    <!-- LINKS — Composer -->
+    <div class="ce-composer">
+
+      <!-- Eve-Assist im Feld (kein zweiter Block) -->
+      <div class="ce-eve-row">
+        <input type="text" x-model="eve.prompt" class="s-input ce-eve-input"
+          placeholder={bt('ce.eve.ph', lang)}
+          @keydown.enter.prevent="eveWrite()" :disabled="eve.loading" />
+        <button type="button" class="v9-btn ce-eve-btn" @click="eveWrite()"
+          :disabled="eve.loading || !eve.prompt.trim()"
+          x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"></button>
       </div>
 
-      <div class="ce-field" style="margin-top:16px">
-        <span class="ce-label">{bt('ce.cta', lang)}</span>
-        <div class="ce-cta-row">
-          <input type="text" x-model="form.cta_label" placeholder={bt('ce.cta.labelph', lang)} class="s-input" />
-          <input type="url" x-model="form.cta_url" placeholder="https://…" class="s-input" />
+      <!-- Kanal-Inhalts-Tabs (nur wenn BEIDE Kanäle) -->
+      <template x-if="form.channels.length === 2">
+        <div class="ce-ctabs">
+          <button type="button" :class="contentTab === 'email' ? 'is-on' : ''" @click="contentTab = 'email'">{bt('cm.ch.email', lang)}</button>
+          <button type="button" :class="contentTab === 'push' ? 'is-on' : ''" @click="contentTab = 'push'">{bt('cm.ch.wallet_push', lang)}</button>
+        </div>
+      </template>
+
+      <!-- ── E-Mail / Primär-Inhalt (immer im DOM → TipTap bleibt gemountet) ── -->
+      <div class="ce-panel" x-show="contentTab === 'email' || form.channels.length < 2">
+        <label class="ce-field">
+          <span class="ce-label" x-text="form.channels.includes('email') ? cfgLabel.subject : cfgLabel.title"></span>
+          <input type="text" x-model="form.title" placeholder={bt('ce.title.ph', lang)} class="s-input ce-input-title" />
+        </label>
+
+        <div class="ce-toolbar">
+          <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title={bt('ce.tb.bold', lang)}><strong>B</strong></button>
+          <button type="button" @click="exec('toggleItalic')" :class="active.italic ? 'is-on' : ''" title={bt('ce.tb.italic', lang)} class="ce-tb-i"><em>I</em></button>
+          <button type="button" @click="exec('toggleHeading', {level: 2})" :class="active.h2 ? 'is-on' : ''" title={bt('ce.tb.h2', lang)}>H2</button>
+          <button type="button" @click="exec('toggleBulletList')"  :class="active.bullet  ? 'is-on' : ''" title={bt('ce.tb.bullet', lang)}>•</button>
+          <button type="button" @click="exec('toggleOrderedList')" :class="active.ordered ? 'is-on' : ''" title={bt('ce.tb.ordered', lang)}>1.</button>
+          <button type="button" @click="setLink()" :class="active.link ? 'is-on' : ''" title={bt('ce.tb.link', lang)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
+        </div>
+
+        <div id="ce-tiptap-mount" class="ce-editor"></div>
+
+        <div class="ce-var-chips">
+          <span class="ce-var-label">{bt('ce.var.label', lang)}</span>
+          {VARIABLE_UI_DEFS.map(v => (
+            <button type="button" class="ce-var-chip" @click={`insertVariable('${v.key}')`} :title="`Beispiel: ${v.example}`">
+              {`{{${v.key}}}`}
+            </button>
+          ))}
+        </div>
+
+        <div class="ce-field" style="margin-top:16px">
+          <span class="ce-label">{bt('ce.cta', lang)}</span>
+          <div class="ce-cta-row">
+            <input type="text" x-model="form.cta_label" placeholder={bt('ce.cta.labelph', lang)} class="s-input" />
+            <input type="url" x-model="form.cta_url" placeholder="https://…" class="s-input" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Wallet-Push-Inhalt (nur wenn BEIDE Kanäle, Push-Tab) ──────────── -->
+      <div class="ce-panel" x-show="form.channels.length === 2 && contentTab === 'push'" x-cloak>
+        <div class="ce-push-head">
+          <span class="ce-hint" set:html={bt('ce.push.note', lang)}></span>
+          <button type="button" class="ce-push-fill" @click="fillPushFromEmail()">{bt('ce.push.fromemail', lang)}</button>
+        </div>
+
+        <label class="ce-field">
+          <span class="ce-label">{bt('ce.push.title', lang)}</span>
+          <input type="text" x-model="form.push_title" maxlength="80" placeholder={bt('ce.push.titleph', lang)} class="s-input" />
+        </label>
+
+        <label class="ce-field">
+          <span class="ce-label">{bt('ce.push.body', lang)}</span>
+          <textarea x-model="form.push_body" maxlength="240" rows="3" placeholder={bt('ce.push.bodyph', lang)} class="s-input ce-push-textarea"></textarea>
+          <span class="ce-hint ce-push-count"><span x-text="(form.push_body || '').length"></span> / 240 {bt('ce.push.chars', lang)}</span>
+        </label>
+
+        <div class="ce-var-chips">
+          <span class="ce-var-label">{bt('ce.var.label', lang)}</span>
+          {VARIABLE_UI_DEFS.map(v => (
+            <button type="button" class="ce-var-chip" @click={`insertPushVariable('${v.key}')`} :title="`Beispiel: ${v.example}`">
+              {`{{${v.key}}}`}
+            </button>
+          ))}
         </div>
       </div>
 
     </div>
 
-    <!-- ── Spalte 3: Vorschau ─────────────────────────────────────────────── -->
-    <div class="ce-col ce-col-preview">
-
+    <!-- RECHTS — Live-Vorschau (sticky) -->
+    <div class="ce-preview">
       <div class="ce-preview-head">
-        <p class="ce-col-eyebrow" style="margin:0">{bt('ce.preview', lang)}</p>
+        <div class="ce-preview-toggle">
+          <button type="button" x-show="form.channels.includes('wallet_push')" :class="previewChannel === 'wallet' ? 'is-on' : ''" @click="previewChannel = 'wallet'">{bt('cm.ch.wallet_push', lang)}</button>
+          <button type="button" x-show="form.channels.includes('email')" :class="previewChannel === 'email' ? 'is-on' : ''" @click="previewChannel = 'email'">{bt('cm.ch.email', lang)}</button>
+        </div>
         <select x-model="previewLang" class="s-input ce-input-sm" aria-label={bt('ce.preview.langaria', lang)}>
           {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
         </select>
       </div>
 
-      <!-- Wallet-Push Mockup -->
-      <template x-if="form.channels.includes('wallet_push')">
-        <div>
-          <p class="ce-preview-eyebrow">{bt('ce.preview.walletpush', lang)}</p>
-          <div class="ce-mockup">
-            <div class="ce-mockup-frame">
-              <div class="ce-mockup-status">{bt('ce.mockup.notif', lang)}</div>
-              <div class="ce-mockup-card">
-                <div class="ce-mockup-brand">
-                  <span class="ce-mockup-logo" style={`background:${p.brandPrimary}`}>{p.hotelName.slice(0, 1).toUpperCase()}</span>
-                  <div>
-                    <div class="ce-mockup-hotel">{p.hotelName}</div>
-                    <div class="ce-mockup-now">{bt('ce.mockup.now', lang)}</div>
-                  </div>
+      <!-- Wallet-Push Mockup (nutzt Push-Inhalt, Fallback E-Mail) -->
+      <div x-show="previewChannel === 'wallet' && form.channels.includes('wallet_push')">
+        <div class="ce-mockup">
+          <div class="ce-mockup-frame">
+            <div class="ce-mockup-status">{bt('ce.mockup.notif', lang)}</div>
+            <div class="ce-mockup-card">
+              <div class="ce-mockup-brand">
+                <span class="ce-mockup-logo" style={`background:${p.brandPrimary}`}>{p.hotelName.slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <div class="ce-mockup-hotel">{p.hotelName}</div>
+                  <div class="ce-mockup-now">{bt('ce.mockup.now', lang)}</div>
                 </div>
-                <div class="ce-mockup-title" x-text="previewTitle"></div>
-                <div class="ce-mockup-body" x-html="previewBody"></div>
-                <template x-if="form.cta_label && form.cta_url">
-                  <div class="ce-mockup-cta">
-                    <span class="ce-mockup-cta-label" x-text="previewCtaLabel"></span>
-                  </div>
-                </template>
-                <div class="ce-mockup-footer">{bt('ce.mockup.unsub', lang)}</div>
               </div>
+              <div class="ce-mockup-title" x-text="previewPushTitle"></div>
+              <div class="ce-mockup-body" x-text="previewPushBody"></div>
+              <template x-if="form.cta_label && form.cta_url">
+                <div class="ce-mockup-cta">
+                  <span class="ce-mockup-cta-label" x-text="previewCtaLabel"></span>
+                </div>
+              </template>
+              <div class="ce-mockup-footer">{bt('ce.mockup.unsub', lang)}</div>
             </div>
           </div>
         </div>
-      </template>
+      </div>
 
-      <!-- E-Mail Mockup (Hebel 1) -->
-      <template x-if="form.channels.includes('email')">
-        <div>
-          <p class="ce-preview-eyebrow" :style="form.channels.includes('wallet_push') ? 'margin-top:20px' : ''">{bt('ce.preview.email', lang)}</p>
-          <div class="ce-email-frame">
-            <div class="ce-email-from">
-              <div class="ce-email-avatar" style={`background:${p.brandPrimary}`}>
-                {p.hotelName.slice(0, 1).toUpperCase()}
-              </div>
-              <div>
-                <div class="ce-email-sender">{p.hotelName}</div>
-                <div class="ce-email-addr">{bt('ce.email.via', lang)}</div>
-              </div>
+      <!-- E-Mail Mockup -->
+      <div x-show="previewChannel === 'email' && form.channels.includes('email')">
+        <div class="ce-email-frame">
+          <div class="ce-email-from">
+            <div class="ce-email-avatar" style={`background:${p.brandPrimary}`}>{p.hotelName.slice(0, 1).toUpperCase()}</div>
+            <div>
+              <div class="ce-email-sender">{p.hotelName}</div>
+              <div class="ce-email-addr">{bt('ce.email.via', lang)}</div>
             </div>
-            <div class="ce-email-subject" x-text={`previewTitle || ${JSON.stringify(bt('ce.email.nosubject', lang))}`}></div>
-            <div class="ce-email-body" x-html="previewBody"></div>
-            <template x-if="form.cta_label">
-              <div class="ce-email-cta-wrap">
-                <span class="ce-email-cta-btn" style={`background:${p.brandPrimary}`} x-text="previewCtaLabel"></span>
-              </div>
-            </template>
-            <div class="ce-email-footer">{bt('ce.email.footer', lang).replace('{hotel}', p.hotelName)} · <span style="text-decoration:underline">{bt('ce.mockup.unsub', lang)}</span></div>
           </div>
+          <div class="ce-email-subject" x-text={`previewTitle || ${JSON.stringify(bt('ce.email.nosubject', lang))}`}></div>
+          <div class="ce-email-body" x-html="previewBody"></div>
+          <template x-if="form.cta_label">
+            <div class="ce-email-cta-wrap">
+              <span class="ce-email-cta-btn" style={`background:${p.brandPrimary}`} x-text="previewCtaLabel"></span>
+            </div>
+          </template>
+          <div class="ce-email-footer">{bt('ce.email.footer', lang).replace('{hotel}', p.hotelName)} · <span style="text-decoration:underline">{bt('ce.mockup.unsub', lang)}</span></div>
         </div>
-      </template>
-
+      </div>
     </div>
 
   </div>
@@ -380,16 +331,32 @@ const ceT = {
     <div class="ce-flash" x-text="errorMsg"></div>
   </template>
 
-  <!-- Actions -->
-  <div class="ce-actions">
-    <a href="/marketing/campaigns" class="v9-btn ce-btn-ghost">{bt('dre.cancel', lang)}</a>
-    <button
-      type="button"
-      class="v9-btn ce-btn-primary"
-      :disabled="submitting"
-      @click="save()"
-      x-text="submitting ? cfg.T.saving : cfg.T.saveCreate"
-    ></button>
+  <!-- ── Versand + Aktionen (unten) ────────────────────────────────────────── -->
+  <div class="ce-footer">
+    <div class="ce-footer-fields">
+      <div class="ce-setup-field">
+        <span class="ce-label">{bt('ce.lang', lang)}</span>
+        <select x-model="form.target_lang" class="s-input ce-input-sm">
+          <option value="">{bt('ce.lang.all', lang)}</option>
+          {LANGS_DISPLAY.map(l => <option value={l}>{l.toUpperCase()}</option>)}
+        </select>
+      </div>
+      <div class="ce-setup-field">
+        <span class="ce-label">{bt('ce.send', lang)}</span>
+        <div class="ce-send-row">
+          <div class="ce-radio-group">
+            <label class="ce-radio"><input type="radio" x-model="form.schedule_mode" value="now" /><span>{bt('ce.send.now', lang)}</span></label>
+            <label class="ce-radio"><input type="radio" x-model="form.schedule_mode" value="later" /><span>{bt('ce.send.later', lang)}</span></label>
+          </div>
+          <input type="datetime-local" x-show="form.schedule_mode === 'later'" x-cloak x-model="form.scheduled_at" class="s-input ce-input-sm" />
+        </div>
+      </div>
+    </div>
+    <div class="ce-actions">
+      <a href="/marketing/campaigns" class="v9-btn ce-btn-ghost">{bt('dre.cancel', lang)}</a>
+      <button type="button" class="v9-btn ce-btn-primary" :disabled="submitting" @click="save()"
+        x-text="submitting ? cfg.T.saving : cfg.T.saveCreate"></button>
+    </div>
   </div>
 
 </div>
@@ -404,11 +371,12 @@ const ceT = {
   LOGO_URL: p.logoUrl,
   SEGMENT_COUNTS: p.segmentCounts,
   CE_T: ceT,
+  CE_LABELS: { subject: bt('ce.title', lang), title: bt('ce.push.title', lang) },
 }}>
   window.__RETAHA_CE__ = {
     TEMPLATES, HOTEL_NAME, HOTEL_DEFAULT, DEMO_CTX,
     ANLASS: ANLASS_DEFS, BRAND_PRIMARY, LOGO_URL,
-    SEGMENT_COUNTS, T: CE_T,
+    SEGMENT_COUNTS, T: CE_T, LABELS: CE_LABELS,
   };
 </script>
 
@@ -417,11 +385,6 @@ const ceT = {
   import StarterKit from '@tiptap/starter-kit';
   import Link from '@tiptap/extension-link';
   import Placeholder from '@tiptap/extension-placeholder';
-
-  function pickI18n(jsonb: any, fallback: string, lang: string): string {
-    if (!jsonb) return '';
-    return jsonb[lang]?.value ?? jsonb[fallback]?.value ?? '';
-  }
 
   function renderVars(text: string, ctx: any, footer?: any): string {
     const REGEX = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
@@ -433,15 +396,24 @@ const ceT = {
     });
   }
 
+  function stripHtmlToText(html: string): string {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    return (tmp.textContent || (tmp as any).innerText || '').replace(/\s+/g, ' ').trim();
+  }
+
   document.addEventListener('alpine:init', () => {
     // @ts-expect-error - Alpine global
     window.Alpine.data('campaignEditor', () => ({
       cfg: (window as any).__RETAHA_CE__,
+      cfgLabel: (window as any).__RETAHA_CE__.LABELS,
       editor: null as any,
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
       previewLang: 'de',
+      previewChannel: 'wallet' as 'wallet' | 'email',
+      contentTab: 'email' as 'email' | 'push',
       eve: { prompt: '', loading: false },
       form: {
         anlass: 'adhoc' as string,
@@ -455,6 +427,8 @@ const ceT = {
         body_html: '<p></p>',
         cta_label: '',
         cta_url: '',
+        push_title: '',
+        push_body: '',
       },
 
       init() {
@@ -466,7 +440,7 @@ const ceT = {
           extensions: [
             StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
-            Placeholder.configure({ placeholder: this.cfg.T.editorPlaceholder }),
+            Placeholder.configure({ placeholder: this.cfg.T.editorPlaceholder, showOnlyCurrent: false }),
           ],
           content: '<p></p>',
           onUpdate: () => {
@@ -497,6 +471,12 @@ const ceT = {
         } else {
           this.form.channels = [...this.form.channels, ch];
         }
+        // Vorschau-Kanal + Inhalts-Tab konsistent halten
+        const pvChannel = this.previewChannel === 'wallet' ? 'wallet_push' : 'email';
+        if (!this.form.channels.includes(pvChannel)) {
+          this.previewChannel = this.form.channels.includes('wallet_push') ? 'wallet' : 'email';
+        }
+        if (this.form.channels.length < 2) this.contentTab = 'email';
       },
 
       get segAll() {
@@ -512,6 +492,16 @@ const ceT = {
       get segLapsed() {
         const n = this.cfg.SEGMENT_COUNTS.lapsed;
         return n > 0 ? n.toLocaleString('de') : '—';
+      },
+
+      fillPushFromEmail() {
+        this.form.push_title = (this.form.title || '').slice(0, 80);
+        const plain = stripHtmlToText(this.editor ? this.editor.getHTML() : this.form.body_html);
+        this.form.push_body = plain.slice(0, 240);
+      },
+
+      insertPushVariable(key: string) {
+        this.form.push_body = (this.form.push_body || '') + `{{${key}}}`;
       },
 
       async eveWrite() {
@@ -538,6 +528,7 @@ const ceT = {
           if (this.editor) this.editor.commands.setContent(body);
           if (data.cta_label) this.form.cta_label = data.cta_label;
           this.form.anlass = 'adhoc';
+          this.contentTab = 'email';
         } catch (err: any) {
           this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
         } finally {
@@ -588,6 +579,17 @@ const ceT = {
       get previewCtaLabel() {
         return renderVars(this.form.cta_label || '', this.cfg.DEMO_CTX);
       },
+      // Push-Vorschau: eigener Push-Inhalt, Fallback auf (gekürzten) E-Mail-Inhalt.
+      get previewPushTitle() {
+        const t = (this.form.push_title && this.form.push_title.trim()) ? this.form.push_title : this.form.title;
+        return renderVars(t || this.cfg.T.noTitle, this.cfg.DEMO_CTX);
+      },
+      get previewPushBody() {
+        const raw = (this.form.push_body && this.form.push_body.trim())
+          ? this.form.push_body
+          : stripHtmlToText(this.form.body_html);
+        return renderVars(raw || this.cfg.T.noText, this.cfg.DEMO_CTX);
+      },
 
       async save() {
         if (this.submitting) return;
@@ -595,9 +597,9 @@ const ceT = {
         const bodyHtml = this.editor ? this.editor.getHTML() : this.form.body_html;
 
         if (!this.form.name?.trim()) { this.errorMsg = this.cfg.T.errName; return; }
+        if (this.form.channels.length === 0) { this.errorMsg = this.cfg.T.errChannel; return; }
         if (!this.form.title?.trim()) { this.errorMsg = this.cfg.T.errTitle; return; }
         if (!bodyHtml?.trim() || bodyHtml === '<p></p>') { this.errorMsg = this.cfg.T.errBody; return; }
-        if (this.form.channels.length === 0) { this.errorMsg = this.cfg.T.errChannel; return; }
 
         const target_filter: any = {};
         if (this.form.segment === 'loyal') target_filter.min_visit_count = 3;
@@ -613,6 +615,14 @@ const ceT = {
           cta_label_default: this.form.cta_label?.trim() || null,
           cta_url: this.form.cta_url?.trim() || null,
         };
+        // Separater Push-Inhalt nur, wenn BEIDE Kanäle aktiv + ausgefüllt.
+        // (Push-only nutzt title/body als Inhalt; leer → Versand kürzt die E-Mail.)
+        if (this.form.channels.includes('wallet_push') && this.form.channels.includes('email')) {
+          const pt = this.form.push_title?.trim() || '';
+          const pb = this.form.push_body?.trim() || '';
+          if (pt) payload.push_title_default = pt;
+          if (pb) payload.push_body_default = pb;
+        }
         if (this.form.schedule_mode === 'later') {
           if (!this.form.scheduled_at) { this.errorMsg = this.cfg.T.errDate; return; }
           payload.scheduled_at = new Date(this.form.scheduled_at).toISOString();
@@ -647,86 +657,8 @@ const ceT = {
 <style>
 [x-cloak] { display: none !important; }
 
-.ce-wrap { display: flex; flex-direction: column; gap: 20px; }
+.ce-wrap { display: flex; flex-direction: column; gap: 16px; }
 
-/* ── Anlass-Kacheln ────────────────────────────────────────────────────── */
-.ce-anlass-row {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.ce-anlass-tile {
-  border-radius: 12px;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px 16px;
-  min-width: 140px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #E5E4E0);
-  color: var(--ink, #0A0A0A);
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-  transition: background 120ms, border-color 120ms, color 120ms;
-}
-.ce-anlass-tile:hover:not(.is-on) {
-  background: rgba(20,97,110,0.10);
-  border-color: var(--petrol);
-  color: var(--petrol);
-}
-.ce-anlass-tile.is-on {
-  background: var(--petrol);
-  border-color: var(--petrol);
-  color: #FFFFFF;
-}
-.ce-tile-eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-.ce-tile-label {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.2;
-}
-
-/* ── 3-Spalten-Grid ────────────────────────────────────────────────────── */
-.ce-grid {
-  display: grid;
-  grid-template-columns: 260px 1fr 340px;
-  gap: 16px;
-  align-items: flex-start;
-}
-@media (max-width: 1200px) { .ce-grid { grid-template-columns: 1fr; } }
-
-.ce-col {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #E5E4E0);
-  border-radius: 16px;
-  padding: 22px;
-}
-.ce-col-preview {
-  background: var(--bg-deep, #F5F4F2);
-  border-color: var(--border, #E5E4E0);
-}
-
-.ce-col-eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #666);
-  margin: 0 0 16px;
-}
-
-/* ── Fields ────────────────────────────────────────────────────────────── */
-.ce-field { display: block; margin-bottom: 16px; }
 .ce-label {
   display: block;
   font-family: 'JetBrains Mono', monospace;
@@ -736,367 +668,209 @@ const ceT = {
   color: var(--ink-muted, #666);
   margin-bottom: 6px;
 }
-.ce-hint {
-  display: block;
-  font-size: 11px;
-  color: var(--ink-muted, #666);
-  margin-top: 5px;
-  line-height: 1.4;
-}
-.ce-input-sm { width: auto; padding: 6px 10px; font-size: 12px; }
+.ce-hint { display: block; font-size: 11px; color: var(--ink-muted, #666); margin-top: 5px; line-height: 1.4; }
+.ce-field { display: block; margin-bottom: 16px; }
+.ce-input-sm { width: auto; padding: 7px 10px; font-size: 13px; }
 .ce-input-title { font-size: 18px; padding: 12px 14px; font-weight: 400; }
+
+/* ── Setup-Zeile ───────────────────────────────────────────────────────── */
+.ce-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 16px;
+  padding: 18px 22px;
+}
+.ce-setup-field { display: flex; flex-direction: column; }
+.ce-setup-name { flex: 1 1 220px; min-width: 180px; }
+.ce-setup-name .s-input { width: 100%; box-sizing: border-box; }
+.ce-setup-anlass select { min-width: 190px; }
 
 /* ── Channel chips ─────────────────────────────────────────────────────── */
 .ce-channel-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .ce-ch-chip {
-  border-radius: 99px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--border, #E5E4E0);
-  color: var(--ink-muted, #666);
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms, color 120ms;
+  border-radius: 99px; padding: 8px 16px; font-size: 12px; font-family: inherit;
+  background: transparent; border: 1px solid var(--border, #E5E4E0); color: var(--ink-muted, #666);
+  cursor: pointer; transition: background 120ms, border-color 120ms, color 120ms;
 }
-.ce-ch-chip:hover:not(.is-on) {
-  background: rgba(20,97,110,0.10);
-  border-color: var(--petrol);
-  color: var(--petrol);
-}
-.ce-ch-chip.is-on {
-  background: var(--petrol);
-  border-color: var(--petrol);
-  color: #FFFFFF;
-}
+.ce-ch-chip:hover:not(.is-on) { background: rgba(20,97,110,0.10); border-color: var(--petrol); color: var(--petrol); }
+.ce-ch-chip.is-on { background: var(--petrol); border-color: var(--petrol); color: #FFFFFF; }
 
-/* ── Segment chips ─────────────────────────────────────────────────────── */
-.ce-seg-row { display: flex; flex-direction: column; gap: 4px; }
+/* ── Segment chips (inline) ────────────────────────────────────────────── */
+.ce-seg-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .ce-seg-chip {
-  border-radius: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--border, #E5E4E0);
-  color: var(--ink, #0A0A0A);
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms, color 120ms;
-  text-align: left;
+  border-radius: 10px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 12px; font-family: inherit;
+  background: transparent; border: 1px solid var(--border, #E5E4E0); color: var(--ink, #0A0A0A);
+  cursor: pointer; transition: background 120ms, border-color 120ms, color 120ms; text-align: left;
 }
-.ce-seg-chip:hover:not(.is-on) {
-  border-color: var(--ink, #0A0A0A);
-  background: var(--bg-deep, #F5F4F2);
-}
-.ce-seg-chip.is-on {
-  background: var(--petrol);
-  border-color: var(--petrol);
-  color: #FFFFFF;
-}
+.ce-seg-chip:hover:not(.is-on) { border-color: var(--ink, #0A0A0A); background: var(--bg-deep, #F5F4F2); }
+.ce-seg-chip.is-on { background: var(--petrol); border-color: var(--petrol); color: #FFFFFF; }
 .ce-seg-name { font-size: 12px; }
-.ce-seg-count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  opacity: 0.7;
-}
+.ce-seg-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.7; }
 
-/* ── Radio group ───────────────────────────────────────────────────────── */
-.ce-radio-group { display: flex; gap: 12px; }
-.ce-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-
-/* ── Eve Row (Hebel 3) ─────────────────────────────────────────────────── */
-.ce-eve-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 0;
+/* ── Two-pane ──────────────────────────────────────────────────────────── */
+.ce-main {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
+@media (max-width: 1100px) { .ce-main { grid-template-columns: 1fr; } }
+
+.ce-composer {
+  background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0);
+  border-radius: 16px; padding: 22px;
+}
+.ce-preview {
+  background: var(--bg-deep, #F5F4F2); border: 1px solid var(--border, #E5E4E0);
+  border-radius: 16px; padding: 20px;
+  position: sticky; top: 16px;
+}
+@media (max-width: 1100px) { .ce-preview { position: static; } }
+
+/* ── Eve row (im Feld) ─────────────────────────────────────────────────── */
+.ce-eve-row { display: flex; gap: 8px; margin-bottom: 18px; }
 .ce-eve-input { flex: 1; }
-.ce-eve-btn {
-  white-space: nowrap;
-  flex-shrink: 0;
-  letter-spacing: 0.01em;
-}
+.ce-eve-btn { white-space: nowrap; flex-shrink: 0; letter-spacing: 0.01em; }
 
-/* ── Divider ───────────────────────────────────────────────────────────── */
-.ce-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
+/* ── Kanal-Inhalts-Tabs ────────────────────────────────────────────────── */
+.ce-ctabs {
+  display: inline-flex; gap: 4px; background: var(--bg-deep, #F5F4F2);
+  border: 1px solid var(--border, #E5E4E0); border-radius: 12px; padding: 4px; margin-bottom: 16px;
 }
-.ce-divider::before,
-.ce-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border, #E5E4E0);
+.ce-ctabs button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-muted, #666); padding: 7px 16px; border-radius: 9px;
 }
-.ce-divider span {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #666);
-  white-space: nowrap;
-}
+.ce-ctabs button.is-on { background: var(--petrol); color: #fff; }
+
+.ce-panel { display: block; }
 
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 .ce-toolbar {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  padding: 5px;
-  background: var(--bg-deep, #F5F4F2);
-  border: 1px solid var(--border, #E5E4E0);
-  border-bottom: none;
-  border-radius: 10px 10px 0 0;
-  margin-top: 12px;
+  display: flex; gap: 2px; align-items: center; padding: 5px;
+  background: var(--bg-deep, #F5F4F2); border: 1px solid var(--border, #E5E4E0);
+  border-bottom: none; border-radius: 10px 10px 0 0; margin-top: 4px;
 }
 .ce-toolbar button {
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--ink-muted, #666);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 32px; height: 32px; background: transparent; border: none; border-radius: 6px;
+  font-size: 13px; color: var(--ink-muted, #666); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 .ce-toolbar button:hover { background: var(--surface, #fff); color: var(--ink, #0A0A0A); }
 .ce-toolbar button.is-on { background: var(--petrol); color: #FFFFFF; }
 .ce-toolbar .ce-tb-i { font-style: italic; }
 
-/* ── TipTap editor ─────────────────────────────────────────────────────── */
+/* ── TipTap editor (einzelner Placeholder via ::before) ────────────────── */
 .ce-editor {
-  min-height: 180px;
-  padding: 14px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #E5E4E0);
-  border-radius: 0 0 10px 10px;
-  font-size: 14px;
-  line-height: 1.6;
+  min-height: 200px; padding: 14px; background: var(--surface, #fff);
+  border: 1px solid var(--border, #E5E4E0); border-radius: 0 0 10px 10px;
+  font-size: 14px; line-height: 1.6;
 }
-.ce-editor :global(.ProseMirror) { min-height: 160px; outline: none; }
+.ce-editor :global(.ProseMirror) { min-height: 180px; outline: none; }
 .ce-editor :global(.ProseMirror p) { margin: 0 0 10px; }
 .ce-editor :global(.ProseMirror h2) { font-size: 18px; font-weight: 500; margin: 14px 0 6px; }
 .ce-editor :global(.ProseMirror a) { color: var(--petrol); text-decoration: underline; }
 .ce-editor :global(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
   color: var(--ink-faint, #C0BEB8);
-  float: left;
-  pointer-events: none;
-  height: 0;
+  float: left; pointer-events: none; height: 0;
 }
 
-/* ── Variable chips (Hebel 5) ──────────────────────────────────────────── */
-.ce-var-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0 0;
-}
+/* ── Variable chips ────────────────────────────────────────────────────── */
+.ce-var-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px 0 0; }
 .ce-var-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #666);
-  margin-right: 4px;
-  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-muted, #666); margin-right: 4px; white-space: nowrap;
 }
 .ce-var-chip {
-  border-radius: 99px;
-  padding: 3px 8px;
-  background: transparent;
-  border: 1px solid var(--border, #E5E4E0);
-  color: var(--ink-muted, #666);
-  font-size: 11px;
-  font-family: 'JetBrains Mono', monospace;
-  cursor: pointer;
+  border-radius: 99px; padding: 3px 8px; background: transparent;
+  border: 1px solid var(--border, #E5E4E0); color: var(--ink-muted, #666);
+  font-size: 11px; font-family: 'JetBrains Mono', monospace; cursor: pointer;
   transition: background 100ms, border-color 100ms, color 100ms;
 }
-.ce-var-chip:hover {
-  background: rgba(20,97,110,0.10);
-  border-color: var(--petrol);
-  color: var(--petrol);
-}
+.ce-var-chip:hover { background: rgba(20,97,110,0.10); border-color: var(--petrol); color: var(--petrol); }
 
 /* ── CTA row ───────────────────────────────────────────────────────────── */
 .ce-cta-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
 
-/* ── Preview column ────────────────────────────────────────────────────── */
-.ce-preview-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+/* ── Push panel ────────────────────────────────────────────────────────── */
+.ce-push-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.ce-push-head .ce-hint { margin-top: 0; flex: 1; }
+.ce-push-fill {
+  flex-shrink: 0; border-radius: 99px; padding: 6px 12px; font-size: 11px; font-family: inherit;
+  background: transparent; border: 1px solid var(--petrol); color: var(--petrol); cursor: pointer;
 }
-.ce-preview-eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #666);
-  margin: 0 0 8px;
+.ce-push-fill:hover { background: rgba(20,97,110,0.10); }
+.ce-push-textarea { width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; line-height: 1.5; }
+.ce-push-count { text-align: right; }
+
+/* ── Preview ───────────────────────────────────────────────────────────── */
+.ce-preview-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ce-preview-toggle {
+  display: inline-flex; gap: 3px; background: var(--surface, #fff);
+  border: 1px solid var(--border, #E5E4E0); border-radius: 10px; padding: 3px;
 }
+.ce-preview-toggle button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-muted, #666); padding: 6px 12px; border-radius: 7px;
+}
+.ce-preview-toggle button.is-on { background: var(--petrol); color: #fff; }
 
 /* ── Wallet mockup ─────────────────────────────────────────────────────── */
-.ce-mockup { padding: 12px 0; display: flex; justify-content: center; }
-.ce-mockup-frame {
-  width: 100%;
-  max-width: 300px;
-  background: #1A1A1A;
-  padding: 10px 8px 20px;
-  border-radius: 20px;
-  box-shadow: 0 20px 40px -12px rgba(0,0,0,.3);
-}
-.ce-mockup-status {
-  color: rgba(255,255,255,.5);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-  padding: 4px 0 8px;
-}
-.ce-mockup-card {
-  background: var(--surface, #fff);
-  padding: 12px;
-  border-radius: 10px;
-  margin: 0 4px;
-}
+.ce-mockup { padding: 4px 0; display: flex; justify-content: center; }
+.ce-mockup-frame { width: 100%; max-width: 320px; background: #1A1A1A; padding: 12px 10px 22px; border-radius: 22px; box-shadow: 0 20px 40px -12px rgba(0,0,0,.3); }
+.ce-mockup-status { color: rgba(255,255,255,.5); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 4px 0 10px; }
+.ce-mockup-card { background: var(--surface, #fff); padding: 14px; border-radius: 12px; margin: 0 4px; }
 .ce-mockup-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.ce-mockup-logo {
-  width: 24px;
-  height: 24px;
-  background: var(--petrol);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
+.ce-mockup-logo { width: 24px; height: 24px; background: var(--petrol); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border-radius: 4px; flex-shrink: 0; }
 .ce-mockup-hotel { font-size: 11px; font-weight: 500; color: var(--ink, #0A0A0A); }
 .ce-mockup-now { font-size: 9px; color: var(--ink-muted, #666); }
-.ce-mockup-title { font-size: 14px; font-weight: 500; color: var(--ink, #0A0A0A); margin: 8px 0 5px; line-height: 1.3; }
-.ce-mockup-body { font-size: 12px; line-height: 1.45; color: var(--ink-muted, #666); }
-.ce-mockup-body :global(p) { margin: 0 0 5px; }
-.ce-mockup-body :global(h2), .ce-mockup-body :global(h3) { font-size: 13px; margin: 6px 0 3px; }
-.ce-mockup-body :global(a) { color: var(--petrol); }
-.ce-mockup-cta {
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--petrol) 8%, transparent);
-  border-left: 2px solid var(--petrol);
-}
+.ce-mockup-title { font-size: 15px; font-weight: 500; color: var(--ink, #0A0A0A); margin: 8px 0 5px; line-height: 1.3; }
+.ce-mockup-body { font-size: 13px; line-height: 1.5; color: var(--ink-muted, #666); white-space: pre-wrap; }
+.ce-mockup-cta { margin-top: 10px; padding: 6px 10px; background: color-mix(in srgb, var(--petrol) 8%, transparent); border-left: 2px solid var(--petrol); }
 .ce-mockup-cta-label { font-size: 11px; color: var(--petrol); font-weight: 500; }
-.ce-mockup-footer {
-  font-size: 9px;
-  color: var(--ink-faint, #C0BEB8);
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border, #E5E4E0);
-  text-decoration: underline;
-}
+.ce-mockup-footer { font-size: 9px; color: var(--ink-faint, #C0BEB8); margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--border, #E5E4E0); text-decoration: underline; }
 
-/* ── Email mockup (Hebel 1) ────────────────────────────────────────────── */
-.ce-email-frame {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #E5E4E0);
-  border-radius: 12px;
-  padding: 16px;
-  font-size: 13px;
-}
-.ce-email-from {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border, #E5E4E0);
-  margin-bottom: 10px;
-}
-.ce-email-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
+/* ── Email mockup ──────────────────────────────────────────────────────── */
+.ce-email-frame { background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0); border-radius: 12px; padding: 18px; font-size: 13px; }
+.ce-email-from { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border, #E5E4E0); margin-bottom: 12px; }
+.ce-email-avatar { width: 28px; height: 28px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .ce-email-sender { font-size: 12px; font-weight: 500; color: var(--ink, #0A0A0A); }
 .ce-email-addr { font-size: 10px; color: var(--ink-muted, #666); }
-.ce-email-subject { font-size: 14px; font-weight: 500; color: var(--ink, #0A0A0A); margin-bottom: 10px; line-height: 1.3; }
-.ce-email-body { font-size: 12px; line-height: 1.5; color: var(--ink-muted, #666); margin-bottom: 10px; }
-.ce-email-body :global(p) { margin: 0 0 6px; }
-.ce-email-body :global(h2) { font-size: 14px; font-weight: 500; margin: 8px 0 4px; color: var(--ink, #0A0A0A); }
+.ce-email-subject { font-size: 16px; font-weight: 500; color: var(--ink, #0A0A0A); margin-bottom: 12px; line-height: 1.3; }
+.ce-email-body { font-size: 13px; line-height: 1.6; color: var(--ink-muted, #666); margin-bottom: 12px; }
+.ce-email-body :global(p) { margin: 0 0 8px; }
+.ce-email-body :global(h2) { font-size: 15px; font-weight: 500; margin: 10px 0 5px; color: var(--ink, #0A0A0A); }
 .ce-email-body :global(a) { color: var(--petrol); }
 .ce-email-cta-wrap { margin-bottom: 12px; }
-.ce-email-cta-btn {
-  display: inline-block;
-  padding: 8px 16px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-}
-.ce-email-footer {
-  font-size: 10px;
-  color: var(--ink-faint, #C0BEB8);
-  padding-top: 10px;
-  border-top: 1px solid var(--border, #E5E4E0);
-  line-height: 1.4;
-}
+.ce-email-cta-btn { display: inline-block; padding: 9px 18px; color: #fff; font-size: 12px; font-weight: 500; border-radius: 6px; }
+.ce-email-footer { font-size: 10px; color: var(--ink-faint, #C0BEB8); padding-top: 10px; border-top: 1px solid var(--border, #E5E4E0); line-height: 1.4; }
 
 /* ── Flash ─────────────────────────────────────────────────────────────── */
-.ce-flash {
-  padding: 12px 16px;
-  background: rgba(140, 33, 40, 0.06);
-  color: #7a1515;
-  font-size: 13px;
-  border-left: 3px solid #8C2128;
-  border-radius: 0 12px 12px 0;
-}
+.ce-flash { padding: 12px 16px; background: rgba(140, 33, 40, 0.06); color: #7a1515; font-size: 13px; border-left: 3px solid #8C2128; border-radius: 0 12px 12px 0; }
 
-/* ── Actions ───────────────────────────────────────────────────────────── */
-.ce-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding-top: 8px;
-  border-top: 1px solid var(--border, #E5E4E0);
+/* ── Footer (Versand + Aktionen) ───────────────────────────────────────── */
+.ce-footer {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px;
+  background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0);
+  border-radius: 16px; padding: 18px 22px;
 }
-.ce-btn-ghost {
-  background: transparent !important;
-  color: var(--ink-muted, #666) !important;
-  border: 1px solid var(--border, #E5E4E0) !important;
-  border-radius: 8px;
-  text-decoration: none;
-}
-.ce-btn-ghost:hover {
-  color: var(--ink, #0A0A0A) !important;
-  border-color: var(--ink, #0A0A0A) !important;
-  background: transparent !important;
-}
-.ce-btn-primary {
-  background: var(--petrol) !important;
-  color: #FFFFFF !important;
-  border: none !important;
-  border-radius: 8px;
-}
-.ce-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
+.ce-footer-fields { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: flex-end; }
+.ce-send-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ce-radio-group { display: flex; gap: 12px; }
+.ce-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+
+.ce-actions { display: flex; gap: 10px; align-items: center; }
+.ce-btn-ghost { background: transparent !important; color: var(--ink-muted, #666) !important; border: 1px solid var(--border, #E5E4E0) !important; border-radius: 8px; text-decoration: none; }
+.ce-btn-ghost:hover { color: var(--ink, #0A0A0A) !important; border-color: var(--ink, #0A0A0A) !important; background: transparent !important; }
+.ce-btn-primary { background: var(--petrol) !important; color: #FFFFFF !important; border: none !important; border-radius: 8px; }
+.ce-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
 .ce-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 </style>
