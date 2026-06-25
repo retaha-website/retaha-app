@@ -100,7 +100,10 @@ export const POST: APIRoute = async ({ request }) => {
     token = existing.confirmation_token;
     waitlistId = existing.id;
   } else {
-    const source = body?.source ?? 'api';
+    // Mandanten-Regel (DB-CHECK): nur die hotel-lose retaha-Newsletter-Quelle darf
+    // ohne hotel_id stehen. Ohne Hotel-Kontext also NIE 'api' (das würde den CHECK
+    // verletzen), sondern 'retaha_newsletter'. Mit Hotel-Kontext bleibt 'api' der Default.
+    const source = body?.source ?? (hotelId ? 'api' : 'retaha_newsletter');
     const { data: inserted, error } = await sb
       .from('marketing_waitlist')
       .insert({ email, source, ...(hotelId ? { hotel_id: hotelId } : {}) })
