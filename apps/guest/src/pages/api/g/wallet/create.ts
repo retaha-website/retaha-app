@@ -262,6 +262,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       last_visit_at: now.toISOString(),
       guest_first_name: guest.first_name ?? null,
       guest_last_name: guest.last_name ?? null,
+      language: guest.language ?? null,
     };
     // Re-Open eines opted-out Passes ist neuer Consent — bewusst noch nicht
     // implementiert (Re-Opt-In kann komplex sein). Wenn opted_out: bleibt so.
@@ -281,6 +282,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       guest_email: guest.email,
       guest_first_name: guest.first_name ?? null,
       guest_last_name: guest.last_name ?? null,
+      language: guest.language ?? null,
       google_object_id: null,
       google_class_id: null,
       marketing_consent_given: marketingConsent,

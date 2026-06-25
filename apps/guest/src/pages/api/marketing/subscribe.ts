@@ -85,6 +85,17 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     .maybeSingle();
   const hotelName = hotel?.name ?? '';
 
+  // Gast-Sprache (für Versand in der vom Gast gewählten App-Sprache) — aus
+  // guests.language des Aufenthalts, dieselbe Quelle wie /api/g/set-language.
+  let guestLang: string | null = null;
+  const { data: stayRow } = await sb
+    .from('stays')
+    .select('guests(language)')
+    .eq('id', session.stay_id)
+    .maybeSingle();
+  const g = stayRow ? (Array.isArray((stayRow as any).guests) ? (stayRow as any).guests[0] : (stayRow as any).guests) : null;
+  if (g?.language) guestLang = g.language;
+
   const proxySecret = (import.meta.env.INTERNAL_PROXY_SECRET as string | undefined) ?? '';
 
   let res: Response;
@@ -103,6 +114,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
         hotel_id: session.hotel_id,
         hotel_name: hotelName,
         source: 'guest_checkout',
+        language: guestLang,
       }),
     });
   } catch (err) {

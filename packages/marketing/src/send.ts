@@ -151,16 +151,18 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
     // ── 3. Wallet-Pässe laden ──────────────────────────────────────────────
     const { data: allPasses, error: passErr } = await sb
       .from('wallet_passes')
-      .select('id, state, marketing_consent_given, guest_first_name, guest_last_name, guest_email, visit_count, first_visit_at, last_visit_at, google_object_id')
+      .select('id, state, marketing_consent_given, guest_first_name, guest_last_name, guest_email, language, visit_count, first_visit_at, last_visit_at, google_object_id')
       .eq('hotel_id', campaign.hotel_id);
     if (passErr) throw new Error(`pass-load failed: ${passErr.message}`);
 
     const targetFilter = campaign.target_filter as TargetFilter | null;
 
-    // Optional: Sprach-Filter braucht guest.language — laden falls Filter aktiv
-    let passLangs = new Map<string, string>();
-    if (targetFilter?.language) {
-      // Join über stays.email = wallet_passes.guest_email + guests.language
+    // Empfänger-Sprache: primär aus contact.language (beim Opt-in gespeichert),
+    // sekundär aus guests.language (Mews, per E-Mail-Join). Dieser Fallback deckt
+    // Legacy-Kontakte ohne eigene language-Spalte ab. IMMER laden (nicht nur bei
+    // Sprach-Filter), damit jeder Empfänger in SEINER Sprache erhält, sonst Hotel-Default.
+    const passLangs = new Map<string, string>();
+    {
       const { data: stayRows } = await sb
         .from('stays')
         .select('hotel_id, guests!inner(email, language)')
@@ -168,7 +170,8 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
       for (const row of (stayRows as any[] ?? [])) {
         const g = Array.isArray(row.guests) ? row.guests[0] : row.guests;
         if (g?.email && g?.language) {
-          if (!passLangs.has(g.email)) passLangs.set(g.email, g.language);
+          const key = String(g.email).toLowerCase();
+          if (!passLangs.has(key)) passLangs.set(key, g.language);
         }
       }
     }
@@ -180,7 +183,7 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
 
     for (const pass of (allPasses ?? [])) {
       // Target-Filter Pre-Check (gilt vor push-guard)
-      const enriched = { ...pass, _preferred_language: passLangs.get(pass.guest_email) };
+      const enriched = { ...pass, _preferred_language: pass.language || passLangs.get((pass.guest_email || '').toLowerCase()) };
       if (!matchesFilter(enriched, targetFilter)) {
         const reason = 'filter_excluded';
         skipReasons[reason] = (skipReasons[reason] || 0) + 1;
@@ -241,8 +244,8 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
 
     for (const pass of eligible) {
       try {
-        // Sprache wählen: pass language (falls bekannt) > hotel-default
-        const passLang = asLanguageCode(passLangs.get(pass.guest_email) || hotelDefault);
+        // Sprache wählen: Kontakt-Sprache (Opt-in) > Mews-Fallback > Hotel-Default
+        const passLang = asLanguageCode(pass.language || passLangs.get((pass.guest_email || '').toLowerCase()) || hotelDefault);
 
         // Step 1: send-Row vorab anlegen (oder updaten wenn schon da)
         const { data: sendRow, error: insErr } = await sb
@@ -361,7 +364,7 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
         // Backoffice-Kontaktliste /marketing/guests in der „Opt-in"-Ansicht nutzt.
         const { data: waitlistEntries } = await applyEmailOptInFilter(
           sb.from('marketing_waitlist')
-            .select('id, email, confirmation_token')
+            .select('id, email, confirmation_token, language')
             .eq('hotel_id', campaign.hotel_id)
         );
 
@@ -376,7 +379,7 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
         for (const target of hotelTargets) {
           try {
             const pass = emailToPass.get(target.email.toLowerCase());
-            const passLang = asLanguageCode(passLangs.get(target.email.toLowerCase()) || hotelDefault);
+            const passLang = asLanguageCode((target as any).language || pass?.language || passLangs.get(target.email.toLowerCase()) || hotelDefault);
 
             // Doppelversand-Check: existiert bereits ein Email-Send für diese Kampagne+Waitlist-ID?
             const { data: existingRow } = await sb

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getEnv } from '@retaha/db';
 import { AcsEmailSender } from '@retaha/marketing';
+import { isLanguageCode } from '@retaha/i18n';
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -104,9 +105,11 @@ export const POST: APIRoute = async ({ request }) => {
     // ohne hotel_id stehen. Ohne Hotel-Kontext also NIE 'api' (das würde den CHECK
     // verletzen), sondern 'retaha_newsletter'. Mit Hotel-Kontext bleibt 'api' der Default.
     const source = body?.source ?? (hotelId ? 'api' : 'retaha_newsletter');
+    const langRaw = (body?.language ?? '').toString().trim();
+    const language = isLanguageCode(langRaw) ? langRaw : null;
     const { data: inserted, error } = await sb
       .from('marketing_waitlist')
-      .insert({ email, source, ...(hotelId ? { hotel_id: hotelId } : {}) })
+      .insert({ email, source, ...(hotelId ? { hotel_id: hotelId } : {}), ...(language ? { language } : {}) })
       .select('id, confirmation_token')
       .single();
     if (error || !inserted) return json({ ok: false, error: error?.message ?? 'insert_failed' }, 500);

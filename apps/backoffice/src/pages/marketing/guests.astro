@@ -42,10 +42,10 @@ const sb = createSupabaseServiceRoleInstance();
 // marketing_consents wird hier NICHT global geladen — Historie kommt on-demand.
 const [passesRes, waitlistRes, staysRes] = await Promise.all([
   sb.from('wallet_passes')
-    .select('id, guest_email, guest_first_name, guest_last_name, marketing_consent_given, marketing_consent_given_at, opted_out_at, state, visit_count, first_visit_at, last_visit_at')
+    .select('id, guest_email, guest_first_name, guest_last_name, marketing_consent_given, marketing_consent_given_at, opted_out_at, state, language, visit_count, first_visit_at, last_visit_at')
     .eq('hotel_id', hotel.id),
   sb.from('marketing_waitlist')
-    .select('id, email, confirmed_at, unsubscribed_at, pending_at, confirmation_sent_at, source')
+    .select('id, email, confirmed_at, unsubscribed_at, pending_at, confirmation_sent_at, source, language')
     .eq('hotel_id', hotel.id),
   sb.from('stays')
     .select('wallet_pass_id, check_in, check_out')
@@ -72,6 +72,7 @@ interface Contact {
   lastVisitAt: string | null;
   visitCount: number | null;
   stay: { check_in: string; check_out: string } | null;
+  language: string | null;
 }
 
 const byEmail = new Map<string, Contact>();
@@ -83,7 +84,7 @@ function ensure(emailRaw: string): Contact {
       email, displayEmail: emailRaw.trim(), name: '',
       viaWallet: false, viaEmail: false,
       emailOptIn: false, walletOptIn: false, pending: false, unsubscribed: false,
-      status: 'none', lastVisitAt: null, visitCount: null, stay: null,
+      status: 'none', lastVisitAt: null, visitCount: null, stay: null, language: null,
     };
     byEmail.set(email, c);
   }
@@ -105,6 +106,7 @@ for (const p of passes) {
   if (!p.guest_email) continue;
   const c = ensure(p.guest_email);
   c.viaWallet = true;
+  if (p.language && !c.language) c.language = p.language;
   const nm = [p.guest_first_name, p.guest_last_name].filter(Boolean).join(' ').trim();
   if (nm && !c.name) c.name = nm;
   if (isWalletOptIn(p)) c.walletOptIn = true;
@@ -120,6 +122,7 @@ for (const w of waitlist) {
   if (!w.email) continue;
   const c = ensure(w.email);
   c.viaEmail = true;
+  if (w.language && !c.language) c.language = w.language;
   if (isEmailOptIn(w)) c.emailOptIn = true;
   if (w.unsubscribed_at) c.unsubscribed = true;
   if (!w.confirmed_at && !w.unsubscribed_at) c.pending = true;
@@ -162,6 +165,7 @@ const contactsJson = JSON.stringify(Object.fromEntries(rendered.map(c => [c.emai
   viaEmail: c.viaEmail,
   status: c.status,
   stay: c.stay,
+  language: c.language,
 }])));
 
 function fmtDate(iso: string | null | undefined): string {
@@ -427,7 +431,7 @@ const emailUnsub = waitlist.filter(w => w.unsubscribed_at).length;
 
 <script>
   type Hist = { created_at: string; action: string; source: string; policy_version: string; channel: 'email' | 'wallet' };
-  type C = { email: string; name: string; emailOptIn: boolean; walletOptIn: boolean; viaWallet: boolean; viaEmail: boolean; status: string; stay: { check_in: string; check_out: string } | null };
+  type C = { email: string; name: string; emailOptIn: boolean; walletOptIn: boolean; viaWallet: boolean; viaEmail: boolean; status: string; stay: { check_in: string; check_out: string } | null; language: string | null };
 
   const dataEl = document.getElementById('mg-data');
   const i18nEl = document.getElementById('mg-i18n');
@@ -517,7 +521,7 @@ const emailUnsub = waitlist.filter(w => w.unsubscribed_at).length;
     if (!c || !dw) return;
     currentEmail = email;
     (document.getElementById('mg-dw-name') as HTMLElement).textContent = c.name || '—';
-    (document.getElementById('mg-dw-email') as HTMLElement).textContent = c.email;
+    (document.getElementById('mg-dw-email') as HTMLElement).textContent = c.email + (c.language ? ` · ${c.language.toUpperCase()}` : '');
 
     const chans = document.getElementById('mg-dw-channels') as HTMLElement;
     chans.innerHTML = '';
