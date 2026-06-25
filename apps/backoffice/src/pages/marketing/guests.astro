@@ -195,11 +195,42 @@ function sourceLabel(c: Contact): string {
   return bt('mg.src.email', lang);
 }
 function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
+
+// ── Consent-KPIs (zusammengeführt aus der früheren /marketing/consent-Seite) ──
+// Kanalgetrennt, aus den bereits geladenen Quellen berechnet (keine Extra-Queries).
+const walletActive = passes.filter(p => p.marketing_consent_given && p.state === 'active').length;
+const walletOptInTotal = passes.filter(p => p.marketing_consent_given).length;
+const emailConfirmed = waitlist.filter(w => isEmailOptIn(w)).length;
+const emailPending = waitlist.filter(w => !w.confirmed_at && !w.unsubscribed_at).length;
+const emailUnsub = waitlist.filter(w => w.unsubscribed_at).length;
+
+// ── Aktivität: letzte Consent-Ereignisse (Art.-7-Feed, aus geladenen consents) ──
+const RECENT_SOURCE_KEYS = new Set(['doi_confirm_link', 'email_unsubscribe_link', 'opt_out_link', 'guest_checkout', 'self_checkout', 'wallet_add', 'owner_unsubscribe']);
+function evSourceLabel(s: string): string {
+  return s && RECENT_SOURCE_KEYS.has(s) ? bt(`mc.source.${s}`, lang) : (s || '—');
+}
+function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+const recentEvents = consents.slice(0, 30);
 ---
 
 <Layout title={bt('mg.crumb', lang)} activeTab="backoffice" hotelName={hotel.name}>
 <style>
 .breadcrumb { padding-top: 36px; }
+
+.mg-kpis { display: flex; flex-wrap: wrap; gap: 28px 36px; margin: 4px 0 26px; }
+.mg-kpi-group { display: flex; flex-direction: column; gap: 10px; }
+.mg-kpi-grouplabel { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); margin: 0; }
+.mg-kpi-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.mg-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; min-width: 104px; }
+.mg-kpi__val { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 500; color: var(--ink); line-height: 1; }
+.mg-kpi__val--petrol { color: #14616E; }
+.mg-kpi__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); margin-top: 8px; }
+#mg-view-activity[hidden], #mg-view-contacts[hidden] { display: none; }
 
 .mg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 8px 0 20px; }
 .mg-tabs { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
@@ -285,16 +316,37 @@ function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
     <p class="settings-hero__sub">{bt('mg.hero.sub', lang)}</p>
   </section>
 
+  <!-- Consent-KPIs (kanalgetrennt) — zusammengeführt aus der früheren Consent-Seite -->
+  <div class="mg-kpis">
+    <div class="mg-kpi-group">
+      <p class="mg-kpi-grouplabel">{bt('mc.wallet.title', lang)}</p>
+      <div class="mg-kpi-row">
+        <div class="mg-kpi"><div class="mg-kpi__val mg-kpi__val--petrol">{walletActive}</div><div class="mg-kpi__label">{bt('mc.wallet.active', lang)}</div></div>
+        <div class="mg-kpi"><div class="mg-kpi__val">{walletOptInTotal}</div><div class="mg-kpi__label">{bt('mc.wallet.total', lang)}</div></div>
+      </div>
+    </div>
+    <div class="mg-kpi-group">
+      <p class="mg-kpi-grouplabel">{bt('mc.email.title', lang)}</p>
+      <div class="mg-kpi-row">
+        <div class="mg-kpi"><div class="mg-kpi__val mg-kpi__val--petrol">{emailConfirmed}</div><div class="mg-kpi__label">{bt('mc.email.confirmed', lang)}</div></div>
+        <div class="mg-kpi"><div class="mg-kpi__val">{emailPending}</div><div class="mg-kpi__label">{bt('mc.email.pending', lang)}</div></div>
+        <div class="mg-kpi"><div class="mg-kpi__val">{emailUnsub}</div><div class="mg-kpi__label">{bt('mc.email.unsub', lang)}</div></div>
+      </div>
+    </div>
+  </div>
+
   <div class="mg-bar">
     <div class="mg-tabs" role="tablist">
       <button class="mg-tab is-active" data-view="all" role="tab">{bt('mg.tab.all', lang)}</button>
       <button class="mg-tab" data-view="optin" role="tab">{bt('mg.tab.optin', lang)}</button>
+      <button class="mg-tab" data-view="activity" role="tab">{bt('mg.tab.activity', lang)}</button>
     </div>
     <span class="mg-count">
       <strong>{totalCount}</strong> {bt('mg.count.contacts', lang)} · <strong>{optinCount}</strong> {bt('mg.count.optin', lang)}
     </span>
   </div>
 
+  <div id="mg-view-contacts">
   <div class="mg-controls">
     <div class="mg-search">
       <input type="search" id="mg-search" placeholder={bt('mg.search', lang)} autocomplete="off" />
@@ -354,6 +406,42 @@ function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
   )}
 
   {truncated && <p class="mg-note">{bt('mg.note.truncated', lang)} ({MAX_RENDER} / {totalCount})</p>}
+  </div><!-- /#mg-view-contacts -->
+
+  <div id="mg-view-activity" hidden>
+    {recentEvents.length === 0 ? (
+      <div class="mg-card"><div class="mg-empty">{bt('mc.recent.empty', lang)}</div></div>
+    ) : (
+      <div class="mg-card">
+        <table class="mg-table">
+          <thead>
+            <tr>
+              <th>{bt('mc.th.action', lang)}</th>
+              <th>{bt('mc.th.source', lang)}</th>
+              <th>{bt('mc.th.channel', lang)}</th>
+              <th>{bt('mc.th.policy', lang)}</th>
+              <th>{bt('mc.th.date', lang)}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentEvents.map(ev => (
+              <tr>
+                <td>
+                  <span class={`mg-badge mg-badge--${ev.action === 'granted' ? 'optin' : 'unsubscribed'}`}>
+                    {ev.action === 'granted' ? bt('mc.badge.granted', lang) : bt('mc.badge.revoked', lang)}
+                  </span>
+                </td>
+                <td class="mg-meta">{evSourceLabel(ev.source)}</td>
+                <td class="mg-meta">{ev.wallet_pass_id ? bt('mc.channel.wallet', lang) : bt('mc.channel.email', lang)}</td>
+                <td class="mg-meta">{ev.policy_version}</td>
+                <td class="mg-meta">{fmtDateTime(ev.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div><!-- /#mg-view-activity -->
 </div>
 
 <!-- Detail-Drawer -->
@@ -420,7 +508,7 @@ function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
   const T = i18nEl ? JSON.parse(i18nEl.textContent || '{}') : {};
 
   // ── Filter-State ──
-  let view: 'all' | 'optin' = 'all';
+  let view: 'all' | 'optin' | 'activity' = 'all';
   let status = 'all';
   let q = '';
 
@@ -450,12 +538,17 @@ function statusLabel(s: Status): string { return bt(`mg.status.${s}`, lang); }
     if (noOptin) (noOptin as HTMLElement).hidden = !(visible === 0 && view === 'optin' && q === '');
   }
 
+  const viewContacts = document.getElementById('mg-view-contacts');
+  const viewActivity = document.getElementById('mg-view-activity');
   document.querySelectorAll<HTMLButtonElement>('.mg-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.mg-tab').forEach(b => b.classList.remove('is-active'));
       btn.classList.add('is-active');
-      view = (btn.dataset.view as 'all' | 'optin') || 'all';
-      applyFilters();
+      view = (btn.dataset.view as 'all' | 'optin' | 'activity') || 'all';
+      const isActivity = view === 'activity';
+      if (viewContacts) (viewContacts as HTMLElement).hidden = isActivity;
+      if (viewActivity) (viewActivity as HTMLElement).hidden = !isActivity;
+      if (!isActivity) applyFilters();
     });
   });
   document.querySelectorAll<HTMLButtonElement>('.mg-chip').forEach(btn => {

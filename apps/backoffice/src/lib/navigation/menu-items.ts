@@ -44,12 +44,6 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           icon: icon('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'),
         },
         {
-          label: bt('nav.consent', lang),
-          sub: bt('nav.consent.sub', lang),
-          href: '/marketing/consent',
-          icon: icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>'),
-        },
-        {
           label: bt('nav.guests', lang),
           sub: bt('nav.guests.sub', lang),
           href: '/marketing/guests',
