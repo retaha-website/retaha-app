@@ -202,11 +202,69 @@ const meT = {
         <button type="button" class="me-eve-cancel" @click="eve.open = false" :disabled="eve.loading">
           {bt('dre.cancel', lang)}
         </button>
-        <button type="button" class="me-aurora-btn" style="min-width:130px" @click="eveWrite()"
+        <button type="button" class="me-aurora-btn" @click="eveWrite()"
           :disabled="eve.loading || !eve.prompt.trim()">
-          <svg class="me-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" x-show="!eve.loading"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+          <svg class="me-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
           <span x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"></span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Link-Modal ────────────────────────────────────────────────────────── -->
+  <div class="me-eve-overlay" x-show="link.open" x-cloak
+    @click.self="link.open = false"
+    @keydown.escape.window="if(link.open) link.open = false">
+    <div class="me-eve-modal">
+      <div class="me-eve-mhd">
+        <span class="me-eve-mhd-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Link einfügen
+        </span>
+        <button type="button" class="me-eve-close" @click="link.open = false">✕</button>
+      </div>
+      <span class="me-label" style="margin-bottom:8px;display:block">URL</span>
+      <input type="url" x-model="link.url" class="s-input" style="width:100%;box-sizing:border-box"
+        placeholder="https://… oder mailto:…"
+        @keydown.enter.prevent="applyLink()"
+        @keydown.escape.prevent="link.open = false" />
+      <p class="me-hint" style="margin-top:6px">Leer lassen zum Entfernen des Links.</p>
+      <div class="me-eve-mft">
+        <button type="button" class="me-eve-cancel" @click="link.open = false">{bt('dre.cancel', lang)}</button>
+        <button type="button" class="v9-btn me-btn-primary" style="padding:7px 18px;font-size:13px;border-radius:8px" @click="applyLink()">Übernehmen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bild-Upload-Modal ─────────────────────────────────────────────────── -->
+  <div class="me-eve-overlay" x-show="imgModal.open" x-cloak
+    @click.self="if(!imgModal.uploading) imgModal.open = false"
+    @keydown.escape.window="if(imgModal.open && !imgModal.uploading) imgModal.open = false">
+    <div class="me-eve-modal">
+      <div class="me-eve-mhd">
+        <span class="me-eve-mhd-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          Bild einfügen
+        </span>
+        <button type="button" class="me-eve-close" @click="if(!imgModal.uploading) imgModal.open = false" :disabled="imgModal.uploading">✕</button>
+      </div>
+      <div class="me-img-drop" @click="$refs.imgFile.click()">
+        <template x-if="!imgModal.preview">
+          <div class="me-img-drop-inner">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span>Klicken zum Hochladen</span>
+            <span class="me-img-drop-hint">JPG · PNG · WebP · max. 5 MB</span>
+          </div>
+        </template>
+        <template x-if="imgModal.preview">
+          <img :src="imgModal.preview" class="me-img-preview" alt="Vorschau" />
+        </template>
+      </div>
+      <input type="file" x-ref="imgFile" accept="image/*" class="me-img-file-input" @change="onImgSelect($event)" />
+      <p class="me-eve-err" x-show="imgModal.err" x-cloak x-text="imgModal.err"></p>
+      <div class="me-eve-mft">
+        <button type="button" class="me-eve-cancel" @click="if(!imgModal.uploading) imgModal.open = false" :disabled="imgModal.uploading">{bt('dre.cancel', lang)}</button>
+        <button type="button" class="v9-btn me-btn-primary" style="padding:7px 18px;font-size:13px;border-radius:8px" @click="insertImage()" :disabled="!imgModal.file || imgModal.uploading" x-text="imgModal.uploading ? 'Hochladen…' : 'Einfügen'"></button>
       </div>
     </div>
   </div>
@@ -250,17 +308,20 @@ const meT = {
   }
 
   document.addEventListener('alpine:init', () => {
+    let _meEditor: any = null;
+
     // @ts-expect-error - Alpine global
     window.Alpine.data('marketingEditor', () => {
       const CFG = (window as any).__RETAHA_ME__;
       return {
       cfg: CFG,
       get isEdit() { return this.cfg.IS_EDIT; },
-      editor: null as any,
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
-      eve: { prompt: '', loading: false, open: false, mode: 'title' as string },
+      eve: { prompt: '', loading: false, open: false, mode: 'full' as string },
+      link: { open: false, url: '' },
+      imgModal: { open: false, preview: '', file: null as File | null, uploading: false, err: '' },
       form: {
         name:     CFG.INITIAL.name     ?? '',
         category: CFG.INITIAL.category ?? '',
@@ -272,11 +333,11 @@ const meT = {
       },
 
       _mountEditor(content: string) {
-        if (this.editor) { this.editor.destroy(); this.editor = null; }
+        if (_meEditor) { _meEditor.destroy(); _meEditor = null; }
         const mount = document.getElementById('me-tiptap-mount');
         if (!mount) return;
         mount.innerHTML = '';
-        this.editor = new Editor({
+        _meEditor = new Editor({
           element: mount,
           extensions: [
             StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
@@ -284,12 +345,12 @@ const meT = {
             Image.configure({}),
           ],
           content,
-          onUpdate: () => { this.form.body_html = this.editor.getHTML(); this._refreshActive(); },
+          onUpdate: () => { this.form.body_html = _meEditor.getHTML(); this._refreshActive(); },
           onSelectionUpdate: () => this._refreshActive(),
         });
       },
       init() {
-        if (this.editor) return;
+        if (_meEditor) return;
         this._mountEditor(this.form.body_html);
       },
       openEve(mode: string, el?: HTMLElement) {
@@ -313,7 +374,6 @@ const meT = {
         }
       },
 
-      // Editor leer? — aus form.body_html (via getHTML in onUpdate, reaktiv).
       get isEditorEmpty() {
         const txt = (this.form.body_html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
         return txt === '';
@@ -347,34 +407,63 @@ const meT = {
       },
 
       _refreshActive() {
-        if (!this.editor) return;
-        const e = this.editor;
+        if (!_meEditor) return;
+        const e = _meEditor;
         this.active = {
           bold: e.isActive('bold'), italic: e.isActive('italic'), h2: e.isActive('heading', { level: 2 }),
           bullet: e.isActive('bulletList'), ordered: e.isActive('orderedList'), link: e.isActive('link'),
         };
       },
       exec(cmd: string, opts: any = {}) {
-        if (!this.editor) return;
-        const ch = (this.editor.chain().focus() as any);
+        if (!_meEditor) return;
+        const ch = (_meEditor.chain().focus() as any);
         (Object.keys(opts).length ? ch[cmd](opts) : ch[cmd]()).run();
       },
       setLink() {
-        if (!this.editor) return;
-        const url = window.prompt(this.cfg.T.promptLink, this.editor.getAttributes('link').href || 'https://');
-        if (url === null) return;
-        if (url === '') { this.editor.chain().focus().extendMarkRange('link').unsetLink().run(); return; }
-        if (!/^(https?:|mailto:)/i.test(url)) { alert(this.cfg.T.alertUrl); return; }
-        this.editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
+        if (!_meEditor) return;
+        this.link.url = _meEditor.getAttributes('link').href || '';
+        this.link.open = true;
+      },
+      applyLink() {
+        if (!_meEditor) return;
+        const url = this.link.url.trim();
+        this.link.open = false;
+        if (!url) { _meEditor.chain().focus().extendMarkRange('link').unsetLink().run(); return; }
+        if (!/^(https?:|mailto:)/i.test(url)) { this.errorMsg = this.cfg.T.alertUrl || 'Ungültige URL'; return; }
+        _meEditor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank' }).run();
       },
       setImage() {
-        if (!this.editor) return;
-        const url = window.prompt(this.cfg.T.promptImage, 'https://');
-        if (!url) return;
-        if (!/^https:\/\//i.test(url)) { alert(this.cfg.T.alertImageHttps); return; }
-        this.editor.chain().focus().setImage({ src: url, alt: '' }).run();
+        this.imgModal.open = true; this.imgModal.preview = ''; this.imgModal.file = null; this.imgModal.err = '';
       },
-      insertVariable(key: string) { if (!this.editor) return; this.editor.chain().focus().insertContent(`{{${key}}}`).run(); },
+      onImgSelect(evt: Event) {
+        const file = (evt.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { this.imgModal.err = 'Nur Bilddateien erlaubt'; return; }
+        if (file.size > 5 * 1024 * 1024) { this.imgModal.err = 'Zu groß — max 5 MB'; return; }
+        this.imgModal.err = '';
+        this.imgModal.file = file;
+        const reader = new FileReader();
+        reader.onload = (e: ProgressEvent<FileReader>) => { this.imgModal.preview = (e.target?.result as string) || ''; };
+        reader.readAsDataURL(file);
+      },
+      async insertImage() {
+        if (!_meEditor || !this.imgModal.file) return;
+        this.imgModal.uploading = true; this.imgModal.err = '';
+        try {
+          const fd = new FormData();
+          fd.append('file', this.imgModal.file);
+          const res = await fetch('/api/marketing/upload-asset', { method: 'POST', credentials: 'include', body: fd });
+          const data = await res.json();
+          if (!data.ok) { this.imgModal.err = data.error || 'Upload fehlgeschlagen'; return; }
+          _meEditor.chain().focus().setImage({ src: data.url, alt: '' }).run();
+          this.imgModal.open = false; this.imgModal.preview = ''; this.imgModal.file = null;
+        } catch (err: any) {
+          this.imgModal.err = 'Netzwerkfehler: ' + (err.message || 'Unbekannt');
+        } finally {
+          this.imgModal.uploading = false;
+        }
+      },
+      insertVariable(key: string) { if (!_meEditor) return; _meEditor.chain().focus().insertContent(`{{${key}}}`).run(); },
 
       get previewTitle() { return renderVars(this.form.title || this.cfg.T.noTitle, this.cfg.DEMO_CTX); },
       get previewBody() {
@@ -386,7 +475,7 @@ const meT = {
       async save() {
         if (this.submitting) return;
         this.errorMsg = '';
-        const bodyHtml = this.editor ? this.editor.getHTML() : this.form.body_html;
+        const bodyHtml = _meEditor ? _meEditor.getHTML() : this.form.body_html;
 
         if (!this.form.name?.trim())  { this.errorMsg = this.cfg.T.errName; return; }
         if (!this.form.title?.trim()) { this.errorMsg = this.cfg.T.errTitle; return; }
@@ -421,7 +510,7 @@ const meT = {
             }
             return;
           }
-          window.retahaToastFlash && window.retahaToastFlash(this.cfg.T.toastSaved);
+          (window as any).retahaToastFlash?.((this.cfg.T.toastSaved));
           window.location.href = '/marketing/templates';
         } catch (err: any) {
           this.errorMsg = this.cfg.T.errNet + ' ' + (err.message || this.cfg.T.errUnknown);
@@ -492,7 +581,7 @@ const meT = {
 .me-toolbar .me-tb-i { font-style: italic; }
 .me-editor { min-height: 170px; padding: 14px; background: var(--surface, #fff); border: 1px solid var(--border, #E5E4E0); border-radius: 0 0 10px 10px; font-size: 14px; line-height: 1.6; }
 .me-editor :global(.ProseMirror) { min-height: 150px; outline: none; }
-.me-editor :global(.ProseMirror p) { margin: 0 0 10px; }
+.me-editor :global(.ProseMirror p) { margin: 0; }
 .me-editor :global(.ProseMirror h2) { font-size: 18px; font-weight: 500; margin: 14px 0 6px; }
 .me-editor :global(.ProseMirror h3) { font-size: 15px; font-weight: 500; margin: 12px 0 5px; }
 .me-editor :global(.ProseMirror a) { color: var(--petrol); text-decoration: underline; }
@@ -535,6 +624,14 @@ const meT = {
 .me-btn-primary { background: var(--petrol) !important; color: #FFFFFF !important; border: none !important; border-radius: 8px; }
 .me-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
 .me-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Bild-Upload-Modal */
+.me-img-drop { border: 2px dashed var(--border, #E5E4E0); border-radius: 12px; min-height: 120px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 150ms; overflow: hidden; margin: 4px 0 10px; }
+.me-img-drop:hover { border-color: var(--petrol); }
+.me-img-drop-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink-muted, #666); font-size: 13px; padding: 20px; }
+.me-img-drop-hint { font-size: 11px; color: var(--ink-faint, #C0BEB8); }
+.me-img-preview { width: 100%; max-height: 220px; object-fit: contain; display: block; }
+.me-img-file-input { display: none; }
 
 /* ── Aurora Eve-Button ──────────────────────────────────────────────────── */
 @keyframes me-aurora-flow { to { background-position: 280% 0 } }
