@@ -107,11 +107,9 @@ const meT = {
       <span class="me-card-title">{bt('me.content', lang)}</span>
     </div>
 
-    <div class="me-eve-row">
-      <input type="text" x-model="eve.prompt" class="s-input s-input--sm me-eve-input"
-        placeholder={bt('ce.eve.ph', lang)} @keydown.enter.prevent="eveWrite()" :disabled="eve.loading" />
-      <button type="button" class="me-card-action me-eve-btn" @click="eveWrite()"
-        :disabled="eve.loading || !eve.prompt.trim()" x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"></button>
+    <div class="me-eve-trigger">
+      <button type="button" class="me-card-action me-eve-btn" @click="eve.open = true; errorMsg = ''"
+        x-text="cfg.T.eveWrite"></button>
     </div>
 
     <label class="me-field">
@@ -178,12 +176,38 @@ const meT = {
     </div>
   </div>
 
-  <template x-if="errorMsg"><div class="me-flash" x-text="errorMsg"></div></template>
+  <template x-if="errorMsg && !eve.open"><div class="me-flash" x-text="errorMsg"></div></template>
 
   <div class="me-actions">
     <a href="/marketing/templates" class="v9-btn me-btn-ghost">{bt('dre.cancel', lang)}</a>
     <button type="button" class="v9-btn me-btn-primary" :disabled="submitting" @click="save()"
       x-text="submitting ? cfg.T.saving : (isEdit ? cfg.T.saveEdit : cfg.T.saveCreate)"></button>
+  </div>
+
+  <!-- ── Eve-Modal ────────────────────────────────────────────────────────── -->
+  <div class="me-eve-overlay" x-show="eve.open" x-cloak
+    @click.self="if(!eve.loading) eve.open = false"
+    @keydown.escape.window="if(eve.open && !eve.loading) eve.open = false">
+    <div class="me-eve-modal">
+      <div class="me-eve-mhd">
+        <span class="me-eve-mhd-title" x-text="cfg.T.eveWrite"></span>
+        <button type="button" class="me-eve-close" @click="eve.open = false" :disabled="eve.loading">✕</button>
+      </div>
+      <textarea class="s-input me-eve-ta" x-model="eve.prompt"
+        placeholder={bt('ce.eve.ph', lang)}
+        :disabled="eve.loading"
+        @keydown.meta.enter.prevent="eveWrite()"
+        @keydown.ctrl.enter.prevent="eveWrite()"></textarea>
+      <p class="me-eve-err" x-show="errorMsg" x-cloak x-text="errorMsg"></p>
+      <div class="me-eve-mft">
+        <button type="button" class="me-eve-cancel" @click="eve.open = false" :disabled="eve.loading">
+          {bt('dre.cancel', lang)}
+        </button>
+        <button type="button" class="me-card-action me-eve-gen" @click="eveWrite()"
+          :disabled="eve.loading || !eve.prompt.trim()"
+          x-text="eve.loading ? cfg.T.eveWriting : cfg.T.eveWrite"></button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -235,7 +259,7 @@ const meT = {
       submitting: false,
       errorMsg: '' as string,
       active: { bold: false, italic: false, h2: false, bullet: false, ordered: false, link: false },
-      eve: { prompt: '', loading: false },
+      eve: { prompt: '', loading: false, open: false },
       form: {
         name:     CFG.INITIAL.name     ?? '',
         category: CFG.INITIAL.category ?? '',
@@ -288,6 +312,7 @@ const meT = {
           this.form.body_html = body;
           if (data.cta_label) this.form.ctaLabel = data.cta_label;
           setTimeout(() => { try { if (this.editor) this.editor.commands.setContent(body); } catch {} }, 0);
+          this.eve.open = false;
         } catch (err: any) {
           this.errorMsg = this.cfg.T.errNet + ': ' + (err.message || this.cfg.T.errUnknown);
         } finally {
@@ -411,9 +436,21 @@ const meT = {
 .me-pv-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted, #666); margin-bottom: 10px; }
 
 /* Eve row */
-.me-eve-row { display: flex; gap: 8px; margin-bottom: 14px; }
-.me-eve-input { flex: 1; }
+.me-eve-trigger { margin-bottom: 14px; }
 .me-eve-btn { white-space: nowrap; }
+.me-eve-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.me-eve-modal { background: var(--surface, #fff); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18); }
+.me-eve-mhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.me-eve-mhd-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--petrol, #14616E); }
+.me-eve-close { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted, #888); padding: 2px 6px; line-height: 1; }
+.me-eve-close:disabled { opacity: .4; cursor: default; }
+.me-eve-ta { width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px; font-size: 13px; }
+.me-eve-err { font-size: 12px; color: #b91c1c; margin: 10px 0 0; }
+.me-eve-mft { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.me-eve-cancel { background: none; border: 1px solid var(--border, #E5E4E0); border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--ink-muted, #666); }
+.me-eve-cancel:hover:not(:disabled) { background: var(--bg-deep, #F5F4F2); }
+.me-eve-cancel:disabled { opacity: .5; cursor: default; }
+.me-eve-gen { min-width: 120px; }
 
 /* Toolbar + Editor */
 .me-toolbar { display: flex; gap: 2px; align-items: center; padding: 5px; background: var(--bg-deep, #F5F4F2); border: 1px solid var(--border, #E5E4E0); border-bottom: none; border-radius: 10px 10px 0 0; }
