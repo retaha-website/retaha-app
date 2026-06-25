@@ -34,7 +34,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt (kein Markdown, kein Code
 {"title":"...","body_html":"<p>...</p>","cta_label":"...oder null"}
 Regeln:
 - title: Betreff/Titel, max 80 Zeichen, klar und einladend
-- body_html: 1-2 kurze Absätze als HTML-Absätze (<p>...</p>), max 100 Wörter gesamt
+- body_html: IMMER mit Anrede beginnen: <p>Hallo {{first_name}},</p>. Dann 1-2 kurze Absätze Inhalt (<p>...</p>). IMMER mit Abschluss enden: <p>Bis bald,<br>Dein {{hotel_name}}-Team</p>. Max 130 Wörter gesamt.
 - cta_label: 2-5 Wörter für den Button, oder null wenn kein CTA passt
 - Ton: professionell, warm, persönlich — kein Marketing-Slang
 - Verfügbare Personalisierungs-Variablen: {{first_name}}, {{hotel_name}}, {{visit_count}}`;
