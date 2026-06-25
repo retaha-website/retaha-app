@@ -107,15 +107,14 @@ const meT = {
       <span class="me-card-title">{bt('me.content', lang)}</span>
     </div>
 
-    <div class="me-eve-trigger">
-      <button type="button" class="me-card-action me-eve-btn" @click="eve.open = true; errorMsg = ''"
-        x-text="cfg.T.eveWrite"></button>
-    </div>
-
-    <label class="me-field">
+    <div class="me-field">
       <span class="me-label">{bt('ce.title', lang)}</span>
-      <input type="text" x-model="form.title" placeholder={bt('ce.title.ph', lang)} class="s-input" />
-    </label>
+      <div class="me-title-row">
+        <input type="text" x-model="form.title" placeholder={bt('ce.title.ph', lang)} class="s-input" />
+        <button type="button" class="me-card-action me-eve-btn" @click="eve.open = true; errorMsg = ''"
+          x-text="cfg.T.eveWrite"></button>
+      </div>
+    </div>
 
     <div class="me-toolbar">
       <button type="button" @click="exec('toggleBold')"   :class="active.bold ? 'is-on' : ''" title={bt('ce.tb.bold', lang)}><strong>B</strong></button>
@@ -270,8 +269,8 @@ const meT = {
         heroUrl:  CFG.INITIAL.heroUrl  ?? '',
       },
 
-      init() {
-        if (this.editor) return; // Alpine ruft init() automatisch — Doppel-Mount verhindern
+      _mountEditor(content: string) {
+        if (this.editor) { this.editor.destroy(); this.editor = null; }
         const mount = document.getElementById('me-tiptap-mount');
         if (!mount) return;
         this.editor = new Editor({
@@ -281,10 +280,14 @@ const meT = {
             Link.configure({ openOnClick: false, autolink: false, linkOnPaste: false }),
             Image.configure({}),
           ],
-          content: this.form.body_html,
+          content,
           onUpdate: () => { this.form.body_html = this.editor.getHTML(); this._refreshActive(); },
           onSelectionUpdate: () => this._refreshActive(),
         });
+      },
+      init() {
+        if (this.editor) return;
+        this._mountEditor(this.form.body_html);
       },
 
       // Editor leer? — aus form.body_html (via getHTML in onUpdate, reaktiv).
@@ -311,7 +314,7 @@ const meT = {
           const body = data.body_html || '<p></p>';
           this.form.body_html = body;
           if (data.cta_label) this.form.ctaLabel = data.cta_label;
-          setTimeout(() => { try { if (this.editor) this.editor.commands.setContent(body); } catch {} }, 0);
+          setTimeout(() => { this._mountEditor(body); }, 0);
           this.eve.open = false;
         } catch (err: any) {
           this.errorMsg = this.cfg.T.errNet + ': ' + (err.message || this.cfg.T.errUnknown);
@@ -436,8 +439,9 @@ const meT = {
 .me-pv-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted, #666); margin-bottom: 10px; }
 
 /* Eve row */
-.me-eve-trigger { margin-bottom: 14px; }
-.me-eve-btn { white-space: nowrap; }
+.me-title-row { display: flex; gap: 8px; align-items: center; }
+.me-title-row .s-input { flex: 1; min-width: 0; }
+.me-eve-btn { white-space: nowrap; flex-shrink: 0; }
 .me-eve-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .me-eve-modal { background: var(--surface, #fff); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18); }
 .me-eve-mhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
