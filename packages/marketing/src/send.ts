@@ -124,7 +124,7 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
     .update({ status: 'sending', send_started_at: new Date().toISOString() })
     .in('status', ['draft', 'scheduled'])
     .eq('id', campaignId)
-    .select('id, hotel_id, title_i18n, body_i18n, cta_label_i18n, cta_url, target_filter, name, channels')
+    .select('id, hotel_id, title_i18n, body_i18n, push_title_i18n, push_body_i18n, cta_label_i18n, cta_url, target_filter, name, channels')
     .single();
 
   if (lockErr || !lockedRows) {
@@ -269,9 +269,13 @@ export async function runCampaignSend(campaignId: string): Promise<SendCampaignR
           ? `${siteOrigin.replace(/\/$/, '')}/m/${sendId}?to=${encodeURIComponent(campaignCtaUrl)}`
           : null;
 
-        // Step 3: Content rendern
-        const titleRaw = pickI18n(campaign.title_i18n as any, hotelDefault, passLang);
-        const bodyHtml = pickI18n(campaign.body_i18n as any, hotelDefault, passLang);
+        // Step 3: Content rendern — Wallet-Push nutzt den separaten Push-Inhalt
+        // (push_*_i18n); ist er NULL (Bestand / Drips / nicht ausgefüllt), fällt
+        // es auf den E-Mail-Inhalt (title/body) zurück.
+        const pushTitleI18n = (campaign as any).push_title_i18n ?? campaign.title_i18n;
+        const pushBodyI18n = (campaign as any).push_body_i18n ?? campaign.body_i18n;
+        const titleRaw = pickI18n(pushTitleI18n as any, hotelDefault, passLang);
+        const bodyHtml = pickI18n(pushBodyI18n as any, hotelDefault, passLang);
         const ctaLabelRaw = pickI18n((campaign as any).cta_label_i18n, hotelDefault, passLang);
         const bodyPlain = htmlToPlain(bodyHtml);
 

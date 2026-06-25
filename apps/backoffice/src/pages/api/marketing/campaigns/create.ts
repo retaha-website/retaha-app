@@ -34,6 +34,10 @@ interface Body {
   cta_label_default?: string;
   cta_url?: string;
   hero_image_url?: string;
+  // C-Full: separater Wallet-Push-Inhalt (kurzer Titel + Text). Optional —
+  // leer → push_*_i18n bleibt NULL und der Versand fällt auf title/body zurück.
+  push_title_default?: string;
+  push_body_default?: string;
 }
 
 export const POST: APIRoute = async ({ cookies, request }) => {
@@ -59,6 +63,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   const hotelDefault = asLanguageCode((hotel as any).default_language);
 
   let titleI18n: any, bodyI18n: any, ctaLabelI18n: any | null, ctaUrl: string | null, heroUrl: string | null;
+  let pushTitleI18n: any = null, pushBodyI18n: any = null;
 
   if (body.template_id) {
     // ── Aus Template kopieren ──────────────────────────────────────────────
@@ -112,6 +117,27 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     ctaLabelI18n = cRes ? cRes.i18n : null;
     ctaUrl = body.cta_url?.toString().trim() || null;
     heroUrl = body.hero_image_url?.toString().trim() || null;
+
+    // C-Full: separater Wallet-Push-Inhalt (optional). Eigene Übersetzung; leer →
+    // bleibt NULL und der Versand nutzt den E-Mail-Inhalt (title/body) gekürzt.
+    const pushTitle = body.push_title_default?.toString().trim() || '';
+    const pushBody = body.push_body_default?.toString().trim() || '';
+    if (pushTitle || pushBody) {
+      const pushValidation = validateVariables(`${pushTitle} ${pushBody}`);
+      if (!pushValidation.ok) {
+        return json({
+          ok: false, error: 'invalid_variables',
+          unknown: pushValidation.unknownVariables,
+          forbidden: pushValidation.forbiddenVariables,
+        }, 400);
+      }
+      const [ptRes, pbRes] = await Promise.all([
+        pushTitle ? mergeAndTranslateMarketing(null, pushTitle, hotelDefault, { logLabel: 'marketing_campaigns.push_title' }) : Promise.resolve(null),
+        pushBody ? mergeAndTranslateMarketing(null, pushBody, hotelDefault, { logLabel: 'marketing_campaigns.push_body' }) : Promise.resolve(null),
+      ]);
+      pushTitleI18n = ptRes ? ptRes.i18n : null;
+      pushBodyI18n = pbRes ? pbRes.i18n : null;
+    }
   }
 
   // Scheduling: wenn scheduled_at gesetzt + in der Zukunft → status=scheduled
@@ -141,6 +167,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     channels,
     title_i18n: titleI18n,
     body_i18n: bodyI18n,
+    push_title_i18n: pushTitleI18n,
+    push_body_i18n: pushBodyI18n,
     cta_label_i18n: ctaLabelI18n,
     cta_url: ctaUrl,
     hero_image_url: heroUrl,
