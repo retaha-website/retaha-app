@@ -300,7 +300,10 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
             <span class="ev-learn-title">Aus eurer Website lernen</span>
             <span class="ev-hint" style="margin-top:0">Eve liest die hinterlegte Hotel-Website und schlägt automatisch FAQs vor — danach bearbeitbar.</span>
           </div>
-          <button type="button" class="v9-btn ev-btn-primary" data-eve-learn-btn style="white-space:nowrap;flex-shrink:0">Aus Website lernen</button>
+          <button type="button" class="ev-aurora-btn" data-eve-learn-btn>
+            <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+            Aus Website lernen
+          </button>
         </div>
 
         <!-- Neue FAQ -->
@@ -439,7 +442,11 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
           setTimeout(function () { window.location.reload(); }, 900);
           return;
         }
-        if (window.retahaToast) window.retahaToast(data.message || 'Konnte die Website nicht auswerten.', 'error');
+        var msg = data.message || 'Konnte die Website nicht auswerten.';
+        var toastOpts = data.error === 'no_website'
+          ? { action: { label: 'Zu den Hotel-Einstellungen', href: '/profil/settings' } }
+          : {};
+        if (window.retahaToast) window.retahaToast(msg, 'error', toastOpts);
       } catch (e) {
         if (window.retahaToast) window.retahaToast('Netzwerk-Fehler. Versuche es erneut.', 'error');
       }
@@ -499,6 +506,24 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     border: 1px solid var(--border) !important; border-radius: 8px;
   }
   .ev-btn-ghost:hover { color: var(--ink) !important; border-color: var(--ink) !important; }
+
+  /* ── Aurora-Button (wie "Mit Eve schreiben") ────────────────────── */
+  .ev-aurora-btn {
+    position: relative; border: 0; cursor: pointer; overflow: visible; flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 8px 13px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    color: #fff;
+    background: linear-gradient(115deg, #14616E 0%, #1AA0B0 34%, #5B7CE0 68%, #14616E 100%);
+    background-size: 280% 100%;
+    animation: ev-aurora-flow 6s linear infinite;
+    box-shadow: 0 4px 14px rgba(20,97,110,.32);
+    transition: transform .15s, box-shadow .2s;
+  }
+  .ev-aurora-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(45,91,208,.4); animation-duration: 2.2s; }
+  .ev-aurora-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; animation-play-state: paused; }
+  .ev-aurora-spk { animation: ev-aurora-twinkle 2.4s ease-in-out infinite; flex-shrink: 0; }
+  @keyframes ev-aurora-flow { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+  @keyframes ev-aurora-twinkle { 0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); } 50% { opacity: 0.6; transform: scale(0.8) rotate(20deg); } }
 
   /* ── Website-lernen-Block ───────────────────────────────────────── */
   .ev-learn-block {
