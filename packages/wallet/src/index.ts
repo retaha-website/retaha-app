@@ -7,6 +7,7 @@ export * from './google';
 export * from './variables';
 export * from './stay-push-variables';
 export * from './stay-push';
+export * from './stay-push-defaults';
 export * from './returning-guest';
 export * from './deep-link-token';
 export * from './opt-out-token';

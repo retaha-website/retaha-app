@@ -7,6 +7,7 @@ import {
   STAY_PUSH_TRIGGER_LABELS, STAY_PUSH_TRIGGER_DESCRIPTIONS, STAY_PUSH_TRIGGER_VARIABLES,
 } from '@retaha/marketing';
 import { VARIABLE_UI_DEFS } from '@retaha/marketing';
+import { STAY_PUSH_DEFAULTS } from '@retaha/wallet';
 import { getLang, bt } from '../../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
@@ -37,9 +38,10 @@ function pickI18n(jsonb: any): string {
   if (!jsonb) return '';
   return jsonb[hotelDefaultLang]?.value ?? '';
 }
-const initialTitle = pickI18n(existing?.title_i18n);
-const initialBody  = pickI18n(existing?.body_i18n);
-const initialActive = existing?.is_active !== false;
+const defaults = STAY_PUSH_DEFAULTS[triggerType] ?? { title: '', body: '' };
+const initialTitle = existing ? pickI18n(existing.title_i18n) : defaults.title;
+const initialBody  = existing ? pickI18n(existing.body_i18n)  : defaults.body;
+const initialActive = existing?.is_active ?? false;
 
 const allowedVars = STAY_PUSH_TRIGGER_VARIABLES[triggerType] ?? [];
 const STAY_VAR_LABELS: Record<string, string> = {
