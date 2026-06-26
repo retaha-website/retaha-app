@@ -38,6 +38,8 @@ const arrivals = (arrivalsRaw ?? []) as Array<{
   rooms: { room_number: string | null; room_name: string | null } | null;
 }>;
 
+const todayLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+
 function fmtTime(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '—';
@@ -47,54 +49,75 @@ function fmtTime(iso: string): string {
 
 <AppLayout title="Anreisen" hotel={hotel} user={{ email: user.email ?? '' }}>
   <header class="app-page-header">
-    <p class="app-page-eyebrow themed-eyebrow-flank">{todayIso}</p>
+    <p class="app-page-eyebrow themed-eyebrow-flank">{todayLabel}</p>
     <h1 class="app-page-title">Anreisen heute<span class="h-dot">.</span></h1>
   </header>
 
+  <div class="arr-count-bar">
+    <span class="arr-count-num">{arrivals.length}</span>
+    <span class="arr-count-label">{arrivals.length === 1 ? 'Anreise' : 'Anreisen'} für heute</span>
+  </div>
+
   {arrivals.length === 0 ? (
-    <div class="arr-empty">Keine Anreisen für heute erfasst.</div>
+    <div class="arr-empty">
+      <p class="arr-empty-icon">✓</p>
+      <p class="arr-empty-text">Keine Anreisen für heute erfasst.</p>
+    </div>
   ) : (
-    <div class="arr-list" id="arr-list">
+    <div class="arr-list">
       {arrivals.map((stay) => {
         const guest = stay.guests as any;
         const room  = stay.rooms as any;
         const name = [guest?.first_name, guest?.last_name].filter(Boolean).join(' ') || 'Gast';
-        const roomLabel = room?.room_number
-          ? `Zimmer ${room.room_number}${room.room_name ? ` (${room.room_name})` : ''}`
-          : room?.room_name ?? '—';
+        const roomNumber = room?.room_number ?? null;
+        const roomName   = room?.room_name ?? null;
+        const roomLabel  = roomNumber
+          ? `Zimmer ${roomNumber}${roomName ? ` · ${roomName}` : ''}`
+          : roomName ?? '—';
+        const checkInTime  = fmtTime(stay.check_in);
+        const checkOutTime = fmtTime(stay.check_out);
         return (
-          <div class="arr-row" data-stay-id={stay.id}>
-            <div class="arr-info">
-              <p class="arr-name">{name}</p>
-              <p class="arr-meta">{roomLabel} · Check-in {fmtTime(stay.check_in)}</p>
+          <article class="arr-row" data-stay-id={stay.id}>
+            <div class="arr-row-inner">
+              <div class="arr-guest">
+                <div class="arr-avatar">{name.slice(0,1).toUpperCase()}</div>
+                <div class="arr-info">
+                  <p class="arr-name">{name}</p>
+                  <p class="arr-meta">
+                    {roomLabel}
+                    {checkInTime !== '—' && <span class="arr-meta-sep">·</span>}
+                    {checkInTime !== '—' && <span>Check-in {checkInTime}</span>}
+                    {checkOutTime !== '—' && <span class="arr-meta-sep">·</span>}
+                    {checkOutTime !== '—' && <span>Check-out {checkOutTime}</span>}
+                  </p>
+                </div>
+              </div>
+              <div class="arr-action-col">
+                <button
+                  class="arr-btn"
+                  data-stay-id={stay.id}
+                  type="button"
+                >
+                  Zimmer bereit
+                </button>
+                <span class="arr-status-msg" aria-live="polite"></span>
+              </div>
             </div>
-            <div class="arr-actions">
-              <button
-                class="arr-btn-ready"
-                data-stay-id={stay.id}
-                data-guest={name}
-                type="button"
-              >
-                Zimmer bereit
-              </button>
-              <span class="arr-status" aria-live="polite"></span>
-            </div>
-          </div>
+          </article>
         );
       })}
     </div>
   )}
 
   <script>
-    document.querySelectorAll<HTMLButtonElement>('.arr-btn-ready').forEach(btn => {
+    document.querySelectorAll<HTMLButtonElement>('.arr-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const stayId = btn.dataset.stayId!;
-        const guestName = btn.dataset.guest ?? 'Gast';
         const statusEl = btn.nextElementSibling as HTMLElement | null;
 
         btn.disabled = true;
         btn.textContent = '…';
-        if (statusEl) statusEl.textContent = '';
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = 'arr-status-msg'; }
 
         try {
           const res = await fetch('/app/api/stays/room-ready', {
@@ -106,80 +129,191 @@ function fmtTime(iso: string): string {
           const data = await res.json();
           if (data.ok || data.status === 'skipped_already_sent') {
             btn.textContent = '✓ Gesendet';
-            btn.classList.add('arr-btn-sent');
-            if (statusEl) statusEl.textContent = data.status === 'skipped_already_sent' ? '(bereits gesendet)' : '';
+            btn.classList.add('arr-btn--sent');
+            if (statusEl && data.status === 'skipped_already_sent') {
+              statusEl.textContent = 'bereits gesendet';
+            }
           } else {
             btn.disabled = false;
             btn.textContent = 'Zimmer bereit';
             if (statusEl) {
-              statusEl.textContent = data.status === 'skipped_template_inactive'
-                ? 'Template inaktiv'
-                : data.status === 'skipped_template_missing'
-                ? 'Kein Template'
-                : data.status === 'skipped_no_pass'
-                ? 'Kein Wallet-Pass'
-                : 'Fehler';
-              statusEl.classList.add('arr-status-err');
+              const msgMap: Record<string, string> = {
+                skipped_template_inactive: 'Template inaktiv',
+                skipped_template_missing:  'Kein Template konfiguriert',
+                skipped_no_pass:           'Kein Wallet-Pass',
+                skipped_guard:             'Push blockiert',
+              };
+              statusEl.textContent = msgMap[data.status] ?? 'Fehler';
+              statusEl.classList.add('arr-status-msg--err');
             }
           }
         } catch {
           btn.disabled = false;
           btn.textContent = 'Zimmer bereit';
-          if (statusEl) { statusEl.textContent = 'Netzwerkfehler'; statusEl.classList.add('arr-status-err'); }
+          if (statusEl) {
+            statusEl.textContent = 'Netzwerkfehler';
+            statusEl.classList.add('arr-status-msg--err');
+          }
         }
       });
     });
   </script>
 
   <style>
-    .arr-empty {
-      padding: 48px 24px;
-      text-align: center;
-      color: var(--ink-muted);
-      font-size: 14px;
+    .app-page-header { margin-bottom: 24px; }
+
+    /* Count bar */
+    .arr-count-bar {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .arr-count-num {
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--theme-text-primary);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .arr-count-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--theme-text-primary) .45, transparent);
     }
 
+    /* Empty state */
+    .arr-empty {
+      background: var(--theme-bg-primary);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      padding: 56px 24px;
+      text-align: center;
+    }
+    .arr-empty-icon {
+      font-size: 24px;
+      margin: 0 0 12px;
+      color: var(--theme-success);
+      line-height: 1;
+    }
+    .arr-empty-text {
+      margin: 0;
+      font-size: 14px;
+      color: color-mix(in srgb, var(--theme-text-primary) .5, transparent);
+      font-style: italic;
+    }
+
+    /* List */
     .arr-list {
       display: flex;
       flex-direction: column;
-      gap: 0;
-      border: 1px solid var(--border);
+      gap: 8px;
     }
 
+    /* Row */
     .arr-row {
+      background: var(--theme-bg-primary);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: box-shadow .16s ease, transform .16s ease;
+    }
+    .arr-row:hover {
+      box-shadow: 0 10px 28px rgba(40, 30, 20, .08);
+      transform: translateY(-2px);
+    }
+    .arr-row-inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
+      padding: 20px 22px;
     }
-    .arr-row:last-child { border-bottom: none; }
 
+    /* Guest info */
+    .arr-guest {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 0;
+    }
+    .arr-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+      color: var(--theme-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
     .arr-info { flex: 1; min-width: 0; }
-    .arr-name { margin: 0 0 2px; font-size: 15px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .arr-meta { margin: 0; font-size: 12px; color: var(--ink-muted); }
+    .arr-name {
+      margin: 0 0 3px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--theme-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .arr-meta {
+      margin: 0;
+      font-size: 13px;
+      color: color-mix(in srgb, var(--theme-text-primary) .55, transparent);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    .arr-meta-sep { opacity: .4; }
 
-    .arr-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-
-    .arr-btn-ready {
-      padding: 8px 14px;
-      background: var(--ink);
-      color: var(--surface);
-      border: none;
-      cursor: pointer;
-      font-size: 12px;
+    /* Action */
+    .arr-action-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .arr-btn {
+      padding: 8px 16px;
+      font-size: 13px;
       font-weight: 500;
       font-family: inherit;
+      border: 1px solid var(--theme-accent);
+      border-radius: 8px;
+      background: var(--theme-accent);
+      color: var(--theme-bg-primary);
+      cursor: pointer;
       white-space: nowrap;
-      transition: background 0.15s;
+      transition: background .15s, border-color .15s, opacity .15s;
     }
-    .arr-btn-ready:hover:not(:disabled) { background: #14616e; }
-    .arr-btn-ready:disabled { opacity: 0.6; cursor: not-allowed; }
-    .arr-btn-ready.arr-btn-sent { background: #14616e; }
+    .arr-btn:hover:not(:disabled) {
+      background: var(--theme-accent-hover, var(--theme-accent));
+      border-color: var(--theme-accent-hover, var(--theme-accent));
+    }
+    .arr-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .arr-btn--sent {
+      background: var(--theme-success);
+      border-color: var(--theme-success);
+    }
 
-    .arr-status { font-size: 11px; color: var(--ink-muted); }
-    .arr-status-err { color: #c0392b; }
+    .arr-status-msg {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      color: color-mix(in srgb, var(--theme-text-primary) .45, transparent);
+      text-align: right;
+    }
+    .arr-status-msg--err {
+      color: var(--theme-accent);
+    }
   </style>
 </AppLayout>
