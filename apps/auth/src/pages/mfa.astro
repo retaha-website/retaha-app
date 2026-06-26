@@ -54,13 +54,18 @@ if (verifyMfaMarker(Astro.cookies, userRes.user.id)) {
   return Astro.redirect(returnTo);
 }
 
-// User-MFA-Status pruefen.
+// User-MFA-Status pruefen. FAIL-CLOSED: DB-Fehler → Zugang verweigert, kein Pass-through.
 const service = createSupabaseServiceRoleInstance();
-const { data: mfa } = await service
+const { data: mfa, error: mfaStatusError } = await service
   .from('user_mfa')
   .select('enabled')
   .eq('user_id', userRes.user.id)
   .maybeSingle();
+
+if (mfaStatusError) {
+  // DB nicht erreichbar → sicher ablehnen statt MFA-Check überspringen.
+  return Astro.redirect('/error?code=mfa_check_failed');
+}
 
 if (!mfa?.enabled) {
   // Kein MFA eingerichtet -> Marker setzen (Pass-through, sonst wirft der
@@ -143,6 +148,7 @@ const userEmail = userRes.user.email ?? '';
       isComplete() { return this.code.every(d => d !== ''); },
 
       async submit() {
+        if (this.isSubmitting) return;
         const fullCode = this.code.join('');
         if (fullCode.length !== 6) return;
 
