@@ -14,7 +14,7 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const sb = createSupabaseServiceRoleInstance();
 const [{ data: cfgRow }, { data: hsRow }] = await Promise.all([
-  sb.from('loyalty_config').select('points_per_night, tiers, rewards').eq('hotel_id', hotel.id).maybeSingle(),
+  sb.from('loyalty_config').select('points_per_night, tiers, rewards, expiry_enabled, expiry_months').eq('hotel_id', hotel.id).maybeSingle(),
   sb.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle(),
 ]);
 
@@ -23,6 +23,8 @@ const initConfig = {
   points_per_night: cfgRow?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.points_per_night,
   tiers: cfgRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers,
   rewards: cfgRow?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards,
+  expiry_enabled: cfgRow?.expiry_enabled ?? false,
+  expiry_months: cfgRow?.expiry_months ?? 24,
 };
 const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loyalty === true;
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
@@ -188,6 +190,26 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
         </div>
 
       </div><!-- /ly-2col -->
+
+      <!-- Punkte-Verfall -->
+      <div class="ly-sec">
+        <div class="ly-sec-head">
+          <div class="ly-sec-l"><span class="ly-dot"></span><b>Punkte-Verfall</b></div>
+          <label class="ly-toggle" title="Verfall aktivieren">
+            <input type="checkbox" x-model="config.expiry_enabled" />
+            <span class="ly-toggle-track"></span>
+          </label>
+        </div>
+        <p class="ly-hint">Aktuelles Guthaben verfällt nach N Monaten ohne Aufenthalt. Lifetime-Punkte und Status-Stufe bleiben unberührt.</p>
+        <div class="ly-ppn" x-show="config.expiry_enabled" x-cloak>
+          <div class="ly-ppn-label">Monate Inaktivität bis Verfall</div>
+          <input
+            type="number" min="1" max="120" inputmode="numeric"
+            class="ly-ppn-input"
+            x-model.number="config.expiry_months"
+          />
+        </div>
+      </div>
 
       <!-- Speichern -->
       <div class="ly-save-row">
@@ -569,6 +591,24 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
   }
   .ly-savebtn:hover:not(:disabled) { filter: brightness(1.1); }
   .ly-savebtn:disabled { opacity: .5; cursor: wait; }
+
+  /* Toggle */
+  .ly-toggle { position: relative; display: inline-flex; cursor: pointer; flex-shrink: 0; }
+  .ly-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .ly-toggle-track {
+    width: 38px; height: 22px; border-radius: 11px;
+    background: var(--ly-line); transition: background 200ms;
+    position: relative; flex-shrink: 0;
+  }
+  .ly-toggle-track::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; transition: transform 200ms;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  }
+  .ly-toggle input:checked ~ .ly-toggle-track { background: var(--ly-ac); }
+  .ly-toggle input:checked ~ .ly-toggle-track::after { transform: translateX(16px); }
+  .ly-toggle:focus-within .ly-toggle-track { outline: 2px solid rgba(20,97,110,0.35); outline-offset: 2px; }
 </style>
 
 </Layout>
