@@ -100,91 +100,96 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
         </div>
       </div>
 
-      <!-- Status-Stufen -->
-      <div class="ly-sec">
-        <div class="ly-sec-head">
-          <div class="ly-sec-l"><span class="ly-dot"></span><b>Status-Stufen</b></div>
-        </div>
-        <p class="ly-hint">Die Stufe richtet sich nach den <strong>jemals verdienten</strong> Punkten — sie sinkt beim Einlösen nicht.</p>
+      <!-- Status-Stufen + Prämien nebeneinander -->
+      <div class="ly-2col">
 
-        <template x-for="(tier, ti) in config.tiers" :key="ti">
-          <div class="ly-tier" :class="tierOpen[ti] ? 'open' : ''">
-            <div class="ly-tier-hd" @click="tierOpen[ti] = !tierOpen[ti]">
-              <div class="ly-tier-l">
-                <svg class="ly-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
-                <span class="ly-tname" x-text="tier.name || 'Neue Stufe'"></span>
+        <!-- Status-Stufen -->
+        <div class="ly-sec">
+          <div class="ly-sec-head">
+            <div class="ly-sec-l"><span class="ly-dot"></span><b>Status-Stufen</b></div>
+          </div>
+          <p class="ly-hint">Die Stufe richtet sich nach den <strong>jemals verdienten</strong> Punkten — sie sinkt beim Einlösen nicht.</p>
+
+          <template x-for="(tier, ti) in config.tiers" :key="ti">
+            <div class="ly-tier" :class="tierOpen[ti] ? 'open' : ''">
+              <div class="ly-tier-hd" @click="tierOpen[ti] = !tierOpen[ti]">
+                <div class="ly-tier-l">
+                  <svg class="ly-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
+                  <span class="ly-tname" x-text="tier.name || 'Neue Stufe'"></span>
+                </div>
+                <span class="ly-tmeta">
+                  ab <span x-text="tier.threshold_points"></span> Pkt
+                  · <span x-text="tier.benefits.length"></span> Vorteile
+                </span>
               </div>
-              <span class="ly-tmeta">
-                ab <span x-text="tier.threshold_points"></span> Pkt
-                · <span x-text="tier.benefits.length"></span> Vorteile
-              </span>
-            </div>
-            <div class="ly-tier-body">
-              <!-- Name + Schwelle -->
-              <div class="ly-tier-fields">
-                <label class="ly-field">
-                  <span class="ly-field-label">Name</span>
-                  <input type="text" class="ly-input" x-model="tier.name" placeholder="z.B. Gold" />
-                </label>
-                <label class="ly-field ly-field--num">
-                  <span class="ly-field-label">Ab Punkten</span>
-                  <input type="number" min="0" inputmode="numeric" class="ly-ppn-input" style="width:100%;font-size:22px" x-model.number="tier.threshold_points" />
-                </label>
-                <button type="button" class="ly-remove-tier" @click.stop="config.tiers.splice(ti,1); delete tierOpen[ti]; $nextTick(() => window.retahaToast?.('Stufe entfernt'))" title="Stufe entfernen">×</button>
-              </div>
-              <!-- Vorteile -->
-              <div class="ly-benefits">
-                <template x-for="(b, bi) in tier.benefits" :key="bi">
-                  <div class="ly-rew">
-                    <div class="ly-rew-l">
-                      <div class="ly-rew-info">
-                        <input type="text" class="ly-rew-title" x-model="b.title" placeholder="Vorteil" />
-                        <input type="text" class="ly-rew-desc" x-model="b.desc" placeholder="Beschreibung (optional)" />
+              <div class="ly-tier-body">
+                <!-- Name + Schwelle -->
+                <div class="ly-tier-fields">
+                  <label class="ly-field">
+                    <span class="ly-field-label">Name</span>
+                    <input type="text" class="ly-input" x-model="tier.name" placeholder="z.B. Gold" />
+                  </label>
+                  <label class="ly-field ly-field--num">
+                    <span class="ly-field-label">Ab Punkten</span>
+                    <input type="number" min="0" inputmode="numeric" class="ly-ppn-input" style="width:100%;font-size:22px" x-model.number="tier.threshold_points" />
+                  </label>
+                  <button type="button" class="ly-remove-tier" @click.stop="config.tiers.splice(ti,1); delete tierOpen[ti]; $nextTick(() => window.retahaToast?.('Stufe entfernt'))" title="Stufe entfernen">×</button>
+                </div>
+                <!-- Vorteile -->
+                <div class="ly-benefits">
+                  <template x-for="(b, bi) in tier.benefits" :key="bi">
+                    <div class="ly-rew">
+                      <div class="ly-rew-l">
+                        <div class="ly-rew-info">
+                          <input type="text" class="ly-rew-title" x-model="b.title" placeholder="Vorteil" />
+                          <input type="text" class="ly-rew-desc" x-model="b.desc" placeholder="Beschreibung (optional)" />
+                        </div>
+                      </div>
+                      <div class="ly-rew-r">
+                        <button type="button" class="ly-rm-sm" @click="tier.benefits.splice(bi,1)" aria-label="Entfernen">×</button>
                       </div>
                     </div>
-                    <div class="ly-rew-r">
-                      <button type="button" class="ly-rm-sm" @click="tier.benefits.splice(bi,1)" aria-label="Entfernen">×</button>
-                    </div>
-                  </div>
-                </template>
+                  </template>
+                </div>
+                <button class="ly-add-dashed" @click="tier.benefits.push({title:'',desc:''})">+ Vorteil</button>
               </div>
-              <button class="ly-add-dashed" @click="tier.benefits.push({title:'',desc:''})">+ Vorteil</button>
             </div>
-          </div>
-        </template>
+          </template>
 
-        <button class="ly-add-dashed" @click="addTier()">+ Stufe</button>
-      </div>
-
-      <!-- Prämien -->
-      <div class="ly-sec">
-        <div class="ly-sec-head">
-          <div class="ly-sec-l"><span class="ly-dot"></span><b>Prämien (einlösbar)</b></div>
+          <button class="ly-add-dashed" @click="addTier()">+ Stufe</button>
         </div>
 
-        <template x-for="(rw, ri) in config.rewards" :key="ri">
-          <div class="ly-rew">
-            <div class="ly-rew-l">
-              <span class="ly-chk" :class="rw.active ? 'ly-chk--on' : ''" @click="rw.active = !rw.active" title="Aktiv/Inaktiv">
-                <svg x-show="rw.active" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 6"/></svg>
-              </span>
-              <div class="ly-rew-info">
-                <input type="text" class="ly-rew-title" x-model="rw.title" placeholder="Prämienname" />
-                <input type="text" class="ly-rew-desc" x-model="rw.desc" placeholder="Kurzbeschreibung" />
-              </div>
-            </div>
-            <div class="ly-rew-r">
-              <div class="ly-cost-wrap">
-                <input type="number" min="0" inputmode="numeric" class="ly-cost-input" x-model.number="rw.cost_points" />
-                <span class="ly-cost-unit">Pkt</span>
-              </div>
-              <button type="button" class="ly-rm-sm ly-rm-sm--rew" @click="config.rewards.splice(ri,1)" aria-label="Entfernen">×</button>
-            </div>
+        <!-- Prämien -->
+        <div class="ly-sec">
+          <div class="ly-sec-head">
+            <div class="ly-sec-l"><span class="ly-dot"></span><b>Prämien (einlösbar)</b></div>
           </div>
-        </template>
 
-        <button class="ly-add-dashed" @click="addReward()">+ Prämie</button>
-      </div>
+          <template x-for="(rw, ri) in config.rewards" :key="ri">
+            <div class="ly-rew">
+              <div class="ly-rew-l">
+                <span class="ly-chk" :class="rw.active ? 'ly-chk--on' : ''" @click="rw.active = !rw.active" title="Aktiv/Inaktiv">
+                  <svg x-show="rw.active" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 6"/></svg>
+                </span>
+                <div class="ly-rew-info">
+                  <input type="text" class="ly-rew-title" x-model="rw.title" placeholder="Prämienname" />
+                  <input type="text" class="ly-rew-desc" x-model="rw.desc" placeholder="Kurzbeschreibung" />
+                </div>
+              </div>
+              <div class="ly-rew-r">
+                <div class="ly-cost-wrap">
+                  <input type="number" min="0" inputmode="numeric" class="ly-cost-input" x-model.number="rw.cost_points" />
+                  <span class="ly-cost-unit">Pkt</span>
+                </div>
+                <button type="button" class="ly-rm-sm ly-rm-sm--rew" @click="config.rewards.splice(ri,1)" aria-label="Entfernen">×</button>
+              </div>
+            </div>
+          </template>
+
+          <button class="ly-add-dashed" @click="addReward()">+ Prämie</button>
+        </div>
+
+      </div><!-- /ly-2col -->
 
       <!-- Speichern -->
       <div class="ly-save-row">
@@ -406,9 +411,14 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
   /* ── Program sections ────────────────────────────────────────────────────── */
   [x-show="phase === 'program'"] { animation: ly-rise .45s ease; }
 
+  .ly-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;
+  }
+  .ly-2col .ly-sec { margin-bottom: 0; }
+
   .ly-sec {
-    background: var(--ly-surf); border: 1px solid var(--border, rgba(10,10,10,0.10)); border-radius: 16px;
-    padding: 18px 22px; margin-bottom: 16px;
+    background: var(--ly-surf); border: 1px solid var(--border, rgba(10,10,10,0.10)); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 12px;
   }
   .ly-sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .ly-sec-l { display: flex; align-items: center; gap: 9px; }
