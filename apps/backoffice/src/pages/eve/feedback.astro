@@ -82,7 +82,6 @@ if (rows.length > 0 && stayIds.length > 0) {
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">{bt('evf.hero.eyebrow', lang)}</span>
       <h1 class="settings-hero__title" set:html={bt('evf.hero.title', lang)}></h1>
       <p class="settings-hero__sub">{bt('evf.hero.sub', lang)}</p>
     </section>
@@ -105,13 +104,10 @@ if (rows.length > 0 && stayIds.length > 0) {
 
     {rows.length === 0 ? (
       <div class="evf-empty">
-        <p>{filter === -1
-          ? bt('evf.empty.neg', lang)
-          : bt('evf.empty.pos', lang)}
-        </p>
+        <p>{filter === -1 ? bt('evf.empty.neg', lang) : bt('evf.empty.pos', lang)}</p>
       </div>
     ) : (
-      <div class="settings-sections">
+      <div class="ev-wrap">
         {rows.map((r: any) => {
           const prior = priorByMessageId[r.message?.id];
           const guestName = r.stay?.guest
@@ -121,15 +117,15 @@ if (rows.length > 0 && stayIds.length > 0) {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
           });
           return (
-            <article class="s-card evf-card">
-              <div class="s-card__head">
+            <article class="ev-card">
+              <div class="ev-card-head">
                 <span class={`evf-badge evf-badge--${r.rating === 1 ? 'pos' : 'neg'}`}>
                   {r.rating === 1 ? bt('evf.badge.pos', lang) : bt('evf.badge.neg', lang)}
                 </span>
-                <span class="s-card__num">{guestName} · {dateStr}</span>
+                <span class="evf-meta">{guestName} · {dateStr}</span>
               </div>
 
-              <div class="s-card__body">
+              <div class="evf-msgs">
                 {prior && (
                   <div class="evf-msg evf-msg--user">
                     <p class="evf-msg-label">{bt('evf.msg.asked', lang)}</p>
@@ -157,89 +153,93 @@ if (rows.length > 0 && stayIds.length > 0) {
 </Layout>
 
 <style>
-  /* Filter-Tabs */
+  .breadcrumb { padding-top: 36px; }
+
+  /* ── V9-Karten ──────────────────────────────────────────────────── */
+  .ev-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .ev-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 22px;
+  }
+  .ev-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+
+  /* ── Filter-Tabs ────────────────────────────────────────────────── */
   .evf-tabs {
-    display: flex; gap: 0; margin-bottom: 24px;
+    display: flex; gap: 0; margin-bottom: 20px;
     border-bottom: 1px solid var(--border);
   }
   .evf-tab {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 10px 20px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px; font-weight: 400;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400;
     color: var(--ink-muted); text-decoration: none;
     border-bottom: 2px solid transparent; margin-bottom: -1px;
-    transition: color 150ms, border-color 150ms;
-    min-height: 44px;
+    transition: color 150ms, border-color 150ms; min-height: 44px;
   }
   .evf-tab:hover { color: var(--ink); }
-  .evf-tab.is-active {
-    color: var(--ink); border-bottom-color: var(--ink);
-    font-weight: 500;
-  }
+  .evf-tab.is-active { color: var(--petrol, #14616E); border-bottom-color: var(--petrol, #14616E); font-weight: 500; }
   .evf-tab-icon { font-size: 15px; }
   .evf-tab-count {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; padding: 1px 7px;
-    border-radius: var(--r-pill);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 1px 7px; border-radius: 99px;
     background: var(--bg-deep); color: var(--ink-muted);
   }
   .evf-tab.is-active .evf-tab-count {
-    background: var(--ink); color: var(--bg);
+    background: var(--petrol, #14616E); color: #fff;
   }
 
-  /* Empty state */
+  /* ── Empty state ────────────────────────────────────────────────── */
   .evf-empty {
     padding: 60px 24px;
     background: var(--surface); border: 1px dashed var(--border);
-    border-radius: var(--r); text-align: center;
+    border-radius: 16px; text-align: center;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; color: var(--ink-muted);
-    letter-spacing: 0.04em;
+    font-size: 12px; color: var(--ink-muted); letter-spacing: 0.04em;
   }
 
-  /* Feedback card */
-  .evf-card .s-card__head { align-items: center; }
-
+  /* ── Karten-Kopf ────────────────────────────────────────────────── */
   .evf-badge {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; letter-spacing: 0.04em;
-    padding: 4px 10px; border-radius: var(--r-sm);
+    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 6px;
   }
   .evf-badge--pos {
-    background: var(--sage-soft); color: var(--sage-strong);
-    border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
+    background: color-mix(in srgb, var(--sage, #5C9070) 12%, transparent);
+    color: var(--sage-strong, #2D6347);
+    border: 1px solid color-mix(in srgb, var(--sage, #5C9070) 30%, transparent);
   }
   .evf-badge--neg {
-    background: var(--burgund-soft); color: var(--burgund);
-    border: 1px solid color-mix(in srgb, var(--burgund) 30%, transparent);
+    background: rgba(153,27,27,0.08); color: #991B1B;
+    border: 1px solid rgba(153,27,27,0.2);
+  }
+  .evf-meta {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.06em; color: var(--ink-muted);
   }
 
-  /* Message blocks */
-  .evf-msg {
-    padding: 10px 14px; border-radius: var(--r-sm);
-  }
+  /* ── Nachrichten-Blöcke ─────────────────────────────────────────── */
+  .evf-msgs { display: flex; flex-direction: column; gap: 10px; }
+  .evf-msg { padding: 11px 14px; border-radius: 10px; }
   .evf-msg--user {
-    background: var(--bg-deep);
-    border-left: 3px solid var(--border-medium);
+    background: var(--bg-deep); border-left: 3px solid var(--border);
   }
   .evf-msg--eve {
-    background: var(--te-yellow-soft);
-    border-left: 3px solid var(--te-yellow);
+    background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent);
+    border-left: 3px solid var(--petrol, #14616E);
   }
   .evf-msg--comment {
-    background: var(--sage-soft);
-    border-left: 3px solid color-mix(in srgb, var(--sage) 50%, transparent);
+    background: color-mix(in srgb, var(--sage, #5C9070) 8%, transparent);
+    border-left: 3px solid color-mix(in srgb, var(--sage, #5C9070) 50%, transparent);
   }
   .evf-msg-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--ink-muted); margin: 0 0 5px;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-muted); margin: 0 0 6px;
   }
-  .evf-msg-text {
-    margin: 0; font-size: 14px; line-height: 1.55;
-    color: var(--ink);
-  }
+  .evf-msg-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink); }
   .evf-msg--user .evf-msg-text,
-  .evf-msg--comment .evf-msg-text { font-style: italic; }
+  .evf-msg--comment .evf-msg-text { font-style: italic; color: var(--ink-muted); }
 </style>
