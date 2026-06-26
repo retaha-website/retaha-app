@@ -9,7 +9,7 @@ const { branding, lang } = Astro.props;
 const assets = [
   { key: 'splash_background', labelKey: 'brand.asset.1.label', hintKey: 'brand.asset.1.hint', ratio: '9/16' },
   { key: 'wallet_pass_bg',    labelKey: 'brand.asset.2.label', hintKey: 'brand.asset.2.hint', ratio: '16/9' },
-  { key: 'email_header',      labelKey: 'brand.asset.3.label', hintKey: 'brand.asset.3.hint', ratio: '3/1'  },
+  { key: 'email_header',      labelKey: 'brand.asset.3.label', hintKey: 'brand.asset.3.hint', ratio: '16/9' },
 ];
 ---
 
@@ -144,6 +144,13 @@ const assets = [
         const j = await res.json();
         showStatus(slot, false, `✗ ${j.error}`);
         (window as any).retahaToast?.(`${T.uploadfail}: ${j.error}`, 'error');
+        // Optimistic preview zurücksetzen
+        const img = drop.querySelector<HTMLImageElement>('.asset-slot__img')!;
+        img.src = ''; img.hidden = true;
+        const empty = drop.querySelector<HTMLElement>('.asset-slot__empty');
+        if (empty) empty.hidden = false;
+        drop.classList.remove('has-image');
+        input.value = '';
       }
     });
   }
