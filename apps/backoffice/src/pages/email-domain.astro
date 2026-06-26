@@ -110,28 +110,127 @@ if (freshSettings?.resend_domain_id) {
 <Layout title="Email-Domain" activeTab="backoffice" hotelName={hotel.name}>
 
 <style>
-/* Wie /marketing + /consent: freistehende Abschnitte, gerundete Karten, Petrol statt Gelb/Gold. */
-.breadcrumb { padding-top: 36px; }
-.ed-sections { display: flex; flex-direction: column; gap: 44px; }
-.ed-section-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 16px; }
-.ed-section-hint { font-family: 'Inter Tight', sans-serif; font-size: 13px; color: var(--ink-soft, var(--ink-muted)); margin: 0 0 16px; }
-.ed-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+.ed-wrap { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.ed-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+}
 .ed-card--table { padding: 0; overflow: hidden; }
-.ed-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 11px; border-radius: 99px; margin-bottom: 14px; }
-.ed-badge--verified { background: rgba(20,97,110,0.12); color: #14616E; }
-.ed-badge--pending  { background: rgba(79,179,198,0.18); color: #14616E; }
+.ed-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 18px;
+}
+.ed-card-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+  font-size: 14px; color: var(--ink);
+}
+.ed-card-title::before {
+  content: ''; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--petrol, #14616E); flex-shrink: 0;
+}
+
+/* ── Labels + Hints ──────────────────────────────────────────────── */
+.ed-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink-muted, #666); margin-bottom: 6px;
+}
+.ed-hint {
+  display: block; font-size: 11px; color: var(--ink-muted, #666);
+  margin-top: 6px; line-height: 1.45;
+}
+.ed-field { margin-bottom: 14px; }
+
+/* ── Status-Badge ────────────────────────────────────────────────── */
+.ed-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 99px;
+}
+.ed-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+.ed-badge--verified { background: rgba(20,97,110,0.10); color: #14616E; }
+.ed-badge--verified::before { background: #14616E; }
+.ed-badge--pending  { background: rgba(79,179,198,0.14); color: #14616E; }
+.ed-badge--pending::before { background: #4FB3C6; }
 .ed-badge--failed   { background: #FEE2E2; color: #991B1B; }
-.ed-email { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: var(--ink); margin: 0 0 12px; }
-.ed-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.ed-badge--failed::before { background: #991B1B; }
+
+/* ── Domain-Anzeige ──────────────────────────────────────────────── */
+.ed-domain-row {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 12px;
+}
+.ed-email {
+  font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--ink);
+}
+
+/* ── Marketing-Toggle (Segmented Control) ────────────────────────── */
+.ed-seg {
+  display: inline-flex; gap: 3px;
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 10px; padding: 3px;
+  background: var(--surface, #fff);
+}
+.ed-seg-btn {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-muted, #666);
+  padding: 7px 11px; border-radius: 7px;
+  white-space: nowrap; transition: background 120ms, color 120ms;
+}
+.ed-seg-btn:hover:not(.is-on) { color: var(--petrol, #14616E); }
+.ed-seg-btn.is-on { background: var(--petrol, #14616E); color: #fff; }
+
+/* ── Action-Buttons lokal ────────────────────────────────────────── */
+.ed-btn-primary {
+  background: var(--petrol, #14616E) !important;
+  color: #fff !important; border: none !important; border-radius: 8px;
+}
+.ed-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+.ed-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.ed-btn-ghost {
+  background: transparent !important; color: var(--ink-muted, #666) !important;
+  border: 1px solid var(--border, #E5E4E0) !important; border-radius: 8px;
+}
+.ed-btn-ghost:hover {
+  color: var(--ink, #0A0A0A) !important; border-color: var(--ink, #0A0A0A) !important;
+}
+.ed-btn-danger {
+  background: transparent !important; color: #991B1B !important;
+  border: 1px solid rgba(153,27,27,0.3) !important; border-radius: 8px;
+}
+.ed-btn-danger:hover { background: rgba(153,27,27,0.06) !important; border-color: #991B1B !important; }
+
+.ed-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+
+/* ── DNS-Tabelle ─────────────────────────────────────────────────── */
 .ed-dns-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.ed-dns-table th { text-align: left; padding: 12px 14px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); border-bottom: 1px solid var(--border); }
-.ed-dns-table td { padding: 12px 14px; font-family: 'JetBrains Mono', monospace; color: var(--ink); word-break: break-all; border-bottom: 1px solid var(--border); }
+.ed-dns-table th {
+  text-align: left; padding: 12px 16px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted);
+  border-bottom: 1px solid var(--border);
+}
+.ed-dns-table td {
+  padding: 11px 16px; font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--ink); word-break: break-all;
+  border-bottom: 1px solid var(--border);
+}
 .ed-dns-table tr:last-child td { border-bottom: none; }
+.ed-dns-table tr:hover td { background: var(--bg-deep, #F5F4F2); }
 </style>
 
 <div class="settings-page">
 
-  <nav class="breadcrumb" aria-label="Breadcrumb">
+  <nav class="breadcrumb" style="padding-top:36px" aria-label="Breadcrumb">
     <a href="/overview" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
     <span class="breadcrumb__sep">/</span>
     <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('nav.emaildomain', lang)}</span>
@@ -143,54 +242,55 @@ if (freshSettings?.resend_domain_id) {
   </section>
 
   {!resendApiKeySet && (
-    <div class="s-flash s-flash--warn" style="margin-bottom:20px" set:html={bt('ed.nokey', lang)}></div>
+    <div class="s-flash s-flash--warn" style="margin-bottom:16px" set:html={bt('ed.nokey', lang)}></div>
   )}
 
   {message && (
-    <div class={`s-flash s-flash--${message.type === 'success' ? 'ok' : 'err'}`} style="margin-bottom:20px">
+    <div class={`s-flash s-flash--${message.type === 'success' ? 'ok' : 'err'}`} style="margin-bottom:16px">
       {message.text}
     </div>
   )}
 
-  <div class="ed-sections">
+  <div class="ed-wrap">
 
     {!freshSettings?.custom_email_domain ? (
-      <section class="ed-section">
-        <h2 class="ed-section-title">{bt('ed.add.title', lang)}</h2>
-        <div class="ed-card">
-          <p class="field__hint" set:html={bt('ed.add.hint', lang)}></p>
 
-          <form method="POST">
-            <input type="hidden" name="_action" value="add" />
-
-            <label class="sp-field">
-              <span class="sp-label">{bt('ed.domain', lang)}</span>
-              <input
-                type="text"
-                name="domain"
-                placeholder="z.B. gategardenhotel.de"
-                required
-                autocomplete="off"
-                spellcheck="false"
-                class="s-input s-input--mono"
-                disabled={!resendApiKeySet}
-              />
-              <span class="field__hint" style="margin-top:4px">{bt('ed.add.domainhint', lang)}</span>
-            </label>
-
-            <div style="margin-top:16px">
-              <button type="submit" class="v9-btn v9-btn--primary" disabled={!resendApiKeySet}>
-                {bt('ed.add.btn', lang)}
-              </button>
-            </div>
-          </form>
+      <!-- ── Domain hinzufügen ──────────────────────────────────────── -->
+      <div class="ed-card">
+        <div class="ed-card-head">
+          <span class="ed-card-title">{bt('ed.add.title', lang)}</span>
         </div>
-      </section>
+        <p class="ed-hint" style="margin-bottom:16px" set:html={bt('ed.add.hint', lang)}></p>
+
+        <form method="POST">
+          <input type="hidden" name="_action" value="add" />
+          <div class="ed-field">
+            <span class="ed-label">{bt('ed.domain', lang)}</span>
+            <input
+              type="text"
+              name="domain"
+              placeholder="z.B. gategardenhotel.de"
+              required
+              autocomplete="off"
+              spellcheck="false"
+              class="s-input s-input--mono"
+              style="width:100%;box-sizing:border-box"
+              disabled={!resendApiKeySet}
+            />
+            <span class="ed-hint">{bt('ed.add.domainhint', lang)}</span>
+          </div>
+          <button type="submit" class="v9-btn ed-btn-primary" disabled={!resendApiKeySet}>
+            {bt('ed.add.btn', lang)}
+          </button>
+        </form>
+      </div>
+
     ) : (
       <>
-        <section class="ed-section">
-          <h2 class="ed-section-title">{bt('ed.config.title', lang)}</h2>
-          <div class="ed-card">
+        <!-- ── Domain-Status ─────────────────────────────────────────── -->
+        <div class="ed-card">
+          <div class="ed-card-head">
+            <span class="ed-card-title">{bt('ed.config.title', lang)}</span>
             {(() => {
               const statusValue = freshSettings.custom_email_status ?? 'pending';
               const cls = statusValue === 'verified' ? 'verified' : statusValue === 'failed' ? 'failed' : 'pending';
@@ -199,56 +299,70 @@ if (freshSettings?.resend_domain_id) {
                 : bt('ed.badge.pending', lang);
               return <span class={`ed-badge ed-badge--${cls}`}>{label}</span>;
             })()}
+          </div>
 
+          <div class="ed-field">
+            <span class="ed-label">{bt('ed.domain', lang)}</span>
             <p class="ed-email">welcome@<strong>{freshSettings.custom_email_domain}</strong></p>
-
-            {freshSettings.custom_email_status === 'verified' ? (
-              <p class="field__hint">{bt('ed.config.verifiedhint', lang)}</p>
-            ) : (
-              <p class="field__hint">{bt('ed.config.pendinghint', lang)}</p>
-            )}
-
-            <div class="ed-actions">
-              {freshSettings.custom_email_status !== 'verified' && (
-                <form method="POST" style="margin:0">
-                  <input type="hidden" name="_action" value="verify" />
-                  <button type="submit" class="v9-btn v9-btn--primary">
-                    {bt('ed.config.verify', lang)}
-                  </button>
-                </form>
-              )}
-              <form method="POST" style="margin:0"
-                    onsubmit={`return confirm(${JSON.stringify(bt('ed.config.removeconfirm', lang))})`}>
-                <input type="hidden" name="_action" value="remove" />
-                <button type="submit" class="v9-btn v9-btn--ghost">
-                  {bt('ed.config.remove', lang)}
-                </button>
-              </form>
-            </div>
           </div>
-        </section>
 
-        <section class="ed-section">
-          <h2 class="ed-section-title">{bt('ed.mkt.title', lang)}</h2>
-          <div class="ed-card">
-            <p class="field__hint" style="margin-bottom:14px">{bt('ed.mkt.hint', lang)}</p>
-            <div class="ed-actions" style="align-items:center;margin-top:0">
-              <span class={`ed-badge ed-badge--${freshSettings.marketing_use_own_domain ? 'verified' : 'pending'}`} style="margin:0">
-                {freshSettings.marketing_use_own_domain ? bt('ed.mkt.on', lang) : bt('ed.mkt.off', lang)}
-              </span>
+          <p class="ed-hint">
+            {freshSettings.custom_email_status === 'verified'
+              ? bt('ed.config.verifiedhint', lang)
+              : bt('ed.config.pendinghint', lang)}
+          </p>
+
+          <div class="ed-actions">
+            {freshSettings.custom_email_status !== 'verified' && (
               <form method="POST" style="margin:0">
-                <input type="hidden" name="_action" value="toggle_marketing" />
-                <input type="hidden" name="enabled" value={freshSettings.marketing_use_own_domain ? 'false' : 'true'} />
-                <button type="submit" class="v9-btn v9-btn--ghost">
-                  {freshSettings.marketing_use_own_domain ? bt('ed.mkt.disable', lang) : bt('ed.mkt.enable', lang)}
+                <input type="hidden" name="_action" value="verify" />
+                <button type="submit" class="v9-btn ed-btn-primary">
+                  {bt('ed.config.verify', lang)}
                 </button>
               </form>
-            </div>
-            {freshSettings.marketing_use_own_domain && freshSettings.custom_email_status !== 'verified' && (
-              <p class="s-flash s-flash--err" style="margin:16px 0 0">{bt('ed.mkt.unverified_warn', lang)}</p>
             )}
+            <form method="POST" style="margin:0"
+                  onsubmit={`return confirm(${JSON.stringify(bt('ed.config.removeconfirm', lang))})`}>
+              <input type="hidden" name="_action" value="remove" />
+              <button type="submit" class="v9-btn ed-btn-danger">
+                {bt('ed.config.remove', lang)}
+              </button>
+            </form>
           </div>
-        </section>
+        </div>
+
+        <!-- ── Marketing-Domain-Toggle ───────────────────────────────── -->
+        <div class="ed-card">
+          <div class="ed-card-head">
+            <span class="ed-card-title">{bt('ed.mkt.title', lang)}</span>
+            <span class={`ed-badge ed-badge--${freshSettings.marketing_use_own_domain ? 'verified' : 'pending'}`}>
+              {freshSettings.marketing_use_own_domain ? bt('ed.mkt.on', lang) : bt('ed.mkt.off', lang)}
+            </span>
+          </div>
+
+          <p class="ed-hint" style="margin-bottom:16px">{bt('ed.mkt.hint', lang)}</p>
+
+          <div class="ed-seg">
+            <form method="POST" style="margin:0;display:contents">
+              <input type="hidden" name="_action" value="toggle_marketing" />
+              <input type="hidden" name="enabled" value="false" />
+              <button type="submit" class={`ed-seg-btn${!freshSettings.marketing_use_own_domain ? ' is-on' : ''}`}>
+                {bt('ed.mkt.off', lang)}
+              </button>
+            </form>
+            <form method="POST" style="margin:0;display:contents">
+              <input type="hidden" name="_action" value="toggle_marketing" />
+              <input type="hidden" name="enabled" value="true" />
+              <button type="submit" class={`ed-seg-btn${freshSettings.marketing_use_own_domain ? ' is-on' : ''}`}>
+                {bt('ed.mkt.on', lang)}
+              </button>
+            </form>
+          </div>
+
+          {freshSettings.marketing_use_own_domain && freshSettings.custom_email_status !== 'verified' && (
+            <p class="s-flash s-flash--err" style="margin:14px 0 0">{bt('ed.mkt.unverified_warn', lang)}</p>
+          )}
+        </div>
 
         {domainDetailError && (
           <div class="s-flash s-flash--err">
@@ -256,44 +370,47 @@ if (freshSettings?.resend_domain_id) {
           </div>
         )}
 
+        <!-- ── DNS-Einträge ───────────────────────────────────────────── -->
         {domainDetail && domainDetail.records.length > 0 && (
-          <section class="ed-section">
-            <h2 class="ed-section-title">{bt('ed.dns.title', lang)}</h2>
-            <p class="ed-section-hint">{bt('ed.dns.hint', lang)}</p>
-            <div class="ed-card ed-card--table">
-              <div style="overflow-x:auto">
-                <table class="ed-dns-table">
-                  <thead>
+          <div class="ed-card ed-card--table">
+            <div style="padding:16px 20px 14px">
+              <div class="ed-card-head" style="margin-bottom:4px">
+                <span class="ed-card-title">{bt('ed.dns.title', lang)}</span>
+              </div>
+              <p class="ed-hint">{bt('ed.dns.hint', lang)}</p>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="ed-dns-table">
+                <thead>
+                  <tr>
+                    <th>{bt('ed.dns.type', lang)}</th>
+                    <th>{bt('ed.dns.name', lang)}</th>
+                    <th>{bt('ed.dns.value', lang)}</th>
+                    {domainDetail.records.some(r => r.priority !== undefined) && (
+                      <th>{bt('ed.dns.priority', lang)}</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {domainDetail.records.map(r => (
                     <tr>
-                      <th>{bt('ed.dns.type', lang)}</th>
-                      <th>{bt('ed.dns.name', lang)}</th>
-                      <th>{bt('ed.dns.value', lang)}</th>
-                      {domainDetail.records.some(r => r.priority !== undefined) && (
-                        <th>{bt('ed.dns.priority', lang)}</th>
+                      <td>{r.type ?? r.record}</td>
+                      <td>{r.name}</td>
+                      <td>{r.value}</td>
+                      {domainDetail.records.some(x => x.priority !== undefined) && (
+                        <td>{r.priority ?? '—'}</td>
                       )}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {domainDetail.records.map(r => (
-                      <tr>
-                        <td>{r.type ?? r.record}</td>
-                        <td>{r.name}</td>
-                        <td>{r.value}</td>
-                        {domainDetail.records.some(x => x.priority !== undefined) && (
-                          <td>{r.priority ?? '—'}</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
+          </div>
         )}
       </>
     )}
 
-  </div><!-- /.ed-sections -->
+  </div><!-- /.ed-wrap -->
 
 </div><!-- /.settings-page -->
 
