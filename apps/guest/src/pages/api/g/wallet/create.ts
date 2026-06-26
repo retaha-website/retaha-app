@@ -31,6 +31,7 @@ import {
 import { isWalletConfigured, getWalletConfig, buildPassObjectId } from '@retaha/wallet';
 import { triggerDripsForEvent } from '@retaha/marketing';
 import { isDemoSession } from '../../../../lib/showcase/session';
+import { computeTierProgress, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier } from '@retaha/loyalty';
 
 const MARKETING_CONSENT_POLICY_VERSION = '2026-06-01';
 
@@ -75,6 +76,24 @@ function buildClassInput(hotel: any, hotelId: string, origin: string): PassClass
     heroImageUrl: absoluteUrl(hotel?.wallet_pass_bg ?? hotel?.hero_image_url ?? null, origin),
     defaultLang: hotel?.default_language || 'de',
   };
+}
+
+// Loyalty-Stufe für einen Gast laden (optional — schlägt nie fehl).
+async function resolveTier(sb: any, hotelId: string, guestId: string | null): Promise<string | undefined> {
+  try {
+    const [{ data: cfgRow }, { data: lpRow }] = await Promise.all([
+      sb.from('loyalty_config').select('tiers').eq('hotel_id', hotelId).maybeSingle(),
+      guestId
+        ? sb.from('loyalty_points').select('points_lifetime').eq('hotel_id', hotelId).eq('guest_id', guestId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const tiers = (cfgRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[];
+    const lifetime = (lpRow?.points_lifetime as number) ?? 0;
+    const progress = computeTierProgress(lifetime, tiers);
+    return progress.tier.name || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export const POST: APIRoute = async ({ cookies, request }) => {
@@ -173,6 +192,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       .eq('id', sc.hotel_id)
       .maybeSingle();
 
+    const tier = await resolveTier(sb, sc.hotel_id, null);
     const passObjectInput: PassObjectInput = {
       walletPassUuid: walletPassId,
       hotelId: sc.hotel_id,
@@ -183,6 +203,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       firstVisitAt,
       lastVisitAt: now,
       defaultLang: hotel?.default_language || 'de',
+      tier,
     };
 
     let googleResult;
@@ -328,6 +349,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     .eq('id', stay.hotel_id)
     .maybeSingle();
 
+  const tier = await resolveTier(sb, stay.hotel_id, guest.id ?? null);
   const passObjectInput: PassObjectInput = {
     walletPassUuid: walletPassId,
     hotelId: stay.hotel_id,
@@ -338,6 +360,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     firstVisitAt,
     lastVisitAt: now,
     defaultLang: guest.language || hotel?.default_language || 'de',
+    tier,
   };
 
   // Google: Object-Create-or-Update

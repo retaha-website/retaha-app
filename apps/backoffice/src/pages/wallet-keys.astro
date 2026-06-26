@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import ModStatusLed from '../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getLang, bt } from '../lib/i18n';
+import { computeTierProgress, DEFAULT_LOYALTY_CONFIG, type LoyaltyTier } from '@retaha/loyalty';
 const lang = getLang(Astro.cookies, Astro.request);
 
 const user = await getUser(Astro.cookies, Astro.request);
@@ -35,6 +36,22 @@ const brandColor: string = (h as any)?.brand_color || (h as any)?.brand_primary 
 const logoUrl: string | null = (h as any)?.logo_primary ?? (h as any)?.logo_dark ?? null;
 const heroUrl: string | null = (h as any)?.wallet_pass_bg ?? (h as any)?.hero_image_url ?? null;
 const hotelName: string = (h as any)?.name ?? (hotel as any).name ?? 'Hotel';
+
+// ─── LOYALTY-TIER FÜR PASS-VORSCHAU ───────────────────────────────────────
+const { data: lcRow } = await sb
+  .from('loyalty_config')
+  .select('tiers')
+  .eq('hotel_id', (hotel as any).id)
+  .maybeSingle();
+const previewTiers = ((lcRow?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[]);
+// Beispiel: mittlere Stufe als Vorschau-Status (repräsentativer Stammgast)
+const previewProgress = computeTierProgress(
+  previewTiers.length > 1
+    ? Math.round((previewTiers[Math.min(1, previewTiers.length - 1)].threshold_points ?? 0) * 1.1)
+    : 0,
+  previewTiers
+);
+const previewTierName = previewProgress.tier.name || undefined;
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
 const { count: totalCount } = await sb
@@ -125,6 +142,16 @@ const passTextColor = isColorDark(brandColor) ? '#ffffff' : '#111111';
 
             <!-- 3 · Gastname (accountName) -->
             <div class="wk-pass-name">Max Mustermann</div>
+
+            <!-- 3b · Loyalty-Stufe (tier) — nur wenn konfiguriert -->
+            {previewTierName && (
+              <div class="wk-pass-fields" style="margin-top:6px">
+                <div class="wk-pass-field">
+                  <span class="wk-pass-field-label">Status</span>
+                  <span class="wk-pass-field-val wk-pass-tier">{previewTierName}</span>
+                </div>
+              </div>
+            )}
 
             <!-- 4 · Felder Reihe 1: MITGLIED SEIT | BESUCHE -->
             <div class="wk-pass-fields">
@@ -277,6 +304,7 @@ const passTextColor = isColorDark(brandColor) ? '#ffffff' : '#111111';
       opacity: .6; color: inherit;
     }
     .wk-pass-field-val { font-size: 13px; font-weight: 500; color: inherit; }
+    .wk-pass-tier { font-weight: 700; letter-spacing: 0.04em; }
 
     /* 6 · Footer: Google G + "Google Wallet" */
     .wk-pass-ft {

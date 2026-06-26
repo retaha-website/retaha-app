@@ -94,6 +94,15 @@ export async function createPassClass(input: PassClassInput): Promise<PassClassR
   if (!token) return { ok: false, classId, status: 'auth_failed' };
 
   const cardRows: any[] = [
+    // Zeile 1: Loyalty-Status (nur sichtbar wenn Objekt ein 'tier'-Feld hat)
+    {
+      oneItem: {
+        item: {
+          firstValue: { fields: [{ fieldPath: 'object.textModulesData["tier"]' }] },
+        },
+      },
+    },
+    // Zeile 2: Mitglied seit | Besuche
     {
       twoItems: {
         startItem: {
@@ -104,6 +113,7 @@ export async function createPassClass(input: PassClassInput): Promise<PassClassR
         },
       },
     },
+    // Zeile 3: Letzter Besuch
     {
       oneItem: {
         item: {
@@ -173,6 +183,7 @@ export interface PassObjectInput {
   firstVisitAt: Date;
   lastVisitAt: Date | null;
   defaultLang: string;
+  tier?: string;                 // Loyalty-Stufen-Name (z.B. "Gold"), optional
 }
 
 export interface PassObjectResult {
@@ -199,6 +210,11 @@ function buildObjectBody(input: PassObjectInput, cfg: WalletConfig): any {
     accountId: input.walletPassUuid,
     accountName: guestName,
     textModulesData: [
+      ...(input.tier ? [{
+        id: 'tier',
+        header: 'Status',
+        body: input.tier,
+      }] : []),
       {
         id: 'member_since',
         header: 'Mitglied seit',

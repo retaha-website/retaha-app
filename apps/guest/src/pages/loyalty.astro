@@ -2,6 +2,7 @@
 // Loyalty — Hotelier-Config (Punkte/Nacht, Status-Stufen, Prämien).
 // Schreibt loyalty_config via /api/loyalty/config. Gate/Sichtbarkeit für Gäste
 // weiterhin über features.loyalty (Gast-Vorschau-Toggle).
+import '@retaha/ui/styles/components/admin-page.css';
 import HotelierLayout from '../layouts/HotelierLayout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { DEFAULT_LOYALTY_CONFIG } from '@retaha/loyalty';
@@ -29,12 +30,19 @@ const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loya
 ---
 
 <HotelierLayout title="Loyalty" activeTab="gast" hotelName={hotel.name}>
-  <section class="lc-wrap" x-data={`loyaltyConfig(${JSON.stringify({ config })})`}>
-    <header class="lc-hero">
-      <span class="lc-eyebrow">Loyalty-Programm</span>
-      <h1 class="lc-title">Stammgäste belohnen<span class="dot-pink">.</span></h1>
-      <p class="lc-sub">Punkte pro Nacht, Status-Stufen und Prämien — pro Hotel konfigurierbar.</p>
-    </header>
+
+  <div class="settings-page" style="padding-top:0">
+
+    <nav class="breadcrumb" style="padding-top:36px" aria-label="Breadcrumb">
+      <a href="/gast-vorschau" class="breadcrumb__crumb">Gäste-Vorschau</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">Loyalty-Programm</span>
+    </nav>
+
+    <section class="settings-hero">
+      <h1 class="settings-hero__title">Stammgäste belohnen<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Punkte pro Nacht, Status-Stufen und Prämien — pro Hotel konfigurierbar.</p>
+    </section>
 
     {!loyaltyEnabled && (
       <div class="lc-banner">
@@ -43,107 +51,114 @@ const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loya
       </div>
     )}
 
-    <div class="lc-card">
-      <div class="lc-card__head"><span class="lc-card__title">Punkte pro Nacht</span></div>
-      <label class="lc-field">
-        <span class="lc-field__label">Punkte, die ein Gast pro Übernachtung erhält</span>
-        <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="config.points_per_night" />
-      </label>
-    </div>
+    <!-- ── Loyalty-Config ──────────────────────────────────────────────────── -->
+    <div class="lc-wrap" x-data={`loyaltyConfig(${JSON.stringify({ config })})`}>
 
-    <div class="lc-card">
-      <div class="lc-card__head">
-        <span class="lc-card__title">Status-Stufen</span>
-        <button type="button" class="lc-add" @click="addTier()">+ Stufe</button>
-      </div>
-      <p class="lc-hint">Die Stufe wird aus den <strong>jemals verdienten</strong> Punkten (lifetime) bestimmt — sie sinkt beim Einlösen nicht.</p>
-      <template x-for="(tier, ti) in config.tiers" :key="ti">
-        <div class="lc-row">
-          <div class="lc-row__top">
-            <label class="lc-field lc-field--grow">
-              <span class="lc-field__label">Name</span>
-              <input type="text" class="lc-input" x-model="tier.name" placeholder="z.B. Gold" />
-            </label>
-            <label class="lc-field lc-field--num">
-              <span class="lc-field__label">Ab Punkten</span>
-              <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="tier.threshold_points" />
-            </label>
-            <button type="button" class="lc-remove" @click="config.tiers.splice(ti, 1)" aria-label="Stufe entfernen">×</button>
-          </div>
-          <div class="lc-sub-block">
-            <span class="lc-field__label">Vorteile</span>
-            <template x-for="(b, bi) in tier.benefits" :key="bi">
-              <div class="lc-benefit">
-                <input type="text" class="lc-input" x-model="b.title" placeholder="Vorteil" />
-                <input type="text" class="lc-input" x-model="b.desc" placeholder="Beschreibung (optional)" />
-                <button type="button" class="lc-remove" @click="tier.benefits.splice(bi, 1)" aria-label="Vorteil entfernen">×</button>
-              </div>
-            </template>
-            <button type="button" class="lc-add lc-add--sm" @click="tier.benefits.push({ title: '', desc: '' })">+ Vorteil</button>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <div class="lc-card">
-      <div class="lc-card__head">
-        <span class="lc-card__title">Prämien (einlösbar)</span>
-        <button type="button" class="lc-add" @click="addReward()">+ Prämie</button>
-      </div>
-      <template x-for="(rw, ri) in config.rewards" :key="ri">
-        <div class="lc-row">
-          <div class="lc-row__top">
-            <label class="lc-field lc-field--grow">
-              <span class="lc-field__label">Titel</span>
-              <input type="text" class="lc-input" x-model="rw.title" placeholder="z.B. Zimmer-Upgrade" />
-            </label>
-            <label class="lc-field lc-field--num">
-              <span class="lc-field__label">Kosten</span>
-              <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="rw.cost_points" />
-            </label>
-            <button type="button" class="lc-remove" @click="config.rewards.splice(ri, 1)" aria-label="Prämie entfernen">×</button>
-          </div>
-          <label class="lc-field">
-            <span class="lc-field__label">Beschreibung</span>
-            <input type="text" class="lc-input" x-model="rw.desc" placeholder="Kurzbeschreibung" />
-          </label>
-          <label class="lc-check">
-            <input type="checkbox" x-model="rw.active" />
-            <span>Aktiv — für Gäste sichtbar</span>
-          </label>
-        </div>
-      </template>
-    </div>
-
-    <div class="lc-savebar">
-      <button type="button" class="lc-save" :disabled="saving" @click="save()" x-text="saving ? 'Speichert …' : 'Speichern'"></button>
-    </div>
-  </section>
-
-  <section class="lc-wrap lc-wrap--tight" x-data="loyaltyValidate()">
-    <div class="lc-card">
-      <div class="lc-card__head"><span class="lc-card__title">Gutschein einlösen</span></div>
-      <p class="lc-hint">Der Gast zeigt seinen Gutschein-Code — hier eingeben, prüfen und am Empfang einlösen.</p>
-      <div class="lc-validate">
-        <input type="text" class="lc-input" x-model="code" @keydown.enter="lookup()" placeholder="z.B. A7K2-9QXM" autocomplete="off" autocapitalize="characters" />
-        <button type="button" class="lc-add" :disabled="busy || !code.trim()" @click="lookup()">Prüfen</button>
+      <div class="lc-card">
+        <div class="lc-card__head"><span class="lc-card__title">Punkte pro Nacht</span></div>
+        <label class="lc-field">
+          <span class="lc-field__label">Punkte, die ein Gast pro Übernachtung erhält</span>
+          <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="config.points_per_night" />
+        </label>
       </div>
 
-      <template x-if="result">
-        <div class="lc-voucher" :class="'lc-voucher--' + (result.is_expired && result.status === 'issued' ? 'expired' : result.status)">
-          <div class="lc-voucher__row"><span class="lc-voucher__label">Prämie</span><span x-text="result.reward_title"></span></div>
-          <div class="lc-voucher__row"><span class="lc-voucher__label">Kosten</span><span x-text="result.cost_points + ' Punkte'"></span></div>
-          <div class="lc-voucher__row"><span class="lc-voucher__label">Status</span><span x-text="statusLabel(result)"></span></div>
-          <div class="lc-voucher__row" x-show="result.expires_at"><span class="lc-voucher__label">Gültig bis</span><span x-text="fmtDate(result.expires_at)"></span></div>
-          <button type="button" class="lc-save lc-save--full" x-show="result.status === 'issued' && !result.is_expired" :disabled="busy" @click="redeem()" x-text="busy ? 'Einlösen …' : 'Einlösen bestätigen'"></button>
-          <p class="lc-voucher__note" x-show="result.status === 'validated'">Bereits eingelöst<span x-show="result.validated_at" x-text="' am ' + fmtDate(result.validated_at)"></span>.</p>
-          <p class="lc-voucher__note" x-show="result.status === 'cancelled'">Dieser Gutschein wurde storniert.</p>
-          <p class="lc-voucher__note" x-show="result.is_expired && result.status === 'issued'">Dieser Gutschein ist abgelaufen.</p>
+      <div class="lc-card">
+        <div class="lc-card__head">
+          <span class="lc-card__title">Status-Stufen</span>
+          <button type="button" class="lc-add" @click="addTier()">+ Stufe</button>
         </div>
-      </template>
-      <p class="lc-validate__empty" x-show="notFound" style="display:none">Kein Gutschein mit diesem Code gefunden.</p>
+        <p class="lc-hint">Die Stufe wird aus den <strong>jemals verdienten</strong> Punkten (lifetime) bestimmt — sie sinkt beim Einlösen nicht.</p>
+        <template x-for="(tier, ti) in config.tiers" :key="ti">
+          <div class="lc-row">
+            <div class="lc-row__top">
+              <label class="lc-field lc-field--grow">
+                <span class="lc-field__label">Name</span>
+                <input type="text" class="lc-input" x-model="tier.name" placeholder="z.B. Gold" />
+              </label>
+              <label class="lc-field lc-field--num">
+                <span class="lc-field__label">Ab Punkten</span>
+                <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="tier.threshold_points" />
+              </label>
+              <button type="button" class="lc-remove" @click="config.tiers.splice(ti, 1)" aria-label="Stufe entfernen">×</button>
+            </div>
+            <div class="lc-sub-block">
+              <span class="lc-field__label">Vorteile</span>
+              <template x-for="(b, bi) in tier.benefits" :key="bi">
+                <div class="lc-benefit">
+                  <input type="text" class="lc-input" x-model="b.title" placeholder="Vorteil" />
+                  <input type="text" class="lc-input" x-model="b.desc" placeholder="Beschreibung (optional)" />
+                  <button type="button" class="lc-remove" @click="tier.benefits.splice(bi, 1)" aria-label="Vorteil entfernen">×</button>
+                </div>
+              </template>
+              <button type="button" class="lc-add lc-add--sm" @click="tier.benefits.push({ title: '', desc: '' })">+ Vorteil</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="lc-card">
+        <div class="lc-card__head">
+          <span class="lc-card__title">Prämien (einlösbar)</span>
+          <button type="button" class="lc-add" @click="addReward()">+ Prämie</button>
+        </div>
+        <template x-for="(rw, ri) in config.rewards" :key="ri">
+          <div class="lc-row">
+            <div class="lc-row__top">
+              <label class="lc-field lc-field--grow">
+                <span class="lc-field__label">Titel</span>
+                <input type="text" class="lc-input" x-model="rw.title" placeholder="z.B. Zimmer-Upgrade" />
+              </label>
+              <label class="lc-field lc-field--num">
+                <span class="lc-field__label">Kosten</span>
+                <input type="number" min="0" inputmode="numeric" class="lc-input lc-input--num" x-model.number="rw.cost_points" />
+              </label>
+              <button type="button" class="lc-remove" @click="config.rewards.splice(ri, 1)" aria-label="Prämie entfernen">×</button>
+            </div>
+            <label class="lc-field">
+              <span class="lc-field__label">Beschreibung</span>
+              <input type="text" class="lc-input" x-model="rw.desc" placeholder="Kurzbeschreibung" />
+            </label>
+            <label class="lc-check">
+              <input type="checkbox" x-model="rw.active" />
+              <span>Aktiv — für Gäste sichtbar</span>
+            </label>
+          </div>
+        </template>
+      </div>
+
+      <div class="lc-savebar">
+        <button type="button" class="lc-save" :disabled="saving" @click="save()" x-text="saving ? 'Speichert …' : 'Speichern'"></button>
+      </div>
+
     </div>
-  </section>
+
+    <!-- ── Gutschein einlösen ──────────────────────────────────────────────── -->
+    <div class="lc-wrap" x-data="loyaltyValidate()">
+      <div class="lc-card">
+        <div class="lc-card__head"><span class="lc-card__title">Gutschein einlösen</span></div>
+        <p class="lc-hint">Der Gast zeigt seinen Gutschein-Code — hier eingeben, prüfen und am Empfang einlösen.</p>
+        <div class="lc-validate">
+          <input type="text" class="lc-input" x-model="code" @keydown.enter="lookup()" placeholder="z.B. A7K2-9QXM" autocomplete="off" autocapitalize="characters" />
+          <button type="button" class="lc-add" :disabled="busy || !code.trim()" @click="lookup()">Prüfen</button>
+        </div>
+
+        <template x-if="result">
+          <div class="lc-voucher" :class="'lc-voucher--' + (result.is_expired && result.status === 'issued' ? 'expired' : result.status)">
+            <div class="lc-voucher__row"><span class="lc-voucher__label">Prämie</span><span x-text="result.reward_title"></span></div>
+            <div class="lc-voucher__row"><span class="lc-voucher__label">Kosten</span><span x-text="result.cost_points + ' Punkte'"></span></div>
+            <div class="lc-voucher__row"><span class="lc-voucher__label">Status</span><span x-text="statusLabel(result)"></span></div>
+            <div class="lc-voucher__row" x-show="result.expires_at"><span class="lc-voucher__label">Gültig bis</span><span x-text="fmtDate(result.expires_at)"></span></div>
+            <button type="button" class="lc-save lc-save--full" x-show="result.status === 'issued' && !result.is_expired" :disabled="busy" @click="redeem()" x-text="busy ? 'Einlösen …' : 'Einlösen bestätigen'"></button>
+            <p class="lc-voucher__note" x-show="result.status === 'validated'">Bereits eingelöst<span x-show="result.validated_at" x-text="' am ' + fmtDate(result.validated_at)"></span>.</p>
+            <p class="lc-voucher__note" x-show="result.status === 'cancelled'">Dieser Gutschein wurde storniert.</p>
+            <p class="lc-voucher__note" x-show="result.is_expired && result.status === 'issued'">Dieser Gutschein ist abgelaufen.</p>
+          </div>
+        </template>
+        <p class="lc-validate__empty" x-show="notFound" style="display:none">Kein Gutschein mit diesem Code gefunden.</p>
+      </div>
+    </div>
+
+  </div>
 
   <script>
     document.addEventListener('alpine:init', () => {
@@ -236,43 +251,54 @@ const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loya
   </script>
 
   <style>
-    .lc-wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 96px; display: flex; flex-direction: column; gap: 20px; }
-    @media (max-width: 768px) { .lc-wrap { padding: 28px 16px 80px; } }
-
-    .lc-hero { margin-bottom: 4px; }
-    .lc-eyebrow {
-      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
-      text-transform: uppercase; color: #0A0A0A; background: var(--te-yellow);
-      padding: 5px 10px; display: inline-block; margin-bottom: 16px; font-weight: 500; border-radius: var(--r-sm);
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    .lc-wrap {
+      display: flex; flex-direction: column; gap: 16px;
+      padding-bottom: 16px;
     }
-    .lc-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(28px, 5vw, 40px); font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; color: var(--ink); }
-    .dot-pink { color: var(--pink); }
-    .lc-sub { font-size: 15px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
 
+    /* ── Aktivierungs-Banner ────────────────────────────────────────────────── */
     .lc-banner {
-      background: var(--te-yellow-soft); border: 1px solid var(--te-yellow);
-      border-radius: var(--r-sm); padding: 12px 14px; font-size: 13px; color: var(--ink); line-height: 1.5;
+      background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent);
+      border: 1px solid color-mix(in srgb, var(--petrol, #14616E) 20%, transparent);
+      border-radius: 12px; padding: 12px 16px; font-size: 13px; color: var(--ink); line-height: 1.5;
+      margin-bottom: 16px;
     }
-    .lc-banner a { color: var(--ink); text-decoration: underline; }
+    .lc-banner a { color: var(--petrol, #14616E); text-decoration: underline; }
 
-    .lc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px 24px 22px; }
+    /* ── V9-Karten ──────────────────────────────────────────────────────────── */
+    .lc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; }
     .lc-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-    .lc-card__title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
+    .lc-card__title {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink);
+    }
+    .lc-card__title::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--petrol, #14616E); flex-shrink: 0; }
     .lc-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; color: var(--ink-muted); margin: 0 0 14px; }
 
+    /* ── Felder ─────────────────────────────────────────────────────────────── */
     .lc-field { display: flex; flex-direction: column; gap: 6px; }
     .lc-field--grow { flex: 1; min-width: 0; }
     .lc-field--num { width: 130px; flex-shrink: 0; }
-    .lc-field__label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
-    .lc-input {
-      width: 100%; padding: 10px 12px; font-family: 'Space Grotesk', sans-serif; font-size: 14px;
-      color: var(--ink); background: var(--bg, #fff); border: 1px solid var(--border); border-radius: var(--r-sm);
-      transition: border-color 150ms ease;
+    .lc-field__label {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--ink-muted);
     }
-    .lc-input:focus { outline: none; border-color: var(--ink); }
+    .lc-input {
+      width: 100%; padding: 10px 12px;
+      font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+      color: var(--ink); background: var(--bg, #fff);
+      border: 1px solid var(--border); border-radius: 8px;
+      transition: border-color 150ms ease; box-sizing: border-box;
+    }
+    .lc-input:focus { outline: none; border-color: var(--petrol, #14616E); }
     .lc-input--num { text-align: right; }
 
-    .lc-row { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px; }
+    /* ── Zeilen (Stufen/Prämien) ────────────────────────────────────────────── */
+    .lc-row {
+      border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+      margin-bottom: 10px; display: flex; flex-direction: column; gap: 12px;
+    }
     .lc-row:last-child { margin-bottom: 0; }
     .lc-row__top { display: flex; align-items: flex-end; gap: 12px; }
     .lc-sub-block { display: flex; flex-direction: column; gap: 8px; }
@@ -280,53 +306,47 @@ const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loya
     .lc-benefit .lc-input { font-size: 13px; padding: 8px 10px; }
 
     .lc-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; }
-    .lc-check input { width: 18px; height: 18px; accent-color: var(--sage); }
+    .lc-check input { width: 18px; height: 18px; accent-color: var(--petrol, #14616E); }
 
+    /* ── Buttons ────────────────────────────────────────────────────────────── */
     .lc-add {
       font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
-      color: var(--ink); background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm);
-      padding: 7px 12px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; white-space: nowrap;
+      color: var(--ink); background: transparent; border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 12px; cursor: pointer; transition: border-color 150ms, background 150ms; white-space: nowrap;
     }
-    .lc-add:hover { border-color: var(--ink); background: var(--te-yellow-soft); }
+    .lc-add:hover:not(:disabled) { border-color: var(--petrol, #14616E); background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent); color: var(--petrol, #14616E); }
+    .lc-add:disabled { opacity: .5; cursor: not-allowed; }
     .lc-add--sm { align-self: flex-start; padding: 5px 10px; font-size: 10px; }
 
     .lc-remove {
       flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm);
-      color: var(--ink-muted); font-size: 18px; line-height: 1; cursor: pointer; transition: all 150ms ease;
+      background: transparent; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--ink-muted); font-size: 18px; line-height: 1; cursor: pointer; transition: all 150ms;
     }
-    .lc-remove:hover { border-color: var(--pink); color: var(--pink); }
+    .lc-remove:hover { border-color: #991B1B; color: #991B1B; }
 
-    .lc-savebar { position: sticky; bottom: 0; padding: 16px 0 0; display: flex; justify-content: flex-end; }
+    .lc-savebar { display: flex; justify-content: flex-end; padding-top: 4px; }
     .lc-save {
       font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
-      color: var(--bg, #fff); background: var(--ink); border: none; border-radius: var(--r-sm);
-      padding: 12px 28px; cursor: pointer; transition: opacity 150ms ease;
+      color: #fff; background: var(--petrol, #14616E); border: none; border-radius: 8px;
+      padding: 12px 28px; cursor: pointer; transition: filter 150ms;
     }
-    .lc-save:hover:not(:disabled) { opacity: 0.9; }
-    .lc-save:disabled { opacity: 0.5; cursor: wait; }
+    .lc-save:hover:not(:disabled) { filter: brightness(1.1); }
+    .lc-save:disabled { opacity: .5; cursor: wait; }
     .lc-save--full { width: 100%; margin-top: 8px; }
 
-    /* Gutschein einlösen */
-    .lc-wrap--tight { padding-top: 0; gap: 0; }
+    /* ── Gutschein-Validierung ──────────────────────────────────────────────── */
     .lc-validate { display: flex; gap: 10px; align-items: stretch; margin-bottom: 4px; }
-    .lc-validate .lc-input {
-      font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase;
-    }
+    .lc-validate .lc-input { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; }
     .lc-validate .lc-add { white-space: nowrap; padding: 0 18px; }
     .lc-validate__empty { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; }
 
-    .lc-voucher {
-      border: 1px solid var(--border); border-radius: var(--r-sm); padding: 16px;
-      display: flex; flex-direction: column; gap: 8px; margin-top: 14px;
-    }
-    .lc-voucher--validated { background: var(--sage-soft); border-color: var(--sage); }
+    .lc-voucher { border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .lc-voucher--validated { background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent); border-color: var(--petrol, #14616E); }
     .lc-voucher--expired, .lc-voucher--cancelled { opacity: 0.7; }
     .lc-voucher__row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--ink); }
-    .lc-voucher__label {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--ink-soft);
-    }
+    .lc-voucher__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
     .lc-voucher__note { font-size: 13px; color: var(--ink-muted); margin: 4px 0 0; }
   </style>
+
 </HotelierLayout>
