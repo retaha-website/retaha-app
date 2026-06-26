@@ -414,22 +414,32 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
         </div>
         <p class="ev-hint" style="margin-bottom:14px">{bt('evk.rules.sub', lang)}</p>
 
-        <!-- Eve-Panel -->
-        <div class="ev-eve-panel" x-show="eveOpen" x-cloak>
-          <span class="ev-label">Hinweis für Eve</span>
-          <textarea class="s-input ev-eve-ta" x-model="evePrompt" rows="3"
-            placeholder="z.B. Haustiere erlaubt, kein Rauchen, Ruhezeit ab 22 Uhr, WLAN kostenfrei …"
-            :disabled="eveLoading"
-            @keydown.meta.enter.prevent="generate()"
-            @keydown.ctrl.enter.prevent="generate()"
-          ></textarea>
-          <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
-          <div class="ev-eve-panel-ft">
-            <button type="button" class="v9-btn ev-btn-ghost" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
-            <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
-              <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
-              <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
-            </button>
+        <!-- Eve-Modal -->
+        <div class="ev-eve-overlay" x-show="eveOpen" x-cloak
+          @click.self="if (!eveLoading) { eveOpen = false; eveError = ''; }"
+          @keydown.escape.window="if (eveOpen && !eveLoading) { eveOpen = false; eveError = ''; }">
+          <div class="ev-eve-modal">
+            <div class="ev-eve-mhd">
+              <span class="ev-eve-mhd-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+                Hausregeln schreiben
+              </span>
+              <button type="button" class="ev-eve-close" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">✕</button>
+            </div>
+            <textarea class="s-input ev-eve-ta" x-model="evePrompt"
+              placeholder="z.B. Haustiere erlaubt, kein Rauchen, Ruhezeit ab 22 Uhr, WLAN kostenfrei …"
+              :disabled="eveLoading"
+              @keydown.meta.enter.prevent="generate()"
+              @keydown.ctrl.enter.prevent="generate()"
+            ></textarea>
+            <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
+            <div class="ev-eve-mft">
+              <button type="button" class="ev-eve-cancel" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
+              <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
+                <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+                <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -475,22 +485,32 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
         </div>
         <p class="ev-hint" style="margin-bottom:14px">{bt('evk.dir.sub', lang)}</p>
 
-        <!-- Eve-Panel -->
-        <div class="ev-eve-panel" x-show="eveOpen" x-cloak>
-          <span class="ev-label">Hinweis für Eve</span>
-          <textarea class="s-input ev-eve-ta" x-model="evePrompt" rows="3"
-            placeholder="z.B. Adresse, Parkplätze im Hof, 5 Min. vom Bahnhof, Flughafen-Shuttle auf Anfrage …"
-            :disabled="eveLoading"
-            @keydown.meta.enter.prevent="generate()"
-            @keydown.ctrl.enter.prevent="generate()"
-          ></textarea>
-          <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
-          <div class="ev-eve-panel-ft">
-            <button type="button" class="v9-btn ev-btn-ghost" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
-            <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
-              <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
-              <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
-            </button>
+        <!-- Eve-Modal -->
+        <div class="ev-eve-overlay" x-show="eveOpen" x-cloak
+          @click.self="if (!eveLoading) { eveOpen = false; eveError = ''; }"
+          @keydown.escape.window="if (eveOpen && !eveLoading) { eveOpen = false; eveError = ''; }">
+          <div class="ev-eve-modal">
+            <div class="ev-eve-mhd">
+              <span class="ev-eve-mhd-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+                Anfahrt schreiben
+              </span>
+              <button type="button" class="ev-eve-close" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">✕</button>
+            </div>
+            <textarea class="s-input ev-eve-ta" x-model="evePrompt"
+              placeholder="z.B. Adresse, Parkplätze im Hof, 5 Min. vom Bahnhof, Flughafen-Shuttle auf Anfrage …"
+              :disabled="eveLoading"
+              @keydown.meta.enter.prevent="generate()"
+              @keydown.ctrl.enter.prevent="generate()"
+            ></textarea>
+            <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
+            <div class="ev-eve-mft">
+              <button type="button" class="ev-eve-cancel" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
+              <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
+                <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+                <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -626,22 +646,34 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     font-size: 14px; color: var(--ink);
   }
 
-  /* ── Eve-Panel (inline unter Karten-Header) ─────────────────────── */
-  .ev-eve-panel {
-    background: color-mix(in srgb, var(--petrol, #14616E) 4%, transparent);
-    border: 1px solid color-mix(in srgb, var(--petrol, #14616E) 18%, transparent);
-    border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+  /* ── Eve-Modal (1:1 aus MarketingEditor) ────────────────────────── */
+  .ev-eve-overlay {
+    position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
   }
-  .ev-eve-ta {
-    width: 100%; box-sizing: border-box; resize: vertical; min-height: 72px;
-    margin-top: 6px; margin-bottom: 10px;
+  .ev-eve-modal {
+    background: var(--surface, #fff); border-radius: 20px; padding: 28px;
+    width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18);
   }
-  .ev-eve-err {
-    font-size: 11.5px; color: #991B1B; margin: 0 0 10px;
+  .ev-eve-mhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .ev-eve-mhd-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px;
+    color: var(--petrol, #14616E); display: inline-flex; align-items: center; gap: 7px;
   }
-  .ev-eve-panel-ft {
-    display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+  .ev-eve-close {
+    background: none; border: none; font-size: 16px; cursor: pointer;
+    color: var(--ink-muted, #888); padding: 2px 6px; line-height: 1;
   }
+  .ev-eve-close:disabled { opacity: .4; cursor: default; }
+  .ev-eve-ta { width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px; font-size: 13px; }
+  .ev-eve-err { font-size: 12px; color: #b91c1c; margin: 10px 0 0; }
+  .ev-eve-mft { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .ev-eve-cancel {
+    background: none; border: 1px solid var(--border, #E5E4E0); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--ink-muted, #666);
+  }
+  .ev-eve-cancel:hover:not(:disabled) { background: var(--bg-deep, #F5F4F2); }
+  .ev-eve-cancel:disabled { opacity: .5; cursor: default; }
 
   /* ── FAQ-Liste ──────────────────────────────────────────────────── */
   .ev-list {
