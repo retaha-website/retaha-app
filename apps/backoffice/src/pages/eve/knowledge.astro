@@ -250,7 +250,6 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
     </nav>
 
     <section class="settings-hero">
-      <span class="settings-hero__eyebrow">{bt('evf.hero.eyebrow', lang)}</span>
       <h1 class="settings-hero__title" set:html={bt('evk.hero.title', lang)}></h1>
       <p class="settings-hero__sub">{bt('evk.hero.sub', lang)}</p>
     </section>
@@ -261,26 +260,23 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       </script>
     )}
 
-    <div class="settings-sections">
+    <div class="ev-wrap">
 
-      <!-- 01 Modul-Status -->
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('nav.eve', lang)}</h2>
-          <span class="s-card__num">01</span>
+      <!-- Modul-Status -->
+      <div class="ev-card">
+        <div class="ev-card-head">
+          <span class="ev-card-title">{bt('nav.eve', lang)}</span>
         </div>
-        <div class="s-card__body">
-          <p class="field__hint">{bt('si.mod.hint', lang)}</p>
-          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-            <ModStatusLed on={eveEnabled} />
-            <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
-          </div>
+        <p class="ev-hint" style="margin-bottom:14px">{bt('si.mod.hint', lang)}</p>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <ModStatusLed on={eveEnabled} />
+          <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
         </div>
-      </section>
+      </div>
 
       <EveSubNav currentPath={Astro.url.pathname} lang={lang} />
 
-      <div class="s-warning-row" style="margin-bottom: 4px;">
+      <div class="s-warning-row">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
@@ -292,44 +288,39 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       </div>
 
       <!-- ── FAQ ── -->
-      <section class="s-card" id="faq-section">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('evk.faq.title', lang)}</h2>
-          <span class="s-card__num">02</span>
+      <div class="ev-card" id="faq-section">
+        <div class="ev-card-head">
+          <span class="ev-card-title">{bt('evk.faq.title', lang)}</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;" set:html={bt('evk.faq.sub', lang).replace('{link}', `<a href="/eve/settings" class="s-btn-link">${bt('evk.faq.sublink', lang)}</a>`)}></p>
+        <p class="ev-hint" style="margin-bottom:16px" set:html={bt('evk.faq.sub', lang).replace('{link}', `<a href="/eve/settings" class="s-btn-link">${bt('evk.faq.sublink', lang)}</a>`)}></p>
 
-        <!-- Eve aus der Hotel-Website lernen lassen (Auto-FAQ via Claude). -->
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 16px;margin:0 0 20px;background:var(--petrol-soft, rgba(20,97,110,0.08));border:1px solid var(--petrol);border-radius:var(--r);">
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
-            <span style="font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14.5px;color:var(--ink);">Aus eurer Website lernen</span>
-            <span style="font-family:'Inter Tight',sans-serif;font-size:12.5px;line-height:1.45;color:var(--ink-soft, rgba(10,10,10,0.6));">Eve liest die hinterlegte Hotel-Website und schlägt automatisch FAQs vor — danach bearbeitbar.</span>
+        <!-- Aus Website lernen -->
+        <div class="ev-learn-block">
+          <div class="ev-learn-text">
+            <span class="ev-learn-title">Aus eurer Website lernen</span>
+            <span class="ev-hint" style="margin-top:0">Eve liest die hinterlegte Hotel-Website und schlägt automatisch FAQs vor — danach bearbeitbar.</span>
           </div>
-          <button type="button" class="v9-btn" data-eve-learn-btn style="white-space:nowrap;">Aus Website lernen</button>
+          <button type="button" class="v9-btn ev-btn-primary" data-eve-learn-btn style="white-space:nowrap;flex-shrink:0">Aus Website lernen</button>
         </div>
 
-        <form method="POST">
+        <!-- Neue FAQ -->
+        <form method="POST" style="margin-top:16px">
           <input type="hidden" name="_action" value="faq_create" />
-          <div class="s-card__body">
-            <div class="field field--row">
-              <label class="field__label field__label--req" for="faq-question">{bt('evk.faq.question', lang)}</label>
-              <input
-                type="text" id="faq-question" name="question" required
-                placeholder="z.B. Wann ist Check-out?"
-                class="s-input" autocomplete="off"
-              />
-            </div>
-            <div class="field field--row">
-              <label class="field__label field__label--req" for="faq-answer">{bt('evk.faq.answer', lang)}</label>
-              <textarea
-                id="faq-answer" name="answer" required rows="3"
-                placeholder="z.B. 11:00 Uhr. Late-Check-out bis 13:00 für €15 möglich."
-                class="s-input s-textarea"
-              ></textarea>
-            </div>
+          <div class="ev-field">
+            <label class="ev-label ev-label--req" for="faq-question">{bt('evk.faq.question', lang)}</label>
+            <input type="text" id="faq-question" name="question" required
+              placeholder="z.B. Wann ist Check-out?"
+              class="s-input" style="width:100%;box-sizing:border-box" autocomplete="off" />
           </div>
-          <div class="s-card__footer">
-            <button type="submit" class="v9-btn">{bt('evk.faq.add', lang)}</button>
+          <div class="ev-field">
+            <label class="ev-label ev-label--req" for="faq-answer">{bt('evk.faq.answer', lang)}</label>
+            <textarea id="faq-answer" name="answer" required rows="3"
+              placeholder="z.B. 11:00 Uhr. Late-Check-out bis 13:00 für €15 möglich."
+              class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:80px"
+            ></textarea>
+          </div>
+          <div class="ev-card-foot">
+            <button type="submit" class="v9-btn ev-btn-primary">{bt('evk.faq.add', lang)}</button>
           </div>
         </form>
 
@@ -353,14 +344,13 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
                     <p class="ev-item__a">{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</p>
                   </div>
                   <div class="ev-item__actions">
-                    <button
-                      type="button" @click="editing = true"
-                      class="v9-btn v9-btn--ghost ev-action-btn"
-                    >{bt('si.items.edit', lang)}</button>
+                    <button type="button" @click="editing = true" class="v9-btn ev-btn-ghost ev-action-btn">
+                      {bt('si.items.edit', lang)}
+                    </button>
                     <form method="POST" class="inline" onsubmit={`return confirm(${JSON.stringify(bt('evk.confirm.delete', lang))})`}>
                       <input type="hidden" name="_action" value="faq_delete" />
                       <input type="hidden" name="id" value={faq.id} />
-                      <button type="submit" class="v9-btn v9-btn--ghost ev-action-btn ev-action-btn--delete">{bt('nfc.delete', lang)}</button>
+                      <button type="submit" class="v9-btn ev-action-btn ev-action-btn--delete">{bt('nfc.delete', lang)}</button>
                     </form>
                   </div>
                 </div>
@@ -369,75 +359,63 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
                   <input type="hidden" name="_action" value="faq_update" />
                   <input type="hidden" name="id" value={faq.id} />
                   <div class="ev-item__edit-body">
-                    <div class="field field--row">
-                      <label class="field__label">{bt('evk.faq.question', lang)}</label>
-                      <input
-                        type="text" name="question" required class="s-input"
-                        value={pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)}
-                      />
+                    <div class="ev-field" style="margin-bottom:0">
+                      <label class="ev-label">{bt('evk.faq.question', lang)}</label>
+                      <input type="text" name="question" required class="s-input" style="width:100%;box-sizing:border-box"
+                        value={pickI18n(faq.question_i18n, hotelDefaultLang, faq.question)} />
                     </div>
-                    <div class="field field--row">
-                      <label class="field__label">{bt('evk.faq.answer', lang)}</label>
-                      <textarea name="answer" required rows="3" class="s-input s-textarea"
+                    <div class="ev-field" style="margin-bottom:0">
+                      <label class="ev-label">{bt('evk.faq.answer', lang)}</label>
+                      <textarea name="answer" required rows="3" class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:80px"
                       >{pickI18n(faq.answer_i18n, hotelDefaultLang, faq.answer)}</textarea>
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
-                    <button type="submit" class="v9-btn">{bt('common.save', lang)}</button>
-                    <button type="button" @click="editing = false" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
+                    <button type="submit" class="v9-btn ev-btn-primary">{bt('common.save', lang)}</button>
+                    <button type="button" @click="editing = false" class="v9-btn ev-btn-ghost">{bt('common.cancel', lang)}</button>
                   </div>
                 </form>
               </article>
             ))}
           </div>
         )}
-      </section>
+      </div>
 
       <!-- ── Hausregeln ── -->
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('evk.cat.rules', lang)}</h2>
-          <span class="s-card__num">03</span>
+      <div class="ev-card">
+        <div class="ev-card-head">
+          <span class="ev-card-title">{bt('evk.cat.rules', lang)}</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">{bt('evk.rules.sub', lang)}</p>
-
+        <p class="ev-hint" style="margin-bottom:14px">{bt('evk.rules.sub', lang)}</p>
         <form method="POST">
           <input type="hidden" name="_action" value="rules_save" />
-          <div class="s-card__body">
-            <textarea
-              name="answer" rows="6"
-              placeholder="z.B. Rauchen ist im gesamten Hotel verboten. Haustiere sind willkommen (Anmeldung vor Anreise). Ruhezeit 22:00–07:00."
-              class="s-input s-textarea"
-            >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
-          </div>
-          <div class="s-card__footer">
-            <button type="submit" class="v9-btn">{bt('evk.rules.save', lang)}</button>
+          <textarea name="answer" rows="6"
+            placeholder="z.B. Rauchen ist im gesamten Hotel verboten. Haustiere sind willkommen (Anmeldung vor Anreise). Ruhezeit 22:00–07:00."
+            class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:120px"
+          >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
+          <div class="ev-card-foot">
+            <button type="submit" class="v9-btn ev-btn-primary">{bt('evk.rules.save', lang)}</button>
           </div>
         </form>
-      </section>
+      </div>
 
       <!-- ── Anfahrt ── -->
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('evk.cat.directions', lang)}</h2>
-          <span class="s-card__num">04</span>
+      <div class="ev-card">
+        <div class="ev-card-head">
+          <span class="ev-card-title">{bt('evk.cat.directions', lang)}</span>
         </div>
-        <p class="s-card__sub" style="margin: -16px 0 20px;">{bt('evk.dir.sub', lang)}</p>
-
+        <p class="ev-hint" style="margin-bottom:14px">{bt('evk.dir.sub', lang)}</p>
         <form method="POST">
           <input type="hidden" name="_action" value="directions_save" />
-          <div class="s-card__body">
-            <textarea
-              name="answer" rows="6"
-              placeholder="z.B. Vom Flughafen BER: S-Bahn S9 bis Zoologischer Garten, dann U-Bahn U1 zur Uhlandstraße. Parkplätze im Innenhof (18€/Nacht)."
-              class="s-input s-textarea"
-            >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
-          </div>
-          <div class="s-card__footer">
-            <button type="submit" class="v9-btn">{bt('evk.dir.save', lang)}</button>
+          <textarea name="answer" rows="6"
+            placeholder="z.B. Vom Flughafen BER: S-Bahn S9 bis Zoologischer Garten, dann U-Bahn U1 zur Uhlandstraße. Parkplätze im Innenhof (18€/Nacht)."
+            class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:120px"
+          >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
+          <div class="ev-card-foot">
+            <button type="submit" class="v9-btn ev-btn-primary">{bt('evk.dir.save', lang)}</button>
           </div>
         </form>
-      </section>
+      </div>
 
     </div>
   </div>
@@ -474,82 +452,116 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
 <style>
   [x-cloak] { display: none !important; }
 
-  /* Touch-target & active state (iPad) */
-  .v9-btn { min-height: 44px; }
-  .v9-btn:active:not(:disabled) { background: var(--te-yellow); color: #0A0A0A; }
-  .v9-btn.v9-btn--ghost:active:not(:disabled) { background: var(--bg-deep); color: var(--ink); }
+  .breadcrumb { padding-top: 36px; }
 
-  /* Textarea variant */
-  .s-textarea { resize: vertical; min-height: 80px; }
-
-  /* FAQ List */
-  .ev-list {
-    border-top: 1px solid var(--border);
-    margin-top: 24px;
-    padding-top: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  /* ── V9-Karten ──────────────────────────────────────────────────── */
+  .ev-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .ev-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 22px;
+  }
+  .ev-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 16px;
+  }
+  .ev-card-title {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+    font-size: 14px; color: var(--ink);
+  }
+  .ev-card-title::before {
+    content: ''; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--petrol, #14616E); flex-shrink: 0;
+  }
+  .ev-card-foot {
+    display: flex; gap: 10px; justify-content: flex-end; align-items: center;
+    margin-top: 0; padding-top: 14px; border-top: 1px solid var(--border);
   }
 
+  /* ── Labels + Hints ─────────────────────────────────────────────── */
+  .ev-label {
+    display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 6px;
+  }
+  .ev-label--req::after { content: ' *'; color: var(--petrol, #14616E); }
+  .ev-hint { display: block; font-size: 11px; color: var(--ink-muted); line-height: 1.45; }
+  .ev-field { margin-bottom: 14px; }
+
+  /* ── Buttons ────────────────────────────────────────────────────── */
+  .ev-btn-primary {
+    background: var(--petrol, #14616E) !important; color: #fff !important;
+    border: none !important; border-radius: 8px;
+  }
+  .ev-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+  .ev-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .ev-btn-ghost {
+    background: transparent !important; color: var(--ink-muted) !important;
+    border: 1px solid var(--border) !important; border-radius: 8px;
+  }
+  .ev-btn-ghost:hover { color: var(--ink) !important; border-color: var(--ink) !important; }
+
+  /* ── Website-lernen-Block ───────────────────────────────────────── */
+  .ev-learn-block {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding: 14px 16px;
+    background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--petrol, #14616E) 22%, transparent);
+    border-radius: 12px;
+  }
+  .ev-learn-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .ev-learn-title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+    font-size: 14px; color: var(--ink);
+  }
+
+  /* ── FAQ-Liste ──────────────────────────────────────────────────── */
+  .ev-list {
+    border-top: 1px solid var(--border); margin-top: 20px; padding-top: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
   .ev-item {
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--bg);
-    transition: border-color 300ms ease, box-shadow 300ms ease;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); transition: border-color 300ms, box-shadow 300ms;
   }
   .ev-item--highlight {
-    border-color: var(--te-yellow) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-yellow) 30%, transparent);
+    border-color: var(--petrol, #14616E) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--petrol, #14616E) 15%, transparent);
   }
-
-
   .ev-item__view {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 14px 16px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 14px 16px;
   }
   .ev-item__content { flex: 1; min-width: 0; }
   .ev-item__q {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 14px; font-weight: 500;
-    color: var(--ink); margin: 0 0 6px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink); margin: 0 0 5px;
   }
   .ev-item__a {
-    font-size: 13px; color: var(--ink-soft);
-    line-height: 1.55; margin: 0;
+    font-size: 13px; color: var(--ink-muted); line-height: 1.55; margin: 0;
     white-space: pre-wrap;
   }
-  .ev-item__actions {
-    display: flex; gap: 6px; flex-shrink: 0; align-items: center;
-  }
-
+  .ev-item__actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
   .ev-action-btn {
-    padding: 6px 12px !important;
-    min-height: 36px !important;
-    font-size: 10px !important;
+    padding: 5px 11px !important; min-height: 32px !important; font-size: 10px !important;
+    border-radius: 7px !important;
   }
   .ev-action-btn--delete {
-    color: var(--burgund) !important;
-    border-color: color-mix(in srgb, var(--burgund) 30%, transparent) !important;
+    background: transparent !important;
+    color: #991B1B !important;
+    border: 1px solid rgba(153,27,27,0.3) !important;
   }
-  .ev-action-btn--delete:hover { background: var(--burgund-soft) !important; }
-
+  .ev-action-btn--delete:hover { background: rgba(153,27,27,0.06) !important; border-color: #991B1B !important; }
   .ev-item__edit-body {
-    display: flex; flex-direction: column; gap: 16px;
-    padding: 14px 16px 0;
+    display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 0;
   }
   .ev-item__edit-footer {
     display: flex; gap: 8px; padding: 12px 16px;
     border-top: 1px solid var(--border); margin-top: 14px;
   }
-
   .ev-empty-hint {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: var(--ink-muted);
-    text-align: center; padding: 24px; margin: 16px 0 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted);
+    text-align: center; padding: 24px; margin: 14px 0 0;
     border-top: 1px solid var(--border);
   }
 </style>
