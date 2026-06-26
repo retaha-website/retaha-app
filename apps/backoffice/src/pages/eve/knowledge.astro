@@ -385,17 +385,60 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       </div>
 
       <!-- ── Hausregeln ── -->
-      <div class="ev-card">
+      <div class="ev-card" x-data={`{
+        eveOpen: false,
+        evePrompt: '',
+        eveLoading: false,
+        eveError: '',
+        val: ${JSON.stringify(pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? ''))},
+        async generate() {
+          this.eveLoading = true; this.eveError = '';
+          try {
+            const r = await fetch('/api/admin/eve/generate-field', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ prompt: this.evePrompt, field: 'rules' })
+            });
+            const d = await r.json();
+            if (d.ok) { this.val = d.text; this.eveOpen = false; this.evePrompt = ''; }
+            else { this.eveError = d.message || 'Fehler beim Generieren.'; }
+          } catch { this.eveError = 'Netzwerk-Fehler. Versuche es erneut.'; }
+          this.eveLoading = false;
+        }
+      }`}>
         <div class="ev-card-head">
           <span class="ev-card-title">{bt('evk.cat.rules', lang)}</span>
+          <button type="button" class="ev-aurora-btn" @click="eveOpen = !eveOpen">
+            <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+            Mit Eve schreiben
+          </button>
         </div>
         <p class="ev-hint" style="margin-bottom:14px">{bt('evk.rules.sub', lang)}</p>
+
+        <!-- Eve-Panel -->
+        <div class="ev-eve-panel" x-show="eveOpen" x-cloak>
+          <span class="ev-label">Hinweis für Eve</span>
+          <textarea class="s-input ev-eve-ta" x-model="evePrompt" rows="3"
+            placeholder="z.B. Haustiere erlaubt, kein Rauchen, Ruhezeit ab 22 Uhr, WLAN kostenfrei …"
+            :disabled="eveLoading"
+            @keydown.meta.enter.prevent="generate()"
+            @keydown.ctrl.enter.prevent="generate()"
+          ></textarea>
+          <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
+          <div class="ev-eve-panel-ft">
+            <button type="button" class="v9-btn ev-btn-ghost" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
+            <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
+              <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+              <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
+            </button>
+          </div>
+        </div>
+
         <form method="POST">
           <input type="hidden" name="_action" value="rules_save" />
-          <textarea name="answer" rows="6"
+          <textarea name="answer" rows="6" x-model="val"
             placeholder="z.B. Rauchen ist im gesamten Hotel verboten. Haustiere sind willkommen (Anmeldung vor Anreise). Ruhezeit 22:00–07:00."
             class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:120px"
-          >{pickI18n(rulesRow?.answer_i18n, hotelDefaultLang, rulesRow?.answer ?? '')}</textarea>
+          ></textarea>
           <div class="ev-card-foot">
             <button type="submit" class="v9-btn ev-btn-primary">{bt('evk.rules.save', lang)}</button>
           </div>
@@ -403,17 +446,60 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
       </div>
 
       <!-- ── Anfahrt ── -->
-      <div class="ev-card">
+      <div class="ev-card" x-data={`{
+        eveOpen: false,
+        evePrompt: '',
+        eveLoading: false,
+        eveError: '',
+        val: ${JSON.stringify(pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? ''))},
+        async generate() {
+          this.eveLoading = true; this.eveError = '';
+          try {
+            const r = await fetch('/api/admin/eve/generate-field', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ prompt: this.evePrompt, field: 'directions' })
+            });
+            const d = await r.json();
+            if (d.ok) { this.val = d.text; this.eveOpen = false; this.evePrompt = ''; }
+            else { this.eveError = d.message || 'Fehler beim Generieren.'; }
+          } catch { this.eveError = 'Netzwerk-Fehler. Versuche es erneut.'; }
+          this.eveLoading = false;
+        }
+      }`}>
         <div class="ev-card-head">
           <span class="ev-card-title">{bt('evk.cat.directions', lang)}</span>
+          <button type="button" class="ev-aurora-btn" @click="eveOpen = !eveOpen">
+            <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+            Mit Eve schreiben
+          </button>
         </div>
         <p class="ev-hint" style="margin-bottom:14px">{bt('evk.dir.sub', lang)}</p>
+
+        <!-- Eve-Panel -->
+        <div class="ev-eve-panel" x-show="eveOpen" x-cloak>
+          <span class="ev-label">Hinweis für Eve</span>
+          <textarea class="s-input ev-eve-ta" x-model="evePrompt" rows="3"
+            placeholder="z.B. Adresse, Parkplätze im Hof, 5 Min. vom Bahnhof, Flughafen-Shuttle auf Anfrage …"
+            :disabled="eveLoading"
+            @keydown.meta.enter.prevent="generate()"
+            @keydown.ctrl.enter.prevent="generate()"
+          ></textarea>
+          <p class="ev-eve-err" x-show="eveError" x-cloak x-text="eveError"></p>
+          <div class="ev-eve-panel-ft">
+            <button type="button" class="v9-btn ev-btn-ghost" @click="eveOpen = false; eveError = ''" :disabled="eveLoading">Abbrechen</button>
+            <button type="button" class="ev-aurora-btn" @click="generate()" :disabled="eveLoading || !evePrompt.trim()">
+              <svg class="ev-aurora-spk" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+              <span x-text="eveLoading ? 'Eve schreibt …' : 'Mit Eve schreiben'"></span>
+            </button>
+          </div>
+        </div>
+
         <form method="POST">
           <input type="hidden" name="_action" value="directions_save" />
-          <textarea name="answer" rows="6"
+          <textarea name="answer" rows="6" x-model="val"
             placeholder="z.B. Vom Flughafen BER: S-Bahn S9 bis Zoologischer Garten, dann U-Bahn U1 zur Uhlandstraße. Parkplätze im Innenhof (18€/Nacht)."
             class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:120px"
-          >{pickI18n(directionsRow?.answer_i18n, hotelDefaultLang, directionsRow?.answer ?? '')}</textarea>
+          ></textarea>
           <div class="ev-card-foot">
             <button type="submit" class="v9-btn ev-btn-primary">{bt('evk.dir.save', lang)}</button>
           </div>
@@ -538,6 +624,23 @@ const directionsRow  = (knowledgeRows ?? []).find(r => r.category === 'direction
   .ev-learn-title {
     font-family: 'Space Grotesk', sans-serif; font-weight: 500;
     font-size: 14px; color: var(--ink);
+  }
+
+  /* ── Eve-Panel (inline unter Karten-Header) ─────────────────────── */
+  .ev-eve-panel {
+    background: color-mix(in srgb, var(--petrol, #14616E) 4%, transparent);
+    border: 1px solid color-mix(in srgb, var(--petrol, #14616E) 18%, transparent);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  .ev-eve-ta {
+    width: 100%; box-sizing: border-box; resize: vertical; min-height: 72px;
+    margin-top: 6px; margin-bottom: 10px;
+  }
+  .ev-eve-err {
+    font-size: 11.5px; color: #991B1B; margin: 0 0 10px;
+  }
+  .ev-eve-panel-ft {
+    display: flex; gap: 8px; justify-content: flex-end; align-items: center;
   }
 
   /* ── FAQ-Liste ──────────────────────────────────────────────────── */
