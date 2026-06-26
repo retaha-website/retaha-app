@@ -480,7 +480,7 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'brand.js.logo.confirm': 'Logo wirklich entfernen?',
     'brand.js.logo.removed': 'Logo entfernt',
     'brand.colors.title': 'Brand-Farben',
-    'brand.colors.primary': 'Primärfarbe *',
+    'brand.colors.primary': 'Primärfarbe',
     'brand.colors.pickeria': 'Farbwähler Primärfarbe',
     'brand.colors.hint': 'Hauptakzentfarbe — alle weiteren Rollen werden automatisch abgeleitet',
     'brand.colors.palette': 'Abgeleitete Palette',
