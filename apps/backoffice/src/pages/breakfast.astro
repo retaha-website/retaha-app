@@ -222,21 +222,8 @@ textarea.s-input { resize: none; min-height: 72px; }
 .bf-hint { display: block; font-size: 11px; color: var(--ink-muted); margin-top: 6px; line-height: 1.45; }
 .bf-field { margin-bottom: 14px; }
 
-/* ── Toggle (petrol) ───────────────────────────────────────────────────── */
-.bp-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
-.bp-toggle-track {
-  position: relative; width: 40px; height: 22px; flex-shrink: 0;
-  background: var(--border-medium, #C8C6C0); border-radius: 11px;
-  transition: background 150ms;
-}
-.bp-toggle-track.is-on { background: var(--petrol, #14616E); }
-.bp-toggle-knob {
-  position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
-  background: #fff; border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 150ms;
-}
-.bp-toggle-track.is-on .bp-toggle-knob { transform: translateX(18px); }
-.bp-toggle-label { font-size: 13px; color: var(--ink); user-select: none; }
+/* iPad touch targets */
+.settings-page .toggle-row { min-height: 44px; }
 
 /* ── Local btn overrides ────────────────────────────────────────────────── */
 .bf-btn-primary {
@@ -456,15 +443,15 @@ textarea.s-input { resize: none; min-height: 72px; }
                 @change="hours[d.key].end = $event.target.value" />
               <span x-show="hours[d.key].closed" class="bp-hours-closed-txt">{bt('si.hours.closed', lang)}</span>
             </div>
-            <label class="bp-toggle" style="gap:6px">
+            <label class="toggle-row" style="margin:0;gap:6px">
               <input type="checkbox"
                 :checked="hours[d.key].closed"
                 @change="hours[d.key].closed = $event.target.checked"
                 class="sr-only" />
-              <span class="bp-toggle-track" :class="{'is-on': hours[d.key].closed}">
-                <span class="bp-toggle-knob"></span>
+              <span class="bt-visual" :class="{'is-checked': hours[d.key].closed}">
+                <span class="bt-knob"></span>
               </span>
-              <span style="font-size:11px;color:var(--ink-muted)">{bt('si.hours.closetoggle', lang)}</span>
+              <span class="toggle-label" style="font-size:11px;color:var(--ink-muted)">{bt('si.hours.closetoggle', lang)}</span>
             </label>
           </div>
         </template>
@@ -558,15 +545,15 @@ textarea.s-input { resize: none; min-height: 72px; }
       </div>
       <p class="bf-hint" style="margin-bottom:14px">{bt('bf.rs.hint', lang)}</p>
 
-      <label class="bp-toggle">
+      <label class="toggle-row">
         <input type="checkbox"
           :checked="data.breakfast_room_service_enabled === 'true'"
           @change="data.breakfast_room_service_enabled = $event.target.checked ? 'true' : 'false'"
           class="sr-only" />
-        <span class="bp-toggle-track" :class="{'is-on': data.breakfast_room_service_enabled === 'true'}">
-          <span class="bp-toggle-knob"></span>
+        <span class="bt-visual" :class="{'is-checked': data.breakfast_room_service_enabled === 'true'}">
+          <span class="bt-knob"></span>
         </span>
-        <span class="bp-toggle-label">{bt('bf.rs.toggle', lang)}</span>
+        <span class="toggle-label">{bt('bf.rs.toggle', lang)}</span>
       </label>
 
       <div x-show="data.breakfast_room_service_enabled === 'true'" class="bp-fee-section"
@@ -698,10 +685,10 @@ textarea.s-input { resize: none; min-height: 72px; }
             </div>
             <div>
               <span class="bp-modal-label">{bt('bf.modal.active', lang)}</span>
-              <label class="bp-toggle" style="margin-top:4px">
+              <label class="toggle-row" style="margin-top:2px">
                 <input type="checkbox" x-model="modalItem.is_active" class="sr-only" />
-                <span class="bp-toggle-track" :class="{'is-on': modalItem.is_active}">
-                  <span class="bp-toggle-knob"></span>
+                <span class="bt-visual" :class="{'is-checked': modalItem.is_active}">
+                  <span class="bt-knob"></span>
                 </span>
               </label>
             </div>
@@ -749,20 +736,20 @@ textarea.s-input { resize: none; min-height: 72px; }
         <div class="bp-modal-section">
           <span class="bp-modal-label" style="display:block;margin-bottom:10px">{bt('bf.modal.dietflags', lang)}</span>
           <div class="bp-diet-flags">
-            <label class="bp-toggle">
+            <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_vegetarian" class="sr-only" />
-              <span class="bp-toggle-track" :class="{'is-on': modalItem.is_vegetarian}"><span class="bp-toggle-knob"></span></span>
-              <span class="bp-toggle-label">{bt('bf.diet.vegetarian', lang)}</span>
+              <span class="bt-visual" :class="{'is-checked': modalItem.is_vegetarian}"><span class="bt-knob"></span></span>
+              <span class="toggle-label">{bt('bf.diet.vegetarian', lang)}</span>
             </label>
-            <label class="bp-toggle">
+            <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_vegan" class="sr-only" />
-              <span class="bp-toggle-track" :class="{'is-on': modalItem.is_vegan}"><span class="bp-toggle-knob"></span></span>
-              <span class="bp-toggle-label">{bt('bf.diet.vegan', lang)}</span>
+              <span class="bt-visual" :class="{'is-checked': modalItem.is_vegan}"><span class="bt-knob"></span></span>
+              <span class="toggle-label">{bt('bf.diet.vegan', lang)}</span>
             </label>
-            <label class="bp-toggle">
+            <label class="toggle-row">
               <input type="checkbox" x-model="modalItem.is_organic" class="sr-only" />
-              <span class="bp-toggle-track" :class="{'is-on': modalItem.is_organic}"><span class="bp-toggle-knob"></span></span>
-              <span class="bp-toggle-label">{bt('bf.diet.organic', lang)}</span>
+              <span class="bt-visual" :class="{'is-checked': modalItem.is_organic}"><span class="bt-knob"></span></span>
+              <span class="toggle-label">{bt('bf.diet.organic', lang)}</span>
             </label>
           </div>
         </div>
