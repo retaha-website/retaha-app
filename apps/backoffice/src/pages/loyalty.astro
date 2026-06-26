@@ -53,13 +53,13 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
   <!-- ══ Alpine wrapper ══════════════════════════════════════════════════════ -->
   <div x-data={`loyaltyPage(${JSON.stringify({ initConfig, hasExisting: hasExistingConfig })})`}>
 
-    <!-- ── Eve card — erscheint ganz oben, Programm bleibt darunter sichtbar ── -->
-    <div id="ly-eve-anchor" class="evecard" x-show="showEve" x-cloak>
+    <!-- ── Eve card — immer sichtbar, Inhalt wechselt je nach Stand ─────────── -->
+    <div id="ly-eve-anchor" class="evecard">
       <div class="ec-head">
         <svg class="ec-spk" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
         <b>Lass <span class="ec-gradient">Eve</span> dein Programm bauen</b>
       </div>
-      <p class="ec-desc">Erzähl in einem Satz von deinem Haus — Eve schlägt Punkte, Stufen und Prämien vor, die passen. Du passt nur noch an.</p>
+      <p class="ec-desc" x-show="!busyGen">Erzähl in einem Satz von deinem Haus — Eve schlägt Punkte, Stufen und Prämien vor, die passen. Du passt nur noch an.</p>
       <div class="ec-row" x-show="!busyGen">
         <input
           type="text"
@@ -80,16 +80,8 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
       </div>
     </div>
 
-    <!-- ── Program — immer sichtbar ──────────────────────────────────────── -->
+    <!-- ── Program ────────────────────────────────────────────────────────── -->
     <div>
-
-      <!-- Eve-Reset -->
-      <div class="ly-eve-reset-row">
-        <button class="ly-btn ly-aurora" @click="showEve = true; brief = ''; $nextTick(() => document.getElementById('ly-eve-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}))">
-          <svg class="ec-spk-anim" width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
-          Mit Eve neu bauen
-        </button>
-      </div>
 
       <!-- Punkte pro Nacht -->
       <div class="ly-sec">
@@ -201,7 +193,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 <script>
   document.addEventListener('alpine:init', () => {
     (window as any).Alpine.data('loyaltyPage', (opts: any) => ({
-      showEve: !opts.hasExisting,
       brief: '',
       config: JSON.parse(JSON.stringify(opts.initConfig)),
       tierOpen: {} as Record<number, boolean>,
@@ -247,7 +238,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
           (window as any).retahaToast?.('Verbindungsfehler', 'error');
         } finally {
           this.busyGen = false;
-          this.showEve = false;
         }
       },
 
