@@ -131,31 +131,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
     </div>
 
-    <!-- ── Gutschein einlösen ──────────────────────────────────────────────── -->
-    <div class="lc-wrap" x-data="loyaltyValidate()">
-      <div class="lc-card">
-        <div class="lc-card__head"><span class="lc-card__title">Gutschein einlösen</span></div>
-        <p class="lc-hint">Der Gast zeigt seinen Gutschein-Code — hier eingeben, prüfen und am Empfang einlösen.</p>
-        <div class="lc-validate">
-          <input type="text" class="lc-input" x-model="code" @keydown.enter="lookup()" placeholder="z.B. A7K2-9QXM" autocomplete="off" autocapitalize="characters" />
-          <button type="button" class="lc-add" :disabled="busy || !code.trim()" @click="lookup()">Prüfen</button>
-        </div>
-        <template x-if="result">
-          <div class="lc-voucher" :class="'lc-voucher--' + (result.is_expired && result.status === 'issued' ? 'expired' : result.status)">
-            <div class="lc-voucher__row"><span class="lc-voucher__label">Prämie</span><span x-text="result.reward_title"></span></div>
-            <div class="lc-voucher__row"><span class="lc-voucher__label">Kosten</span><span x-text="result.cost_points + ' Punkte'"></span></div>
-            <div class="lc-voucher__row"><span class="lc-voucher__label">Status</span><span x-text="statusLabel(result)"></span></div>
-            <div class="lc-voucher__row" x-show="result.expires_at"><span class="lc-voucher__label">Gültig bis</span><span x-text="fmtDate(result.expires_at)"></span></div>
-            <button type="button" class="lc-save lc-save--full" x-show="result.status === 'issued' && !result.is_expired" :disabled="busy" @click="redeem()" x-text="busy ? 'Einlösen …' : 'Einlösen bestätigen'"></button>
-            <p class="lc-voucher__note" x-show="result.status === 'validated'">Bereits eingelöst<span x-show="result.validated_at" x-text="' am ' + fmtDate(result.validated_at)"></span>.</p>
-            <p class="lc-voucher__note" x-show="result.status === 'cancelled'">Dieser Gutschein wurde storniert.</p>
-            <p class="lc-voucher__note" x-show="result.is_expired && result.status === 'issued'">Dieser Gutschein ist abgelaufen.</p>
-          </div>
-        </template>
-        <p class="lc-validate__empty" x-show="notFound" style="display:none">Kein Gutschein mit diesem Code gefunden.</p>
-      </div>
-    </div>
-
   </div>
 
   <script>
@@ -187,62 +162,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
           } finally {
             this.saving = false;
           }
-        },
-      }));
-
-      (window as any).Alpine.data('loyaltyValidate', () => ({
-        code: '',
-        busy: false,
-        result: null as any,
-        notFound: false,
-        fmtDate(iso: string) {
-          try { return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }); }
-          catch { return ''; }
-        },
-        statusLabel(v: any) {
-          if (v?.is_expired && v?.status === 'issued') return 'Abgelaufen';
-          return v?.status === 'validated' ? 'Eingelöst' : v?.status === 'expired' ? 'Abgelaufen' : v?.status === 'cancelled' ? 'Storniert' : 'Offen';
-        },
-        async lookup() {
-          const code = (this.code || '').trim();
-          if (!code || this.busy) return;
-          this.busy = true; this.result = null; this.notFound = false;
-          try {
-            const res = await fetch('/api/loyalty/validate', {
-              method: 'POST', credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, action: 'lookup' }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.ok && data.voucher) this.result = data.voucher;
-            else this.notFound = true;
-          } catch {
-            (window as any).retahaToast?.('Fehler bei der Prüfung', 'error');
-          } finally { this.busy = false; }
-        },
-        async redeem() {
-          const code = (this.code || '').trim();
-          if (!code || this.busy) return;
-          this.busy = true;
-          try {
-            const res = await fetch('/api/loyalty/validate', {
-              method: 'POST', credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code, action: 'redeem' }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.ok) {
-              if (this.result) { this.result.status = 'validated'; this.result.validated_at = data.validated_at; }
-              (window as any).retahaToast?.('Gutschein eingelöst');
-            } else {
-              const map: Record<string, string> = { already_validated: 'Bereits eingelöst', expired: 'Abgelaufen', cancelled: 'Storniert', not_found: 'Nicht gefunden' };
-              (window as any).retahaToast?.(map[data.error] || 'Einlösen fehlgeschlagen', 'error');
-              if (data.error === 'already_validated' && this.result) this.result.status = 'validated';
-              if (data.error === 'expired' && this.result) { this.result.status = 'expired'; this.result.is_expired = true; }
-            }
-          } catch {
-            (window as any).retahaToast?.('Fehler beim Einlösen', 'error');
-          } finally { this.busy = false; }
         },
       }));
     });
@@ -318,17 +237,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
     .lc-save:disabled { opacity: .5; cursor: wait; }
     .lc-save--full { width: 100%; margin-top: 8px; }
 
-    .lc-validate { display: flex; gap: 10px; align-items: stretch; margin-bottom: 4px; }
-    .lc-validate .lc-input { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; }
-    .lc-validate .lc-add { white-space: nowrap; padding: 0 18px; }
-    .lc-validate__empty { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; }
-
-    .lc-voucher { border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-    .lc-voucher--validated { background: color-mix(in srgb, var(--petrol, #14616E) 6%, transparent); border-color: var(--petrol, #14616E); }
-    .lc-voucher--expired, .lc-voucher--cancelled { opacity: 0.7; }
-    .lc-voucher__row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--ink); }
-    .lc-voucher__label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
-    .lc-voucher__note { font-size: 13px; color: var(--ink-muted); margin: 4px 0 0; }
   </style>
 
 </Layout>

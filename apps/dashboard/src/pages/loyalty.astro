@@ -1,0 +1,261 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+---
+
+<AppLayout title="Loyalty" hotel={hotel as any} user={user}>
+
+  <div class="ly-page">
+
+    <div class="ly-head">
+      <h1 class="ly-title">Loyalty · Gutschein einlösen</h1>
+      <a href={`${BACKOFFICE}/loyalty`} target="_blank" rel="noopener" class="ly-cfg-link">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Programmeinstellungen
+      </a>
+    </div>
+
+    <!-- ── Gutschein-Scanner ──────────────────────────────────────────────── -->
+    <div class="ly-card" x-data="loyaltyValidate()">
+      <p class="ly-hint">Gast zeigt Gutschein-Code → hier eingeben → prüfen → einlösen.</p>
+
+      <div class="ly-scan">
+        <input
+          type="text"
+          class="ly-code-input"
+          x-model="code"
+          @keydown.enter="lookup()"
+          @input="reset()"
+          placeholder="z. B. A7K2-9QXM"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+        />
+        <button type="button" class="ly-btn ly-btn--primary" :disabled="busy || !code.trim()" @click="lookup()"
+          x-text="busy && !result ? 'Prüft …' : 'Prüfen'"></button>
+      </div>
+
+      <!-- Ergebnis -->
+      <template x-if="result">
+        <div class="ly-result" :class="resultClass()">
+          <div class="ly-result-top">
+            <div class="ly-result-icon" aria-hidden="true" x-html="resultIcon()"></div>
+            <div class="ly-result-info">
+              <span class="ly-result-reward" x-text="result.reward_title"></span>
+              <span class="ly-result-meta">
+                <span x-text="result.cost_points + ' Punkte'"></span>
+                <span class="ly-sep">·</span>
+                <span x-text="statusLabel()"></span>
+              </span>
+            </div>
+          </div>
+          <div class="ly-result-fields">
+            <div class="ly-field" x-show="result.expires_at">
+              <span class="ly-field-label">Gültig bis</span>
+              <span x-text="fmtDate(result.expires_at)"></span>
+            </div>
+            <div class="ly-field" x-show="result.validated_at">
+              <span class="ly-field-label">Eingelöst am</span>
+              <span x-text="fmtDate(result.validated_at)"></span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="ly-btn ly-btn--redeem"
+            x-show="result.status === 'issued' && !result.is_expired"
+            :disabled="busy"
+            @click="redeem()"
+            x-text="busy ? 'Einlösen …' : 'Einlösen bestätigen'"
+          ></button>
+        </div>
+      </template>
+
+      <p class="ly-not-found" x-show="notFound" style="display:none">
+        Kein Gutschein mit diesem Code gefunden.
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      (window as any).Alpine.data('loyaltyValidate', () => ({
+        code: '',
+        busy: false,
+        result: null as any,
+        notFound: false,
+
+        reset() { this.result = null; this.notFound = false; },
+
+        fmtDate(iso: string) {
+          if (!iso) return '';
+          try { return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }); }
+          catch { return ''; }
+        },
+
+        statusLabel() {
+          const v = this.result;
+          if (!v) return '';
+          if (v.is_expired && v.status === 'issued') return 'Abgelaufen';
+          if (v.status === 'validated') return 'Bereits eingelöst';
+          if (v.status === 'cancelled') return 'Storniert';
+          return 'Offen · einlösbar';
+        },
+
+        resultClass() {
+          const v = this.result;
+          if (!v) return '';
+          if (v.status === 'validated') return 'ly-result--done';
+          if (v.is_expired || v.status === 'expired' || v.status === 'cancelled') return 'ly-result--invalid';
+          return 'ly-result--open';
+        },
+
+        resultIcon() {
+          const v = this.result;
+          if (!v) return '';
+          if (v.status === 'validated') return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+          if (v.is_expired || v.status === 'expired' || v.status === 'cancelled')
+            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+          return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>';
+        },
+
+        async lookup() {
+          const code = (this.code || '').trim();
+          if (!code || this.busy) return;
+          this.busy = true; this.result = null; this.notFound = false;
+          try {
+            const res = await fetch('/api/loyalty/validate', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, action: 'lookup' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok && data.voucher) this.result = data.voucher;
+            else this.notFound = true;
+          } catch {
+            (window as any).retahaToast?.('Fehler bei der Prüfung', 'error');
+          } finally { this.busy = false; }
+        },
+
+        async redeem() {
+          const code = (this.code || '').trim();
+          if (!code || this.busy) return;
+          this.busy = true;
+          try {
+            const res = await fetch('/api/loyalty/validate', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, action: 'redeem' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) {
+              if (this.result) { this.result.status = 'validated'; this.result.validated_at = data.validated_at; }
+              (window as any).retahaToast?.('Gutschein eingelöst ✓');
+            } else {
+              const msg: Record<string, string> = {
+                already_validated: 'Bereits eingelöst',
+                expired: 'Gutschein ist abgelaufen',
+                cancelled: 'Gutschein wurde storniert',
+                not_found: 'Nicht gefunden',
+              };
+              (window as any).retahaToast?.(msg[data.error] || 'Einlösen fehlgeschlagen', 'error');
+              if (data.error === 'already_validated' && this.result) this.result.status = 'validated';
+              if (data.error === 'expired' && this.result) { this.result.is_expired = true; }
+            }
+          } catch {
+            (window as any).retahaToast?.('Fehler beim Einlösen', 'error');
+          } finally { this.busy = false; }
+        },
+      }));
+    });
+  </script>
+
+  <style>
+    .ly-page { max-width: 560px; }
+
+    .ly-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .ly-title {
+      font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600;
+      color: #1A1A1A; margin: 0;
+    }
+    .ly-cfg-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em;
+      color: rgba(26,26,26,0.5); text-decoration: none;
+      border: 1px solid #e8e8e8; border-radius: 7px; padding: 6px 10px;
+      transition: color 150ms, border-color 150ms;
+    }
+    .ly-cfg-link:hover { color: #14616E; border-color: #14616E; }
+
+    .ly-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 14px;
+      padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .ly-hint { font-size: 13px; color: rgba(26,26,26,0.55); margin: 0; }
+
+    .ly-scan { display: flex; gap: 10px; align-items: stretch; }
+    .ly-code-input {
+      flex: 1; min-width: 0;
+      font-family: 'JetBrains Mono', monospace; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 12px 14px; border: 1.5px solid #e0e0e0; border-radius: 9px;
+      color: #1A1A1A; background: #fafafa; outline: none; transition: border-color 150ms;
+    }
+    .ly-code-input:focus { border-color: #14616E; background: #fff; }
+
+    .ly-btn {
+      font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+      border: none; border-radius: 9px; padding: 0 22px; cursor: pointer; transition: filter 150ms, opacity 150ms;
+      white-space: nowrap;
+    }
+    .ly-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ly-btn--primary { background: #1A1A1A; color: #fff; }
+    .ly-btn--primary:hover:not(:disabled) { filter: brightness(1.25); }
+    .ly-btn--redeem { background: #14616E; color: #fff; width: 100%; padding: 13px; margin-top: 4px; }
+    .ly-btn--redeem:hover:not(:disabled) { filter: brightness(1.1); }
+
+    /* Result */
+    .ly-result {
+      border: 1.5px solid #e0e0e0; border-radius: 10px; padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .ly-result--open  { border-color: #14616E; background: color-mix(in srgb, #14616E 5%, #fff); }
+    .ly-result--done  { border-color: #16a34a; background: color-mix(in srgb, #16a34a 6%, #fff); }
+    .ly-result--invalid { border-color: #d1d5db; background: #f9f9f9; opacity: 0.75; }
+
+    .ly-result-top { display: flex; align-items: center; gap: 12px; }
+    .ly-result-icon {
+      flex-shrink: 0; width: 38px; height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.7); border-radius: 8px;
+    }
+    .ly-result--open  .ly-result-icon { color: #14616E; }
+    .ly-result--done  .ly-result-icon { color: #16a34a; }
+    .ly-result--invalid .ly-result-icon { color: rgba(26,26,26,0.4); }
+
+    .ly-result-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .ly-result-reward { font-weight: 600; font-size: 15px; color: #1A1A1A; }
+    .ly-result-meta { font-size: 12px; color: rgba(26,26,26,0.55); display: flex; align-items: center; gap: 6px; }
+    .ly-sep { color: rgba(26,26,26,0.25); }
+
+    .ly-result-fields { display: flex; flex-direction: column; gap: 6px; }
+    .ly-field { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #1A1A1A; }
+    .ly-field-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: rgba(26,26,26,0.45); }
+
+    .ly-not-found { font-size: 13px; color: #dc2626; margin: 0; }
+  </style>
+
+</AppLayout>
