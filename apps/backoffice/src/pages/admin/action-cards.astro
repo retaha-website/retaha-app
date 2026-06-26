@@ -18,15 +18,6 @@ const { data: hotelLangRow, error: langError } = await client
   .eq('id', hotel.id).maybeSingle();
 if (langError) console.error('[action-cards] hotels lang query error', { hotelId: hotel.id, error: langError });
 const hotelDefaultLang = (hotelLangRow?.default_language as string | undefined) ?? 'de';
-const hotelEnabledLangs: string[] = Array.isArray(hotelLangRow?.enabled_languages)
-  ? hotelLangRow.enabled_languages : ['de','en','fr','es'];
-const LANG_LABELS: Record<string, string> = {
-  de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español',
-  it: 'Italiano', pt: 'Português', nl: 'Nederlands',
-  ru: 'Русский', ar: 'العربية', zh: '中文',
-};
-const otherEnabled = hotelEnabledLangs.filter(l => l !== hotelDefaultLang);
-const otherEnabledLabel = otherEnabled.map(l => LANG_LABELS[l] || l).join(', ');
 
 if (!hotel.id) console.error('[action-cards] hotel.id is undefined — cards query will return empty', { hotel });
 const { data: cards, error: cardsError } = await client
@@ -39,10 +30,6 @@ if (cardsError) console.error('[action-cards] hotel_action_cards query error', {
 const cardList = (cards ?? []) as any[];
 const overFive = cardList.length > 5;
 
-function pickI18n(value: any, lang: string, fallbackLang: string = 'de'): string {
-  if (!value || typeof value !== 'object') return '';
-  return value[lang]?.value || value[fallbackLang]?.value || value['de']?.value || '';
-}
 
 const INTERNAL_ACTIONS = [
   { value: 'open_breakfast',  label: bt('ac.action.breakfast', lang) },
@@ -187,15 +174,27 @@ const acT = {
     </template>
 
     <div class="ac-list">
-      <template x-for="(c, idx) in cards" :key="c.id">
-        <article class="ac-row">
+      <template x-for="c in cards" :key="c.id">
+        <div class="ac-row"
+          :class="{'is-drag-over': dragTarget && dragTarget.id === c.id, 'is-dragging': dragItem && dragItem.id === c.id}"
+          :data-card-id="c.id">
+          <span class="ac-drag-handle"
+            @click.stop
+            @pointerdown="dndPtrDown($event, c)"
+            aria-label="Reihenfolge ändern">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="4" r="1.5"/><circle cx="11" cy="4" r="1.5"/>
+              <circle cx="5" cy="8" r="1.5"/><circle cx="11" cy="8" r="1.5"/>
+              <circle cx="5" cy="12" r="1.5"/><circle cx="11" cy="12" r="1.5"/>
+            </svg>
+          </span>
           <div class="ac-row-thumb">
             <template x-if="c.image_url">
               <img :src="c.image_url" alt="" loading="lazy" />
             </template>
             <template x-if="!c.image_url">
               <div class="ac-row-thumb-placeholder">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
               </div>
             </template>
           </div>
@@ -210,12 +209,10 @@ const acT = {
                x-text="pickI18nClient(c.subtitle_i18n, defaultLang) || c.subtitle_de"></p>
           </div>
           <div class="ac-row-actions">
-            <button type="button" @click="moveCard(c.id,'up')" :disabled="idx === 0" class="ac-icon-btn" title={bt('ac.up', lang)}>↑</button>
-            <button type="button" @click="moveCard(c.id,'down')" :disabled="idx === cards.length - 1" class="ac-icon-btn" title={bt('ac.down', lang)}>↓</button>
             <button type="button" @click="openEdit(c.id)" class="ac-icon-btn" title={bt('si.items.edit', lang)}>✎</button>
             <button type="button" @click="deleteCard(c.id)" class="ac-icon-btn ac-icon-btn--danger" title={bt('nfc.delete', lang)}>×</button>
           </div>
-        </article>
+        </div>
       </template>
     </div>
   </div>
@@ -317,8 +314,6 @@ const acT = {
           </template>
         </div>
 
-        <div class="ac-i18n-hint" set:html={`<strong>${bt('ac.modal.inputin', lang)} ${LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang}</strong> · ${otherEnabled.length > 0 ? bt('ac.modal.willtranslate', lang).replace('{langs}', otherEnabledLabel) : bt('ac.modal.notranslate', lang)}`}></div>
-
         <label class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.titlelabel', lang)} <span class="ac-required">*</span></span>
           <input type="text" x-model="editor.title" required maxlength="60" class="ac-input" />
@@ -419,6 +414,13 @@ const acT = {
       editor: emptyEditor(),
       isSaving: false,
       saveError: '' as string,
+
+      // DnD state (same pattern as breakfast.astro)
+      dragItem: null as any,
+      dragTarget: null as any,
+      _ptrItem: null as any,
+      _ptrMoveHandler: null as any,
+      _ptrUpHandler: null as any,
 
       // Eve set
       eveBrief: '' as string,
@@ -626,14 +628,64 @@ const acT = {
         }
       },
 
-      async moveCard(id: string, direction: 'up' | 'down') {
-        const res = await fetch('/api/action-cards/sort', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, direction }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) { this.showToast(data.error || `API ${res.status}: ${res.statusText}`, 'error'); return; }
-        if (!data.noop) window.location.reload();
+      dndPtrDown(e: PointerEvent, card: any) {
+        e.preventDefault();
+        this._ptrItem = card;
+        this.dragItem = card;
+        const pid = e.pointerId;
+        this._ptrMoveHandler = (ev: PointerEvent) => {
+          if (ev.pointerId !== pid) return;
+          ev.preventDefault();
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const row = el && (el as HTMLElement).closest('[data-card-id]');
+          if (row) {
+            const idStr = (row as HTMLElement).dataset.cardId;
+            const target = this.cards.find((c: any) => c.id === idStr);
+            if (target && target.id !== this._ptrItem?.id) this.dragTarget = target;
+          }
+        };
+        this._ptrUpHandler = (ev: PointerEvent) => {
+          if (ev.pointerId !== pid) return;
+          window.removeEventListener('pointermove', this._ptrMoveHandler);
+          window.removeEventListener('pointerup', this._ptrUpHandler);
+          window.removeEventListener('pointercancel', this._ptrUpHandler);
+          if (this._ptrItem && this.dragTarget) {
+            this._dndPerform(this.dragTarget);
+          } else {
+            this.dragItem = null; this.dragTarget = null;
+          }
+          this._ptrItem = null; this._ptrMoveHandler = null; this._ptrUpHandler = null;
+        };
+        window.addEventListener('pointermove', this._ptrMoveHandler, { passive: false });
+        window.addEventListener('pointerup', this._ptrUpHandler);
+        window.addEventListener('pointercancel', this._ptrUpHandler);
+      },
+
+      _dndPerform(target: any) {
+        const fromIdx = this.cards.findIndex((c: any) => c.id === this.dragItem.id);
+        const toIdx   = this.cards.findIndex((c: any) => c.id === target.id);
+        if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) {
+          this.dragItem = null; this.dragTarget = null; return;
+        }
+        const newCards = [...this.cards];
+        const [moved] = newCards.splice(fromIdx, 1);
+        newCards.splice(toIdx, 0, moved);
+        this.cards = newCards;
+        this.dragItem = null; this.dragTarget = null;
+        this._saveOrder(newCards.map((c: any) => c.id));
+      },
+
+      async _saveOrder(ids: string[]) {
+        try {
+          const res = await fetch('/api/action-cards/reorder', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          });
+          const d = await res.json();
+          if (!d.ok) this.showToast(d.error || 'Reihenfolge konnte nicht gespeichert werden', 'error');
+        } catch {
+          this.showToast('Netzwerk-Fehler beim Speichern der Reihenfolge', 'error');
+        }
       },
 
       async deleteCard(id: string) {
@@ -649,7 +701,7 @@ const acT = {
       },
 
       showToast(text: string, type: 'success' | 'error') {
-        window.retahaToast?.(text, type);
+        (window as any).retahaToast?.(text, type);
       },
     }));
   });
@@ -786,39 +838,55 @@ const acT = {
   }
   .ac-eve-set-take:hover { background: rgba(20,97,110,.07); }
 
-  /* ── Card list ───────────────────────────────────────────────────────────── */
-  .ac-counter-badge { font-size: 11px; color: var(--ink-muted); font-weight: 400; }
+  /* ── Card list (breakfast.astro-Pattern) ────────────────────────────────── */
+  .ac-counter-badge { font-size: 11px; color: var(--ly-ink3); font-weight: 400; }
   .ac-empty { padding: 32px 20px; text-align: center; }
-  .ac-empty-text { margin: 0; font-size: 13px; color: var(--ink-muted); font-style: italic; }
-  .ac-list { display: flex; flex-direction: column; }
+  .ac-empty-text { margin: 0; font-size: 13px; color: var(--ly-ink3); font-style: italic; }
+  .ac-list { display: flex; flex-direction: column; margin: 0 -16px; }
+
   .ac-row {
-    display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; padding: 12px 20px;
-    align-items: center; border-top: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border, rgba(10,10,10,0.10));
+    transition: background 120ms;
   }
-  .ac-row:first-child { border-top: none; }
+  .ac-row:last-child { border-bottom: none; }
+  .ac-row.is-drag-over { background: color-mix(in srgb, var(--petrol, #14616E) 8%, transparent); box-shadow: inset 0 2px 0 var(--petrol, #14616E); }
+  .ac-row.is-dragging { opacity: 0.4; }
+  .ac-row:hover { background: var(--bg-deep, #F5F4F2); }
+
+  .ac-drag-handle {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; min-height: 72px; flex-shrink: 0;
+    cursor: grab; color: var(--ink-faint, rgba(10,10,10,.2)); touch-action: none; user-select: none;
+  }
+  .ac-drag-handle:hover { color: var(--ly-ink3); }
+  .ac-drag-handle:active { cursor: grabbing; }
+  .ac-drag-handle svg { pointer-events: none; }
+
   .ac-row-thumb {
-    width: 64px; height: 64px; border-radius: 8px;
-    background: var(--surface-raised, #f4f4f4);
-    display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+    width: 56px; height: 56px; border-radius: 8px; flex-shrink: 0;
+    background: var(--bg-deep, #F5F4F2);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    margin-right: 12px;
   }
   .ac-row-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .ac-row-thumb-placeholder { color: var(--ink-muted); }
-  .ac-row-meta { min-width: 0; }
-  .ac-row-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 3px; }
-  .ac-badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,.06); color: var(--ink-muted); letter-spacing: 0.04em; }
-  .ac-badge--draft { background: rgba(0,0,0,.06); color: var(--ink-muted); }
-  .ac-badge--target { background: rgba(20,97,110,.1); color: var(--petrol, #14616E); font-family: 'JetBrains Mono', monospace; }
-  .ac-row-title { margin: 2px 0 1px; font-size: 14px; font-weight: 500; color: var(--ink); }
-  .ac-row-sub { margin: 0; font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55ch; }
-  .ac-row-actions { display: flex; gap: 4px; }
+  .ac-row-thumb-placeholder { color: var(--ly-ink3); }
 
+  .ac-row-meta { flex: 1; min-width: 0; padding: 12px 0; }
+  .ac-row-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 3px; }
+  .ac-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(20,97,110,.10); color: var(--petrol, #14616E); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; white-space: nowrap; }
+  .ac-badge--draft { background: rgba(0,0,0,.06); color: var(--ly-ink3); font-family: inherit; }
+  .ac-badge--target { background: rgba(20,97,110,.10); color: var(--petrol, #14616E); font-family: 'JetBrains Mono', monospace; }
+  .ac-row-title { margin: 2px 0 1px; font-size: 14px; font-weight: 500; color: var(--ly-ink); }
+  .ac-row-sub { margin: 0; font-size: 12px; color: var(--ly-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55ch; }
+
+  .ac-row-actions { display: flex; gap: 4px; padding-right: 16px; flex-shrink: 0; }
   .ac-icon-btn {
     width: 30px; height: 30px; padding: 0; background: transparent;
-    border: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-    border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1; color: var(--ink-muted);
+    border: 1px solid var(--ly-line); border-radius: 6px;
+    cursor: pointer; font-size: 14px; line-height: 1; color: var(--ly-ink3);
   }
-  .ac-icon-btn:hover:not(:disabled) { background: var(--surface-raised, #f4f4f4); border-color: var(--ink-muted); color: var(--ink); }
-  .ac-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ac-icon-btn:hover { background: var(--bg-deep, #F5F4F2); border-color: var(--ly-ink3); color: var(--ly-ink); }
   .ac-icon-btn--danger:hover { background: rgba(220,38,38,.06); border-color: #dc2626; color: #dc2626; }
 
   /* ── Modal ───────────────────────────────────────────────────────────────── */
