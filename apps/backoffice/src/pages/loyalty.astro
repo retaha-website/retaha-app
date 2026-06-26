@@ -14,7 +14,7 @@ if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
 const sb = createSupabaseServiceRoleInstance();
 const [{ data: cfgRow }, { data: hsRow }] = await Promise.all([
-  sb.from('loyalty_config').select('points_per_night, tiers, rewards, expiry_enabled, expiry_months').eq('hotel_id', hotel.id).maybeSingle(),
+  sb.from('loyalty_config').select('points_per_night, tiers, rewards, expiry_enabled, expiry_months, direct_bonus_enabled, direct_bonus_multiplier').eq('hotel_id', hotel.id).maybeSingle(),
   sb.from('hotel_settings').select('features').eq('hotel_id', hotel.id).maybeSingle(),
 ]);
 
@@ -25,6 +25,8 @@ const initConfig = {
   rewards: cfgRow?.rewards ?? DEFAULT_LOYALTY_CONFIG.rewards,
   expiry_enabled: cfgRow?.expiry_enabled ?? false,
   expiry_months: cfgRow?.expiry_months ?? 24,
+  direct_bonus_enabled: cfgRow?.direct_bonus_enabled ?? false,
+  direct_bonus_multiplier: cfgRow?.direct_bonus_multiplier ?? 2,
 };
 const loyaltyEnabled = ((hsRow?.features ?? {}) as Record<string, unknown>).loyalty === true;
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
@@ -190,6 +192,30 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
         </div>
 
       </div><!-- /ly-2col -->
+
+      <!-- Direktbuchungs-Bonus -->
+      <div class="ly-sec">
+        <div class="ly-sec-head">
+          <div class="ly-sec-l"><span class="ly-dot"></span><b>Direktbuchungs-Bonus</b></div>
+          <label class="ly-toggle" title="Bonus aktivieren">
+            <input type="checkbox" x-model="config.direct_bonus_enabled" />
+            <span class="ly-toggle-track"></span>
+          </label>
+        </div>
+        <p class="ly-hint">Direktbucher (Buchungsmaschine, Rezeption) erhalten einen Faktor auf ihre Nacht-Punkte. Buchungen via OTA bleiben unverändert.</p>
+        <div class="ly-ppn" x-show="config.direct_bonus_enabled" x-cloak>
+          <div class="ly-ppn-label">Faktor auf Punkte pro Nacht</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--ly-ink3)">×</span>
+            <input
+              type="number" min="1" max="10" step="0.5" inputmode="decimal"
+              class="ly-ppn-input"
+              style="width:60px"
+              x-model.number="config.direct_bonus_multiplier"
+            />
+          </div>
+        </div>
+      </div>
 
       <!-- Punkte-Verfall -->
       <div class="ly-sec">

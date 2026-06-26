@@ -27,6 +27,10 @@ export interface LoyaltyConfig {
   points_per_night: number;
   tiers: LoyaltyTier[];
   rewards: LoyaltyReward[];
+  expiry_enabled?: boolean;
+  expiry_months?: number;
+  direct_bonus_enabled?: boolean;
+  direct_bonus_multiplier?: number;
 }
 
 // Muss mit dem Migration-Seed (20260617120000_loyalty_program.sql) übereinstimmen
@@ -150,20 +154,34 @@ export async function awardStayPoints(sb: any, args: {
     return { ok: true, skipped: 'loyalty_disabled' };
   }
 
-  // Config (Punkte/Nacht + Tiers); Fallback Defaults
+  // Config (Punkte/Nacht + Tiers + Direktbonus); Fallback Defaults
   const { data: cfg } = await sb.from('loyalty_config')
-    .select('points_per_night, tiers').eq('hotel_id', hotelId).maybeSingle();
+    .select('points_per_night, tiers, direct_bonus_enabled, direct_bonus_multiplier')
+    .eq('hotel_id', hotelId).maybeSingle();
   const pointsPerNight = (cfg?.points_per_night ?? DEFAULT_LOYALTY_CONFIG.points_per_night) as number;
   const tiers = (cfg?.tiers ?? DEFAULT_LOYALTY_CONFIG.tiers) as LoyaltyTier[];
+  const directBonusEnabled = cfg?.direct_bonus_enabled === true;
+  const directBonusMultiplier = Math.max(1, Number(cfg?.direct_bonus_multiplier ?? 2));
+
+  // Booking-Source aus Stay — für Direktbuchungs-Bonus
+  let bookingSource: string | null = null;
+  if (directBonusEnabled) {
+    const { data: stayRow } = await sb.from('stays').select('booking_source').eq('id', stayId).maybeSingle();
+    bookingSource = stayRow?.booking_source ?? null;
+  }
 
   const nights = nightsBetween(args.checkIn, args.checkOut);
-  const points = pointsForNights(nights, pointsPerNight);
+  const multiplier = (directBonusEnabled && bookingSource === 'direct') ? directBonusMultiplier : 1;
+  const basePoints = pointsForNights(nights, pointsPerNight);
+  const points = Math.round(basePoints * multiplier);
   if (points <= 0) return { ok: true, awarded: 0, skipped: 'no_points' };
+
+  const note = multiplier > 1 ? `Stay-Checkout · Direktbuchung ×${multiplier}` : 'Stay-Checkout';
 
   // Idempotent: earn-Ledger-Eintrag (unique je stay_id WHERE type='earn')
   const { error: txErr } = await sb.from('loyalty_transactions').insert({
     hotel_id: hotelId, guest_id: guestId, stay_id: stayId,
-    type: 'earn', points, nights, note: 'Stay-Checkout',
+    type: 'earn', points, nights, note,
   });
   if (txErr) {
     if ((txErr.code ?? '') === '23505') return { ok: true, awarded: 0, skipped: 'already_awarded' };

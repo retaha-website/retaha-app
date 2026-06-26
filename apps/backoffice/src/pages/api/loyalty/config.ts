@@ -21,8 +21,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   try { body = await request.json(); } catch { return json({ ok: false, error: 'invalid_json' }, 400); }
 
   const points_per_night = num(body.points_per_night, 0, 10000);
-  const expiry_enabled = body.expiry_enabled === true;
-  const expiry_months  = num(body.expiry_months, 1, 120);
+  const expiry_enabled          = body.expiry_enabled === true;
+  const expiry_months           = num(body.expiry_months, 1, 120);
+  const direct_bonus_enabled    = body.direct_bonus_enabled === true;
+  const direct_bonus_multiplier = Math.max(1, Math.min(10, Number(body.direct_bonus_multiplier) || 2));
 
   const tiers = (Array.isArray(body.tiers) ? body.tiers : []).slice(0, 10).map((t: any, i: number) => ({
     key: slug(t.key, `tier_${i}`),
@@ -51,6 +53,8 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     rewards,
     expiry_enabled,
     expiry_months,
+    direct_bonus_enabled,
+    direct_bonus_multiplier,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'hotel_id' });
 

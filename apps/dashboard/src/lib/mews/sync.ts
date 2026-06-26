@@ -417,6 +417,22 @@ async function syncGuestsFromCustomers(
 // Sub-Sync — stays (access_token-protected)
 // ============================================================
 
+// Mews Origin → normalisierte Buchungsquelle.
+// Mapping: provisionsorientiert (direct = ohne Drittanbieter-Provision).
+// "Connector" bleibt 'other' — kann OTA-seitig gesetzt sein.
+function normalizeMewsOrigin(origin: string | null | undefined): 'direct' | 'ota' | 'other' | null {
+  switch (origin) {
+    case 'Booking Engine': return 'direct';
+    case 'Distributor':    return 'direct';  // Mews Distributor = Hotel-Website-Widget
+    case 'Commander':      return 'direct';  // Rezeption / Front-Desk
+    case 'Mews':           return 'direct';  // intern angelegt, provisionsfrei
+    case 'Channel':        return 'ota';     // Channel Manager (Booking.com, Expedia …)
+    case 'Connector':      return 'other';
+    case 'Import':         return 'other';
+    default:               return null;      // unbekannt / kein Mews-Feld
+  }
+}
+
 interface Reservation {
   Id?: string;
   AccountId?: string;
@@ -476,6 +492,7 @@ async function syncStaysFromReservations(
       0,
     ) || 1;
 
+    const mewsOrigin = typeof r.Origin === 'string' ? r.Origin : null;
     const mewsFields = {
       mews_reservation_id: r.Id,
       mews_customer_id: accountId,
@@ -488,6 +505,8 @@ async function syncStaysFromReservations(
       raw_mews_data: r,
       guest_id: guestId,
       room_id: roomId,
+      booking_source_raw: mewsOrigin,
+      booking_source: normalizeMewsOrigin(mewsOrigin),
     };
 
     if (existingIds.has(r.Id)) {
