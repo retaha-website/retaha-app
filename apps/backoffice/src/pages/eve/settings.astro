@@ -5,6 +5,7 @@ import ModStatusLed from '../../components/shared/ModStatusLed.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getLang, bt } from '../../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
+const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 
 interface TuningRule {
   trigger: string;
@@ -173,16 +174,10 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
         <div class="ev-card-head">
           <span class="ev-card-title">{bt('nav.eve', lang)}</span>
         </div>
-        <p class="ev-hint" style="margin-bottom:14px">{eveEnabled ? bt('evs.mod.on', lang) : bt('evs.mod.off', lang)}</p>
+        <p class="ev-hint" style="margin-bottom:14px">{bt('si.mod.hint', lang)}</p>
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
           <ModStatusLed on={eveEnabled} />
-          <form method="POST" style="margin:0">
-            <input type="hidden" name="_action" value="toggle_enabled" />
-            <input type="hidden" name="eve_enabled" value={(!eveEnabled).toString()} />
-            <button type="submit" class={`v9-btn${eveEnabled ? ' ev-btn-ghost' : ' ev-btn-primary'}`}>
-              {eveEnabled ? bt('evs.deactivate', lang) : bt('evs.activate', lang)}
-            </button>
-          </form>
+          <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
         </div>
       </div>
 
@@ -243,7 +238,7 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
             </div>
           </div>
 
-          <div class="ev-field">
+          <div class="ev-field" style="margin-bottom:0">
             <label class="ev-label" for="eve-online-until">{bt('evs.persona.onlineuntil', lang)}</label>
             <input type="time" id="eve-online-until" name="eve_online_until"
               value={eveOnlineUntil} class="s-input evs-time-input" />
@@ -274,24 +269,12 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
             <span class="ev-hint" style="margin-top:5px">{bt('evs.tune.triggerhint', lang)}</span>
           </div>
 
-          <div class="ev-field">
+          <div class="ev-field" style="margin-bottom:0">
             <label class="ev-label ev-label--req" for="rule-instruction">{bt('evs.tune.instruction', lang)}</label>
             <textarea id="rule-instruction" name="instruction" required rows="3"
               placeholder="z.B. 'Empfiehl immer erst unser hauseigenes Restaurant Maria.'"
               class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:72px"
             ></textarea>
-          </div>
-
-          <div class="ev-field">
-            <label class="ev-label" for="rule-force-model">{bt('evs.tune.model', lang)}</label>
-            <div class="s-select-wrap" style="max-width:220px">
-              <select id="rule-force-model" name="force_model" class="s-select">
-                <option value="">{bt('evs.model.auto', lang)}</option>
-                <option value="sonnet">{bt('evs.model.sonnet', lang)}</option>
-                <option value="haiku">{bt('evs.model.haiku', lang)}</option>
-              </select>
-            </div>
-            <span class="ev-hint" style="margin-top:5px">{bt('evs.tune.modelhint', lang)}</span>
           </div>
 
           <div class="ev-card-foot">
@@ -311,12 +294,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                   <div class="ev-item__content">
                     <p class="evs-rule-trigger">{rule.trigger}</p>
                     <p class="ev-item__a">{rule.instruction}</p>
-                    {rule.force_model && (
-                      <p class="evs-rule-model">
-                        <span class="evs-model-badge">{rule.force_model}</span>
-                        {bt('evs.tune.override', lang)}
-                      </p>
-                    )}
                   </div>
                   <div class="ev-item__actions">
                     <button type="button" @click="editing = true" class="v9-btn ev-btn-ghost ev-action-btn">
@@ -344,16 +321,6 @@ const guestAddressForm = settings?.guest_address_form ?? 'sie';
                       <textarea name="instruction" required rows="3"
                         class="s-input" style="width:100%;box-sizing:border-box;resize:vertical;min-height:72px"
                       >{rule.instruction}</textarea>
-                    </div>
-                    <div class="ev-field" style="margin-bottom:0">
-                      <label class="ev-label">{bt('evs.edit.model', lang)}</label>
-                      <div class="s-select-wrap" style="max-width:220px">
-                        <select name="force_model" class="s-select">
-                          <option value="" selected={!rule.force_model}>{bt('evs.model.autoshort', lang)}</option>
-                          <option value="sonnet" selected={rule.force_model === 'sonnet'}>Sonnet</option>
-                          <option value="haiku" selected={rule.force_model === 'haiku'}>Haiku</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                   <div class="ev-item__edit-footer">
