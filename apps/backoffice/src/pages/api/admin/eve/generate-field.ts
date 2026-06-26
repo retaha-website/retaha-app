@@ -20,6 +20,12 @@ Nutze den Hinweis des Nutzers als Basis, ergänze typische Hotelregeln sinnvoll.
 Antworte NUR mit dem reinen Text der Anfahrt — kein JSON, kein Markdown, keine Erklärungen.
 Stil: klar, praktisch, strukturiert (z.B. nach Verkehrsmittel). Maximal 120 Wörter.
 Nutze den Hinweis des Nutzers als Basis, ergänze typische Anfahrtsinformationen sinnvoll.`,
+
+  checkout_note: `Du bist ein Hotel-Assistent. Schreibe einen kurzen, freundlichen Checkout-Hinweis für Gäste auf Deutsch.
+Antworte NUR mit dem reinen Text des Hinweises — kein JSON, kein Markdown, keine Erklärungen.
+Stil: freundlich, klar, praktisch. Maximal 80 Wörter.
+Typische Inhalte: Schlüsselrückgabe, Late-Checkout-Möglichkeit, Minibar, Gepäckaufbewahrung.
+Nutze den Hinweis des Nutzers als Basis.`,
 };
 
 export const POST: APIRoute = async ({ cookies, request }) => {
