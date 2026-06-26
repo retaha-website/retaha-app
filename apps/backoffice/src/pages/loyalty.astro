@@ -53,14 +53,14 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
   <!-- ══ Alpine wrapper ══════════════════════════════════════════════════════ -->
   <div x-data={`loyaltyPage(${JSON.stringify({ initConfig, hasExisting: hasExistingConfig })})`}>
 
-    <!-- ── Eve start card ──────────────────────────────────────────────────── -->
-    <div id="ly-eve-anchor" class="evecard" x-show="phase === 'init'" x-cloak>
+    <!-- ── Eve card — erscheint ganz oben, Programm bleibt darunter sichtbar ── -->
+    <div id="ly-eve-anchor" class="evecard" x-show="showEve" x-cloak>
       <div class="ec-head">
         <svg class="ec-spk" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
         <b>Lass <span class="ec-gradient">Eve</span> dein Programm bauen</b>
       </div>
       <p class="ec-desc">Erzähl in einem Satz von deinem Haus — Eve schlägt Punkte, Stufen und Prämien vor, die passen. Du passt nur noch an.</p>
-      <div class="ec-row">
+      <div class="ec-row" x-show="!busyGen">
         <input
           type="text"
           class="ec-brief"
@@ -69,25 +69,23 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
           placeholder="z.B. 4-Sterne Stadthotel, ruhig, viele Wiederkehrer"
           maxlength="300"
         />
-        <button class="ly-btn ly-aurora" :disabled="busyGen || !brief.trim()" @click="generate()">
+        <button class="ly-btn ly-aurora" :disabled="!brief.trim()" @click="generate()">
           <svg class="ec-spk-anim" width="13" height="13" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
           Programm erstellen
         </button>
       </div>
+      <div class="ec-gen" x-show="busyGen">
+        <span class="ec-orb"></span>
+        Eve baut dein Treueprogramm …
+      </div>
     </div>
 
-    <!-- ── Generating ──────────────────────────────────────────────────────── -->
-    <div class="ec-gen" x-show="phase === 'generating'" x-cloak>
-      <span class="ec-orb"></span>
-      Eve baut dein Treueprogramm …
-    </div>
-
-    <!-- ── Program ─────────────────────────────────────────────────────────── -->
-    <div x-show="phase === 'program'" x-cloak>
+    <!-- ── Program — immer sichtbar ──────────────────────────────────────── -->
+    <div>
 
       <!-- Eve-Reset -->
       <div class="ly-eve-reset-row">
-        <button class="ly-btn ly-aurora" @click="phase = 'init'; brief = ''; $nextTick(() => document.getElementById('ly-eve-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}))">
+        <button class="ly-btn ly-aurora" @click="showEve = true; brief = ''; $nextTick(() => document.getElementById('ly-eve-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}))">
           <svg class="ec-spk-anim" width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
           Mit Eve neu bauen
         </button>
@@ -203,7 +201,7 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 <script>
   document.addEventListener('alpine:init', () => {
     (window as any).Alpine.data('loyaltyPage', (opts: any) => ({
-      phase: opts.hasExisting ? 'program' : 'init',
+      showEve: !opts.hasExisting,
       brief: '',
       config: JSON.parse(JSON.stringify(opts.initConfig)),
       tierOpen: {} as Record<number, boolean>,
@@ -225,7 +223,6 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
         const brief = (this.brief || '').trim();
         if (!brief || this.busyGen) return;
         this.busyGen = true;
-        this.phase = 'generating';
 
         // sparkle burst on button (best-effort)
         try {
@@ -250,7 +247,7 @@ const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
           (window as any).retahaToast?.('Verbindungsfehler', 'error');
         } finally {
           this.busyGen = false;
-          this.phase = 'program';
+          this.showEve = false;
         }
       },
 
