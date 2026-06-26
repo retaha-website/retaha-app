@@ -35,11 +35,9 @@ if (Astro.request.method === 'POST') {
   const coRaw = form.get('checkout_time')?.toString().trim() || '';
   const ciRaw = form.get('checkin_time')?.toString().trim() || '';
   const noteDe = (form.get('note_de')?.toString() ?? '').trim().slice(0, 600);
-  const noteEn = (form.get('note_en')?.toString() ?? '').trim().slice(0, 600);
 
   const note: Record<string, string> = {};
   if (noteDe) note.de = noteDe;
-  if (noteEn) note.en = noteEn;
 
   const updates: Record<string, unknown> = {
     self_checkout_note: note,
@@ -148,18 +146,12 @@ const scOn = scState !== 'off';
         </div>
         <p class="sc-hint" set:html={bt('sc.note.sub', lang)}></p>
 
-        <div class="sc-field">
+        <div class="sc-field" style="margin-bottom:0">
           <label class="sc-label" for="note-de">{bt('sc.note.de', lang)}</label>
           <textarea id="note-de" name="note_de" class="s-input sc-textarea" rows="3"
             x-model="valDe"
             placeholder="z.B. Schlüsselkarte einfach im Zimmer lassen. Late-Checkout auf Anfrage an der Rezeption."></textarea>
         </div>
-        <div class="sc-field" style="margin-bottom:0">
-          <label class="sc-label" for="note-en">{bt('sc.note.en', lang)}</label>
-          <textarea id="note-en" name="note_en" class="s-input sc-textarea" rows="3"
-            placeholder="e.g. Just leave the key card in the room. Late check-out on request at reception.">{noteEn}</textarea>
-        </div>
-
         <!-- Eve-Popup -->
         <div class="sc-eve-overlay" x-show="eveOpen" x-cloak @click.self="eveOpen=false" @keydown.escape.window="eveOpen=false">
           <div class="sc-eve-modal" @click.stop>
