@@ -1,11 +1,6 @@
 ---
-// Sprint Wallet · Phase 14 — Drip-Editor mit SortableJS-Step-Builder
-//
-// Sections:
-//   1. Drip-Settings: Name, Trigger-Typ, Trigger-Config (kontextbezogen), Active-Toggle
-//   2. Step-Builder: Drag-Drop-Reorder, Template-Picker pro Step, delay_days
-//
-// SortableJS via npm (auch Mobile-Touch-Support).
+// Drip-Editor — V9-Redesign (optisch identisch mit CampaignEditor / MarketingEditor).
+// Logik (Alpine, SortableJS, API-Calls) unverändert.
 
 interface Tpl { id: string; name: string; }
 interface InitialStep { template_id: string; delay_days: number; }
@@ -35,7 +30,6 @@ const TRIGGERS = [
   { value: 'seasonal',              label: bt('dr.trigger.seasonal', lang) },
 ];
 
-// Client-Strings (Alpine) — via define:vars ins window-Objekt
 const dreT = {
   saving: bt('dre.saving', lang),
   saveEdit: bt('dre.save.edit', lang),
@@ -53,103 +47,129 @@ const dreT = {
 };
 ---
 
-<div class="de-wrap" x-data="dripEditor()">
+<div class="dre-wrap" x-data="dripEditor()">
 
-  <!-- ── Section 1: Settings ─────────────────────────────────────── -->
-  <section class="de-section">
-    <h3 class="de-section-title">{bt('dre.settings', lang)}</h3>
-
-    <label class="de-field">
-      <span class="de-label">{bt('dre.name', lang)}</span>
-      <input type="text" x-model="form.name" placeholder={bt('dre.name.ph', lang)} class="de-input" />
-    </label>
-
-    <div class="de-row">
-      <label class="de-field de-flex-1">
-        <span class="de-label">{bt('dre.trigger', lang)}</span>
-        <select x-model="form.trigger_type" class="de-input">
-          {TRIGGERS.map(t => <option value={t.value}>{t.label}</option>)}
-        </select>
-      </label>
-      <label class="de-field de-flex-fixed">
-        <span class="de-label">{bt('dre.active', lang)}</span>
-        <div class="de-toggle">
-          <input type="checkbox" x-model="form.is_active" id="de-active-toggle" />
-          <label for="de-active-toggle"></label>
-        </div>
-      </label>
+  <!-- ── Settings-Karte ────────────────────────────────────────────── -->
+  <div class="dre-card">
+    <div class="dre-card-head">
+      <span class="dre-card-title">{bt('dre.settings', lang)}</span>
     </div>
 
-    <!-- Trigger-Config: kontextbezogen -->
-    <div x-show="form.trigger_type === 'visit_count_milestone'" x-cloak class="de-cfg-block">
-      <span class="de-label">{bt('dre.milestones.label', lang)}</span>
-      <input type="text" x-model="form.milestones_input" placeholder="5, 10, 25" class="de-input" />
-      <p class="de-hint">{bt('dre.milestones.hint', lang)}</p>
+    <div class="dre-field">
+      <span class="dre-label">{bt('dre.name', lang)}</span>
+      <input type="text" x-model="form.name" placeholder={bt('dre.name.ph', lang)} class="s-input" style="width:100%;box-sizing:border-box" />
     </div>
 
-    <div x-show="form.trigger_type === 'seasonal'" x-cloak class="de-cfg-block">
-      <span class="de-label">{bt('dre.seasonal.label', lang)}</span>
-      <div class="de-row">
-        <label class="de-flex-1">
-          <span class="de-label-small">{bt('dre.month', lang)}</span>
-          <select x-model.number="form.seasonal_month" class="de-input">
-            {Array.from({ length: 12 }, (_, i) => <option value={i + 1}>{bt('dre.month.' + (i + 1), lang)}</option>)}
+    <div class="dre-ctrl-row">
+      <div class="dre-field dre-field--grow">
+        <span class="dre-label">{bt('dre.trigger', lang)}</span>
+        <div class="s-select-wrap">
+          <select x-model="form.trigger_type" class="s-select">
+            {TRIGGERS.map(t => <option value={t.value}>{t.label}</option>)}
           </select>
-        </label>
-        <label class="de-flex-1">
-          <span class="de-label-small">{bt('dre.day', lang)}</span>
-          <input type="number" min="1" max="31" x-model.number="form.seasonal_day" class="de-input" />
-        </label>
+        </div>
       </div>
-      <p class="de-hint">{bt('dre.seasonal.hint', lang)}</p>
-    </div>
-  </section>
 
-  <!-- ── Section 2: Step-Builder ──────────────────────────────────── -->
-  <section class="de-section">
-    <div class="de-step-head">
-      <h3 class="de-section-title">{bt('dr.step.many', lang)}</h3>
-      <button type="button" class="de-btn-add" @click="addStep()">+ {bt('dre.addstep', lang)}</button>
+      <div class="dre-field dre-field--shrink">
+        <span class="dre-label">{bt('dre.active', lang)}</span>
+        <div class="dre-seg">
+          <button type="button" :class="!form.is_active ? 'is-on' : ''" @click="form.is_active = false">
+            {bt('dre.inactive', lang) || 'Inaktiv'}
+          </button>
+          <button type="button" :class="form.is_active ? 'is-on' : ''" @click="form.is_active = true">
+            {bt('dre.active.on', lang) || 'Aktiv'}
+          </button>
+        </div>
+      </div>
     </div>
-    <p class="de-hint" set:html={bt('dre.steps.hint', lang)}></p>
 
-    <ul id="de-steps-list" class="de-steps-list">
-      <template x-for="(step, idx) in form.steps" :key="step._key">
-        <li class="de-step-card" :data-key="step._key">
-          <span class="de-step-grip" aria-label={bt('dre.move', lang)}>⋮⋮</span>
-          <span class="de-step-num" x-text="(idx + 1)"></span>
-          <div class="de-step-body">
-            <label class="de-step-row">
-              <span class="de-label-small">{bt('dre.template', lang)}</span>
-              <select x-model="step.template_id" class="de-input">
-                <option value="">{bt('dre.choose', lang)}</option>
-                {p.templates.map(t => <option value={t.id}>{t.name}</option>)}
-              </select>
-            </label>
-            <label class="de-step-row">
-              <span class="de-label-small">{bt('dre.delay.label', lang)}</span>
-              <input type="number" min="0" x-model.number="step.delay_days" class="de-input de-input-narrow" />
-            </label>
+    <!-- Trigger-Config: Meilensteine -->
+    <div x-show="form.trigger_type === 'visit_count_milestone'" x-cloak class="dre-cfg-block">
+      <span class="dre-label">{bt('dre.milestones.label', lang)}</span>
+      <input type="text" x-model="form.milestones_input" placeholder="5, 10, 25" class="s-input" style="width:100%;box-sizing:border-box" />
+      <p class="dre-hint">{bt('dre.milestones.hint', lang)}</p>
+    </div>
+
+    <!-- Trigger-Config: Saisonales -->
+    <div x-show="form.trigger_type === 'seasonal'" x-cloak class="dre-cfg-block">
+      <span class="dre-label">{bt('dre.seasonal.label', lang)}</span>
+      <div class="dre-ctrl-row dre-ctrl-row--sm">
+        <div class="dre-field dre-field--grow">
+          <span class="dre-label-small">{bt('dre.month', lang)}</span>
+          <div class="s-select-wrap">
+            <select x-model.number="form.seasonal_month" class="s-select">
+              {Array.from({ length: 12 }, (_, i) => <option value={i + 1}>{bt('dre.month.' + (i + 1), lang)}</option>)}
+            </select>
           </div>
-          <button type="button" class="de-step-remove" @click="removeStep(idx)" aria-label={bt('dre.remove', lang)}>×</button>
+        </div>
+        <div class="dre-field" style="flex: 0 0 120px">
+          <span class="dre-label-small">{bt('dre.day', lang)}</span>
+          <input type="number" min="1" max="31" x-model.number="form.seasonal_day" class="s-input" />
+        </div>
+      </div>
+      <p class="dre-hint">{bt('dre.seasonal.hint', lang)}</p>
+    </div>
+  </div>
+
+  <!-- ── Step-Builder-Karte ─────────────────────────────────────────── -->
+  <div class="dre-card">
+    <div class="dre-card-head">
+      <span class="dre-card-title">{bt('dr.step.many', lang)}</span>
+      <button type="button" class="dre-add-btn" @click="addStep()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        {bt('dre.addstep', lang)}
+      </button>
+    </div>
+    <p class="dre-hint" set:html={bt('dre.steps.hint', lang)}></p>
+
+    <ul id="de-steps-list" class="dre-steps-list">
+      <template x-for="(step, idx) in form.steps" :key="step._key">
+        <li class="dre-step-card" :data-key="step._key">
+          <span class="dre-step-grip de-step-grip" aria-label={bt('dre.move', lang)}>
+            <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="3" r="1.5"/><circle cx="8" cy="3" r="1.5"/><circle cx="4" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
+          </span>
+          <span class="dre-step-num" x-text="(idx + 1)"></span>
+          <div class="dre-step-body">
+            <div class="dre-step-field">
+              <span class="dre-label-small">{bt('dre.template', lang)}</span>
+              <div class="s-select-wrap">
+                <select x-model="step.template_id" class="s-select">
+                  <option value="">{bt('dre.choose', lang)}</option>
+                  {p.templates.map(t => <option value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div class="dre-step-field dre-step-field--delay">
+              <span class="dre-label-small">{bt('dre.delay.label', lang)}</span>
+              <div class="dre-delay-row">
+                <input type="number" min="0" x-model.number="step.delay_days" class="s-input s-input--sm dre-delay-input" />
+                <span class="dre-delay-unit">{bt('dre.delay.days', lang) || 'Tage'}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="dre-step-remove" @click="removeStep(idx)" aria-label={bt('dre.remove', lang)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </li>
       </template>
     </ul>
 
     <template x-if="form.steps.length === 0">
-      <div class="de-empty">
+      <div class="dre-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
         <p>{bt('dre.empty', lang)}</p>
       </div>
     </template>
-  </section>
+  </div>
 
   <template x-if="errorMsg">
-    <div class="de-error" x-text="errorMsg"></div>
+    <div class="dre-flash" x-text="errorMsg"></div>
   </template>
 
-  <div class="de-actions">
-    <a href="/marketing/drips" class="de-btn-ghost">{bt('dre.cancel', lang)}</a>
-    <button type="button" class="de-btn-primary" :disabled="submitting" @click="save()" x-text="submitting ? cfg.T.saving : (isEditMode ? cfg.T.saveEdit : cfg.T.saveCreate)"></button>
+  <div class="dre-actions">
+    <a href="/marketing/drips" class="v9-btn dre-btn-ghost">{bt('dre.cancel', lang)}</a>
+    <button type="button" class="v9-btn dre-btn-primary" :disabled="submitting" @click="save()"
+      x-text="submitting ? cfg.T.saving : (isEditMode ? cfg.T.saveEdit : cfg.T.saveCreate)"></button>
   </div>
 </div>
 
@@ -185,7 +205,7 @@ const dreT = {
       get isEditMode() { return this.cfg.IS_EDIT; },
 
       init() {
-        if (this._inited) return; // Alpine ruft init() automatisch — Doppel-Push verhindern
+        if (this._inited) return;
         this._inited = true;
         if (this.cfg.IS_EDIT && this.cfg.DRIP) {
           const d = this.cfg.DRIP;
@@ -203,7 +223,6 @@ const dreT = {
         for (const s of this.cfg.INITIAL_STEPS) {
           this.form.steps.push({ _key: this._nextKey++, template_id: s.template_id, delay_days: s.delay_days });
         }
-        // SortableJS auf der Liste anbringen — kurz delayen damit Alpine rendert
         setTimeout(() => this._initSortable(), 0);
       },
 
@@ -213,14 +232,13 @@ const dreT = {
         Sortable.create(list, {
           handle: '.de-step-grip',
           animation: 150,
-          forceFallback: true,  // Touch-Support
+          forceFallback: true,
           fallbackTolerance: 5,
           onEnd: (evt: any) => {
             const oldI = evt.oldIndex; const newI = evt.newIndex;
             if (oldI === newI || oldI == null || newI == null) return;
             const moved = this.form.steps.splice(oldI, 1)[0];
             this.form.steps.splice(newI, 0, moved);
-            // Force Alpine re-render via reassign
             this.form.steps = [...this.form.steps];
           },
         });
@@ -268,7 +286,6 @@ const dreT = {
         this.submitting = true;
         try {
           if (this.cfg.IS_EDIT) {
-            // Update Drip + Steps separat
             const r1 = await fetch(`/api/marketing/drips/${this.cfg.DRIP.id}`, {
               method: 'PUT', credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
@@ -302,7 +319,7 @@ const dreT = {
             });
             const data = await res.json();
             if (!data.ok) { this.errorMsg = data.error || this.cfg.T.errSave; return; }
-            window.retahaToastFlash && window.retahaToastFlash(this.cfg.T.toastSaved);
+            (window as any).retahaToastFlash?.((this.cfg.T.toastSaved));
             window.location.href = `/marketing/drips/${data.id}`;
           }
         } catch (err: any) {
@@ -316,60 +333,200 @@ const dreT = {
 </script>
 
 <style>
-  .de-wrap { display: flex; flex-direction: column; gap: 20px; max-width: 800px; }
-  .de-section { background: var(--theme-bg-primary); border: 1px solid var(--theme-border); padding: 20px; }
-  .de-section-title { font-size: 13px; font-weight: 500; margin: 0 0 12px; color: var(--theme-text-primary); }
-  .de-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .55, transparent); margin-bottom: 6px; }
-  .de-label-small { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); margin-bottom: 4px; }
-  .de-hint { font-size: 12px; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; margin: 6px 0; }
-  .de-hint code { background: var(--theme-bg-tertiary); padding: 1px 4px; font-family: var(--theme-font-mono); font-size: 11px; color: var(--theme-accent); }
-  .de-field { display: block; margin-bottom: 12px; }
-  .de-row { display: flex; gap: 12px; align-items: end; }
-  .de-flex-1 { flex: 1; }
-  .de-flex-fixed { flex: 0 0 80px; }
-  .de-input {
-    width: 100%; box-sizing: border-box; padding: 9px 11px;
-    font-family: inherit; font-size: 14px;
-    border: 1px solid var(--theme-border); background: var(--theme-bg-primary); color: var(--theme-text-primary);
-  }
-  .de-input:focus { outline: none; border-color: var(--theme-text-primary); }
-  .de-input-narrow { width: 100px; }
-  .de-cfg-block { background: #fff8e1; padding: 12px; border-left: 3px solid #f5d77a; margin-top: 8px; }
+[x-cloak] { display: none !important; }
 
-  /* Toggle-Switch */
-  .de-toggle { position: relative; width: 44px; height: 24px; }
-  .de-toggle input { opacity: 0; width: 0; height: 0; }
-  .de-toggle label { position: absolute; cursor: pointer; inset: 0; background: var(--theme-border); transition: background .15s; }
-  .de-toggle label::before { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; background: var(--theme-bg-primary); transition: transform .15s; }
-  .de-toggle input:checked + label { background: var(--theme-accent); }
-  .de-toggle input:checked + label::before { transform: translateX(20px); }
+.dre-wrap { display: flex; flex-direction: column; gap: 16px; }
 
-  .de-step-head { display: flex; justify-content: space-between; align-items: center; }
-  .de-btn-add { padding: 6px 14px; background: transparent; border: 1px dashed var(--theme-text-primary); font-size: 12px; cursor: pointer; }
-  .de-btn-add:hover { background: var(--theme-accent); color: var(--theme-bg-primary); border-color: var(--theme-accent); }
+/* ── Label + Hints ───────────────────────────────────────────────── */
+.dre-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink-muted, #666); margin-bottom: 6px;
+}
+.dre-label-small {
+  display: block;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--ink-muted, #666); margin-bottom: 5px;
+}
+.dre-hint {
+  display: block; font-size: 11px; color: var(--ink-muted, #666);
+  margin-top: 6px; line-height: 1.45;
+}
+.dre-hint :global(code) {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  background: var(--bg-deep, #F5F4F2); padding: 1px 5px; border-radius: 4px;
+  color: var(--petrol, #14616E);
+}
+.dre-field { display: block; margin-bottom: 14px; }
+.dre-field--grow { flex: 1 1 0; min-width: 0; }
+.dre-field--shrink { flex: 0 0 auto; }
 
-  .de-steps-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
-  .de-step-card { display: grid; grid-template-columns: 24px 24px 1fr 32px; gap: 10px; align-items: center; padding: 12px; background: var(--theme-bg-primary); border: 1px solid var(--theme-border); transition: border-color .12s; }
-  .de-step-card:hover { border-color: var(--theme-text-primary); }
-  .de-step-grip { cursor: grab; color: color-mix(in srgb, var(--theme-text-primary) .3, transparent); font-size: 18px; user-select: none; text-align: center; }
-  .de-step-grip:active { cursor: grabbing; }
-  .de-step-num { width: 24px; height: 24px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-  .de-step-body { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
-  .de-step-row { display: block; }
-  .de-step-remove { width: 28px; height: 28px; background: transparent; border: 1px solid var(--theme-border); color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-size: 16px; cursor: pointer; }
-  .de-step-remove:hover { background: #fdeaea; color: #B00020; border-color: #B00020; }
-  .sortable-ghost { opacity: 0.3; background: rgba(var(--theme-accent-rgb), 0.06) !important; }
-  .sortable-chosen { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+/* ── Cards ───────────────────────────────────────────────────────── */
+.dre-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+.dre-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 18px;
+}
+.dre-card-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+  font-size: 14px; color: var(--ink, #0A0A0A);
+}
+.dre-card-title::before {
+  content: ''; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--petrol, #14616E);
+}
 
-  .de-empty { padding: 24px; background: var(--theme-bg-secondary); border: 1px dashed var(--theme-border-strong); text-align: center; color: color-mix(in srgb, var(--theme-text-primary) .5, transparent); font-style: italic; }
-  .de-empty p { margin: 0; }
+/* ── Control row ─────────────────────────────────────────────────── */
+.dre-ctrl-row {
+  display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+}
+.dre-ctrl-row--sm { flex-wrap: nowrap; }
 
-  .de-error { padding: 12px; background: rgba(220,53,69,.08); color: #B00020; font-size: 13px; border-left: 3px solid #B00020; }
+/* ── Segmented control (Aktiv / Inaktiv) ─────────────────────────── */
+.dre-seg {
+  display: inline-flex; gap: 3px;
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 10px; padding: 3px;
+  background: var(--surface, #fff);
+}
+.dre-seg button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-muted, #666);
+  padding: 7px 11px; border-radius: 7px;
+  white-space: nowrap; transition: background 120ms, color 120ms;
+}
+.dre-seg button:hover:not(.is-on) { color: var(--petrol, #14616E); }
+.dre-seg button.is-on { background: var(--petrol, #14616E); color: #fff; }
 
-  .de-actions { display: flex; gap: 12px; justify-content: flex-end; }
-  .de-btn-ghost { padding: 12px 20px; background: transparent; color: color-mix(in srgb, var(--theme-text-primary) .6, transparent); border: 1px solid var(--theme-border); text-decoration: none; font-size: 14px; }
-  .de-btn-ghost:hover { color: var(--theme-text-primary); border-color: var(--theme-text-primary); }
-  .de-btn-primary { padding: 12px 24px; background: var(--theme-bg-anthrazit); color: var(--theme-bg-primary); border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
-  .de-btn-primary:hover:not(:disabled) { background: var(--theme-burgund); }
-  .de-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+/* ── Trigger-Config-Block ────────────────────────────────────────── */
+.dre-cfg-block {
+  margin-top: 2px; margin-bottom: 4px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--petrol, #14616E) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--petrol, #14616E) 18%, transparent);
+  border-radius: 10px;
+}
+
+/* ── Add-Step-Button ─────────────────────────────────────────────── */
+.dre-add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--petrol, #14616E);
+  color: var(--petrol, #14616E); background: transparent;
+  border-radius: 8px; padding: 6px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap;
+  transition: background 120ms, color 120ms;
+}
+.dre-add-btn:hover {
+  background: var(--petrol, #14616E); color: #fff;
+}
+.dre-add-btn svg { flex-shrink: 0; }
+
+/* ── Step-Liste ──────────────────────────────────────────────────── */
+.dre-steps-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+
+.dre-step-card {
+  display: grid;
+  grid-template-columns: 28px 28px 1fr 32px;
+  gap: 10px; align-items: center;
+  padding: 14px 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 12px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.dre-step-card:hover { border-color: var(--petrol, #14616E); }
+
+.dre-step-grip {
+  cursor: grab; color: var(--ink-faint, #C0BEB8);
+  display: flex; align-items: center; justify-content: center;
+  user-select: none;
+}
+.dre-step-grip:active { cursor: grabbing; color: var(--ink-muted, #666); }
+
+.dre-step-num {
+  width: 26px; height: 26px;
+  background: var(--petrol, #14616E); color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; flex-shrink: 0;
+}
+
+.dre-step-body {
+  display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end;
+}
+@media (max-width: 640px) { .dre-step-body { grid-template-columns: 1fr; } }
+
+.dre-step-field { display: block; }
+.dre-step-field--delay { }
+
+.dre-delay-row { display: flex; align-items: center; gap: 7px; }
+.dre-delay-input { width: 70px !important; text-align: center; }
+.dre-delay-unit {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted, #666); white-space: nowrap;
+}
+
+.dre-step-remove {
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid var(--border, #E5E4E0);
+  border-radius: 6px;
+  color: var(--ink-muted, #666);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.dre-step-remove:hover {
+  background: rgba(185, 28, 28, 0.06);
+  color: #b91c1c; border-color: #b91c1c;
+}
+
+:global(.sortable-ghost) { opacity: 0.3; background: rgba(20,97,110,0.06) !important; }
+:global(.sortable-chosen) { box-shadow: 0 4px 16px rgba(0,0,0,.10); }
+
+/* ── Leer-Zustand ────────────────────────────────────────────────── */
+.dre-empty {
+  margin-top: 12px; padding: 32px 20px;
+  border: 1.5px dashed var(--border, #E5E4E0);
+  border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: var(--ink-faint, #C0BEB8); text-align: center;
+}
+.dre-empty p { margin: 0; font-size: 13px; }
+
+/* ── Flash + Actions ─────────────────────────────────────────────── */
+.dre-flash {
+  padding: 12px 16px;
+  background: rgba(140, 33, 40, 0.06); color: #7a1515;
+  font-size: 13px; border-left: 3px solid #8C2128;
+  border-radius: 0 12px 12px 0;
+}
+.dre-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+.dre-btn-ghost {
+  background: transparent !important; color: var(--ink-muted, #666) !important;
+  border: 1px solid var(--border, #E5E4E0) !important; border-radius: 8px;
+  text-decoration: none;
+}
+.dre-btn-ghost:hover {
+  color: var(--ink, #0A0A0A) !important; border-color: var(--ink, #0A0A0A) !important;
+  background: transparent !important;
+}
+.dre-btn-primary {
+  background: var(--petrol, #14616E) !important;
+  color: #fff !important; border: none !important; border-radius: 8px;
+}
+.dre-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+.dre-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 </style>
