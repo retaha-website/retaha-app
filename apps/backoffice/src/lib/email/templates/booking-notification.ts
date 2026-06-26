@@ -9,7 +9,7 @@ export interface BookingNotificationData {
   recipientFirstName?: string | null;
   guestName: string;
   roomLabel?: string | null;
-  bookingType: 'breakfast' | 'service' | 'conference';
+  bookingType: 'breakfast' | 'service';
   scheduledFor?: string | null;  // Pre-Formatted Datum/Zeit, z.B. "morgen 08:00"
   detailsSummary?: string | null;  // z.B. "2 Personen · innen"
   backofficeUrl: string;          // Link zu /admin/bookings (oder /admin/bookings/[id])
@@ -18,7 +18,6 @@ export interface BookingNotificationData {
 const TYPE_LABELS: Record<string, string> = {
   breakfast: 'Frühstück',
   service: 'Service-Anfrage',
-  conference: 'Konferenz-Anfrage',
 };
 
 export function bookingNotificationSubject(data: BookingNotificationData): string {

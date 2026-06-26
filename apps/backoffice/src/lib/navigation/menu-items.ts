@@ -114,12 +114,6 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           href: '/branding',
           icon: icon('<circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M2 12a10 10 0 0 0 10 10"/><path d="m8 12 2 2 4-4"/>'),
         },
-        {
-          label: bt('nav.conference', lang),
-          sub: bt('nav.conference.sub', lang),
-          href: '/conference',
-          icon: icon('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3L12 7 8 3"/>'),
-        },
       ],
     },
     {

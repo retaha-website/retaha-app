@@ -45,10 +45,6 @@ export interface EveHotelSettings {
   breakfast_location_en?: string | null;
   breakfast_location_fr?: string | null;
   breakfast_location_es?: string | null;
-  // Konferenz
-  conference_rooms?: Array<{ id?: string; name_de?: string; name?: string }> | null;
-  conference_start_time?: string | null;
-  conference_end_time?: string | null;
 }
 
 export interface EveStay {
@@ -386,18 +382,6 @@ function buildHotelInfoSection(hotel: EveHotel, s: EveHotelSettings, lang: Lang)
     const end = s.breakfast_end_time.slice(0, 5);
     const loc = pickI18n(s, 'breakfast_location', lang);
     lines.push(`Frühstück: ${start}–${end}${loc ? ` (${loc})` : ''}`);
-  }
-
-  if (s.conference_rooms && s.conference_rooms.length > 0) {
-    const names = s.conference_rooms
-      .map(r => r.name_de ?? r.name ?? null)
-      .filter((n): n is string => typeof n === 'string' && n.length > 0);
-    if (names.length > 0) {
-      const time = s.conference_start_time && s.conference_end_time
-        ? ` (verfügbar ${s.conference_start_time.slice(0, 5)}–${s.conference_end_time.slice(0, 5)})`
-        : '';
-      lines.push(`Konferenz-Räume: ${names.join(', ')}${time}`);
-    }
   }
 
   return lines.join('\n');

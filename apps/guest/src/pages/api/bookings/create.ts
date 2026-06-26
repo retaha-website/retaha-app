@@ -9,7 +9,7 @@ import { isShowcaseToken, findShowcaseSessionByToken } from '../../../lib/showca
 
 interface CreateBookingPayload {
   access_token: string;
-  type: 'breakfast' | 'conference' | 'service';
+  type: 'breakfast' | 'service';
   details: Record<string, any>;
 }
 
@@ -29,7 +29,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  if (!['breakfast', 'conference', 'service', 'restaurant', 'spa', 'late_checkout', 'housekeeping'].includes(payload.type)) {
+  if (!['breakfast', 'service', 'restaurant', 'spa', 'late_checkout', 'housekeeping'].includes(payload.type)) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid type' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });

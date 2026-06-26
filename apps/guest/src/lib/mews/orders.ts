@@ -21,7 +21,6 @@ import type { MewsOrderItem, MewsAddOrderParams } from './client';
 // Fallback-Preise wenn lookup fehlschlägt (für Phase 3 Bootstrap — sobald
 // Admin-UI für Preise da ist, werden diese aus DB überschrieben).
 const DEFAULT_BREAKFAST_PRICE_CENTS = 1500;
-const DEFAULT_CONFERENCE_PRICE_CENTS_PER_HOUR = 5000;
 const DEFAULT_SERVICE_PRICE_CENTS = 2000;
 
 export type PushSkipReason =
@@ -98,7 +97,7 @@ export async function loadHotelMewsIntegration(hotelId: string) {
     .select(`
       hotel_id, enterprise_id, environment, access_token_encrypted,
       default_currency, default_tax_code, default_tax_rate, pricing_mode,
-      service_id_breakfast, service_id_service, service_id_conference,
+      service_id_breakfast, service_id_service,
       pricing_source
     `)
     .eq('hotel_id', hotelId)
@@ -191,10 +190,9 @@ function pickBreakfastName(item: BreakfastItemRow | undefined, fallback = 'Früh
 
 function pickServiceId(integration: any, type: string): string | null {
   switch (type) {
-    case 'breakfast':  return integration.service_id_breakfast ?? null;
-    case 'service':    return integration.service_id_service ?? null;
-    case 'conference': return integration.service_id_conference ?? null;
-    default:           return null;
+    case 'breakfast': return integration.service_id_breakfast ?? null;
+    case 'service':   return integration.service_id_service ?? null;
+    default:          return null;
   }
 }
 
@@ -210,7 +208,7 @@ function pickServiceId(integration: any, type: string): string | null {
 export async function buildOrderItems(
   booking: any,
   integration: any,
-  hotelSettings?: { conference_rooms?: any[]; service_items?: any[] } | null,
+  hotelSettings?: { service_items?: any[] } | null,
 ): Promise<MewsOrderItem[]> {
   const Currency: string = integration.default_currency ?? 'GBP';
   const taxCode: string | null = integration.default_tax_code ?? null;
@@ -296,17 +294,6 @@ export async function buildOrderItems(
         Name: pickBreakfastName(defaultItem),
         UnitCount: people,
         UnitAmount: makeUnitAmount(price),
-      }];
-    }
-
-    case 'conference': {
-      const details = booking.details ?? {};
-      const room = hotelSettings?.conference_rooms?.find(r => r.id === details.room_id);
-      const pricePerHour = room?.price_cents_per_hour ?? DEFAULT_CONFERENCE_PRICE_CENTS_PER_HOUR;
-      return [{
-        Name: `Konferenzraum: ${details.room_name ?? room?.name_de ?? 'unbekannt'}`,
-        UnitCount: details.duration_hours ?? 1,
-        UnitAmount: makeUnitAmount(pricePerHour),
       }];
     }
 

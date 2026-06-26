@@ -15,7 +15,7 @@ export interface BookingNotificationContext {
   bookingId: string;
   hotelId: string;
   stayId: string;
-  bookingType: 'breakfast' | 'service' | 'conference';
+  bookingType: 'breakfast' | 'service';
   details: any;
 }
 
@@ -27,13 +27,6 @@ const TYPE_LABELS_SUMMARY: Record<string, (details: any) => string | null> = {
     return parts.length > 0 ? parts.join(' · ') : null;
   },
   service: d => d?.item_name ?? null,
-  conference: d => {
-    const parts: string[] = [];
-    if (d?.room_name) parts.push(d.room_name);
-    if (d?.duration_hours) parts.push(`${d.duration_hours}h`);
-    if (d?.people) parts.push(`${d.people} ${d.people === 1 ? 'Person' : 'Personen'}`);
-    return parts.length > 0 ? parts.join(' · ') : null;
-  },
 };
 
 function formatScheduledFor(type: string, details: any): string | null {

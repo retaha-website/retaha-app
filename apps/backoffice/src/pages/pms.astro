@@ -135,7 +135,6 @@ if (Astro.request.method === 'POST') {
     // Service-Mapping + TaxCode + Pricing-Source speichern
     const serviceBreakfast = form.get('service_id_breakfast')?.toString().trim() || null;
     const serviceService = form.get('service_id_service')?.toString().trim() || null;
-    const serviceConference = form.get('service_id_conference')?.toString().trim() || null;
     const taxCode = form.get('default_tax_code')?.toString().trim() || null;
     const pricingSource = form.get('pricing_source')?.toString();
 
@@ -189,7 +188,6 @@ if (Astro.request.method === 'POST') {
         .update({
           service_id_breakfast: serviceBreakfast,
           service_id_service: serviceService,
-          service_id_conference: serviceConference,
           default_tax_code: taxCode,
           default_tax_rate: resolvedTaxRate,
           pricing_source: pricingSource,
@@ -210,7 +208,7 @@ if (Astro.request.method === 'POST') {
     // UX-017 P3 — Charge-Required-Toggle pro Booking-Type.
     // HTML-Checkboxen senden nur Wert wenn checked → fehlende Felder = false.
     const CHARGE_TYPES = [
-      'breakfast', 'conference', 'service',
+      'breakfast', 'service',
       'restaurant', 'spa', 'late_checkout', 'housekeeping',
     ] as const;
     const update: Record<string, boolean | string> = {
@@ -281,9 +279,9 @@ const { data: integration } = await ssrClient
   .select(`
     enterprise_id, environment, last_sync_at, sync_status, sync_error_message, created_at, updated_at,
     pricing_source, default_currency, default_tax_code, default_tax_rate, pricing_mode,
-    service_id_breakfast, service_id_service, service_id_conference,
+    service_id_breakfast, service_id_service,
     mews_products_count,
-    breakfast_charge_enabled, conference_charge_enabled, service_charge_enabled,
+    breakfast_charge_enabled, service_charge_enabled,
     restaurant_charge_enabled, spa_charge_enabled,
     late_checkout_charge_enabled, housekeeping_charge_enabled
   `)
@@ -797,7 +795,6 @@ const statusBadge = { label: syncStatusLabels[statusKey] ?? bt('pms.status.idle'
             <div class="charge-toggle-grid" style="margin-bottom:20px;">
               {[
                 { type: 'breakfast',     label: bt('pms.charge.breakfast', lang),     hint: bt('pms.charge.breakfast.hint', lang) },
-                { type: 'conference',    label: bt('pms.charge.conference', lang),     hint: bt('pms.charge.conference.hint', lang) },
                 { type: 'service',       label: bt('pms.charge.service', lang),       hint: bt('pms.charge.service.hint', lang) },
                 { type: 'restaurant',    label: bt('pms.charge.restaurant', lang),    hint: bt('pms.charge.restaurant.hint', lang) },
                 { type: 'spa',           label: bt('pms.charge.spa', lang),           hint: bt('pms.charge.spa.hint', lang) },

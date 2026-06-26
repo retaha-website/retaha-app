@@ -7,7 +7,6 @@ export interface PreviewState {
     recommendations: boolean;
     service: boolean;
     breakfast: boolean;
-    conference: boolean;
     self_checkout: boolean;
     action_cards: boolean;
     wallet: boolean;
@@ -27,7 +26,6 @@ export const initialState: PreviewState = {
     recommendations: true,
     service: true,
     breakfast: true,
-    conference: true,
     self_checkout: true,
     action_cards: true,
     wallet: true,

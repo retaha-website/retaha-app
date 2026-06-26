@@ -19,7 +19,7 @@ const SET_TOOL = {
           type: 'object',
           properties: {
             card_type:     { type: 'string', enum: ['internal_action', 'external_link', 'info', 'phone', 'email'] },
-            action_target: { type: 'string', description: 'Für internal_action: open_breakfast / open_service / open_eve / open_places / open_wifi / open_conference. Für external_link: URL. Für phone: Nummer. Für email: Adresse. Für info: leer.' },
+            action_target: { type: 'string', description: 'Für internal_action: open_breakfast / open_service / open_eve / open_places / open_wifi. Für external_link: URL. Für phone: Nummer. Für email: Adresse. Für info: leer.' },
             card_class:    { type: 'string', enum: ['rec-anthrazit', 'rec-pink', 'rec-white'], description: 'rec-anthrazit = dunkel, rec-pink = Statement, rec-white = hell' },
             eyebrow:       { type: 'string', description: 'Kurze Oberschrift, max 30 Zeichen, z.B. "Täglich bis 10:30"' },
             title:         { type: 'string', description: 'Haupttitel, max 40 Zeichen, prägnant und aktionsorientiert' },
@@ -71,7 +71,7 @@ Beschreibung: ${brief}
 
 Erstelle ein Set von 4–5 Marketing-Action-Cards für die Gäste-App. Alle Texte auf Deutsch.
 Die Karten sollen Gäste zu buchbaren Leistungen, Extras und Erlebnissen führen.
-Nutze internal_actions für in-App-Module (open_breakfast, open_service, open_eve, open_places, open_wifi, open_conference).
+Nutze internal_actions für in-App-Module (open_breakfast, open_service, open_eve, open_places, open_wifi).
 Erste Karte am wichtigsten (z.B. Upsell oder Direktbuchung), letzte am unwichtigsten.
 Sei konkret, aktionsorientiert und hotelbezogen — kein generisches Marketing-Sprech.`;
 

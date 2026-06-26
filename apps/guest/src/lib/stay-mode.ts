@@ -1,5 +1,5 @@
 export type StayMode = 'pre_arrival' | 'in_house' | 'checking_out';
-export type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'conference' | 'checkout' | 'wallet';
+export type ModuleKey = 'wifi' | 'breakfast' | 'eve' | 'service' | 'places' | 'checkout' | 'wallet';
 
 export function getStayMode(stay: { check_in: string; check_out: string; status?: string }): StayMode {
   // Mews-Status zuerst (falls vorhanden)
@@ -15,7 +15,7 @@ export function getStayMode(stay: { check_in: string; check_out: string; status?
 // Reihenfolge ist gleichzeitig Priorität in der Action-Liste
 const MODULE_ORDER: Record<StayMode, ModuleKey[]> = {
   pre_arrival:  ['wifi', 'breakfast', 'eve', 'places', 'wallet'],
-  in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'conference', 'checkout', 'wallet'],
+  in_house:     ['wifi', 'breakfast', 'eve', 'service', 'places', 'checkout', 'wallet'],
   checking_out: ['checkout', 'eve', 'wallet', 'breakfast', 'places'],
 };
 

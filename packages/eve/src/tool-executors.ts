@@ -27,7 +27,7 @@ export interface ToolExecutionResult {
 }
 
 export interface PendingAction {
-  action_type: 'create_breakfast_booking' | 'request_service' | 'request_conference_room' | 'cancel_booking';
+  action_type: 'create_breakfast_booking' | 'request_service' | 'cancel_booking';
   action_params: Record<string, any>;
   /** Lesbare Zusammenfassung für die Confirmation-Card im Frontend. */
   summary: {
@@ -50,7 +50,6 @@ export async function executeTool(
       case 'get_breakfast_menu':   return { data: await getBreakfastMenu(ctx) };
       case 'get_recommendations':  return { data: await getRecommendations(ctx, toolInput.category) };
       case 'get_active_bookings':  return { data: await getActiveBookings(ctx) };
-      case 'get_conference_rooms': return { data: await getConferenceRooms(ctx) };
       case 'get_hotel_info':       return { data: await getHotelInfo(ctx) };
     }
   }
@@ -64,7 +63,6 @@ export async function executeTool(
     switch (toolName) {
       case 'create_breakfast_booking':  return buildCreateBreakfastPending(toolInput);
       case 'request_service':           return buildRequestServicePending(toolInput);
-      case 'request_conference_room':   return buildRequestConferencePending(toolInput);
       case 'cancel_booking':            return await buildCancelBookingPending(toolInput, ctx);
     }
   }
@@ -276,11 +274,6 @@ async function getActiveBookings(ctx: EveExecutionContext) {
   };
 }
 
-async function getConferenceRooms(_ctx: EveExecutionContext) {
-  // Conference-Modul ist deaktiviert (Legacy-Drop). Immer leere Liste zurückgeben.
-  return { rooms: [], booking_window: { start: null, end: null, slot_minutes: null } };
-}
-
 async function getHotelInfo(ctx: EveExecutionContext) {
   const { data: hotel } = await sb()
     .from('hotels')
@@ -363,31 +356,6 @@ function buildRequestServicePending(input: any): ToolExecutionResult {
   };
   return {
     data: { pending_confirmation: true, preview: pendingAction.summary, message_to_guest: 'Service-Anfrage wartet auf deine Bestätigung.' },
-    pendingAction,
-  };
-}
-
-function buildRequestConferencePending(input: any): ToolExecutionResult {
-  const duration = input.duration_hours ?? estimateHours(input.time_start, input.time_end);
-  const pendingAction: PendingAction = {
-    action_type: 'request_conference_room',
-    action_params: {
-      room_id: input.room_id,
-      room_name: input.room_name,
-      date: input.date,
-      time_start: input.time_start,
-      time_end: input.time_end,
-      duration_hours: duration,
-      people: input.people ?? 1,
-    },
-    summary: {
-      title: `Konferenz-Raum buchen: ${input.room_name}`,
-      when: `${input.date} · ${input.time_start}–${input.time_end} (${duration}h)`,
-      note: input.people ? `${input.people} Personen` : undefined,
-    },
-  };
-  return {
-    data: { pending_confirmation: true, preview: pendingAction.summary, message_to_guest: 'Raum-Buchung wartet auf Bestätigung.' },
     pendingAction,
   };
 }
@@ -488,23 +456,6 @@ export async function executeConfirmedAction(
           hotel_id: ctx.hotel_id,
           stay_id: ctx.stay_id,
           type: 'service',
-          status: 'pending',
-          details: bookingDetails,
-        })
-        .select('id')
-        .single();
-      if (error) throw new Error(error.message);
-      result = { ok: true, booking_id: data!.id };
-    }
-
-    else if (pending.action_type === 'request_conference_room') {
-      bookingDetails = pending.action_params;
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert({
-          hotel_id: ctx.hotel_id,
-          stay_id: ctx.stay_id,
-          type: 'conference',
           status: 'pending',
           details: bookingDetails,
         })

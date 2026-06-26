@@ -1,12 +1,11 @@
 // Sprint E4 · Phase 7 — Tool-Definitionen für Eve
 //
-// 6 Lookup-Tools (read-only, direkt ausführbar):
+// 5 Lookup-Tools (read-only, direkt ausführbar):
 //   get_stay_details, get_breakfast_menu, get_recommendations,
-//   get_active_bookings, get_conference_rooms, get_hotel_info
+//   get_active_bookings, get_hotel_info
 //
-// 4 Action-Tools (write — IMMER mit Confirmation-Step):
-//   create_breakfast_booking, request_service, request_conference_room,
-//   cancel_booking
+// 3 Action-Tools (write — IMMER mit Confirmation-Step):
+//   create_breakfast_booking, request_service, cancel_booking
 //
 // WICHTIG: stay_id ist NIE Tool-Input — kommt aus Stay-Session-Cookie via
 // EveExecutionContext. Verhindert dass Eve manipuliert wird andere Stays
@@ -75,16 +74,7 @@ Best-Practice für deine Antwort:
   },
   {
     name: 'get_active_bookings',
-    description: 'Listet die aktuellen Buchungen des Gastes für seinen aktuellen Aufenthalt (Frühstück, Service-Anfragen, Konferenz-Räume mit Status pending/confirmed/cancelled).',
-    input_schema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'get_conference_rooms',
-    description: 'Listet die verfügbaren Konferenz-Räume des Hotels mit Kapazität und Buchungs-Slots. Nutze das wenn der Gast nach Meeting-Räumen, Tagungen oder Besprechungs-Möglichkeiten fragt.',
+    description: 'Listet die aktuellen Buchungen des Gastes für seinen aktuellen Aufenthalt (Frühstück, Service-Anfragen mit Status pending/confirmed/cancelled).',
     input_schema: {
       type: 'object',
       properties: {},
@@ -93,7 +83,7 @@ Best-Practice für deine Antwort:
   },
   {
     name: 'get_hotel_info',
-    description: 'Liefert allgemeine Hotel-Infos: WLAN-Daten (SSID + Passwort), Frühstücks-Zeiten und -Ort, Hotel-Adresse, Konferenz-Verfügbarkeitszeiten. Nutze das für klassische FAQ-artige Anfragen.',
+    description: 'Liefert allgemeine Hotel-Infos: WLAN-Daten (SSID + Passwort), Frühstücks-Zeiten und -Ort, Hotel-Adresse. Nutze das für klassische FAQ-artige Anfragen.',
     input_schema: {
       type: 'object',
       properties: {},
@@ -154,23 +144,6 @@ Best-Practice: Zeige zuerst dem Gast die Items + Summe in deiner Text-Antwort un
     },
   },
   {
-    name: 'request_conference_room',
-    description: `Bereitet eine Konferenz-Raum-Buchung zur Bestätigung vor. KRITISCH: nur Vorbereitung — Verfügbarkeit prüfen vorher mit get_conference_rooms!`,
-    input_schema: {
-      type: 'object',
-      properties: {
-        room_id: { type: 'string', description: 'ID des Konferenz-Raums aus get_conference_rooms.' },
-        room_name: { type: 'string', description: 'Name für Confirmation-Dialog.' },
-        date: { type: 'string', description: 'Datum YYYY-MM-DD' },
-        time_start: { type: 'string', description: 'Start-Zeit HH:MM' },
-        time_end: { type: 'string', description: 'End-Zeit HH:MM' },
-        duration_hours: { type: 'number', description: 'Dauer in Stunden (berechnet aus start/end).' },
-        people: { type: 'number', description: 'Erwartete Personenzahl.' },
-      },
-      required: ['room_id', 'room_name', 'date', 'time_start', 'time_end'],
-    },
-  },
-  {
     name: 'cancel_booking',
     description: `Bereitet die Stornierung einer bestehenden Buchung des Gastes zur Bestätigung vor. KRITISCH: nur Vorbereitung. Booking-ID muss aus get_active_bookings stammen.`,
     input_schema: {
@@ -194,14 +167,12 @@ export const LOOKUP_TOOL_NAMES = [
   'get_breakfast_menu',
   'get_recommendations',
   'get_active_bookings',
-  'get_conference_rooms',
   'get_hotel_info',
 ] as const;
 
 export const ACTION_TOOL_NAMES = [
   'create_breakfast_booking',
   'request_service',
-  'request_conference_room',
   'cancel_booking',
 ] as const;
 
