@@ -1,8 +1,8 @@
 // Loyalty Punkte-Verfall — täglicher Cron (vercel.json: "0 5 * * *").
 //
 // Für jedes Hotel mit expiry_enabled=true:
-//   Findet Gäste, deren letzter 'earn'-Eintrag in loyalty_transactions älter
-//   als expiry_months Monate ist UND die ein points_balance > 0 haben.
+//   Findet Gäste, deren letzte Aktivität ('earn' oder 'redeem') in loyalty_transactions
+//   älter als expiry_months Monate ist UND die ein points_balance > 0 haben.
 //   → Bucht ein 'adjust'-Eintrag (negativ) + setzt points_balance = 0.
 //   → points_lifetime (Stufe) bleibt immer unberührt.
 //
@@ -73,22 +73,23 @@ export const GET: APIRoute = async ({ request }) => {
       }
       if (!candidates || candidates.length === 0) continue;
 
-      // Letzte earn-Transaktionen für diese Gäste (batch)
+      // Letzte Aktivität (earn ODER redeem) für diese Gäste (batch).
+      // 'adjust' zählt nicht — das ist der Verfall-Eintrag selbst.
       const guestIds = candidates.map((c: any) => c.guest_id);
-      const { data: recentEarns, error: earnErr } = await sb
+      const { data: recentActivity, error: actErr } = await sb
         .from('loyalty_transactions')
         .select('guest_id')
         .eq('hotel_id', cfg.hotel_id)
-        .eq('type', 'earn')
+        .in('type', ['earn', 'redeem'])
         .gt('created_at', cutoffIso)
         .in('guest_id', guestIds);
 
-      if (earnErr) {
-        errors.push(`hotel ${cfg.hotel_id} earns: ${earnErr.message}`);
+      if (actErr) {
+        errors.push(`hotel ${cfg.hotel_id} activity: ${actErr.message}`);
         continue;
       }
 
-      const activeGuests = new Set((recentEarns ?? []).map((r: any) => r.guest_id));
+      const activeGuests = new Set((recentActivity ?? []).map((r: any) => r.guest_id));
       const toExpire = (candidates as any[]).filter(c => !activeGuests.has(c.guest_id));
       if (toExpire.length === 0) continue;
 
