@@ -104,44 +104,67 @@ const passTextColor = isColorDark(brandColor) ? '#ffffff' : '#111111';
         </div>
         <p class="wk-hint">{bt('wk.pass.sub', lang)}</p>
 
-        <!-- Google Wallet Pass Mock -->
+        <!-- Google Wallet Loyalty Card — echtes Layout nachgebaut -->
         <div class="wk-pass-wrap">
-          <div class="wk-pass" style={`background:${brandColor};color:${passTextColor}`}>
-            <!-- Pass-Header -->
-            <div class="wk-pass-header">
-              <div class="wk-pass-issuer">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={hotelName} class="wk-pass-logo" />
-                ) : (
-                  <span class="wk-pass-logo-text" style={`color:${passTextColor}`}>{hotelName.slice(0, 2).toUpperCase()}</span>
-                )}
-              </div>
-              <div class="wk-pass-type-badge">
-                <span class="wk-pass-type-label" style={`color:${passTextColor};opacity:.7`}>{bt('wk.pass.member', lang)}</span>
-              </div>
+          <div class="wk-pass" style={`--pass-bg:${brandColor};--pass-fg:${passTextColor}`}>
+
+            <!-- 1 · Header: Logo + Programmname (= hotelName) -->
+            <div class="wk-pass-hd">
+              {logoUrl ? (
+                <img src={logoUrl} alt={hotelName} class="wk-pass-logo" />
+              ) : (
+                <span class="wk-pass-logo-fallback">{hotelName.slice(0, 2).toUpperCase()}</span>
+              )}
+              <span class="wk-pass-program">{hotelName}</span>
             </div>
-            <!-- Pass-Hero -->
+
+            <!-- 2 · Hero-Image (wallet_pass_bg / hero_image_url) -->
             {heroUrl && (
-              <div class="wk-pass-hero" style={`background-image:url(${heroUrl})`}></div>
+              <div class="wk-pass-hero" style={`background-image:url(${heroUrl})`} aria-hidden="true"></div>
             )}
-            <!-- Pass-Body -->
-            <div class="wk-pass-body">
-              <div class="wk-pass-hotel" style={`color:${passTextColor}`}>{hotelName}</div>
-              <div class="wk-pass-meta" style={`color:${passTextColor};opacity:.65`}>
-                <span>{bt('wk.pass.stays', lang)}: 1</span>
+
+            <!-- 3 · Gastname (accountName) -->
+            <div class="wk-pass-name">Max Mustermann</div>
+
+            <!-- 4 · Felder Reihe 1: MITGLIED SEIT | BESUCHE -->
+            <div class="wk-pass-fields">
+              <div class="wk-pass-field">
+                <span class="wk-pass-field-label">Mitglied seit</span>
+                <span class="wk-pass-field-val">2024-01-01</span>
+              </div>
+              <div class="wk-pass-field">
+                <span class="wk-pass-field-label">Besuche</span>
+                <span class="wk-pass-field-val">1</span>
               </div>
             </div>
-            <!-- Google Wallet Branding -->
-            <div class="wk-pass-foot">
-              <svg class="wk-pass-gw-icon" viewBox="0 0 24 24" fill="none" aria-label="Google Wallet">
-                <rect width="24" height="24" rx="4" fill="rgba(255,255,255,.15)"/>
-                <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" fill="rgba(255,255,255,.6)"/>
-                <path d="M12 8.5c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5z" fill="rgba(255,255,255,.9)"/>
-              </svg>
-              <span class="wk-pass-gw-label" style={`color:${passTextColor};opacity:.6`}>Google Wallet</span>
+
+            <!-- 5 · Felder Reihe 2: LETZTER BESUCH -->
+            <div class="wk-pass-fields" style="margin-top:8px">
+              <div class="wk-pass-field">
+                <span class="wk-pass-field-label">Letzter Besuch</span>
+                <span class="wk-pass-field-val">—</span>
+              </div>
             </div>
+
+            <!-- 6 · Footer: Google Wallet G-Logo + Schriftzug -->
+            <div class="wk-pass-ft">
+              <!-- Offizielles Google "G" Logo (vereinfacht) -->
+              <svg class="wk-pass-g" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              <span class="wk-pass-ft-text">Google Wallet</span>
+            </div>
+
           </div>
-          <p class="wk-pass-note">{hotelName} · {brandColor}</p>
+          <!-- Hinweis: was wir einstellen können -->
+          <div class="wk-pass-meta-row">
+            <span class="wk-pass-meta-chip" style={`background:${brandColor};color:${passTextColor}`}>{brandColor}</span>
+            {logoUrl && <span class="wk-pass-meta-chip wk-pass-meta-chip--muted">Logo ✓</span>}
+            {heroUrl && <span class="wk-pass-meta-chip wk-pass-meta-chip--muted">Hero-Bild ✓</span>}
+          </div>
         </div>
       </div>
 
@@ -201,39 +224,77 @@ const passTextColor = isColorDark(brandColor) ? '#ffffff' : '#111111';
     .wk-link { color: var(--petrol, #14616E); text-decoration: none; font-weight: 500; }
     .wk-link:hover { text-decoration: underline; }
 
-    /* ── Pass-Vorschau ──────────────────────────────────────────────────────── */
-    .wk-pass-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+    /* ── Google Wallet Loyalty Card Mock ───────────────────────────────────── */
+    .wk-pass-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+
+    /* Karte selbst: brand-color Hintergrund, Portrait-Proportion wie im echten Wallet */
     .wk-pass {
-      width: 100%; max-width: 340px; border-radius: 16px; overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,.18); position: relative;
+      width: 100%; max-width: 300px;
+      background: var(--pass-bg); color: var(--pass-fg);
+      border-radius: 18px; overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,.22);
+      font-family: 'Google Sans', 'Roboto', sans-serif;
     }
-    .wk-pass-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 16px 0;
+
+    /* 1 · Header */
+    .wk-pass-hd {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 16px 14px;
     }
-    .wk-pass-issuer { display: flex; align-items: center; gap: 8px; }
-    .wk-pass-logo { height: 28px; width: auto; object-fit: contain; border-radius: 4px; }
-    .wk-pass-logo-text {
-      width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,.2);
+    .wk-pass-logo { height: 32px; width: auto; max-width: 80px; object-fit: contain; border-radius: 4px; }
+    .wk-pass-logo-fallback {
+      width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0;
+      background: rgba(255,255,255,.2);
       display: flex; align-items: center; justify-content: center;
-      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 11px;
+      font-weight: 700; font-size: 12px; color: inherit;
     }
-    .wk-pass-type-badge { }
-    .wk-pass-type-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; }
+    .wk-pass-program {
+      font-size: 13px; font-weight: 500; opacity: .9;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* 2 · Hero-Image */
     .wk-pass-hero {
-      height: 80px; background-size: cover; background-position: center;
-      margin: 12px 0 0; opacity: .85;
+      width: 100%; height: 100px;
+      background-size: cover; background-position: center;
     }
-    .wk-pass-body { padding: 12px 16px 0; }
-    .wk-pass-hotel { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.3; }
-    .wk-pass-meta { font-size: 11px; margin-top: 4px; }
-    .wk-pass-foot {
+
+    /* 3 · Gastname */
+    .wk-pass-name {
+      padding: 14px 16px 0;
+      font-size: 18px; font-weight: 600; line-height: 1.2;
+      color: inherit;
+    }
+
+    /* 4/5 · Felder-Reihen */
+    .wk-pass-fields {
+      display: flex; gap: 24px;
+      padding: 10px 16px 0;
+    }
+    .wk-pass-field { display: flex; flex-direction: column; gap: 2px; }
+    .wk-pass-field-label {
+      font-size: 9px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+      opacity: .6; color: inherit;
+    }
+    .wk-pass-field-val { font-size: 13px; font-weight: 500; color: inherit; }
+
+    /* 6 · Footer: Google G + "Google Wallet" */
+    .wk-pass-ft {
       display: flex; align-items: center; gap: 6px;
-      padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.12); margin-top: 12px;
+      padding: 14px 16px;
+      margin-top: 10px;
+      border-top: 1px solid rgba(255,255,255,.15);
     }
-    .wk-pass-gw-icon { width: 20px; height: 20px; flex-shrink: 0; }
-    .wk-pass-gw-label { font-size: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.08em; }
-    .wk-pass-note { font-size: 10px; color: var(--ink-faint); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+    .wk-pass-g { width: 18px; height: 18px; flex-shrink: 0; }
+    .wk-pass-ft-text { font-size: 11px; font-weight: 500; opacity: .7; color: inherit; }
+
+    /* Meta-Zeile unter der Karte */
+    .wk-pass-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .wk-pass-meta-chip {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
+      padding: 3px 8px; border-radius: 20px; font-weight: 500;
+    }
+    .wk-pass-meta-chip--muted { background: var(--bg-deep); color: var(--ink-muted); }
 
     /* ── Statistiken ────────────────────────────────────────────────────────── */
     .wk-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
