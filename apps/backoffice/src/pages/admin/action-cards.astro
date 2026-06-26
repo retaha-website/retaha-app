@@ -220,44 +220,6 @@ const acT = {
     </div>
   </div>
 
-  <!-- ── Vorschau ──────────────────────────────────────────────────────────── -->
-  <div class="ly-sec">
-    <div class="ly-sec-head">
-      <div class="ly-sec-l"><span class="ly-dot"></span><b>{bt('ac.preview.title', lang)}</b></div>
-    </div>
-    <p class="ly-sec-hint">
-      {bt('ac.preview.sub', lang).replace('{lang}', LANG_LABELS[hotelDefaultLang] ?? hotelDefaultLang).replace('{others}', otherEnabledLabel || bt('ac.preview.theirlang', lang))}
-    </p>
-
-    <template x-if="cards.length === 0">
-      <p class="ac-preview-empty">{bt('ac.preview.empty', lang)}</p>
-    </template>
-
-    <template x-if="cards.length > 0">
-      <div class="ac-preview-stage">
-        <div class="ac-preview-scroller">
-          <template x-for="c in cards" :key="c.id">
-            <div :class="`ac-preview-card rec-card ${c.card_class}`">
-              <template x-if="c.image_url">
-                <img :src="c.image_url" alt="" class="ac-preview-card-img" />
-              </template>
-              <template x-if="pickI18nClient(c.eyebrow_i18n, defaultLang) || c.eyebrow_de">
-                <div class="rec-card-eyebrow" x-text="pickI18nClient(c.eyebrow_i18n, defaultLang) || c.eyebrow_de"></div>
-              </template>
-              <div class="rec-card-title" x-text="pickI18nClient(c.title_i18n, defaultLang) || c.title_de"></div>
-              <template x-if="pickI18nClient(c.subtitle_i18n, defaultLang) || c.subtitle_de">
-                <div class="rec-card-sub" x-text="pickI18nClient(c.subtitle_i18n, defaultLang) || c.subtitle_de"></div>
-              </template>
-              <template x-if="pickI18nClient(c.cta_i18n, defaultLang) || c.cta_de">
-                <button class="rec-card-cta" type="button" disabled x-text="pickI18nClient(c.cta_i18n, defaultLang) || c.cta_de"></button>
-              </template>
-            </div>
-          </template>
-        </div>
-      </div>
-    </template>
-  </div>
-
   <!-- ── Modal ─────────────────────────────────────────────────────────────── -->
   <div x-show="editorOpen" x-cloak class="ac-modal-backdrop" @click.self="closeEditor()">
     <div class="ac-modal" @click.stop>
@@ -696,96 +658,108 @@ const acT = {
 <style>
   [x-cloak] { display: none !important; }
 
-  /* ── shared ly- tokens used here ───────────────────────────────────────── */
+  /* ── ly- CSS variables (1:1 aus loyalty.astro) ─────────────────────────── */
+  .settings-page {
+    --ly-ink:   var(--ink,  #0A0A0A);
+    --ly-ink2:  var(--ink-soft,  rgba(10,10,10,0.65));
+    --ly-ink3:  var(--ink-muted, rgba(10,10,10,0.42));
+    --ly-line:  var(--border-medium, rgba(10,10,10,0.16));
+    --ly-line2: var(--bg-deep, #F0EFEA);
+    --ly-ac:    var(--petrol, #14616E);
+    --ly-surf:  var(--surface, #FFFFFF);
+    --ly-aurora: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
+  }
+  @keyframes ly-flow    { to { background-position: 0 0, 240% 0; } }
+  @keyframes ly-breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.25)} }
+  @keyframes ly-twinkle { 0%,100%{transform:scale(1) rotate(0);opacity:1} 50%{transform:scale(1.3) rotate(90deg);opacity:.7} }
+  @keyframes ly-rise    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+  /* ── shared ly- components ──────────────────────────────────────────────── */
   .ly-sec {
-    background: var(--surface);
-    border: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-    border-radius: var(--r-sm, 12px);
-    overflow: hidden;
-    margin-bottom: 20px;
+    background: var(--ly-surf); border: 1px solid var(--border, rgba(10,10,10,0.10));
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
   }
-  .ly-sec-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-  }
+  .ly-sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .ly-sec-l { display: flex; align-items: center; gap: 10px; }
-  .ly-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--petrol, #14616E);
-    flex-shrink: 0;
-  }
-  .ly-sec-l b { font-size: 14px; font-weight: 600; color: var(--ly-ink, var(--ink)); }
-  .ly-sec-hint {
-    padding: 10px 20px 14px;
-    font-size: 12px; color: var(--ink-muted);
-    border-bottom: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-  }
+  .ly-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ly-ac); flex-shrink: 0; }
+  .ly-sec-l b { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ly-ink); }
+  .ly-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; color: var(--ly-ink3); margin: 0 0 14px; }
   .ly-banner {
+    border-radius: 12px; padding: 12px 16px; font-size: 13px; color: var(--ly-ink); line-height: 1.5;
+    margin-bottom: 12px;
     background: rgba(20,97,110,.07);
     border: 1px solid rgba(20,97,110,.18);
-    border-left: 3px solid var(--petrol, #14616E);
-    border-radius: var(--r-sm, 12px);
-    padding: 12px 16px; font-size: 13px; color: var(--ink);
-    margin-bottom: 20px;
+    border-left: 3px solid var(--ly-ac);
   }
 
-  /* Buttons */
-  .ly-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 500; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background .15s, opacity .15s; }
-  .ly-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .ly-btn-outline { background: transparent; border-color: var(--ly-line, var(--border-medium, #e0e0e0)); color: var(--ly-ink, var(--ink)); }
-  .ly-btn-outline:hover:not(:disabled) { background: var(--surface-raised, #f4f4f4); }
-  .ly-btn-ghost { background: transparent; border-color: var(--ly-line, var(--border-medium, #e0e0e0)); color: var(--ly-ink, var(--ink)); }
-  .ly-btn-ghost:hover:not(:disabled) { background: var(--surface-raised, #f4f4f4); }
-  .ly-btn-petrol { background: var(--petrol, #14616E); color: #fff; border-color: var(--petrol, #14616E); }
-  .ly-btn-petrol:hover:not(:disabled) { background: #0f4f59; }
-
-  /* Aurora button (copied from loyalty.astro pattern) */
+  /* Aurora button (1:1 aus loyalty.astro) */
+  .ly-btn {
+    border: 0; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+    padding: 8px 13px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px;
+    white-space: nowrap; transition: transform .15s, box-shadow .2s;
+  }
   .ly-aurora {
-    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
-    background-size: 240% 100%;
-    animation: aurora-btn 4s linear infinite;
-    color: #fff; border: none; font-weight: 600;
-    box-shadow: 0 2px 12px rgba(20,97,110,.35);
-    padding: 8px 13px; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #fff;
+    background: var(--ly-aurora); background-size: 280% 100%;
+    animation: ly-flow 6s linear infinite;
+    box-shadow: 0 5px 16px rgba(20,97,110,.28);
   }
-  .ly-aurora:hover:not(:disabled) { opacity: 0.9; }
-  @keyframes aurora-btn { to { background-position: 240% 0; } }
+  .ly-aurora:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 9px 26px rgba(45,91,208,.38); animation-duration: 2.2s; }
+  .ly-aurora:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
-  /* ── evecard (same pattern as loyalty.astro) ────────────────────────────── */
+  /* Outline + ghost + petrol buttons (sekundär) */
+  .ly-btn-outline { background: transparent; border: 1px solid var(--ly-line); color: var(--ly-ink); border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; padding: 7px 14px; }
+  .ly-btn-outline:hover:not(:disabled) { background: var(--ly-line2); }
+  .ly-btn-ghost { background: transparent; border: 1px solid var(--ly-line); color: var(--ly-ink); border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; padding: 7px 14px; }
+  .ly-btn-ghost:hover:not(:disabled) { background: var(--ly-line2); }
+  .ly-btn-petrol { background: var(--ly-ac); color: #fff; border-radius: 9px; font-family: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; padding: 7px 14px; }
+  .ly-btn-petrol:hover:not(:disabled) { background: #0f4f59; }
+  .ly-btn-outline:disabled, .ly-btn-ghost:disabled, .ly-btn-petrol:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── evecard (1:1 aus loyalty.astro) ───────────────────────────────────── */
   .evecard {
-    border: 1px solid rgba(20,97,110,.25);
-    border-radius: var(--r-sm, 12px);
-    padding: 18px 20px;
-    background: linear-gradient(135deg, rgba(20,97,110,.04) 0%, rgba(91,124,224,.04) 100%);
-    margin-bottom: 20px;
+    position: relative;
+    border: 1.6px solid transparent;
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 22px;
+    background: linear-gradient(#fff,#fff) padding-box, var(--ly-aurora) border-box;
+    background-size: auto, 240% 100%;
+    animation: ly-flow 7s linear infinite;
+    box-shadow: 0 8px 30px rgba(45,91,208,.12);
   }
-  .ec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .ec-spk { color: #14616E; flex-shrink: 0; }
-  .ec-head b { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .ec-head {
+    display: flex; align-items: center; gap: 9px; margin-bottom: 6px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px;
+  }
+  .ec-spk { color: #2E72C8; flex-shrink: 0; }
   .ec-gradient {
-    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
-    background-size: 240% 100%;
+    background: var(--ly-aurora); background-size: 240% 100%;
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    animation: aurora-btn 5s linear infinite;
+    animation: ly-flow 5s linear infinite; font-weight: 700;
   }
-  .ec-desc { margin: 0 0 12px; font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
-  .ec-row { display: flex; gap: 8px; align-items: center; }
+  .ec-desc { font-size: 13px; color: var(--ly-ink2); line-height: 1.55; margin-bottom: 16px; max-width: 560px; }
+  .ec-row { display: flex; gap: 10px; align-items: stretch; }
   .ec-brief {
-    flex: 1; padding: 9px 12px; border: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-    border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--ink); background: var(--surface);
+    flex: 1; border: 1px solid var(--ly-line); border-radius: var(--r-sm, 12px);
+    padding: 10px 14px; font-size: 14px; font-family: 'Space Grotesk', sans-serif;
+    color: var(--ly-ink); background: var(--ly-surf);
+    outline: none; transition: border-color 150ms, box-shadow 150ms; width: 100%; box-sizing: border-box;
   }
-  .ec-brief:focus { outline: none; border-color: var(--petrol, #14616E); }
-  .ec-gen { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; color: var(--ink-muted); }
+  .ec-brief:focus { border-color: var(--ly-ac); box-shadow: 0 0 0 3px rgba(20,97,110,0.12); }
+  .ec-brief::placeholder { color: var(--ly-ink3); }
+  .ec-spk-anim { animation: ly-twinkle 2.4s ease-in-out infinite; }
+  .ec-gen {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 40px; color: var(--ly-ac);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+  }
   .ec-orb {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: linear-gradient(135deg,#14616E,#5B7CE0);
-    animation: orb-pulse 1.2s ease-in-out infinite;
-    flex-shrink: 0;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%,#7FECE8,#1AA0B0 42%,#3A63D6 86%);
+    animation: ly-breathe 1s ease-in-out infinite; flex-shrink: 0;
   }
-  @keyframes orb-pulse { 0%,100%{opacity:.5;transform:scale(.85)} 50%{opacity:1;transform:scale(1.1)} }
-  .ec-spk-anim { animation: spk-spin 2s linear infinite; }
-  @keyframes spk-spin { to { transform: rotate(360deg); } }
 
   /* Eve set result */
   .ac-eve-result { margin-top: 16px; border-top: 1px solid rgba(20,97,110,.18); padding-top: 14px; }
@@ -846,13 +820,6 @@ const acT = {
   .ac-icon-btn:hover:not(:disabled) { background: var(--surface-raised, #f4f4f4); border-color: var(--ink-muted); color: var(--ink); }
   .ac-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .ac-icon-btn--danger:hover { background: rgba(220,38,38,.06); border-color: #dc2626; color: #dc2626; }
-
-  /* ── Preview ─────────────────────────────────────────────────────────────── */
-  .ac-preview-empty { padding: 20px; font-size: 13px; color: var(--ink-muted); font-style: italic; }
-  .ac-preview-stage { padding: 20px; background: var(--surface-raised, #f4f4f4); overflow: hidden; }
-  .ac-preview-scroller { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; }
-  .ac-preview-card { flex: 0 0 260px; min-height: 200px; border-radius: 12px; }
-  .ac-preview-card-img { width: calc(100% + 52px); margin: -28px -26px 8px; height: 110px; object-fit: cover; }
 
   /* ── Modal ───────────────────────────────────────────────────────────────── */
   .ac-modal-backdrop {
