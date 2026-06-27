@@ -65,33 +65,24 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
       </div>
     </div>
 
-    <!-- Trigger-Liste -->
-    <div class="sp-list">
+    <!-- Trigger-Grid -->
+    <div class="sp-grid">
       {STAY_PUSH_TRIGGER_ORDER.map((trigger) => {
         const t = tplByTrigger.get(trigger) as any;
         const preview = pickI18n(t?.title_i18n);
         const isActive = t?.is_active === true;
-        const isConfigured = !!t;
         return (
-          <a href={`/stay-pushes/${trigger}`} class="sp-row">
-            <div class="sp-row-main">
-              <div class="sp-row-head">
-                <span class={`sp-pill${isActive ? ' sp-pill--active' : ''}`}>
-                  {isActive ? bt('nfc.pill.active', lang) : bt('nfc.pill.inactive', lang)}
-                </span>
-                <span class="sp-row-trigger">{bt('sp.trigger.' + trigger + '.label', lang)}</span>
-              </div>
-              <p class="sp-row-preview">
-                {preview ? preview : <em>{bt('sp.notconfigured', lang)}</em>}
-              </p>
-              <p class="sp-row-desc">{bt('sp.trigger.' + trigger + '.desc', lang)}</p>
+          <a href={`/stay-pushes/${trigger}`} class={`sp-card${isActive ? '' : ' sp-card--off'}`}>
+            <div class="sp-card-head">
+              <span class={`sp-pill${isActive ? ' sp-pill--active' : ''}`}>
+                {isActive ? bt('nfc.pill.active', lang) : bt('nfc.pill.inactive', lang)}
+              </span>
             </div>
-            <div class="sp-row-meta">
-              {isConfigured && (
-                <span class="sp-chip">{bt('sp.eyebrow', lang)}</span>
-              )}
-              <span class="sp-arrow">→</span>
-            </div>
+            <p class="sp-card-trigger">{bt('sp.trigger.' + trigger + '.label', lang)}</p>
+            <p class="sp-card-preview">
+              {preview ? preview : <em>{bt('sp.notconfigured', lang)}</em>}
+            </p>
+            <p class="sp-card-desc">{bt('sp.trigger.' + trigger + '.desc', lang)}</p>
           </a>
         );
       })}
@@ -111,28 +102,34 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     .sp-kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 500; line-height: 1; color: var(--ink); margin-bottom: 4px; }
     .sp-kpi-sub { font-size: 12px; color: var(--ink-muted); }
 
-    /* List */
-    .sp-list { display: flex; flex-direction: column; gap: 10px; }
-    .sp-row {
+    /* Grid — 3 Karten pro Zeile */
+    .sp-grid {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 24px;
-      align-items: center;
-      padding: 18px 20px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .sp-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .sp-grid { grid-template-columns: 1fr; } }
+
+    .sp-card {
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 16px;
       text-decoration: none;
       color: inherit;
       transition: box-shadow .16s ease, transform .16s ease;
     }
-    .sp-row:hover { box-shadow: 0 10px 28px rgba(40,30,20,.09); transform: translateY(-2px); }
+    .sp-card:hover { box-shadow: 0 12px 32px rgba(40,30,20,.10); transform: translateY(-2px); }
+    .sp-card--off { opacity: .6; }
 
-    .sp-row-main { min-width: 0; }
-    .sp-row-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .sp-card-head { margin-bottom: 12px; }
 
     /* Status pill */
     .sp-pill {
+      display: inline-block;
       font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
       padding: 3px 9px;
@@ -145,43 +142,28 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     }
     .sp-pill--active { background: #14616E; color: #fff; }
 
-    .sp-row-trigger {
+    .sp-card-trigger {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 500;
       color: var(--ink);
-      letter-spacing: -0.005em;
+      margin: 0 0 6px;
+      letter-spacing: -0.01em;
     }
-    .sp-row-preview {
-      margin: 0 0 4px;
+    .sp-card-preview {
+      margin: 0 0 8px;
       font-family: 'Inter Tight', sans-serif;
       font-size: 13px;
       color: var(--ink-soft, var(--ink-muted));
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 600px;
+      flex: 1;
     }
-    .sp-row-preview em { color: var(--ink-muted); font-style: italic; }
-    .sp-row-desc { margin: 0; font-size: 12px; color: var(--ink-muted); line-height: 1.4; }
-
-    .sp-row-meta { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-    .sp-chip {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      padding: 2px 8px;
-      border: 1px solid var(--border);
-      color: var(--ink-muted);
-      background: var(--bg-deep);
-      letter-spacing: 0.03em;
-      border-radius: 99px;
-    }
-    .sp-arrow { font-size: 14px; color: var(--ink-muted); }
-
-    @media (max-width: 640px) {
-      .sp-row { grid-template-columns: 1fr; }
-      .sp-row-meta { display: none; }
-    }
+    .sp-card-preview em { color: var(--ink-muted); font-style: italic; }
+    .sp-card-desc { margin: 0; font-size: 11px; color: var(--ink-muted); line-height: 1.45; }
 
     .sp-footnote { margin-top: 32px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; font-size: 13px; line-height: 1.5; color: var(--ink-soft, var(--ink-muted)); }
     .sp-footnote strong { color: var(--ink); }
