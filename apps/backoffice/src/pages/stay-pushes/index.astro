@@ -41,19 +41,18 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
   <div
     class="settings-page"
     x-data={`{
-      eveBrief: '',
+      showToneInput: false,
+      eveTone: '',
       busySet: false,
       eveSuggestions: [],
       applyStates: {},
       async generateSet() {
-        const brief = this.eveBrief.trim();
-        if (!brief) return;
         this.busySet = true;
         this.eveSuggestions = [];
         try {
           const res = await fetch('/api/stay-pushes/generate', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ brief }),
+            body: JSON.stringify({ tone: this.eveTone.trim() }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) { alert('Eve konnte keine Texte generieren. Bitte versuche es erneut.'); return; }
@@ -104,28 +103,41 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     <div class="evecard">
       <div class="ec-head">
         <svg class="ec-spk" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
-        <b>Lass <span class="ec-gradient">Eve</span> deine Push-Texte gestalten</b>
+        <b><span class="ec-gradient">Eve</span> kennt euer Haus</b>
       </div>
-      <p class="ec-desc" x-show="!busySet">Beschreibe dein Hotel kurz — Eve schlägt für alle 9 Trigger passende Titel und Texte vor, die du mit einem Klick übernehmen kannst.</p>
 
-      <div class="ec-row" x-show="!busySet">
-        <input
-          type="text"
-          class="ec-brief"
-          x-model="eveBrief"
-          @keydown.enter="generateSet()"
-          placeholder="z.B. Boutique-Hotel in München, 4 Sterne, Fokus auf Wellness und regionaler Küche…"
-          maxlength="300"
-        />
-        <button class="ly-btn ly-aurora" :disabled="!eveBrief.trim()" @click="generateSet()">
-          <svg class="ec-spk-anim" width="13" height="13" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
-          Texte generieren
-        </button>
+      <div x-show="!busySet">
+        <p class="ec-desc">Eve liest eure Hoteldaten und bringt alle 9 Nachrichten in einen Ton, der zu eurem Haus passt — ihr müsst nichts eingeben. Ein Klick, gegenlesen, aktivieren.</p>
+
+        <div class="ec-primary-row">
+          <button class="ly-btn ly-aurora" @click="generateSet()">
+            <svg class="ec-spk-anim" width="13" height="13" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
+            Mit Eve anpassen
+          </button>
+        </div>
+
+        <!-- Optionaler Ton-Override (sekundär, eingeklappt) -->
+        <div class="ec-tone-toggle">
+          <button type="button" class="ec-tone-toggle-btn" @click="showToneInput = !showToneInput">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="showToneInput ? 'transform:rotate(90deg)' : ''" style="transition:transform .15s; flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
+            Ton lieber selbst vorgeben?
+          </button>
+        </div>
+        <div x-show="showToneInput" x-cloak class="ec-tone-field">
+          <input
+            type="text"
+            class="ec-brief"
+            x-model="eveTone"
+            @keydown.enter="generateSet()"
+            placeholder="z. B. entspannt und per Du"
+            maxlength="200"
+          />
+        </div>
       </div>
 
       <div class="ec-gen" x-show="busySet">
         <span class="ec-orb"></span>
-        <span>Eve generiert Push-Texte …</span>
+        <span>Eve liest euer Haus und schreibt …</span>
       </div>
 
       <template x-if="eveSuggestions.length > 0">
@@ -227,6 +239,15 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
       animation: ly-flow 5s linear infinite; font-weight: 700;
     }
     .ec-desc { font-size: 13px; color: var(--ly-ink2); line-height: 1.55; margin-bottom: 16px; max-width: 560px; }
+    .ec-primary-row { margin-bottom: 14px; }
+    .ec-tone-toggle { margin-bottom: 0; }
+    .ec-tone-toggle-btn {
+      background: none; border: none; padding: 0; cursor: pointer;
+      font-size: 12px; color: var(--ly-ink3); display: inline-flex; align-items: center; gap: 5px;
+      font-family: inherit; transition: color .15s;
+    }
+    .ec-tone-toggle-btn:hover { color: var(--ly-ac); }
+    .ec-tone-field { margin-top: 10px; }
     .ec-row { display: flex; gap: 10px; align-items: stretch; }
     .ec-brief {
       flex: 1; border: 1px solid var(--ly-line); border-radius: 12px;
