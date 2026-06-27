@@ -135,8 +135,11 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
       </div>
 
       <div class="ec-gen" x-show="busySet">
-        <span class="ec-orb"></span>
-        <span>Eve liest euer Haus und schreibt …</span>
+        <div class="ec-sk">
+          <i></i>
+          <i></i>
+          <i></i>
+        </div>
       </div>
 
       <template x-if="eveSuggestions.length > 0">
@@ -265,16 +268,23 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     .ec-brief:focus { border-color: var(--ly-ac); box-shadow: 0 0 0 3px rgba(20,97,110,0.12); }
     .ec-brief::placeholder { color: var(--ly-ink3); }
     .ec-spk-anim { animation: ly-twinkle 2.4s ease-in-out infinite; }
-    .ec-gen {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      padding: 40px; color: var(--ly-ac);
-      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+    .ec-gen { padding: 28px 0 20px; }
+    .ec-sk { display: flex; flex-direction: column; gap: 9px; width: 74%; }
+    .ec-sk i {
+      display: block; height: 9px; border-radius: 5px;
+      background: var(--ly-line2, #ECE8E0); position: relative; overflow: hidden;
     }
-    .ec-orb {
-      width: 16px; height: 16px; border-radius: 50%;
-      background: radial-gradient(circle at 34% 30%,#7FECE8,#1AA0B0 42%,#3A63D6 86%);
-      animation: ly-breathe 1s ease-in-out infinite; flex-shrink: 0;
+    .ec-sk i::after {
+      content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(26,160,176,.6), rgba(91,124,224,.6), transparent);
+      animation: ec-sk-sweep 1.6s ease-in-out infinite;
     }
+    .ec-sk i:nth-child(1) { width: 88%; }
+    .ec-sk i:nth-child(2) { width: 100%; }
+    .ec-sk i:nth-child(2)::after { animation-delay: .18s; }
+    .ec-sk i:nth-child(3) { width: 60%; }
+    .ec-sk i:nth-child(3)::after { animation-delay: .36s; }
+    @keyframes ec-sk-sweep { to { transform: translateX(100%); } }
 
     /* Aurora button */
     .ly-btn {
