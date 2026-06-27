@@ -29,15 +29,15 @@ const trialEndFormatted = trial.endsAt?.toLocaleDateString(dateLocale, {
 const TIER_RANK: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
 const allIn = (planLabel: string) => bt('sub.mod.allin', lang).replace('{plan}', planLabel);
 
+// priceType: 'free' = Kostenlos, 'anchor' = "ab X € · individuell", 'custom' = Individuell
 const PLANS = [
   {
     key: 'lite',
     label: 'Lite',
     tagline: bt('sub.plan.lite.tagline', lang),
     popular: false,
-    price: '49',
-    priceYear: '470,40',
-    priceYearlyPerMonth: '39,20',
+    priceType: 'free' as const,
+    price: null,
     modules: [
       bt('sub.mod.welcomehub', lang), bt('sub.mod.wifi', lang), bt('sub.mod.breakfast', lang),
       bt('sub.mod.service', lang), bt('sub.mod.feedback', lang), bt('sub.mod.actioncards', lang),
@@ -48,25 +48,24 @@ const PLANS = [
     label: 'Pro',
     tagline: bt('sub.plan.pro.tagline', lang),
     popular: false,
+    priceType: 'anchor' as const,
     price: '249',
-    priceYear: '2.390,40',
-    priceYearlyPerMonth: '199,20',
     modules: [
       allIn('Lite'),
       bt('sub.mod.places', lang), bt('sub.mod.langs', lang),
-      bt('sub.mod.nfc', lang), bt('sub.mod.prestay', lang), bt('sub.mod.staypush', lang),
+      bt('sub.mod.nfc', lang), bt('sub.mod.prestay', lang),
     ],
   },
   {
     key: 'premium',
     label: 'Premium',
     tagline: bt('sub.plan.premium.tagline', lang),
+    priceType: 'anchor' as const,
     price: '549',
-    priceYear: '5.270,40',
-    priceYearlyPerMonth: '439,20',
     popular: true,
     modules: [
       allIn('Pro'),
+      bt('sub.mod.staypush', lang),
       bt('sub.mod.eve', lang), bt('sub.mod.wallet', lang),
       bt('sub.mod.marketing', lang), bt('sub.mod.loyalty', lang),
       bt('sub.mod.referral', lang), bt('sub.mod.bestprice', lang), bt('sub.mod.microsite', lang),
@@ -77,9 +76,8 @@ const PLANS = [
     label: 'Enterprise',
     tagline: bt('sub.plan.enterprise.tagline', lang),
     popular: false,
+    priceType: 'custom' as const,
     price: null,
-    priceYear: null,
-    priceYearlyPerMonth: null,
     modules: [
       allIn('Premium'),
       bt('sub.mod.multiprop', lang), bt('sub.mod.whitelabel', lang),
@@ -93,8 +91,10 @@ const PLAN_LABEL: Record<string, string> = {
   lite: 'Lite', pro: 'Pro', premium: 'Premium', enterprise: 'Enterprise',
 };
 
-const showEveAddon = currentPlan === 'lite' || currentPlan === 'pro';
+// Eve Add-on: show for Lite, Pro, Premium (not enterprise — already in allIn)
+const showEveAddon = currentPlan !== 'enterprise';
 const hasEveAddon  = currentAddons.includes('eve');
+const eveIncluded  = currentPlan === 'premium';
 ---
 
 <Layout
@@ -103,41 +103,45 @@ const hasEveAddon  = currentAddons.includes('eve');
   hotelName={hotel.name}
   hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}
 >
-  <script is:inline define:vars={{ SUB_ERR_CHECKOUT: bt('sub.err.checkout', lang) }}>
-    window.__SUB_T__ = { errCheckout: SUB_ERR_CHECKOUT };
+  <script is:inline define:vars={{
+    SUB_ERR_TRIAL: bt('sub.err.trial', lang),
+    SUB_TRIAL_SENT: bt('sub.trial.sent', lang),
+  }}>
+    window.__SUB_T__ = { errTrial: SUB_ERR_TRIAL, trialSent: SUB_TRIAL_SENT };
   </script>
   <div
     class="settings-page"
     x-data="{
-      interval: 'monthly',
       loading: '',
-      async checkout(plan) {
+      async requestTrial(plan) {
         this.loading = plan;
         try {
-          const res = await fetch('/api/stripe/checkout', {
+          const res = await fetch('/api/subscription/request-upgrade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan, interval: this.interval })
+            body: JSON.stringify({ plan })
           });
           const data = await res.json();
-          if (!res.ok || !data.url) throw new Error(data.error || window.__SUB_T__.errCheckout);
-          window.location.href = data.url;
+          if (!res.ok) throw new Error(data.error || window.__SUB_T__.errTrial);
+          window.retahaToast?.(window.__SUB_T__.trialSent, 'success');
+          this.loading = '';
         } catch(e) {
           window.retahaToast?.(e.message, 'error');
           this.loading = '';
         }
       },
-      async checkoutAddon(addon) {
+      async requestAddon(addon) {
         this.loading = addon;
         try {
-          const res = await fetch('/api/stripe/checkout', {
+          const res = await fetch('/api/subscription/request-upgrade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ addon })
           });
           const data = await res.json();
-          if (!res.ok || !data.url) throw new Error(data.error || window.__SUB_T__.errCheckout);
-          window.location.href = data.url;
+          if (!res.ok) throw new Error(data.error || window.__SUB_T__.errTrial);
+          window.retahaToast?.(window.__SUB_T__.trialSent, 'success');
+          this.loading = '';
         } catch(e) {
           window.retahaToast?.(e.message, 'error');
           this.loading = '';
@@ -190,24 +194,6 @@ const hasEveAddon  = currentAddons.includes('eve');
         </div>
         <div class="s-card__body">
 
-          <!-- Interval Toggle -->
-          <div class="sub-interval-toggle" style="margin-bottom:24px">
-            <button
-              type="button"
-              @click="interval = 'monthly'"
-              :class="interval === 'monthly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
-            >
-              {bt('sub.monthly', lang)}
-            </button>
-            <button
-              type="button"
-              @click="interval = 'yearly'"
-              :class="interval === 'yearly' ? 'v9-btn v9-btn--primary sub-interval-btn' : 'v9-btn v9-btn--ghost sub-interval-btn'"
-            >
-              {bt('sub.yearly', lang)} <span class="sub-discount-badge">−20 %</span>
-            </button>
-          </div>
-
           <!-- Plans Grid -->
           <div class="sub-plans-grid">
             {PLANS.map(plan => {
@@ -239,23 +225,10 @@ const hasEveAddon  = currentAddons.includes('eve');
                   </div>
 
                   <div class="sub-plan-card__price">
-                    {plan.price !== null ? (
-                      <>
-                        <div x-show="interval === 'monthly'">
-                          <span class="sub-plan-price-num">{plan.price} €</span>
-                          <span class="sub-plan-price-per">{bt('sub.permonth', lang)}</span>
-                          <div class="sub-plan-price-year">
-                            {bt('sub.yearlyprefix', lang)} {plan.priceYear} € <span class="sub-discount-tag">−20 %</span>
-                          </div>
-                        </div>
-                        <div x-show="interval === 'yearly'" style="display:none">
-                          <span class="sub-plan-price-num">{plan.priceYearlyPerMonth} €</span>
-                          <span class="sub-plan-price-per">{bt('sub.permonth', lang)}</span>
-                          <div class="sub-plan-price-year">
-                            {plan.priceYear} €{bt('sub.peryear', lang)} · <span class="sub-discount-tag">{bt('sub.saved20', lang)}</span>
-                          </div>
-                        </div>
-                      </>
+                    {plan.priceType === 'free' ? (
+                      <span class="sub-plan-price-free">{bt('sub.price.free', lang)}</span>
+                    ) : plan.priceType === 'anchor' ? (
+                      <span class="sub-plan-price-anchor">{bt('sub.price.anchor', lang).replace('{price}', plan.price ?? '')}</span>
                     ) : (
                       <span class="sub-plan-price-custom">{bt('sub.custom', lang)}</span>
                     )}
@@ -283,12 +256,12 @@ const hasEveAddon  = currentAddons.includes('eve');
                       <button
                         type="button"
                         class="v9-btn v9-btn--primary sub-plan-btn"
-                        @click={`checkout('${plan.key}')`}
+                        @click={`requestTrial('${plan.key}')`}
                         :disabled="loading !== ''"
                         :class={`loading === '${plan.key}' ? 'v9-btn v9-btn--primary sub-plan-btn sub-plan-btn--loading' : 'v9-btn v9-btn--primary sub-plan-btn'`}
                       >
-                        <span x-show={`loading !== '${plan.key}'`}>{bt('sub.btn.upgrade', lang).replace('{plan}', plan.label)}</span>
-                        <span x-show={`loading === '${plan.key}'`} style="display:none">{bt('sub.btn.preparing', lang)}</span>
+                        <span x-show={`loading !== '${plan.key}'`}>{bt('sub.btn.trial', lang)}</span>
+                        <span x-show={`loading === '${plan.key}'`} style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
                       </button>
                     ) : (
                       <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--downgrade" disabled>
@@ -304,7 +277,7 @@ const hasEveAddon  = currentAddons.includes('eve');
         </div>
       </section>
 
-      <!-- 03 Eve Add-on (nur für Lite & Pro) -->
+      <!-- 03 Eve Add-on (Lite, Pro, Premium) -->
       {showEveAddon && (
         <section class="s-card">
           <div class="s-card__head">
@@ -324,27 +297,31 @@ const hasEveAddon  = currentAddons.includes('eve');
                   <p class="sub-addon-card__label">{bt('sub.addon.eve.label', lang)}</p>
                   <p class="sub-addon-card__desc">
                     {bt('sub.addon.eve.desc', lang)}
-                    {hasEveAddon
+                    {!eveIncluded && (hasEveAddon
                       ? bt('sub.addon.booked', lang)
-                      : bt('sub.addon.available', lang)}
+                      : bt('sub.addon.available', lang))}
                   </p>
                 </div>
               </div>
               <div class="sub-addon-card__right">
-                <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
-                {hasEveAddon ? (
+                {eveIncluded ? (
+                  <span class="sub-addon-badge sub-addon-badge--included">{bt('sub.addon.eve.included', lang)}</span>
+                ) : hasEveAddon ? (
                   <span class="sub-addon-badge">{bt('sub.addon.active', lang)}</span>
                 ) : (
-                  <button
-                    type="button"
-                    class="v9-btn v9-btn--primary"
-                    @click="checkoutAddon('eve')"
-                    :disabled="loading !== ''"
-                    :class="loading === 'eve' ? 'v9-btn v9-btn--primary sub-plan-btn--loading' : 'v9-btn v9-btn--primary'"
-                  >
-                    <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
-                    <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.preparing', lang)}</span>
-                  </button>
+                  <>
+                    <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
+                    <button
+                      type="button"
+                      class="v9-btn v9-btn--primary"
+                      @click="requestAddon('eve')"
+                      :disabled="loading !== ''"
+                      :class="loading === 'eve' ? 'v9-btn v9-btn--primary sub-plan-btn--loading' : 'v9-btn v9-btn--primary'"
+                    >
+                      <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
+                      <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -379,17 +356,6 @@ const hasEveAddon  = currentAddons.includes('eve');
   .sub-trial-note {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em;
-  }
-
-  /* ── Interval Toggle ─────────────────────────────────────────────────────── */
-  .sub-interval-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
-  .sub-interval-btn { display: flex; align-items: center; gap: 6px; }
-
-  .sub-discount-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px; font-weight: 500; letter-spacing: 0.06em;
-    color: #2e7d4f; background: #edf7f0;
-    padding: 1px 5px; border-radius: 4px;
   }
 
   /* ── Plans Grid ──────────────────────────────────────────────────────────── */
@@ -447,23 +413,13 @@ const hasEveAddon  = currentAddons.includes('eve');
   .sub-plan-card__price {
     margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
   }
-  .sub-plan-price-num {
+  .sub-plan-price-free {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 28px; font-weight: 300; color: var(--ink); letter-spacing: -0.02em; line-height: 1;
   }
-  .sub-plan-price-per {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); margin-left: 2px;
-  }
-  .sub-plan-price-year {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); margin-top: 4px;
-  }
-  .sub-discount-tag {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
-    color: #2e7d4f; background: #edf7f0;
-    padding: 1px 5px; border-radius: 4px;
+  .sub-plan-price-anchor {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 400; color: var(--ink); line-height: 1.3;
   }
   .sub-plan-price-custom {
     font-family: 'Space Grotesk', sans-serif;
@@ -528,6 +484,9 @@ const hasEveAddon  = currentAddons.includes('eve');
     font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
     padding: 4px 10px; border-radius: 99px;
     background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8;
+  }
+  .sub-addon-badge--included {
+    background: #f4f0fb; color: #6d28d9; border-color: #c4b5f5;
   }
 
   /* ── Footer note ─────────────────────────────────────────────────────────── */
