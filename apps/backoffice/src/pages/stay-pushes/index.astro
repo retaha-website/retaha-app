@@ -6,6 +6,7 @@ import { hasPermission } from '@retaha/auth';
 import {
   STAY_PUSH_TRIGGER_ORDER,
 } from '@retaha/marketing';
+import { STAY_PUSH_DEFAULTS } from '@retaha/wallet';
 import { getLang, bt } from '../../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
@@ -181,8 +182,9 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     <div class="sp-grid">
       {STAY_PUSH_TRIGGER_ORDER.map((trigger) => {
         const t = tplByTrigger.get(trigger) as any;
-        const previewTitle = pickI18n(t?.title_i18n);
-        const previewBody  = pickI18n(t?.body_i18n);
+        const defaults = STAY_PUSH_DEFAULTS[trigger] ?? { title: '', body: '' };
+        const previewTitle = pickI18n(t?.title_i18n) || defaults.title;
+        const previewBody  = pickI18n(t?.body_i18n)  || defaults.body;
         const isActive = t?.is_active === true;
         return (
           <a href={`/stay-pushes/${trigger}`} class={`sp-card${isActive ? '' : ' sp-card--off'}`}>
