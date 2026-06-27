@@ -77,12 +77,11 @@ const tJs = {
 ---
 
 <Layout title="NFC-Tags" activeTab="backoffice">
-  <div class="nf-page" x-data="nfcTagsAdmin()">
-    <header class="nf-header">
-      <p class="nf-eyebrow">{bt('nfc.eyebrow', lang)}</p>
-      <h1 class="nf-title" set:html={bt('nfc.title', lang)}></h1>
-      <p class="nf-sub" set:html={bt('nfc.sub', lang)}></p>
-    </header>
+  <div class="settings-page" x-data="nfcTagsAdmin()">
+    <section class="settings-hero">
+      <h1 class="settings-hero__title" set:html={bt('nfc.title', lang)}></h1>
+      <p class="settings-hero__sub" set:html={bt('nfc.sub', lang)}></p>
+    </section>
 
     <section class="nf-howto">
       <p class="nf-section-eyebrow">{bt('nfc.howto.title', lang)}</p>
@@ -286,58 +285,104 @@ const tJs = {
   </script>
 
   <style>
-    .nf-page { --surface-raised: var(--bg-deep); max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
-    .nf-header { margin: 20px 0 24px; }
-    .nf-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--te-pink, #FF4A82); margin: 0 0 6px; }
-    .nf-title { margin: 0 0 8px; font-size: 26px; font-weight: 300; }
-    .nf-sub { margin: 0; font-size: 14px; color: var(--ink-soft); max-width: 720px; line-height: 1.5; }
-    .nf-sub strong { color: var(--ink); }
+    --surface-raised: var(--bg-deep);
 
-    .nf-section-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--te-pink, #FF4A82); margin: 0 0 8px; }
+    .nf-section-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-muted); margin: 0 0 8px;
+    }
 
-    .nf-howto { background: var(--surface-raised); padding: 20px; margin-bottom: 24px; border-left: 3px solid var(--te-pink, #FF4A82); }
+    .nf-howto {
+      background: var(--bg-deep); padding: 20px; margin-bottom: 24px;
+      border-left: 3px solid #14616E; border-radius: 16px;
+    }
     .nf-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; }
     @media (max-width: 720px) { .nf-steps { grid-template-columns: 1fr; } }
     .nf-step { display: flex; gap: 10px; align-items: flex-start; }
-    .nf-step-num { width: 24px; height: 24px; background: var(--ink); color: var(--surface); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .nf-step-num {
+      width: 24px; height: 24px; background: #14616E; color: #fff;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 500; flex-shrink: 0;
+    }
     .nf-step-text { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
     .nf-step-text strong { color: var(--ink); }
 
     .nf-form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-    .nf-btn-primary { padding: 10px 18px; background: var(--ink); color: var(--surface); border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
-    .nf-btn-primary:hover:not(:disabled) { background: var(--te-pink, #FF4A82); }
+
+    .nf-btn-primary {
+      padding: 10px 18px; background: #14616E; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 500; transition: filter .15s;
+    }
+    .nf-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
     .nf-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-    .nf-btn-ghost { padding: 10px 18px; background: transparent; color: var(--ink-soft); border: 1px solid var(--border); cursor: pointer; font-family: inherit; font-size: 13px; }
+    .nf-btn-ghost {
+      padding: 10px 18px; background: transparent; color: var(--ink-muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; font-family: inherit; font-size: 13px; transition: color .15s, border-color .15s;
+    }
     .nf-btn-ghost:hover { color: var(--ink); border-color: var(--ink); }
     .nf-btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
     .nf-btn-small { padding: 6px 12px; font-size: 12px; }
-    .nf-btn-danger { padding: 10px 18px; background: transparent; color: var(--te-pink, #FF4A82); border: 1px solid var(--te-pink, #FF4A82); cursor: pointer; font-family: inherit; font-size: 13px; }
-    .nf-btn-danger:hover:not(:disabled) { background: rgba(255,74,130, 0.08); }
+    .nf-btn-danger {
+      padding: 10px 18px; background: transparent; color: #c0392b;
+      border: 1px solid #c0392b; border-radius: 8px;
+      cursor: pointer; font-family: inherit; font-size: 13px; transition: background .15s;
+    }
+    .nf-btn-danger:hover:not(:disabled) { background: rgba(192,57,43,.08); }
 
-    .nf-create { background: var(--surface); border: 1px solid var(--border); padding: 20px; margin-bottom: 24px; }
+    .nf-create {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 24px; margin-bottom: 24px; border-radius: 16px;
+    }
     .nf-form-title { font-size: 14px; font-weight: 500; margin: 0 0 12px; }
     .nf-form-hint { font-size: 12px; color: var(--ink-muted); font-style: italic; margin: 0 0 12px; }
     .nf-field { display: block; margin-bottom: 12px; }
-    .nf-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 6px; }
-    .nf-input { width: 100%; box-sizing: border-box; padding: 9px 12px; font-family: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
-    .nf-input:focus { outline: none; border-color: var(--te-pink, #FF4A82); }
+    .nf-label {
+      display: block; font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-muted); margin-bottom: 8px;
+    }
+    .nf-input {
+      width: 100%; box-sizing: border-box; padding: 10px 13px;
+      font-family: inherit; font-size: 14px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--ink); transition: border-color .15s;
+    }
+    .nf-input:focus { outline: none; border-color: #14616E; box-shadow: 0 0 0 3px rgba(20,97,110,.10); }
     .nf-input--narrow { width: 100px; }
     .nf-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
     .nf-flex-1 { flex: 1; min-width: 160px; }
-    .nf-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .nf-error { color: var(--te-pink, #FF4A82); font-size: 13px; margin: 8px 0; }
+    .nf-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      padding-top: 16px; border-top: 1px solid var(--border); margin-top: 8px;
+    }
+    .nf-error { color: #c0392b; font-size: 13px; margin: 8px 0; }
 
     .nf-list-section { margin-top: 8px; }
-    .nf-empty { padding: 48px 24px; background: var(--surface); border: 1px dashed var(--border); text-align: center; color: var(--ink-muted); font-style: italic; }
+    .nf-empty {
+      padding: 48px 24px; background: var(--surface);
+      border: 1px dashed var(--border); border-radius: 16px;
+      text-align: center; color: var(--ink-muted); font-style: italic;
+    }
     .nf-empty p { margin: 0; }
     .nf-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 10px; }
 
-    .nf-tag-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; display: grid; grid-template-columns: 1fr auto; gap: 12px; transition: border-color .15s; }
-    .nf-tag-card:hover { border-color: var(--ink); }
+    .nf-tag-card {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 20px; border-radius: 16px;
+      display: grid; grid-template-columns: 1fr auto; gap: 12px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .nf-tag-card:hover { border-color: rgba(20,97,110,.3); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
     .nf-tag-card--off { opacity: .55; }
     .nf-tag-main { min-width: 0; }
     .nf-tag-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
-    .nf-tag-pill { font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.05em; background: var(--surface-raised); color: var(--ink-muted); }
+    .nf-tag-pill {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      padding: 3px 10px; text-transform: uppercase; letter-spacing: 0.05em;
+      background: var(--bg-deep); color: var(--ink-muted); border-radius: 99px;
+    }
     .nf-tag-pill.is-on { background: rgba(76,175,80,.1); color: #4CAF50; border: 1px solid rgba(76,175,80,.35); }
     .nf-tag-type { font-size: 11px; color: var(--ink-muted); }
     .nf-tag-label { font-size: 16px; font-weight: 500; margin: 0 0 4px; color: var(--ink); }
@@ -351,6 +396,10 @@ const tJs = {
     .nf-qr { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid var(--border); margin-top: 8px; text-align: center; }
     .nf-qr-img { display: block; margin: 0 auto 12px; max-width: 240px; width: 100%; height: auto; }
     .nf-qr-help { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; line-height: 1.5; }
-    .nf-qr-url { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 6px 10px; background: var(--surface-raised); color: var(--ink); word-break: break-all; display: inline-block; }
+    .nf-qr-url {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      padding: 6px 10px; background: var(--bg-deep); border-radius: 6px;
+      color: var(--ink); word-break: break-all; display: inline-block;
+    }
   </style>
 </Layout>
