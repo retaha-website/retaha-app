@@ -1,34 +1,80 @@
 ---
-// Sprint H · Group 3 — NFC-Welcome Empty-State
-//
 // /n/welcome?hotel=<uuid>[&room=<nr>]
-//
-// Zeigt: "Willkommen im Hotel X — frag an der Rezeption nach deinem Zugang"
-// Mit Hotel-Logo + Brand-Color + Theme.
+// Empty-State wenn kein aktiver Stay für den NFC-Tag gefunden wurde.
+// Zeigt Hotel-Logo + ausgewähltes Hotel-Theme — identisch zur /g/[token]-Logik.
 
-import { createServerClient } from '@retaha/db';
+import { createSupabaseServiceRoleInstance } from '@retaha/auth';
+import { computeBrandPalette } from '@retaha/auth';
 import { resolveTheme } from '@retaha/ui/theme';
 import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/retaha.css';
+import '@retaha/ui-guest/themes/bauhaus';
+import '@retaha/ui-guest/themes/editorial';
+import '@retaha/ui-guest/themes/maison';
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/inter-tight/400.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/600.css';
+import '@fontsource/bodoni-moda/400.css';
+import '@fontsource/bodoni-moda/400-italic.css';
+import '@fontsource/bodoni-moda/500.css';
+import '@fontsource/dm-sans/300.css';
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
 
 const url = new URL(Astro.request.url);
 const hotelId = url.searchParams.get('hotel');
 const roomNumber = url.searchParams.get('room');
 
-let hotel: { name: string; logo_primary: string | null; logo_dark: string | null; theme: string | null } | null = null;
+let hotel: {
+  name: string;
+  logo_primary: string | null;
+  logo_dark: string | null;
+  theme: string | null;
+  design_identity: string | null;
+  brand_primary: string | null;
+} | null = null;
+
 if (hotelId && /^[0-9a-f-]{36}$/i.test(hotelId)) {
-  const sb = createServerClient();
+  const sb = createSupabaseServiceRoleInstance();
   const { data } = await sb
-    .from('hotels').select('name, logo_primary, logo_dark, theme').eq('id', hotelId).maybeSingle();
+    .from('hotels')
+    .select('name, logo_primary, logo_dark, theme, design_identity, brand_primary')
+    .eq('id', hotelId)
+    .maybeSingle();
   if (data) hotel = data;
 }
 
-const hotelName = hotel?.name ?? 'das Hotel';
-const activeTheme = resolveTheme({ hotelTheme: hotel?.theme });
+// Theme-Auflösung identisch zu /g/[token].astro
+const IDENTITY_REMAP: Record<string, string> = {
+  classic:             'bauhaus',
+  bauhaus_manufaktur:  'bauhaus',
+  premium_anthrazit:   'maison',
+  warmes_burgund:      'editorial',
+};
+const VALID_IDENTITIES = new Set(['bauhaus', 'editorial', 'maison']);
+const rawIdentity = hotel?.design_identity ?? null;
+const remappedIdentity = rawIdentity ? (IDENTITY_REMAP[rawIdentity] ?? rawIdentity) : null;
+const hotelDesignIdentity = remappedIdentity && VALID_IDENTITIES.has(remappedIdentity) ? remappedIdentity : null;
+const legacyTheme = resolveTheme({ hotelTheme: hotel?.theme });
+const activeTheme = hotelDesignIdentity ?? (IDENTITY_REMAP[legacyTheme] ?? 'bauhaus');
 
+const brandPrimary: string | null = hotel?.brand_primary ?? null;
+const brandStyle = (() => {
+  if (!brandPrimary) return undefined;
+  const p = computeBrandPalette(brandPrimary);
+  return `--user-brand-primary:${brandPrimary};--accent:${brandPrimary};--user-brand-hover:${p.hover};--user-brand-soft:${p.soft};--user-brand-on-accent:${p.onAccent}`;
+})();
+
+const hotelName = hotel?.name ?? 'das Hotel';
 const heading = roomNumber
   ? `Willkommen in Zimmer ${roomNumber}`
   : `Willkommen im ${hotelName}`;
-
 const subtitle = roomNumber
   ? `Es ist gerade kein aktiver Aufenthalt für dieses Zimmer hinterlegt. Frag an der Rezeption nach deinem Zugang.`
   : `Frag an der Rezeption nach deinem persönlichen Zugang oder scanne den QR-Code auf deinem Schlüsselanhänger.`;
@@ -38,11 +84,11 @@ const subtitle = roomNumber
 <html lang="de" data-theme={activeTheme}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
     <title>{hotelName} · retaha</title>
   </head>
-  <body class="nw-body">
+  <body class={`gate-guest gate-theme-${activeTheme}`} style={brandStyle}>
     <main class="nw-shell">
       {(hotel?.logo_primary ?? hotel?.logo_dark) && (
         <img class="nw-logo" src={hotel.logo_primary ?? hotel.logo_dark!} alt={hotelName} />
@@ -56,24 +102,19 @@ const subtitle = roomNumber
     </main>
 
     <style>
-      .nw-body {
-        margin: 0;
-        font-family: var(--theme-font-sans, 'Space Grotesk', system-ui, sans-serif);
-        background: var(--theme-bg-primary, #fff);
-        color: var(--theme-text-primary, #1A1A1A);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px 24px;
+      .nw-shell {
+        max-width: 520px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 64px 24px;
+        text-align: center;
       }
-      .nw-shell { max-width: 520px; width: 100%; text-align: center; }
-      .nw-logo { max-height: 56px; width: auto; margin-bottom: 24px; }
+      .nw-logo { max-height: 56px; width: auto; margin-bottom: 28px; }
       .nw-eyebrow {
         font-size: 11px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: var(--theme-accent, #FF4A82);
+        color: var(--theme-accent, var(--accent, #FF4A82));
         margin: 0 0 16px;
         font-weight: 500;
       }
@@ -86,7 +127,7 @@ const subtitle = roomNumber
         margin: 0 0 16px;
         color: var(--theme-text-primary);
       }
-      .nw-dot { color: var(--theme-accent, #FF4A82); }
+      .h-dot { color: var(--theme-accent, var(--accent, #FF4A82)); }
       .nw-sub {
         font-size: 15px;
         line-height: 1.55;
@@ -96,7 +137,7 @@ const subtitle = roomNumber
       .nw-hint {
         padding: 16px 20px;
         background: var(--theme-bg-secondary, #FAFAF8);
-        border-left: 3px solid var(--theme-accent, #FF4A82);
+        border-left: 3px solid var(--theme-accent, var(--accent, #FF4A82));
         text-align: left;
       }
       .nw-hint-line {
