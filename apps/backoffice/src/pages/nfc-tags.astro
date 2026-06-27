@@ -3,7 +3,6 @@ import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
-import { getEnv } from '@retaha/db';
 import QRCode from 'qrcode';
 import { getLang, bt } from '../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
@@ -27,7 +26,7 @@ const { data: tagRows } = await client
   .order('created_at', { ascending: false });
 const tags = (tagRows ?? []) as any[];
 
-const siteOrigin = (getEnv('PUBLIC_SITE_URL') || 'http://localhost:4321').replace(/\/$/, '');
+const siteOrigin = (import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de').replace(/\/$/, '');
 
 const tagQrMap = new Map<string, string>();
 for (const t of tags) {
