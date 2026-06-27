@@ -258,7 +258,7 @@ const eveIncluded  = currentPlan === 'premium';
                         class="v9-btn v9-btn--primary sub-plan-btn"
                         @click={`requestTrial('${plan.key}')`}
                         :disabled="loading !== ''"
-                        :class={`loading === '${plan.key}' ? 'v9-btn v9-btn--primary sub-plan-btn sub-plan-btn--loading' : 'v9-btn v9-btn--primary sub-plan-btn'`}
+                        :class={`{ 'sub-plan-btn--loading': loading === '${plan.key}' }`}
                       >
                         <span x-show={`loading !== '${plan.key}'`}>{bt('sub.btn.trial', lang)}</span>
                         <span x-show={`loading === '${plan.key}'`} style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
@@ -285,45 +285,37 @@ const eveIncluded  = currentPlan === 'premium';
             <span class="s-card__num">03</span>
           </div>
           <div class="s-card__body">
-            <div class="sub-addon-card">
-              <div class="sub-addon-card__left">
-                <div class="sub-addon-card__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                       stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="sub-addon-card__label">{bt('sub.addon.eve.label', lang)}</p>
-                  <p class="sub-addon-card__desc">
-                    {bt('sub.addon.eve.desc', lang)}
-                    {!eveIncluded && (hasEveAddon
-                      ? bt('sub.addon.booked', lang)
-                      : bt('sub.addon.available', lang))}
-                  </p>
+            <div class="sub-evecard">
+              <div class="sub-eve-head">
+                <svg class="sub-eve-spk" width="14" height="14" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/>
+                </svg>
+                <b><span class="sub-eve-gradient">Eve</span> KI-Concierge</b>
+                <div class="sub-eve-head-right">
+                  {eveIncluded ? (
+                    <span class="sub-addon-badge sub-addon-badge--included">{bt('sub.addon.eve.included', lang)}</span>
+                  ) : hasEveAddon ? (
+                    <span class="sub-addon-badge">{bt('sub.addon.active', lang)}</span>
+                  ) : null}
                 </div>
               </div>
-              <div class="sub-addon-card__right">
-                {eveIncluded ? (
-                  <span class="sub-addon-badge sub-addon-badge--included">{bt('sub.addon.eve.included', lang)}</span>
-                ) : hasEveAddon ? (
-                  <span class="sub-addon-badge">{bt('sub.addon.active', lang)}</span>
-                ) : (
-                  <>
-                    <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
-                    <button
-                      type="button"
-                      class="v9-btn v9-btn--primary"
-                      @click="requestAddon('eve')"
-                      :disabled="loading !== ''"
-                      :class="loading === 'eve' ? 'v9-btn v9-btn--primary sub-plan-btn--loading' : 'v9-btn v9-btn--primary'"
-                    >
-                      <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
-                      <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
-                    </button>
-                  </>
-                )}
-              </div>
+              <p class="sub-eve-desc">{bt('sub.addon.eve.desc', lang)}</p>
+              {!eveIncluded && !hasEveAddon && (
+                <div class="sub-eve-row">
+                  <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
+                  <button
+                    type="button"
+                    class="sub-eve-aurora-btn"
+                    @click="requestAddon('eve')"
+                    :disabled="loading !== ''"
+                    :class="{ 'sub-eve-aurora-btn--loading': loading === 'eve' }"
+                  >
+                    <svg class="sub-eve-spk-anim" width="11" height="11" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
+                    <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
+                    <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -447,30 +439,39 @@ const eveIncluded  = currentPlan === 'premium';
   .sub-plan-btn--downgrade { opacity: 0.5; cursor: not-allowed; }
   .sub-plan-btn--loading { opacity: 0.65; }
 
-  /* ── Eve Add-on card ─────────────────────────────────────────────────────── */
-  .sub-addon-card {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
-    flex-wrap: wrap;
-    padding: 16px 20px;
-    border: 1px solid var(--border); border-radius: var(--r, 8px);
-    background: var(--bg-deep, #F0EDE6);
+  /* ── Eve Add-on card (evecard-Stil aus action-cards) ────────────────────── */
+  @keyframes sub-aurora-flow { to { background-position: 0 0, 240% 0; } }
+  @keyframes sub-eve-twinkle { 0%,100%{transform:scale(1) rotate(0);opacity:1} 50%{transform:scale(1.3) rotate(90deg);opacity:.7} }
+
+  .sub-evecard {
+    position: relative;
+    border: 1.6px solid transparent;
+    border-radius: 16px;
+    padding: 20px 22px;
+    background: linear-gradient(var(--surface, #fff), var(--surface, #fff)) padding-box,
+                linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%) border-box;
+    background-size: auto, 240% 100%;
+    animation: sub-aurora-flow 7s linear infinite;
+    box-shadow: 0 8px 30px rgba(45,91,208,.12);
   }
-  .sub-addon-card__left { display: flex; align-items: flex-start; gap: 14px; flex: 1; min-width: 0; }
-  .sub-addon-card__icon {
-    width: 36px; height: 36px; border-radius: 8px;
-    background: var(--border); display: flex; align-items: center; justify-content: center;
-    color: var(--ink-muted); flex-shrink: 0;
+  .sub-eve-head {
+    display: flex; align-items: center; gap: 9px; margin-bottom: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: var(--ink);
   }
-  .sub-addon-card__label {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 14px; font-weight: 500; color: var(--ink); margin: 0 0 4px;
+  .sub-eve-head-right { margin-left: auto; }
+  .sub-eve-spk { color: #2E72C8; flex-shrink: 0; animation: sub-eve-twinkle 2.4s ease-in-out infinite; }
+  .sub-eve-spk-anim { animation: sub-eve-twinkle 2.4s ease-in-out infinite; }
+  .sub-eve-gradient {
+    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
+    background-size: 240% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: sub-aurora-flow 5s linear infinite; font-weight: 700;
   }
-  .sub-addon-card__desc {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); line-height: 1.5; margin: 0; letter-spacing: 0.02em;
+  .sub-eve-desc {
+    font-size: 13px; color: var(--ink-muted); line-height: 1.55; margin: 0 0 16px; max-width: 560px;
   }
-  .sub-addon-card__right {
-    display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0;
+  .sub-eve-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   }
   .sub-addon-price {
     font-family: 'Space Grotesk', sans-serif;
@@ -479,6 +480,20 @@ const eveIncluded  = currentPlan === 'premium';
   .sub-addon-price-per {
     font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted);
   }
+  .sub-eve-aurora-btn {
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+    white-space: nowrap; border-radius: 9px; border: 0; color: #fff;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+    padding: 8px 13px;
+    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
+    background-size: 280% 100%;
+    animation: sub-aurora-flow 6s linear infinite;
+    box-shadow: 0 5px 16px rgba(20,97,110,.28);
+    transition: transform .15s, box-shadow .2s;
+  }
+  .sub-eve-aurora-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 9px 26px rgba(45,91,208,.38); animation-duration: 2.2s; }
+  .sub-eve-aurora-btn:disabled,
+  .sub-eve-aurora-btn--loading { opacity: .55; cursor: not-allowed; transform: none; }
   .sub-addon-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
