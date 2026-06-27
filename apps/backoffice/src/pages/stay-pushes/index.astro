@@ -152,13 +152,21 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
                   <strong class="ec-result-title" x-text="s.title"></strong>
                   <span class="ec-result-body" x-text="s.body"></span>
                 </div>
-                <button
-                  class="ec-apply-btn"
-                  :class="applyStates[s.trigger_type] === 'done' ? 'ec-apply-btn--done' : applyStates[s.trigger_type] === 'err' ? 'ec-apply-btn--err' : ''"
-                  :disabled="applyStates[s.trigger_type] === 'busy' || applyStates[s.trigger_type] === 'done'"
-                  @click="applyOne(s)"
-                  x-text="applyStates[s.trigger_type] === 'done' ? '✓ Gespeichert' : applyStates[s.trigger_type] === 'err' ? 'Fehler' : applyStates[s.trigger_type] === 'busy' ? '…' : 'Übernehmen'"
-                ></button>
+                <div class="ec-result-actions">
+                  <button
+                    class="ec-apply-btn"
+                    :class="applyStates[s.trigger_type] === 'done' ? 'ec-apply-btn--done' : applyStates[s.trigger_type] === 'err' ? 'ec-apply-btn--err' : ''"
+                    :disabled="applyStates[s.trigger_type] === 'busy' || applyStates[s.trigger_type] === 'done'"
+                    @click="applyOne(s)"
+                    x-text="applyStates[s.trigger_type] === 'done' ? '✓ Gespeichert' : applyStates[s.trigger_type] === 'err' ? 'Fehler' : applyStates[s.trigger_type] === 'busy' ? '…' : 'Übernehmen'"
+                  ></button>
+                  <button
+                    class="ec-dismiss-btn"
+                    :disabled="applyStates[s.trigger_type] === 'busy'"
+                    @click="eveSuggestions = eveSuggestions.filter(x => x.trigger_type !== s.trigger_type)"
+                    aria-label="Ablehnen"
+                  >✕</button>
+                </div>
               </div>
             </template>
           </div>
@@ -319,6 +327,16 @@ const activeCount = STAY_PUSH_TRIGGER_ORDER.filter(t => {
     .ec-apply-btn:disabled { opacity: .5; cursor: not-allowed; }
     .ec-apply-btn--done { background: #14616E; color: #fff; border-color: #14616E; }
     .ec-apply-btn--err  { border-color: #c0392b; color: #c0392b; }
+    .ec-result-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .ec-dismiss-btn {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border, #e5e4e0); border-radius: 7px;
+      background: transparent; color: var(--ly-ink3); font-size: 11px;
+      cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+      flex-shrink: 0; line-height: 1;
+    }
+    .ec-dismiss-btn:hover:not(:disabled) { background: #fef2f2; border-color: #fca5a5; color: #c0392b; }
+    .ec-dismiss-btn:disabled { opacity: .4; cursor: not-allowed; }
 
     /* KPI mini-bar */
     .sp-kpis { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
