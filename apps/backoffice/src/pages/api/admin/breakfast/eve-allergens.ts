@@ -67,10 +67,10 @@ export const POST: APIRoute = async ({ cookies, request }) => {
       return json({ ok: false, message: 'Keine Speisen vorhanden.' }, 400);
     }
 
-    const systemPrompt = `Du bist Lebensmittelexperte (LMIV Art. 9). Analysiere Frühstücksartikel auf die 14 EU-Hauptallergene.
-Antworte NUR mit einem JSON-Array ohne Markdown. Jedes Element: {"id":"<id>","allergens":["<key>",...]}
+    const systemPrompt = `Du bist Lebensmittelexperte (LMIV Art. 9). Analysiere Frühstücksartikel auf die 14 EU-Hauptallergene sowie ob sie vegetarisch oder vegan sind.
+Antworte NUR mit einem JSON-Array ohne Markdown. Jedes Element: {"id":"<id>","allergens":["<key>",...],"vegetarian":true|false,"vegan":true|false}
 Mögliche allergen-Keys: ${ALLERGEN_KEYS.join(', ')}.
-Leere allergens-Arrays sind erlaubt.`;
+Leere allergens-Arrays sind erlaubt. Vegan impliziert immer auch vegetarisch.`;
 
     const userMsg = JSON.stringify(rows.map(r => ({
       id: r.id,
@@ -89,7 +89,7 @@ Leere allergens-Arrays sind erlaubt.`;
     const raw = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : '';
     console.log('[eve-allergens] raw:', raw.slice(0, 400));
 
-    let parsed: Array<{ id: string; allergens: string[] }>;
+    let parsed: Array<{ id: string; allergens: string[]; vegetarian?: boolean; vegan?: boolean }>;
     try {
       parsed = JSON.parse(extractJson(raw));
       if (!Array.isArray(parsed)) throw new Error('not an array');
@@ -103,12 +103,15 @@ Leere allergens-Arrays sind erlaubt.`;
 
     const updateResults = await Promise.all(
       validEntries.map(entry => {
-        const flags: Record<string, boolean> = {};
+        const flags: Record<string, boolean | string> = {};
         for (const k of ALLERGEN_KEYS) flags[`contains_${k}`] = false;
         for (const k of parseAllergenKeys(entry.allergens)) flags[`contains_${k}`] = true;
+        flags.is_vegetarian = entry.vegan === true ? true : (entry.vegetarian === true);
+        flags.is_vegan = entry.vegan === true;
+        flags.updated_at = now;
         return supabase
           .from('breakfast_items')
-          .update({ ...flags, updated_at: now })
+          .update(flags)
           .eq('id', entry.id)
           .eq('hotel_id', (hotel as any).id);
       })
