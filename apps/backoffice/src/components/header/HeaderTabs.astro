@@ -109,6 +109,11 @@ const tabs = [
   }
 
   /* Kacheln: kein eigener Rahmen — nur der Container hat einen */
+  @keyframes tab-sheen {
+    0%, 72% { left: -70%; }
+    100%     { left: 140%; }
+  }
+
   .header-tabs__tab {
     position: relative;
     z-index: 1;
@@ -138,6 +143,23 @@ const tabs = [
   }
   .header-tabs__tab:hover:not(.is-active) { color: var(--petrol); }
   .header-tabs__tab.is-active { color: #fff; }
+
+  /* Sheen sweep on active tab (3× the mockup speed: 6.5 s × 3 = 19.5 s) */
+  .header-tabs__tab.is-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -70%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.36), transparent);
+    transform: skewX(-18deg);
+    pointer-events: none;
+    animation: tab-sheen 19.5s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .header-tabs__tab.is-active::after { animation: none; }
+  }
 
   .header-tabs__tab svg {
     width: 14px;

@@ -1,10 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getUser, getUserHotels, getUserRole, hasPermission } from '@retaha/auth';
-import { calculateTrialStatus } from '../lib/trial-status';
 import { getLang, bt } from '../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
-const dateLocale = lang === 'de' ? 'de-DE' : lang;
 
 const user = await getUser(Astro.cookies, Astro.request);
 if (!user) return Astro.redirect('/admin/login');
@@ -13,99 +11,12 @@ const hotels = await getUserHotels(Astro.cookies, Astro.request);
 const hotel = hotels?.[0]?.hotel;
 if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
 
-// Billing ist Owner-only (Matrix: manager = „kein Billing").
 const billingRole = await getUserRole(Astro.cookies, Astro.request, hotel.id);
 if (!billingRole || !hasPermission(billingRole, 'hotel.billing')) {
   return Astro.redirect('/overview?error=billing_owner_only');
 }
 
 const currentPlan: string = (hotel as any).plan ?? 'lite';
-const currentAddons: string[] = (hotel as any).addons ?? [];
-const trial = calculateTrialStatus(hotel);
-const trialEndFormatted = trial.endsAt?.toLocaleDateString(dateLocale, {
-  day: 'numeric', month: 'long', year: 'numeric',
-});
-
-const TIER_RANK: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
-const allIn = (planLabel: string) => bt('sub.mod.allin', lang).replace('{plan}', planLabel);
-
-const PLANS = [
-  {
-    key: 'lite',
-    label: 'Lite',
-    headline: bt('sub.plan.lite.headline', lang),
-    frame: bt('sub.plan.lite.frame', lang),
-    popular: false,
-    isFree: true,
-    paysOff: false,
-    modules: [
-      bt('sub.mod.welcomehub', lang), bt('sub.mod.wifi', lang), bt('sub.mod.breakfast', lang),
-      bt('sub.mod.service', lang), bt('sub.mod.feedback', lang), bt('sub.mod.actioncards', lang),
-      bt('sub.mod.eve.lite', lang),
-    ],
-  },
-  {
-    key: 'pro',
-    label: 'Pro',
-    headline: bt('sub.plan.pro.headline', lang),
-    frame: bt('sub.plan.pro.frame', lang),
-    popular: false,
-    isFree: false,
-    paysOff: false,
-    modules: [
-      allIn('Lite'),
-      bt('sub.mod.places', lang), bt('sub.mod.langs', lang),
-      bt('sub.mod.nfc', lang), bt('sub.mod.prestay', lang),
-      bt('sub.mod.pmsext', lang),
-      bt('sub.mod.eve.pro', lang),
-    ],
-  },
-  {
-    key: 'premium',
-    label: 'Premium',
-    headline: bt('sub.plan.premium.headline', lang),
-    frame: bt('sub.plan.premium.frame', lang),
-    popular: true,
-    isFree: false,
-    paysOff: true,
-    modules: [
-      allIn('Pro'),
-      bt('sub.mod.staypush', lang),
-      bt('sub.mod.eve', lang),
-      bt('sub.mod.wallet', lang),
-      bt('sub.mod.marketing', lang), bt('sub.mod.loyalty', lang),
-      bt('sub.mod.referral', lang), bt('sub.mod.bestprice', lang),
-      bt('sub.mod.microsite', lang),
-      bt('sub.mod.ownpms', lang),
-      bt('sub.mod.selfcheckout', lang), bt('sub.mod.dooropener', lang),
-      bt('sub.mod.domain', lang), bt('sub.mod.emaildomain', lang),
-    ],
-  },
-  {
-    key: 'enterprise',
-    label: 'Enterprise',
-    headline: bt('sub.plan.enterprise.headline', lang),
-    frame: bt('sub.plan.enterprise.frame', lang),
-    popular: false,
-    isFree: false,
-    paysOff: false,
-    modules: [
-      allIn('Premium'),
-      bt('sub.mod.multiprop', lang), bt('sub.mod.whitelabel', lang),
-      bt('sub.mod.api', lang),
-      bt('sub.mod.accountmgr', lang),
-    ],
-  },
-];
-
-const PLAN_LABEL: Record<string, string> = {
-  lite: 'Lite', pro: 'Pro', premium: 'Premium', enterprise: 'Enterprise',
-};
-
-// Eve Add-on: alle Pläne; bei Premium + Enterprise ist Eve inklusive
-const showEveAddon = true;
-const hasEveAddon  = currentAddons.includes('eve');
-const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
 ---
 
 <Layout
@@ -204,202 +115,161 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
     }"
   >
 
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="/overview" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
-      <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__crumb breadcrumb__crumb--current">{bt('sub.crumb', lang)}</span>
-    </nav>
+    <!-- ── Wow-Abo-Page ──────────────────────────────────────────────────── -->
+    <div class="wow-page">
 
-    <section class="settings-hero">
-      <h1 class="settings-hero__title" set:html={bt('sub.title', lang)}></h1>
-      <p class="settings-hero__sub">
-        {trial.isInTrial
-          ? bt('sub.hero.trial', lang).replace('{ends}', trialEndFormatted ? bt('sub.hero.trialends', lang).replace('{date}', trialEndFormatted) : '')
-          : bt('sub.hero.notrial', lang)}
-      </p>
-    </section>
+      <!-- Hero -->
+      <div class="wow-hero">
+        <div class="wow-eyebrow">retaha · Hospitality</div>
+        <h1 class="wow-h1">Startet kostenlos.<br>Wachst, <span class="wow-g">wenn es sich lohnt.</span></h1>
+        <p class="wow-sub">Kein Tarif-Dschungel, keine Preisschilder. Wählt, wie weit ihr gehen wollt — und seht, was jede Stufe für euch tut.</p>
+      </div>
 
-    <div class="settings-sections">
+      <!-- Plan Cards -->
+      <div class="wow-cards">
 
-      <!-- Aktueller Plan -->
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('sub.current.title', lang)}</h2>
-        </div>
-        <div class="s-card__body">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span class={`sub-plan-badge sub-plan-badge--${currentPlan}`}>
-              {PLAN_LABEL[currentPlan] ?? currentPlan}
-            </span>
-            {trial.isInTrial && trialEndFormatted && (
-              <span class="sub-trial-note">{bt('sub.trialnote', lang).replace('{date}', trialEndFormatted)}</span>
+        <!-- LITE -->
+        <div class={`wow-tier wow-tier--lite${currentPlan === 'lite' ? ' wow-tier--current' : ''}`}>
+          {currentPlan === 'lite' && <div class="wow-your-plan">Euer aktueller Plan</div>}
+          <div class="wow-tcap">Lite · Kostenlos</div>
+          <h2 class="wow-tier__h2">Kostenlos modern werden.</h2>
+          <div class="wow-frame">Eure Gästemappe wird digital — null Kosten, null Risiko.</div>
+          <ul class="wow-bl">
+            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Gästemappe digital — <b>nie wieder nachdrucken</b></span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Eve beantwortet Gästefragen 24/7</span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Weniger Nachfragen am Empfang</span></li>
+          </ul>
+          <div class="wow-cta-wrap">
+            {currentPlan === 'lite' ? (
+              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
+            ) : (
+              <Fragment>
+                <div x-show="!downgradeConfirm" style="display:none">
+                  <button type="button" class="wow-cta wow-cta--free" @click="downgradeConfirm = true" :disabled="loading !== ''">Kostenlos starten</button>
+                </div>
+                <div x-show="downgradeConfirm" class="wow-downgrade" style="display:none">
+                  <p class="wow-downgrade__warn">{bt('sub.btn.toLite.warning', lang)}</p>
+                  <div class="wow-downgrade__btns">
+                    <button type="button" class="wow-cta wow-cta--danger" @click="downgradeLite()" :disabled="loading === 'lite'">
+                      <span x-show="loading !== 'lite'">Ja, wechseln</span>
+                      <span x-show="loading === 'lite'" style="display:none">…</span>
+                    </button>
+                    <button type="button" class="wow-cta wow-cta--ghost" @click="downgradeConfirm = false" :disabled="loading === 'lite'">Abbrechen</button>
+                  </div>
+                </div>
+              </Fragment>
             )}
           </div>
         </div>
-      </section>
 
-      <!-- Pakete -->
-      <section class="s-card">
-        <div class="s-card__head">
-          <h2 class="s-card__title">{bt('sub.compare.title', lang)}</h2>
-        </div>
-        <div class="s-card__body">
-
-          <div class="sub-plans-grid">
-            {PLANS.map(plan => {
-              const isCurrent = plan.key === currentPlan;
-
-              return (
-                <div class={[
-                  'sub-plan-card',
-                  isCurrent ? 'sub-plan-card--current' : '',
-                  plan.popular && !isCurrent ? 'sub-plan-card--popular' : '',
-                ].filter(Boolean).join(' ')}>
-
-                  {plan.popular && !isCurrent && (
-                    <div class="sub-plan-card__bar sub-plan-card__bar--popular">{bt('sub.recommended', lang)}</div>
-                  )}
-                  {isCurrent && (
-                    <div class="sub-plan-card__bar sub-plan-card__bar--current">{bt('sub.yourplan', lang)}</div>
-                  )}
-
-                  <div class="sub-plan-card__head">
-                    <span class={`sub-plan-tier sub-plan-tier--${plan.key}`}>{plan.label}</span>
-                    {plan.paysOff && (
-                      <span class="sub-plan-paysoff">{bt('sub.paysoff', lang)}</span>
-                    )}
-                    {plan.isFree && (
-                      <span class="sub-plan-free">{bt('sub.price.free', lang)}</span>
-                    )}
-                  </div>
-
-                  <!-- Benefit headline (replaces price) -->
-                  <div class="sub-plan-card__headline">
-                    <p class="sub-plan-headline">{plan.headline}</p>
-                    <p class="sub-plan-frame">{plan.frame}</p>
-                  </div>
-
-                  <ul class="sub-plan-modules">
-                    {plan.modules.map(m => (
-                      <li class="sub-plan-module-item">
-                        <span class="sub-plan-module-check" aria-hidden="true">✓</span>
-                        {m}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div class="sub-plan-card__cta">
-                    {isCurrent ? (
-                      <button type="button" class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--current" disabled>
-                        {bt('sub.btn.current', lang)}
-                      </button>
-                    ) : plan.key === 'enterprise' ? (
-                      <a href="mailto:hallo@retaha.de" class="v9-btn v9-btn--ghost sub-plan-btn">
-                        {bt('sub.btn.contact', lang)}
-                      </a>
-                    ) : plan.key === 'lite' ? (
-                      <div class="sub-plan-downgrade">
-                        <div x-show="!downgradeConfirm" style="display:none">
-                          <button
-                            type="button"
-                            class="v9-btn v9-btn--ghost sub-plan-btn"
-                            @click="downgradeConfirm = true"
-                            :disabled="loading !== ''"
-                          >
-                            {bt('sub.btn.toLite', lang)}
-                          </button>
-                        </div>
-                        <div x-show="downgradeConfirm" class="sub-plan-downgrade__confirm" style="display:none">
-                          <p class="sub-plan-downgrade__warning">{bt('sub.btn.toLite.warning', lang)}</p>
-                          <div class="sub-plan-downgrade__actions">
-                            <button
-                              type="button"
-                              class="v9-btn v9-btn--danger sub-plan-btn sub-plan-btn--sm"
-                              @click="downgradeLite()"
-                              :disabled="loading === 'lite'"
-                            >
-                              <span x-show="loading !== 'lite'">{bt('sub.btn.toLite.confirm', lang)}</span>
-                              <span x-show="loading === 'lite'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
-                            </button>
-                            <button
-                              type="button"
-                              class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--sm"
-                              @click="downgradeConfirm = false"
-                              :disabled="loading === 'lite'"
-                            >
-                              {bt('common.cancel', lang)}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        class="v9-btn v9-btn--primary sub-plan-btn"
-                        @click={`openLeadModal('${plan.key}')`}
-                        :disabled="loading !== ''"
-                      >
-                        {bt('sub.btn.sales', lang)}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+        <!-- PRO -->
+        <div class={`wow-tier wow-tier--pro${currentPlan === 'pro' ? ' wow-tier--current' : ''}`}>
+          {currentPlan === 'pro' && <div class="wow-your-plan">Euer aktueller Plan</div>}
+          <div class="wow-tcap">Pro</div>
+          <h2 class="wow-tier__h2">Eure Marke, mehr Reichweite, weniger Arbeit.</h2>
+          <div class="wow-frame">Die Mappe sieht aus wie euer Haus — und Eve nimmt Arbeit ab.</div>
+          <ul class="wow-bl">
+            <li class="wow-b"><span class="wow-chk wow-chk--pink">✓</span><span>Euer Branding statt Vorlage</span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--pink">✓</span><span>10 Sprachen automatisch</span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--pink">✓</span><span><b>Eve handelt</b>, nicht nur antworten</span></li>
+          </ul>
+          <div class="wow-cta-wrap">
+            {currentPlan === 'pro' ? (
+              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
+            ) : (
+              <button type="button" class="wow-cta" @click="openLeadModal('pro')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
+            )}
           </div>
-
         </div>
-      </section>
 
-      <!-- Eve Add-on -->
-      {showEveAddon && (
-        <section class="s-card">
-          <div class="s-card__head">
-            <h2 class="s-card__title">{bt('sub.addons.title', lang)}</h2>
+        <!-- PREMIUM -->
+        <div class={`wow-tier wow-tier--prem${currentPlan === 'premium' ? ' wow-tier--current' : ''}`}>
+          <div class="wow-ribbon">{currentPlan === 'premium' ? 'Euer aktueller Plan' : 'Empfohlen · zahlt sich aus'}</div>
+          <div class="wow-sheen" aria-hidden="true"></div>
+          <div class="wow-tcap">Premium</div>
+          <h2 class="wow-tier__h2">Mehr Direktumsatz, Wiederkehrer, weniger Aufwand.</h2>
+          <div class="wow-frame">Die Stufe, die nicht nur kostet — sondern verdient.</div>
+          <ul class="wow-bl">
+            <li class="wow-b wow-b--money"><span class="wow-chk wow-chk--money">✓</span><span>Direkt buchen — <b>15–25 % OTA-Provision gespart</b></span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--money">✓</span><span>Erstgäste zu Stammgästen (Wallet, Loyalty)</span></li>
+            <li class="wow-b"><span class="wow-chk wow-chk--money">✓</span><span>Self-Check-out &amp; Tür per App</span></li>
+          </ul>
+          <div class="wow-cta-wrap">
+            {currentPlan === 'premium' ? (
+              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
+            ) : (
+              <button type="button" class="wow-cta wow-cta--prem" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
+            )}
           </div>
-          <div class="s-card__body">
-            <div class="sub-evecard">
-              <div class="sub-eve-head">
-                <svg class="sub-eve-spk" width="14" height="14" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/>
-                </svg>
-                <b><span class="sub-eve-gradient">Eve</span> KI · Aktions-Agent</b>
-                <div class="sub-eve-head-right">
-                  {eveIncluded ? (
-                    <span class="sub-addon-badge sub-addon-badge--included">{bt('sub.addon.eve.included', lang)}</span>
-                  ) : hasEveAddon ? (
-                    <span class="sub-addon-badge">{bt('sub.addon.active', lang)}</span>
-                  ) : null}
-                </div>
-              </div>
-              <p class="sub-eve-desc">{bt('sub.addon.eve.desc', lang)}</p>
-              {!eveIncluded && !hasEveAddon && (
-                <div class="sub-eve-row">
-                  <span class="sub-addon-price">89 € <span class="sub-addon-price-per">{bt('sub.permonth', lang)}</span></span>
-                  <button
-                    type="button"
-                    class="sub-eve-aurora-btn"
-                    @click="requestAddon('eve')"
-                    :disabled="loading !== ''"
-                    :class="{ 'sub-eve-aurora-btn--loading': loading === 'eve' }"
-                  >
-                    <svg class="sub-eve-spk-anim" width="11" height="11" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
-                    <span x-show="loading !== 'eve'">{bt('sub.btn.add', lang)}</span>
-                    <span x-show="loading === 'eve'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
-                  </button>
-                </div>
-              )}
+        </div>
+
+        <!-- ENTERPRISE -->
+        <div class={`wow-tier wow-tier--ent${currentPlan === 'enterprise' ? ' wow-tier--current' : ''}`}>
+          {currentPlan === 'enterprise' && <div class="wow-your-plan">Euer aktueller Plan</div>}
+          <div class="wow-tcap">Enterprise</div>
+          <h2 class="wow-tier__h2">Für Gruppen: eure eigene App, zentral.</h2>
+          <div class="wow-frame">Eure eigene Welt — für Ketten und Gruppen.</div>
+          <ul class="wow-bl">
+            <li class="wow-b"><span class="wow-chk">✓</span><span>Eure eigene <b>White-Label-App</b></span></li>
+            <li class="wow-b"><span class="wow-chk">✓</span><span>Mehrere Häuser zentral</span></li>
+            <li class="wow-b"><span class="wow-chk">✓</span><span>API + fester Ansprechpartner</span></li>
+          </ul>
+          <div class="wow-cta-wrap">
+            {currentPlan === 'enterprise' ? (
+              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
+            ) : (
+              <button type="button" class="wow-cta" @click="openLeadModal('enterprise')" :disabled="loading !== ''">Kontakt aufnehmen</button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Eve Show / Wow Moment -->
+      <div class="wow-show">
+        <div class="wow-show__txt">
+          <span class="wow-tag">Zeigen statt aufzählen</span>
+          <h3 class="wow-show__h3">Tippe ein Feature an — sieh, was es <span class="wow-au">kann.</span></h3>
+          <p class="wow-show__p">Jedes gesperrte Modul zeigt eine kurze Live-Vorschau, statt nur einen Haken in einer Liste. Hier: ein Gast fragt, <b>Eve handelt</b> — und bucht direkt aufs Zimmer.</p>
+          <p class="wow-show__note">Der Unterschied zwischen „Microsite-Builder ✓" und dem Gefühl, zu <i>sehen</i>, wie der Umsatz reinkommt.</p>
+        </div>
+        <div class="wow-demo" aria-hidden="true">
+          <div class="wow-demo__aurora"></div>
+          <div class="wow-demo__scr">
+            <div class="wow-demo__head">
+              <span class="wow-demo__orb"></span>
+              <span class="wow-demo__lbl">Eve · live</span>
+            </div>
+            <div class="wow-bub wow-bub--guest">Können wir Spätabreise um 14 Uhr buchen?</div>
+            <div class="wow-bub wow-bub--eve">Erledige ich — Late Check-out bis 14:00, 25 €.</div>
+            <div class="wow-act">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>
+              Auf Zimmer 204 gebucht
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </div>
 
-      <!-- Footer-Notiz -->
-      <div class="sub-footer-note">
-        <p>
-          {bt('sub.footer.note', lang)} <a href="mailto:hallo@retaha.de" class="sub-footer-link">hallo@retaha.de</a>
-        </p>
-        <a href="/overview" class="v9-btn v9-btn--ghost">{bt('sub.footer.back', lang)}</a>
+      <!-- Closing CTA -->
+      <div class="wow-close">
+        <h3 class="wow-close__h3">Fangt heute kostenlos an.</h3>
+        <p class="wow-close__p">Lite kostet nichts und ist in Minuten live. Wenn ihr mehr wollt, reden wir — kein Risiko, kein Abo-Zwang.</p>
+        <div class="wow-close__btns">
+          {currentPlan !== 'lite' && (
+            <button
+              type="button"
+              class="wow-cbtn wow-cbtn--light"
+              @click="window.confirm('Zu Lite wechseln? Premium-Funktionen werden deaktiviert.') && downgradeLite()"
+              :disabled="loading !== ''"
+            >
+              Kostenlos starten
+            </button>
+          )}
+          {currentPlan === 'lite' && (
+            <span class="wow-cbtn-curr">Euer Plan: Lite ✓</span>
+          )}
+          <button type="button" class="wow-cbtn wow-cbtn--outline" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
+        </div>
       </div>
 
     </div>
@@ -577,220 +447,268 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
   .lead-sent__sub { font-size: 14px; color: var(--ink-muted, #888); margin: 0 0 24px; }
   .lead-close-btn { min-width: 120px; }
 
-  /* ── Layout-Overrides (wie /marketing: 16px-Radius, 32px-Gap) ───────────── */
-  .breadcrumb { padding-top: 36px; }
-  .settings-sections { gap: 32px; }
-  .s-card { border-radius: 16px; }
+  /* ── Wow-Abo-Page ───────────────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-  /* ── Plan badge (current plan indicator) ────────────────────────────────── */
-  .sub-plan-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
-    padding: 4px 10px; border-radius: 99px; text-transform: uppercase;
-  }
-  .sub-plan-badge--lite       { background: #f5f5f5; color: #1a1a1a; border: 1px solid #d0d0d0; }
-  .sub-plan-badge--pro        { background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8; }
-  .sub-plan-badge--premium    { background: #f4f0fb; color: #6d28d9; border: 1px solid #c4b5f5; }
-  .sub-plan-badge--enterprise { background: #1a1a1a; color: #fff;    border: 1px solid #1a1a1a; }
-
-  .sub-trial-note {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em;
+  .wow-page {
+    --sage: #5C9070; --sageBg: #E9F1EC;
+    --pink: #FF4A82; --pinkInk: #C9215A;
+    --purp: #5B4B8A; --purpLine: #D8CFE8; --purpBg: #F0EDF6;
+    --money: #2E6B4E; --moneyBg: #E6F1EA;
+    --auA: #14616E; --auB: #1AA0B0; --auC: #5B7CE0;
+    --w-ink: #0E0D0B; --w-ink2: #56524B; --w-ink3: #9E988E;
+    --w-card: #FFFFFF; --w-line: #E7E3DB; --w-line2: #F0ECE4;
+    --sg: 'Space Grotesk', sans-serif; --mn: 'JetBrains Mono', monospace;
+    padding: 46px 0 80px;
   }
 
-  /* ── Plans Grid ──────────────────────────────────────────────────────────── */
-  .sub-plans-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+  /* Hero */
+  .wow-hero { text-align: center; margin-bottom: 46px; }
+  .wow-eyebrow {
+    font-family: var(--mn); font-size: 10px; letter-spacing: .34em;
+    text-transform: uppercase; color: var(--w-ink3); margin-bottom: 16px;
   }
-  @media (max-width: 1000px) { .sub-plans-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 600px)  { .sub-plans-grid { grid-template-columns: 1fr; } }
-
-  /* ── Plan Card ───────────────────────────────────────────────────────────── */
-  .sub-plan-card {
-    border: 1px solid var(--border);
-    border-radius: var(--r, 8px);
-    background: var(--surface);
-    padding: 20px;
-    display: flex; flex-direction: column;
-    position: relative; overflow: hidden;
-    transition: box-shadow 150ms;
+  .wow-h1 {
+    font-family: var(--sg); font-weight: 700; font-size: 40px;
+    line-height: 1.05; letter-spacing: -.03em;
+    color: var(--w-ink); margin: 0 0 14px;
   }
-  .sub-plan-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-  .sub-plan-card--current  { border-color: var(--ink, #1a1a1a); border-width: 2px; }
-  .sub-plan-card--popular  { border-color: #7c3aed; }
-
-  .sub-plan-card__bar {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
-    text-align: center; padding: 4px;
-    margin: -20px -20px 16px;
+  .wow-g {
+    background: linear-gradient(100deg, var(--auA), var(--auB) 55%, var(--auC));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .sub-plan-card__bar--popular { background: #7c3aed; color: #fff; }
-  .sub-plan-card__bar--current { background: var(--ink, #1a1a1a); color: #fff; }
-
-  /* ── Card Head: tier badge + paysOff/free badge ─────────────────────────── */
-  .sub-plan-card__head {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    margin-bottom: 14px;
+  .wow-sub {
+    font-size: 15px; color: var(--w-ink2); max-width: 520px;
+    margin: 0 auto; line-height: 1.6;
   }
 
-  .sub-plan-tier {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 99px; border: 1px solid;
-    display: inline-block;
+  /* Cards grid */
+  .wow-cards {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; align-items: stretch; margin-bottom: 54px;
   }
-  .sub-plan-tier--lite       { background: transparent; color: #555; border-color: #ccc; }
-  .sub-plan-tier--pro        { background: #edf7f0;    color: #2e7d4f; border-color: #a8d5b8; }
-  .sub-plan-tier--premium    { background: #f4f0fb;    color: #6d28d9; border-color: #c4b5f5; }
-  .sub-plan-tier--enterprise { background: #1a1a1a;    color: #fff;    border-color: #1a1a1a; }
+  @media (max-width: 960px)  { .wow-cards { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px)  { .wow-cards { grid-template-columns: 1fr; } }
 
-  /* "Kostenlos" label for Lite */
-  .sub-plan-free {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 99px;
-    background: #e8f5ec; color: #2e7d4f; border: 1px solid #a8d5b8;
+  /* Single card */
+  .wow-tier {
+    position: relative; background: var(--w-card);
+    border: 1px solid var(--w-line); border-radius: 18px;
+    padding: 24px 22px; display: flex; flex-direction: column;
+    transition: transform .32s cubic-bezier(.2,.7,.3,1), box-shadow .32s;
+    overflow: hidden;
+  }
+  .wow-tier:hover { transform: translateY(-7px); box-shadow: 0 28px 50px -30px rgba(0,0,0,.38); }
+  .wow-tier--current { border-width: 2px; }
+  .wow-tier--lite.wow-tier--current    { border-color: var(--sage); }
+  .wow-tier--pro.wow-tier--current     { border-color: var(--pinkInk); }
+  .wow-tier--prem.wow-tier--current    { border-color: var(--purp); }
+  .wow-tier--ent.wow-tier--current     { border-color: var(--w-ink); }
+
+  /* Premium: elevated + ribbon */
+  .wow-tier--prem {
+    border-color: var(--purpLine);
+    box-shadow: 0 24px 48px -30px rgba(91,76,138,.45);
+    transform: translateY(-6px);
+    padding-top: 48px;
+  }
+  .wow-tier--prem:hover { transform: translateY(-13px); }
+
+  .wow-ribbon {
+    position: absolute; top: 0; left: 0; right: 0; height: 34px;
+    background: var(--purp); display: flex; align-items: center; justify-content: center;
+    font-family: var(--mn); font-size: 8.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: #fff;
   }
 
-  /* "zahlt sich aus" badge for Premium */
-  .sub-plan-paysoff {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 99px;
-    background: #e6f1ea; color: #2E6B4E; border: 1px solid #BBD8C7;
+  @keyframes wow-sheen { 0%,72%{left:-60%} 100%{left:130%} }
+  .wow-sheen {
+    position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
+    background: linear-gradient(100deg,transparent,rgba(255,255,255,.46),transparent);
+    transform: skewX(-18deg);
+    animation: wow-sheen 6.5s ease-in-out infinite;
+    pointer-events: none;
   }
 
-  /* ── Benefit headline (replaces price) ──────────────────────────────────── */
-  .sub-plan-card__headline {
+  /* "Your plan" bar for non-premium cards */
+  .wow-your-plan {
+    position: absolute; top: 0; left: 0; right: 0; height: 30px;
+    background: #0E0D0B; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mn); font-size: 8px; letter-spacing: .14em;
+    text-transform: uppercase; color: #fff;
     margin-bottom: 18px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+  }
+  .wow-tier--lite .wow-your-plan  { background: var(--sage); }
+  .wow-tier--pro  .wow-your-plan  { background: var(--pinkInk); }
+  .wow-tier--ent  .wow-your-plan  { background: #0E0D0B; }
+  /* add top padding when your-plan bar is present */
+  .wow-tier--current:not(.wow-tier--prem) { padding-top: 44px; }
+
+  .wow-tcap {
+    font-family: var(--mn); font-size: 9.5px; letter-spacing: .14em;
+    text-transform: uppercase; margin-bottom: 14px; color: var(--w-ink3);
+  }
+  .wow-tier--lite .wow-tcap { color: var(--sage); }
+  .wow-tier--pro  .wow-tcap { color: var(--pinkInk); }
+  .wow-tier--prem .wow-tcap { color: var(--purp); }
+
+  .wow-tier__h2 {
+    font-family: var(--sg); font-weight: 700; font-size: 20px;
+    line-height: 1.15; letter-spacing: -.02em;
+    color: var(--w-ink); margin: 0 0 9px; min-height: 60px;
+  }
+  .wow-frame {
+    font-size: 12px; color: var(--w-ink2); line-height: 1.5;
+    margin-bottom: 16px; padding-bottom: 15px;
+    border-bottom: 1px solid var(--w-line2);
   }
 
-  .sub-plan-headline {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px; font-weight: 700; line-height: 1.25;
-    letter-spacing: -0.02em; color: var(--ink);
-    margin: 0 0 6px;
+  /* Benefit list */
+  .wow-bl { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .wow-b  { display: flex; gap: 9px; font-size: 12.5px; color: var(--w-ink2); line-height: 1.4; }
+  .wow-b--money { color: var(--money); font-weight: 600; }
+  .wow-chk       { flex-shrink: 0; font-weight: 700; color: var(--w-ink); }
+  .wow-chk--sage  { color: var(--sage); }
+  .wow-chk--pink  { color: var(--pink); }
+  .wow-chk--money { color: var(--money); }
+
+  /* CTA buttons */
+  .wow-cta-wrap { margin-top: auto; }
+  .wow-cta {
+    display: block; width: 100%; text-align: center;
+    font-family: var(--mn); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 13px; border-radius: 11px; cursor: pointer;
+    border: 1px solid var(--w-ink); color: var(--w-ink); background: none;
+    transition: background .2s, color .2s;
   }
+  .wow-cta:hover:not(:disabled):not([aria-disabled]) { background: var(--w-ink); color: #fff; }
+  .wow-cta:disabled { opacity: .55; cursor: not-allowed; }
+  .wow-cta--free   { border-color: var(--sage); color: var(--sage); }
+  .wow-cta--free:hover:not(:disabled)   { background: var(--sage); color: #fff; }
+  .wow-cta--prem   { background: var(--purp); border-color: var(--purp); color: #fff; }
+  .wow-cta--prem:hover:not(:disabled)  { filter: brightness(1.12); }
+  .wow-cta--danger { background: #c0392b; border-color: #c0392b; color: #fff; }
+  .wow-cta--danger:hover:not(:disabled) { background: #a93226; }
+  .wow-cta--ghost  { border-color: var(--w-line); color: var(--w-ink3); }
+  .wow-cta--ghost:hover:not(:disabled)  { background: var(--w-line2); color: var(--w-ink); }
+  .wow-cta--current { border-color: transparent; background: rgba(0,0,0,.04); color: var(--w-ink3); cursor: default; }
 
-  .sub-plan-frame {
-    font-size: 11.5px; line-height: 1.55; color: var(--ink-muted);
-    margin: 0;
+  .wow-downgrade { display: flex; flex-direction: column; gap: 8px; }
+  .wow-downgrade__warn { font-size: 10px; color: #c0392b; margin: 0; line-height: 1.4; }
+  .wow-downgrade__btns { display: flex; gap: 6px; }
+  .wow-downgrade__btns .wow-cta { padding: 10px; font-size: 8.5px; }
+
+  /* Eve show / demo */
+  .wow-show {
+    display: grid; grid-template-columns: 1.05fr .95fr;
+    gap: 30px; align-items: center;
+    background: var(--w-card); border: 1px solid var(--w-line);
+    border-radius: 22px; padding: 34px;
+    margin-bottom: 48px; position: relative; overflow: hidden;
   }
-
-  /* ── Module list ─────────────────────────────────────────────────────────── */
-  .sub-plan-modules {
-    list-style: none; padding: 0; margin: 0 0 20px;
-    display: flex; flex-direction: column; gap: 6px; flex: 1;
+  .wow-show::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(90% 120% at 100% 0%, rgba(91,124,224,.07), transparent 55%);
+    pointer-events: none;
   }
-  .sub-plan-module-item {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; color: var(--ink-muted); letter-spacing: 0.02em;
-    display: flex; align-items: flex-start; gap: 7px; line-height: 1.4;
+  @media (max-width: 780px) { .wow-show { grid-template-columns: 1fr; gap: 24px; } }
+
+  .wow-tag {
+    font-family: var(--mn); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--auA); background: #E6F0F0; border: 1px solid #BBD9DD;
+    border-radius: 999px; padding: 6px 12px; display: inline-block; margin-bottom: 12px;
   }
-  .sub-plan-module-check { color: #2e7d4f; flex-shrink: 0; font-size: 10px; margin-top: 1px; }
-
-  .sub-plan-card__cta { margin-top: auto; }
-
-  .sub-plan-btn {
-    width: 100%; display: block; text-align: center; text-decoration: none;
-    font-size: 10px !important;
+  .wow-show__h3 {
+    font-family: var(--sg); font-weight: 700; font-size: 24px;
+    letter-spacing: -.02em; line-height: 1.15; margin: 0 0 12px; color: var(--w-ink);
   }
-  .sub-plan-btn--current { opacity: 0.6; cursor: not-allowed; }
-  .sub-plan-btn--loading { opacity: 0.65; }
-  .sub-plan-btn--sm { font-size: 9px !important; padding: 7px 10px !important; }
-
-  .v9-btn--danger {
-    background: #c0392b; color: #fff; border-color: #c0392b;
+  .wow-au {
+    background: linear-gradient(100deg, var(--auA), var(--auB), var(--auC));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .v9-btn--danger:hover:not(:disabled) { background: #a93226; border-color: #a93226; }
+  .wow-show__p    { font-size: 13.5px; color: var(--w-ink2); line-height: 1.6; margin: 0 0 10px; }
+  .wow-show__note { font-size: 12px; color: var(--w-ink3); font-style: italic; margin: 0; }
 
-  .sub-plan-downgrade { width: 100%; }
-  .sub-plan-downgrade__confirm { display: flex; flex-direction: column; gap: 8px; }
-  .sub-plan-downgrade__warning {
-    font-size: 10px; color: #c0392b; margin: 0; line-height: 1.4;
-  }
-  .sub-plan-downgrade__actions { display: flex; gap: 6px; }
+  /* Phone demo */
+  @keyframes wow-spin { to{transform:rotate(360deg)} }
+  @keyframes wow-b1 { 0%,4%{opacity:0;transform:translateY(6px)} 9%,30%{opacity:1;transform:none} 37%,100%{opacity:0} }
+  @keyframes wow-b2 { 0%,36%{opacity:0;transform:translateY(6px)} 43%,66%{opacity:1;transform:none} 73%,100%{opacity:0} }
+  @keyframes wow-b3 { 0%,68%{opacity:0;transform:translateY(6px) scale(.96)} 75%,93%{opacity:1;transform:none} 100%{opacity:0} }
 
-  /* ── Eve Add-on card ────────────────────────────────────────────────────── */
-  @keyframes sub-aurora-flow { to { background-position: 0 0, 240% 0; } }
-  @keyframes sub-eve-twinkle { 0%,100%{transform:scale(1) rotate(0);opacity:1} 50%{transform:scale(1.3) rotate(90deg);opacity:.7} }
-
-  .sub-evecard {
+  .wow-demo {
+    justify-self: center; width: 280px; height: 290px;
+    background: #0E0D0B; border-radius: 26px; padding: 16px;
     position: relative;
-    border: 1.6px solid transparent;
-    border-radius: 16px;
-    padding: 20px 22px;
-    background: linear-gradient(var(--surface, #fff), var(--surface, #fff)) padding-box,
-                linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%) border-box;
-    background-size: auto, 240% 100%;
-    animation: sub-aurora-flow 7s linear infinite;
-    box-shadow: 0 8px 30px rgba(45,91,208,.12);
+    box-shadow: 0 30px 60px -28px rgba(0,0,0,.55);
+    overflow: hidden;
   }
-  .sub-eve-head {
-    display: flex; align-items: center; gap: 9px; margin-bottom: 8px;
-    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: var(--ink);
+  .wow-demo::after {
+    content: ''; position: absolute; inset: 0; border-radius: 26px;
+    border: 1px solid rgba(255,255,255,.08); pointer-events: none;
   }
-  .sub-eve-head-right { margin-left: auto; }
-  .sub-eve-spk { color: #2E72C8; flex-shrink: 0; animation: sub-eve-twinkle 2.4s ease-in-out infinite; }
-  .sub-eve-spk-anim { animation: sub-eve-twinkle 2.4s ease-in-out infinite; }
-  .sub-eve-gradient {
-    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
-    background-size: 240% 100%;
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    animation: sub-aurora-flow 5s linear infinite; font-weight: 700;
+  .wow-demo__aurora {
+    position: absolute; inset: 0;
+    background: radial-gradient(80% 60% at 20% 0%, rgba(26,160,176,.22), transparent 60%),
+                radial-gradient(80% 60% at 100% 100%, rgba(91,124,224,.20), transparent 60%);
   }
-  .sub-eve-desc {
-    font-size: 13px; color: var(--ink-muted); line-height: 1.55; margin: 0 0 16px; max-width: 560px;
+  .wow-demo__scr {
+    position: relative; height: 100%;
+    display: flex; flex-direction: column; gap: 9px; padding: 6px 4px;
   }
-  .sub-eve-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  .wow-demo__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .wow-demo__orb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: conic-gradient(from 200deg,#14616E,#1AA0B0,#5B7CE0,#14616E);
+    animation: wow-spin 9s linear infinite; flex-shrink: 0;
   }
-  .sub-addon-price {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 20px; font-weight: 300; color: var(--ink); line-height: 1;
+  .wow-demo__lbl { font-family: var(--mn); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: #cfe6ea; }
+  .wow-bub {
+    max-width: 82%; font-size: 11.5px; line-height: 1.4;
+    padding: 9px 12px; border-radius: 14px; opacity: 0;
   }
-  .sub-addon-price-per {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-muted);
+  .wow-bub--guest {
+    align-self: flex-end; background: rgba(255,255,255,.12); color: #F4F1EC;
+    border-bottom-right-radius: 4px; animation: wow-b1 9s ease infinite;
   }
-  .sub-eve-aurora-btn {
-    cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
-    white-space: nowrap; border-radius: 9px; border: 0; color: #fff;
-    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
-    padding: 8px 13px;
-    background: linear-gradient(115deg,#14616E 0%,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%);
-    background-size: 280% 100%;
-    animation: sub-aurora-flow 6s linear infinite;
-    box-shadow: 0 5px 16px rgba(20,97,110,.28);
-    transition: transform .15s, box-shadow .2s;
+  .wow-bub--eve {
+    align-self: flex-start; background: #fff; color: #161514;
+    border-bottom-left-radius: 4px; animation: wow-b2 9s ease infinite;
   }
-  .sub-eve-aurora-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 9px 26px rgba(45,91,208,.38); animation-duration: 2.2s; }
-  .sub-eve-aurora-btn:disabled,
-  .sub-eve-aurora-btn--loading { opacity: .55; cursor: not-allowed; transform: none; }
-  .sub-addon-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 4px 10px; border-radius: 99px;
-    background: #edf7f0; color: #2e7d4f; border: 1px solid #a8d5b8;
-  }
-  .sub-addon-badge--included {
-    background: #f4f0fb; color: #6d28d9; border-color: #c4b5f5;
+  .wow-act {
+    align-self: flex-start; display: flex; align-items: center; gap: 7px;
+    font-family: var(--mn); font-size: 9px; letter-spacing: .04em; color: #fff;
+    background: linear-gradient(100deg, #1AA0B0, #5B7CE0);
+    padding: 8px 12px; border-radius: 999px;
+    opacity: 0; animation: wow-b3 9s ease infinite;
   }
 
-  /* ── Footer note ─────────────────────────────────────────────────────────── */
-  .sub-footer-note {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    flex-wrap: wrap;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; color: var(--ink-muted); letter-spacing: 0.02em;
-    padding: 16px 20px;
-    border: 1px solid var(--border); border-radius: var(--r, 8px);
-    background: var(--bg-deep, #F0EDE6);
+  /* Closing CTA section */
+  .wow-close {
+    text-align: center; background: #0E0D0B;
+    border-radius: 22px; padding: 44px 30px;
+    color: #fff; position: relative; overflow: hidden;
   }
-  .sub-footer-note p { margin: 0; }
-  .sub-footer-link { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .wow-close__h3 {
+    font-family: var(--sg); font-weight: 700; font-size: 26px;
+    letter-spacing: -.02em; margin: 0 0 10px;
+  }
+  .wow-close__p {
+    font-size: 13.5px; color: #D8D3CB;
+    max-width: 460px; margin: 0 auto 24px; line-height: 1.6;
+  }
+  .wow-close__btns { display: inline-flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .wow-cbtn {
+    font-family: var(--mn); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 14px 26px; border-radius: 12px; cursor: pointer; border: none;
+    transition: filter .2s, opacity .15s;
+  }
+  .wow-cbtn:disabled { opacity: .55; cursor: not-allowed; }
+  .wow-cbtn--light   { background: #fff; color: #0E0D0B; }
+  .wow-cbtn--light:hover:not(:disabled) { filter: brightness(.92); }
+  .wow-cbtn--outline { background: none; color: #fff; border: 1px solid rgba(255,255,255,.4); }
+  .wow-cbtn--outline:hover:not(:disabled) { background: rgba(255,255,255,.1); }
+  .wow-cbtn-curr {
+    font-family: var(--mn); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: rgba(255,255,255,.55); padding: 14px 0; align-self: center;
+  }
 </style>
