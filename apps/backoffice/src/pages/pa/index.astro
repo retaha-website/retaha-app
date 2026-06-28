@@ -1,0 +1,358 @@
+---
+import { getUser, isPlatformAdmin, createSupabaseServiceRoleInstance } from '@retaha/auth';
+
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const isAdmin = await isPlatformAdmin(Astro.cookies, Astro.request);
+if (!isAdmin) return Astro.redirect('/overview');
+
+const db = createSupabaseServiceRoleInstance();
+
+// Alle Hotels laden
+const { data: hotels } = await db
+  .from('hotels')
+  .select('id, name, plan, addons, is_active, subscription_status, created_at')
+  .order('created_at', { ascending: false });
+
+// Upgrade-Anfragen laden (neueste zuerst)
+const { data: upgradeRequests } = await db
+  .from('upgrade_requests')
+  .select('id, hotel_id, requested_by, requested_plan, phone, preferred_time, note, status, created_at')
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+// Hotel-Namen für Requests auflösen
+const hotelMap = Object.fromEntries((hotels ?? []).map(h => [h.id, h.name]));
+
+// Plan-Change-Log (letzte 20)
+const { data: planLog } = await db
+  .from('plan_change_log')
+  .select('id, hotel_id, changed_by, old_plan, new_plan, reason, created_at')
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+const PLANS = ['lite', 'pro', 'premium', 'enterprise'];
+const ADDONS = ['eve'];
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+---
+
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Platform Admin · retaha</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter Tight', 'Inter', system-ui, sans-serif; font-size: 13px; background: #F5F4F1; color: #1A1A1A; min-height: 100vh; }
+    .pa-header { background: #14616E; color: #fff; padding: 14px 32px; display: flex; align-items: center; gap: 16px; }
+    .pa-header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+    .pa-badge { background: rgba(255,255,255,0.18); border-radius: 99px; padding: 2px 10px; font-size: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; }
+    .pa-user { margin-left: auto; font-size: 11px; opacity: 0.8; }
+    .pa-wrap { max-width: 1400px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 32px; }
+    .pa-section { background: #fff; border: 1px solid #E5E4E0; border-radius: 16px; overflow: hidden; }
+    .pa-section-head { padding: 18px 24px; border-bottom: 1px solid #E5E4E0; display: flex; align-items: center; gap: 12px; }
+    .pa-section-head h2 { font-size: 13px; font-weight: 600; }
+    .pa-count { background: #14616E; color: #fff; border-radius: 99px; font-size: 9px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace; }
+    .pa-count--warn { background: #E8A000; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; padding: 10px 16px; text-align: left; border-bottom: 1px solid #E5E4E0; background: #FAFAF8; }
+    td { padding: 12px 16px; border-bottom: 1px solid #F0EFED; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #FAFAF8; }
+    .plan-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; }
+    .plan-badge--lite { color: #888; border-color: #ddd; }
+    .plan-badge--pro { color: #2E72C8; border-color: rgba(46,114,200,0.3); background: rgba(46,114,200,0.06); }
+    .plan-badge--premium { color: #14616E; border-color: rgba(20,97,110,0.3); background: rgba(20,97,110,0.08); }
+    .plan-badge--enterprise { color: #5B3FA0; border-color: rgba(91,63,160,0.3); background: rgba(91,63,160,0.06); }
+    select { font-size: 12px; font-family: inherit; border: 1px solid #E5E4E0; border-radius: 6px; padding: 5px 8px; background: #fff; cursor: pointer; color: #1A1A1A; }
+    .pa-btn { font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 14px; border-radius: 8px; border: none; cursor: pointer; transition: all 120ms ease; }
+    .pa-btn--primary { background: #14616E; color: #fff; }
+    .pa-btn--primary:hover { background: #0f4a54; }
+    .pa-btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pa-btn--ghost { background: transparent; border: 1px solid #E5E4E0; color: #666; }
+    .pa-btn--ghost:hover { border-color: #14616E; color: #14616E; }
+    .pa-btn--sm { padding: 4px 10px; font-size: 10px; }
+    .pa-btn--danger { background: #c0392b; color: #fff; }
+    .status-badge { display: inline-block; font-size: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 99px; }
+    .status-badge--neu { background: #FFF3CD; color: #856404; }
+    .status-badge--kontaktiert { background: #D1ECF1; color: #0C5460; }
+    .status-badge--abgeschlossen { background: #D4EDDA; color: #155724; }
+    .status-badge--abgebrochen { background: #F8D7DA; color: #721C24; }
+    .addon-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+    .addon-toggle input[type="checkbox"] { width: 14px; height: 14px; accent-color: #14616E; }
+    .toast-msg { position: fixed; bottom: 24px; right: 24px; background: #14616E; color: #fff; border-radius: 10px; padding: 12px 20px; font-size: 12px; z-index: 999; opacity: 0; transform: translateY(8px); transition: all 300ms ease; pointer-events: none; }
+    .toast-msg.is-visible { opacity: 1; transform: translateY(0); }
+    .toast-msg.is-error { background: #c0392b; }
+    .reason-input { font-family: inherit; font-size: 12px; border: 1px solid #E5E4E0; border-radius: 6px; padding: 5px 8px; width: 180px; }
+    .pa-empty { padding: 24px; text-align: center; color: #888; font-size: 12px; }
+    .note-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #666; }
+  </style>
+</head>
+<body>
+
+<div class="pa-header">
+  <h1>retaha Platform Admin</h1>
+  <span class="pa-badge">RESTRICTED</span>
+  <span class="pa-user">{user.email}</span>
+</div>
+
+<div class="pa-wrap">
+
+  <!-- ── HOTELS & PLAN SETZEN ──────────────────────────────────────────── -->
+  <div class="pa-section">
+    <div class="pa-section-head">
+      <h2>Hotels &amp; Pläne</h2>
+      <span class="pa-count">{hotels?.length ?? 0}</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Hotel</th>
+          <th>Aktueller Plan</th>
+          <th>Add-ons</th>
+          <th>Status</th>
+          <th>Neuer Plan</th>
+          <th>Grund</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {(hotels ?? []).map(h => (
+          <tr id={`row-${h.id}`}>
+            <td>
+              <div style="font-weight:600">{h.name}</div>
+              <div style="font-size:10px;color:#888;font-family:'JetBrains Mono',monospace">{h.id.slice(0,8)}…</div>
+            </td>
+            <td>
+              <span class={`plan-badge plan-badge--${h.plan ?? 'lite'}`}>
+                {(h.plan ?? 'lite').toUpperCase()}
+              </span>
+            </td>
+            <td>
+              <span style="font-size:11px;color:#666">
+                {(h.addons as string[] | null)?.join(', ') || '—'}
+              </span>
+            </td>
+            <td>
+              <span style={`font-size:10px;font-family:'JetBrains Mono',monospace;color:${h.is_active ? '#14616E' : '#c0392b'}`}>
+                {h.is_active ? 'AKTIV' : 'INAKTIV'}
+              </span>
+            </td>
+            <td>
+              <select id={`plan-${h.id}`} class="plan-select" data-hotel={h.id} data-current={h.plan ?? 'lite'}>
+                {PLANS.map(p => (
+                  <option value={p} selected={p === (h.plan ?? 'lite')}>{p}</option>
+                ))}
+              </select>
+              <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                {ADDONS.map(a => (
+                  <label class="addon-toggle">
+                    <input
+                      type="checkbox"
+                      class="addon-check"
+                      data-hotel={h.id}
+                      data-addon={a}
+                      checked={((h.addons as string[] | null) ?? []).includes(a)}
+                    />
+                    {a}
+                  </label>
+                ))}
+              </div>
+            </td>
+            <td>
+              <input type="text" class="reason-input" id={`reason-${h.id}`} placeholder="Grund (optional)" />
+            </td>
+            <td>
+              <button
+                class="pa-btn pa-btn--primary pa-btn--sm save-btn"
+                data-hotel={h.id}
+                data-name={h.name}
+              >
+                Speichern
+              </button>
+            </td>
+          </tr>
+        ))}
+        {(!hotels || hotels.length === 0) && (
+          <tr><td colspan="7" class="pa-empty">Keine Hotels gefunden</td></tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── UPGRADE-ANFRAGEN ─────────────────────────────────────────────── -->
+  <div class="pa-section">
+    <div class="pa-section-head">
+      <h2>Upgrade-Anfragen</h2>
+      {(() => {
+        const neuCount = (upgradeRequests ?? []).filter(r => r.status === 'neu').length;
+        return neuCount > 0
+          ? <span class="pa-count pa-count--warn">{neuCount} NEU</span>
+          : <span class="pa-count">{upgradeRequests?.length ?? 0}</span>;
+      })()}
+    </div>
+    {(!upgradeRequests || upgradeRequests.length === 0) ? (
+      <div class="pa-empty">Noch keine Anfragen</div>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            <th>Hotel</th>
+            <th>Plan</th>
+            <th>Telefon</th>
+            <th>Zeitfenster</th>
+            <th>Notiz</th>
+            <th>Eingegangen</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {upgradeRequests.map(r => (
+            <tr>
+              <td style="font-weight:600">{hotelMap[r.hotel_id] ?? r.hotel_id.slice(0,8)}</td>
+              <td>
+                <span class={`plan-badge plan-badge--${r.requested_plan}`}>
+                  {r.requested_plan.toUpperCase()}
+                </span>
+              </td>
+              <td>{r.phone || '—'}</td>
+              <td>{r.preferred_time || '—'}</td>
+              <td class="note-cell" title={r.note ?? ''}>{r.note || '—'}</td>
+              <td style="font-size:11px;color:#666">{formatDate(r.created_at)}</td>
+              <td>
+                <select
+                  class="status-select"
+                  data-request={r.id}
+                  style="font-size:11px"
+                >
+                  {['neu','kontaktiert','abgeschlossen','abgebrochen'].map(s => (
+                    <option value={s} selected={s === r.status}>{s}</option>
+                  ))}
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  <!-- ── PLAN-CHANGE-LOG ──────────────────────────────────────────────── -->
+  <div class="pa-section">
+    <div class="pa-section-head">
+      <h2>Plan-Change-Log</h2>
+      <span class="pa-count">{planLog?.length ?? 0} letzte</span>
+    </div>
+    {(!planLog || planLog.length === 0) ? (
+      <div class="pa-empty">Noch keine Änderungen</div>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            <th>Hotel</th>
+            <th>Alt</th>
+            <th>Neu</th>
+            <th>Grund</th>
+            <th>Wann</th>
+          </tr>
+        </thead>
+        <tbody>
+          {planLog.map(l => (
+            <tr>
+              <td style="font-weight:600">{hotelMap[l.hotel_id] ?? l.hotel_id.slice(0,8)}</td>
+              <td>
+                <span class={`plan-badge plan-badge--${l.old_plan ?? 'lite'}`}>
+                  {(l.old_plan ?? '—').toUpperCase()}
+                </span>
+              </td>
+              <td>
+                <span class={`plan-badge plan-badge--${l.new_plan}`}>
+                  {l.new_plan.toUpperCase()}
+                </span>
+              </td>
+              <td class="note-cell" title={l.reason ?? ''}>{l.reason || '—'}</td>
+              <td style="font-size:11px;color:#666">{formatDate(l.created_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+</div>
+
+<div class="toast-msg" id="paToast"></div>
+
+<script is:inline>
+  function showToast(msg, isError) {
+    var t = document.getElementById('paToast');
+    t.textContent = msg;
+    t.className = 'toast-msg' + (isError ? ' is-error' : '') + ' is-visible';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() { t.className = 'toast-msg'; }, 3500);
+  }
+
+  // ── Plan speichern ───────────────────────────────────────────────────
+  document.querySelectorAll('.save-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var hotelId = btn.dataset.hotel;
+      var hotelName = btn.dataset.name;
+      var plan = document.getElementById('plan-' + hotelId).value;
+      var reason = document.getElementById('reason-' + hotelId).value.trim();
+      var addons = Array.from(
+        document.querySelectorAll('.addon-check[data-hotel="' + hotelId + '"]')
+      ).filter(function(c) { return c.checked; }).map(function(c) { return c.dataset.addon; });
+
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        var res = await fetch('/api/pa/set-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hotel_id: hotelId, plan: plan, addons: addons, reason: reason || null })
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Fehler');
+        showToast('✓ ' + hotelName + ' → ' + plan.toUpperCase(), false);
+        // Plan-Badge aktualisieren
+        var badge = document.querySelector('#row-' + hotelId + ' .plan-badge');
+        if (badge) {
+          badge.className = 'plan-badge plan-badge--' + plan;
+          badge.textContent = plan.toUpperCase();
+        }
+      } catch(e) {
+        showToast('✗ ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Speichern';
+      }
+    });
+  });
+
+  // ── Status-Update für Upgrade-Requests ──────────────────────────────
+  document.querySelectorAll('.status-select').forEach(function(sel) {
+    sel.addEventListener('change', async function() {
+      var requestId = sel.dataset.request;
+      var status = sel.value;
+      try {
+        var res = await fetch('/api/pa/upgrade-request-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: requestId, status: status })
+        });
+        if (!res.ok) throw new Error('Fehler');
+        showToast('✓ Status → ' + status, false);
+      } catch(e) {
+        showToast('✗ ' + e.message, true);
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

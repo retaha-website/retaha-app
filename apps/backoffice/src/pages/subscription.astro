@@ -117,14 +117,57 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
   <script is:inline define:vars={{
     SUB_ERR_TRIAL: bt('sub.err.trial', lang),
     SUB_TRIAL_SENT: bt('sub.trial.sent', lang),
+    SUB_HOTEL_NAME: hotel.name,
+    SUB_USER_EMAIL: user.email ?? '',
   }}>
-    window.__SUB_T__ = { errTrial: SUB_ERR_TRIAL, trialSent: SUB_TRIAL_SENT };
+    window.__SUB_T__ = {
+      errTrial: SUB_ERR_TRIAL,
+      trialSent: SUB_TRIAL_SENT,
+      hotelName: SUB_HOTEL_NAME,
+      userEmail: SUB_USER_EMAIL,
+    };
   </script>
   <div
     class="settings-page"
     x-data="{
       loading: '',
       downgradeConfirm: false,
+      leadModal: false,
+      leadPlan: '',
+      leadPhone: '',
+      leadTime: '',
+      leadNote: '',
+      leadSent: false,
+      openLeadModal(plan) {
+        this.leadPlan = plan;
+        this.leadPhone = '';
+        this.leadTime = '';
+        this.leadNote = '';
+        this.leadSent = false;
+        this.leadModal = true;
+      },
+      async submitLead() {
+        this.loading = 'lead';
+        try {
+          const res = await fetch('/api/subscription/request-upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              plan: this.leadPlan,
+              phone: this.leadPhone || undefined,
+              preferred_time: this.leadTime || undefined,
+              note: this.leadNote || undefined,
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || window.__SUB_T__.errTrial);
+          this.leadSent = true;
+          this.loading = '';
+        } catch(e) {
+          window.retahaToast?.(e.message, 'error');
+          this.loading = '';
+        }
+      },
       async downgradeLite() {
         this.loading = 'lite';
         try {
@@ -139,23 +182,6 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
           window.retahaToast?.(e.message, 'error');
           this.loading = '';
           this.downgradeConfirm = false;
-        }
-      },
-      async requestSales(plan) {
-        this.loading = plan;
-        try {
-          const res = await fetch('/api/subscription/request-upgrade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan })
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || window.__SUB_T__.errTrial);
-          window.retahaToast?.(window.__SUB_T__.trialSent, 'success');
-          this.loading = '';
-        } catch(e) {
-          window.retahaToast?.(e.message, 'error');
-          this.loading = '';
         }
       },
       async requestAddon(addon) {
@@ -310,12 +336,10 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
                       <button
                         type="button"
                         class="v9-btn v9-btn--primary sub-plan-btn"
-                        @click={`requestSales('${plan.key}')`}
+                        @click={`openLeadModal('${plan.key}')`}
                         :disabled="loading !== ''"
-                        :class={`{ 'sub-plan-btn--loading': loading === '${plan.key}' }`}
                       >
-                        <span x-show={`loading !== '${plan.key}'`}>{bt('sub.btn.sales', lang)}</span>
-                        <span x-show={`loading === '${plan.key}'`} style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
+                        {bt('sub.btn.sales', lang)}
                       </button>
                     )}
                   </div>
@@ -379,10 +403,180 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
       </div>
 
     </div>
+
+    <!-- ── Lead-Modal ────────────────────────────────────────────────────── -->
+    <div class="lead-overlay" x-show="leadModal" x-cloak @click.self="leadModal = false" style="display:none">
+      <div class="lead-modal" @keydown.escape.window="leadModal = false" role="dialog" aria-modal="true">
+
+        <!-- Bestätigung nach Absenden -->
+        <div x-show="leadSent" class="lead-sent" style="display:none">
+          <div class="lead-sent__icon">✓</div>
+          <h2 class="lead-sent__title">Danke — wir melden uns!</h2>
+          <p class="lead-sent__sub">Deine Anfrage ist eingegangen. Wir kommen in Kürze auf dich zu.</p>
+          <button type="button" class="v9-btn v9-btn--primary lead-close-btn" @click="leadModal = false">
+            Schließen
+          </button>
+        </div>
+
+        <!-- Formular -->
+        <div x-show="!leadSent" style="display:none">
+          <div class="lead-modal__head">
+            <div>
+              <p class="lead-modal__eyebrow">Upgrade-Interesse</p>
+              <h2 class="lead-modal__title">
+                Kontakt für <span class="lead-plan-chip" x-text="leadPlan.toUpperCase()"></span>
+              </h2>
+            </div>
+            <button type="button" class="lead-modal__close" @click="leadModal = false" aria-label="Schließen">✕</button>
+          </div>
+
+          <!-- Read-only Hotel-Info -->
+          <div class="lead-readonlys">
+            <div class="lead-readonly">
+              <span class="lead-readonly__label">Hotel</span>
+              <span class="lead-readonly__val" x-text="window.__SUB_T__.hotelName"></span>
+            </div>
+            <div class="lead-readonly">
+              <span class="lead-readonly__label">E-Mail</span>
+              <span class="lead-readonly__val" x-text="window.__SUB_T__.userEmail"></span>
+            </div>
+          </div>
+
+          <form class="lead-form" @submit.prevent="submitLead()">
+            <div class="lead-field">
+              <label class="lead-label" for="lead-phone">Telefon</label>
+              <input
+                id="lead-phone"
+                type="tel"
+                class="s-input lead-input"
+                placeholder="+49 123 456789"
+                x-model="leadPhone"
+                autocomplete="tel"
+              />
+            </div>
+            <div class="lead-field">
+              <label class="lead-label" for="lead-time">Wunsch-Zeitfenster</label>
+              <input
+                id="lead-time"
+                type="text"
+                class="s-input lead-input"
+                placeholder="z.B. Mo–Fr 9–12 Uhr"
+                x-model="leadTime"
+              />
+            </div>
+            <div class="lead-field">
+              <label class="lead-label" for="lead-note">Notiz <span style="color:var(--ink-muted)">(optional)</span></label>
+              <textarea
+                id="lead-note"
+                class="s-input lead-input"
+                rows="3"
+                placeholder="Was noch wichtig ist…"
+                x-model="leadNote"
+                style="resize:vertical"
+              ></textarea>
+            </div>
+
+            <div class="lead-actions">
+              <button type="button" class="v9-btn v9-btn--ghost" @click="leadModal = false">
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                class="v9-btn v9-btn--primary lead-submit"
+                :disabled="loading === 'lead'"
+              >
+                <span x-show="loading !== 'lead'">Anfrage absenden →</span>
+                <span x-show="loading === 'lead'" style="display:none">Wird gesendet…</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </Layout>
 
 <style>
+  /* ── Lead Modal ─────────────────────────────────────────────────────────── */
+  .lead-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .lead-modal {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #E5E4E0);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.12);
+  }
+  .lead-modal__head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 20px; gap: 12px;
+  }
+  .lead-modal__eyebrow {
+    font-size: 11px; font-weight: 500; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-muted, #888);
+    margin: 0 0 4px;
+  }
+  .lead-modal__title {
+    font-size: 18px; font-weight: 600; color: var(--ink, #1a1a1a);
+    margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .lead-plan-chip {
+    background: var(--petrol, #14616E);
+    color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .lead-modal__close {
+    background: none; border: none; cursor: pointer;
+    color: var(--ink-muted, #888); font-size: 16px; line-height: 1;
+    padding: 4px; border-radius: 6px; flex-shrink: 0;
+  }
+  .lead-modal__close:hover { color: var(--ink, #1a1a1a); background: var(--surface-alt, #f4f4f3); }
+  .lead-readonlys {
+    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .lead-readonly {
+    background: var(--surface-alt, #f4f4f3);
+    border: 1px solid var(--border, #E5E4E0);
+    border-radius: 8px; padding: 8px 12px;
+    display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 140px;
+  }
+  .lead-readonly__label {
+    font-size: 10px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-muted, #888);
+  }
+  .lead-readonly__val {
+    font-size: 13px; font-weight: 500; color: var(--ink, #1a1a1a);
+    word-break: break-all;
+  }
+  .lead-form { display: flex; flex-direction: column; gap: 14px; }
+  .lead-field { display: flex; flex-direction: column; gap: 5px; }
+  .lead-label { font-size: 13px; font-weight: 500; color: var(--ink, #1a1a1a); }
+  .lead-input { width: 100%; }
+  .lead-actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;
+  }
+  .lead-submit { min-width: 160px; }
+  .lead-sent {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; padding: 16px 0;
+  }
+  .lead-sent__icon {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--petrol, #14616E); color: #fff;
+    font-size: 24px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .lead-sent__title { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  .lead-sent__sub { font-size: 14px; color: var(--ink-muted, #888); margin: 0 0 24px; }
+  .lead-close-btn { min-width: 120px; }
+
   /* ── Layout-Overrides (wie /marketing: 16px-Radius, 32px-Gap) ───────────── */
   .breadcrumb { padding-top: 36px; }
   .settings-sections { gap: 32px; }

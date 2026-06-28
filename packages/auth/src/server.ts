@@ -40,6 +40,22 @@ export function createSupabaseServerInstance(cookies: AstroCookies, _request: Re
  * Currently used by: onboarding/setup/branding.astro (Setup-Wizard INSERT-Transaktion).
  * RLS-Bug-Workaround — siehe Phase 8.E.
  */
+/**
+ * Prüft ob der aktuell eingeloggte User ein Plattform-Admin ist.
+ * Nutzt Service-Role-Client damit RLS auf platform_admins nicht blockiert.
+ */
+export async function isPlatformAdmin(cookies: AstroCookies, request: Request): Promise<boolean> {
+  const user = await getUser(cookies, request);
+  if (!user) return false;
+  const admin = createSupabaseServiceRoleInstance();
+  const { data } = await admin
+    .from('platform_admins')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  return !!data;
+}
+
 export function createSupabaseServiceRoleInstance() {
   const supabaseUrl = getEnv('PUBLIC_SUPABASE_URL');
   const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');

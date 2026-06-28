@@ -11,6 +11,7 @@ export {
   getUser,
   getUserHotels,
   getUserRoles,
+  isPlatformAdmin,
 } from './server';
 
 // Permissions (Sprint Functional) — alle exports
