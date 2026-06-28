@@ -23,7 +23,7 @@ export async function getOrCreateShowcaseUrl(
   const sb = createSupabaseServiceRoleInstance();
 
   const [{ data: hotel }, { data: existing }] = await Promise.all([
-    sb.from('hotels').select('slug').eq('id', hotelId).single(),
+    sb.from('hotels').select('slug, plan').eq('id', hotelId).single(),
     sb
       .from('showcase_sessions')
       .select('token')
@@ -35,7 +35,9 @@ export async function getOrCreateShowcaseUrl(
       .maybeSingle(),
   ]);
 
-  const slug = (hotel as any)?.slug ?? null;
+  // Lite-Plan: immer app.retaha.de — kein Hotelname in der URL (Matrix §12 F)
+  const isLite = ((hotel as any)?.plan ?? 'lite') === 'lite';
+  const slug = isLite ? null : ((hotel as any)?.slug ?? null);
 
   if (existing?.token) {
     return buildGuestUrl(slug, existing.token);
