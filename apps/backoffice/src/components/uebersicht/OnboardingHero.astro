@@ -29,10 +29,9 @@ const STEPS = 4;       // 1 Eve · 2 Stil · 3 Ausblick · 4 Live
       </p>
       <div class="onb-cta-row onb-reveal" data-r="2">
         <button type="button" class="onb-cta">
-          <span class="word">Weiter</span>
-          <span class="ab"><span class="g base">→</span><span class="g fill">→</span><span class="g chk">✓</span></span>
-          <span class="uflow"></span>
-          <span class="loadbar"></span>
+          <span class="onb-cta__label">Weiter</span>
+          <span class="onb-cta__arrow" aria-hidden="true">→</span>
+          <span class="onb-cta__line" aria-hidden="true"></span>
         </button>
         <button type="button" class="onb-skip" data-onb-action="skip">Setup überspringen</button>
       </div>
@@ -188,63 +187,37 @@ const STEPS = 4;       // 1 Eve · 2 Stil · 3 Ausblick · 4 Live
 
   .onb-cta-row { display: flex; gap: 12px; align-items: center; }
   .onb-cta {
-    position: relative; display: inline-flex; align-items: center;
+    --hover-dur: 850ms;
+    --hover-ease: cubic-bezier(.65, 0, .35, 1);
+    position: relative; display: inline-flex; align-items: center; gap: .7em;
+    padding: 14px 4px;
     appearance: none; -webkit-appearance: none; border: none; background: none;
-    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
-    letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--ink, #0A0A0A); padding: 14px 8px;
-    cursor: pointer; overflow: visible; text-decoration: none;
-    transition: color 280ms cubic-bezier(.4,0,.2,1), opacity 120ms ease;
+    font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink, #0A0A0A); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--hover-dur) var(--hover-ease);
   }
-  .onb-cta::before {
-    content: ''; position: absolute; bottom: 0; left: 0;
-    width: 100%; height: 1.5px;
+  .onb-cta__arrow {
+    display: inline-block; color: var(--ink, #0A0A0A);
+    transition: transform var(--hover-dur) var(--hover-ease), color var(--hover-dur) var(--hover-ease);
+    will-change: transform;
+  }
+  .onb-cta__line {
+    position: absolute; left: 4px; right: 4px; bottom: 8px; height: 1.5px;
     background: var(--petrol, #14616E);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 600ms cubic-bezier(.25,0,0,1);
+    transform: scaleX(0); transform-origin: left center;
+    transition: transform var(--hover-dur) var(--hover-ease);
+    will-change: transform;
   }
   @media (hover: hover) {
     .onb-cta:hover { color: var(--petrol, #14616E); }
-    .onb-cta:hover::before { clip-path: inset(0 0% 0 0); }
-    .onb-cta:hover .g { transform: translateX(4px); }
+    .onb-cta:hover .onb-cta__arrow { transform: translateX(6px); color: var(--petrol, #14616E); }
+    .onb-cta:hover .onb-cta__line { transform: scaleX(1); }
   }
-  .onb-cta:active { opacity: 0.5; }
-  .onb-cta .ab {
-    position: relative; display: inline-block;
-    width: 1.1em; height: 1.1em; margin-left: 0.55em; flex-shrink: 0;
+  @media (prefers-reduced-motion: reduce) {
+    .onb-cta, .onb-cta__arrow, .onb-cta__line { transition: none; }
   }
-  .onb-cta .g {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center; line-height: 1;
-    transition: transform 220ms cubic-bezier(.4,0,.2,1), opacity 200ms ease;
-  }
-  .onb-cta .fill {
-    color: var(--sage, #5C9070);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 420ms cubic-bezier(.4,0,.2,1), opacity 200ms ease;
-  }
-  .onb-cta .chk {
-    color: var(--sage, #5C9070); opacity: 0; transform: scale(.4);
-    transition: opacity .2s ease, transform .4s cubic-bezier(.2,1.5,.4,1);
-  }
-  .onb-cta .uflow {
-    position: absolute; bottom: 0; left: 0; width: 100%; height: 1.5px;
-    background: var(--sage, #5C9070);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 420ms cubic-bezier(.4,0,.2,1);
-  }
-  .onb-cta .loadbar {
-    position: absolute; bottom: 0; left: -42%; width: 42%; height: 1.5px;
-    background: var(--petrol, #14616E); display: none;
-  }
-  .onb-cta.is-loading .loadbar { display: block; animation: onb-cta-loadbar 1.05s cubic-bezier(.5,0,.5,1) infinite; }
-  @keyframes onb-cta-loadbar { 0% { left: -42%; } 100% { left: 100%; } }
-  .onb-cta.go .fill { clip-path: inset(0 0% 0 0); }
-  .onb-cta.go .uflow { clip-path: inset(0 0% 0 0); }
-  .onb-cta.done .word { color: var(--sage, #5C9070); }
-  .onb-cta.done .base { opacity: 0; }
-  .onb-cta.done .fill { opacity: 0; }
-  .onb-cta.done .chk { opacity: 1; transform: scale(1); }
   .onb-skip {
     font-family: 'Inter Tight', -apple-system, sans-serif;
     font-size: 14px; font-weight: 500;
@@ -546,13 +519,7 @@ const STEPS = 4;       // 1 Eve · 2 Stil · 3 Ausblick · 4 Live
     var ctaBtn = document.querySelector('[data-onb-step="1"] .onb-cta') || document.querySelector('.onb-hero .onb-cta') || document.querySelector('.onb-cta');
     if (ctaBtn) {
       ctaBtn.addEventListener('click', function () {
-        if (ctaBtn.classList.contains('go')) return;
-        ctaBtn.classList.add('go');
-        setTimeout(function () { ctaBtn.classList.add('done'); }, 460);
-        setTimeout(function () {
-          if (typeof window.__onbGoto === 'function') window.__onbGoto(2);
-          ctaBtn.classList.remove('go', 'done');
-        }, 950);
+        if (typeof window.__onbGoto === 'function') window.__onbGoto(2);
       });
     }
   })();
