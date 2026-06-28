@@ -441,9 +441,24 @@ textarea.s-input { resize: none; min-height: 72px; }
 .bf-eve-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(45,91,208,.4); animation-duration: 2.2s; }
 .bf-eve-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; animation-play-state: paused; }
 .bf-eve-spk { animation: bf-aurora-twinkle 2.4s ease-in-out infinite; flex-shrink: 0; }
+
+/* ── Eve Overlay / Modal ────────────────────────────────────────────────── */
+.bf-eve-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.45); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.bf-eve-modal { background: var(--surface, #fff); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(10,10,10,.18); }
+.bf-eve-mhd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.bf-eve-mhd-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--petrol, #14616E); display: inline-flex; align-items: center; gap: 7px; }
+.bf-eve-close { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--ink-muted, #888); padding: 2px 6px; line-height: 1; }
+.bf-eve-close:disabled { opacity: .4; cursor: default; }
+.bf-eve-ta { width: 100%; box-sizing: border-box; resize: vertical; min-height: 80px; font-size: 13px; }
+.bf-eve-result { font-size: 13px; color: var(--ink); white-space: pre-wrap; line-height: 1.6; background: var(--bg-deep, #F5F4F2); border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+.bf-eve-err { font-size: 12px; color: #b91c1c; margin: 10px 0 0; }
+.bf-eve-mft { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.bf-eve-cancel { background: none; border: 1px solid var(--border, #E5E4E0); border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--ink-muted, #666); }
+.bf-eve-cancel:hover:not(:disabled) { background: var(--bg-deep, #F5F4F2); }
+.bf-eve-cancel:disabled { opacity: .5; cursor: default; }
 </style>
 
-<div class="settings-page" x-data="bfPage()">
+<div class="settings-page" x-data="bfPage()" @bf-eve-open="openEve($event.detail.target)">
 
   <nav class="breadcrumb" aria-label="Breadcrumb">
     <a href="/overview" class="breadcrumb__crumb">{bt('nav.sec.overview', lang)}</a>
@@ -565,7 +580,7 @@ textarea.s-input { resize: none; min-height: 72px; }
     <div class="bf-card" x-data={`sectionSave({ initial: ${JSON.stringify({ location_de: locationDe })}, section: 'location' })`}>
       <div class="bf-card-head">
         <span class="bf-card-title">{bt('bf.location.title', lang)}</span>
-        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve', { target: 'location', field: 'location_de', comp: $data })">
+        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve-open', { target: 'location' })">
           <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
           Mit Eve hinzufügen
         </button>
@@ -584,7 +599,7 @@ textarea.s-input { resize: none; min-height: 72px; }
     <div class="bf-card" x-data={`sectionSave({ initial: ${JSON.stringify({ included_de: includedDe })}, section: 'included' })`}>
       <div class="bf-card-head">
         <span class="bf-card-title">{bt('bf.included.title', lang)}</span>
-        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve', { target: 'included', field: 'included_de', comp: $data })">
+        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve-open', { target: 'included' })">
           <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
           Mit Eve hinzufügen
         </button>
@@ -698,6 +713,10 @@ textarea.s-input { resize: none; min-height: 72px; }
                 class="bf-cta bf-cta--ghost">{bt('bf.menu.frommews', lang)}</button>
             </form>
           )}
+          <button type="button" class="bf-eve-btn" @click="openEve('allergen')">
+            <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+            Allergene vorschlagen
+          </button>
           <button type="button" @click="openNew()" class="bf-cta">{bt('bf.menu.new', lang)}</button>
         </div>
       </div>
@@ -820,22 +839,6 @@ textarea.s-input { resize: none; min-height: 72px; }
 
         <!-- 14 Allergene -->
         <div class="bp-modal-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
-            <span class="bp-modal-label" style="margin-bottom:0">14 Allergene</span>
-            <button type="button" class="bf-eve-btn" @click="allergenHint = !allergenHint">
-              <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
-              Mit Eve suchen
-            </button>
-          </div>
-          <div x-show="allergenHint" x-cloak class="s-warning-row" style="margin-bottom:10px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 width="16" height="16" aria-hidden="true" style="flex-shrink:0">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
-            </svg>
-            <span set:html={bt('bf.lmiv', lang)}></span>
-          </div>
           <div class="bp-allergen-grid">
             <template x-for="a in allergens" :key="a.key">
               <label class="bp-allergen-row">
@@ -886,6 +889,46 @@ textarea.s-input { resize: none; min-height: 72px; }
 
     </div><!-- .bp-modal -->
   </div><!-- .bp-modal-bd -->
+
+  <!-- ── Eve-Overlay ────────────────────────────────────────────────────── -->
+  <div class="bf-eve-overlay" x-show="eve.open" x-cloak
+    @click.self="if(!eve.loading) eve.open = false"
+    @keydown.escape.window="if(eve.open && !eve.loading) eve.open = false">
+    <div class="bf-eve-modal">
+      <div class="bf-eve-mhd">
+        <span class="bf-eve-mhd-title">
+          <svg class="bf-eve-spk" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor" style="color:#14616E"/></svg>
+          <span x-text="eve.target === 'location' ? 'Frühstücksort' : eve.target === 'included' ? 'Was ist inklusiv?' : 'Allergene vorschlagen'"></span>
+        </span>
+        <button type="button" class="bf-eve-close" @click="eve.open = false" :disabled="eve.loading">✕</button>
+      </div>
+      <template x-if="!eve.result">
+        <div>
+          <textarea class="s-input bf-eve-ta" x-model="eve.prompt"
+            :placeholder="eve.target === 'location' ? 'z.B. Heller Wintergarten, EG links' : eve.target === 'included' ? 'z.B. Backwaren, regionale Produkte, Bio-Eier' : 'z.B. Roggen-Brot, Bio-Eier, Honig, Müsli …'"
+            :disabled="eve.loading"
+            @keydown.meta.enter.prevent="runEve()"
+            @keydown.ctrl.enter.prevent="runEve()"></textarea>
+          <div class="bf-eve-err" x-show="eve.error" x-text="eve.error"></div>
+          <div class="bf-eve-mft">
+            <button type="button" class="bf-eve-cancel" @click="eve.open = false" :disabled="eve.loading">Abbrechen</button>
+            <button type="button" class="bf-eve-btn" @click="runEve()" :disabled="eve.loading || !eve.prompt.trim()">
+              <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+              <span x-text="eve.loading ? 'Eve denkt …' : 'Mit Eve generieren'"></span>
+            </button>
+          </div>
+        </div>
+      </template>
+      <template x-if="eve.result">
+        <div>
+          <pre class="bf-eve-result" x-text="eve.result"></pre>
+          <div class="bf-eve-mft">
+            <button type="button" class="bf-eve-cancel" @click="eve.result = ''; eve.open = false">Schließen</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
 
 </div><!-- .settings-page -->
 
@@ -978,7 +1021,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       modalItem: {},
       modalSaving: false,
       modalError: '',
-      allergenHint: false,
+      eve: { open: false, loading: false, prompt: '', target: '', error: '', result: '' },
       _toastTimer: null,
 
       // Drag & Drop state
@@ -1015,7 +1058,6 @@ textarea.s-input { resize: none; min-height: 72px; }
           is_active: true, is_vegetarian: false, is_vegan: false, is_organic: false,
         }, defaults);
         this.modalError = '';
-        this.allergenHint = false;
         this.modalOpen = true;
       },
 
@@ -1025,12 +1067,50 @@ textarea.s-input { resize: none; min-height: 72px; }
           price_eur: ((item.price_cents != null ? item.price_cents : 0) / 100).toFixed(2),
         });
         this.modalError = '';
-        this.allergenHint = false;
         this.modalOpen = true;
       },
 
       closeModal() {
         this.modalOpen = false;
+      },
+
+      openEve(target) {
+        this.eve.target = target;
+        this.eve.error = '';
+        this.eve.result = '';
+        if (target === 'allergen') {
+          this.eve.prompt = this.items.map(i => i.name_de + (i.description_de ? ` (${i.description_de})` : '')).filter(Boolean).join('\n');
+        } else {
+          this.eve.prompt = '';
+        }
+        this.eve.open = true;
+      },
+
+      async runEve() {
+        if (!this.eve.prompt.trim() || this.eve.loading) return;
+        this.eve.loading = true;
+        this.eve.error = '';
+        try {
+          const res = await fetch('/api/admin/eve/generate-field', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ field: this.eve.target, prompt: this.eve.prompt }),
+          });
+          const d = await res.json();
+          if (!d.ok) { this.eve.error = d.message || 'Fehler bei der KI-Generierung.'; return; }
+          if (this.eve.target === 'allergen') {
+            this.eve.result = d.text;
+          } else {
+            const fieldId = this.eve.target === 'location' ? 'bf-location' : 'bf-included';
+            const el = document.getElementById(fieldId);
+            if (el) { el.value = d.text; el.dispatchEvent(new Event('input', { bubbles: true })); }
+            this.eve.open = false;
+          }
+        } catch (err) {
+          this.eve.error = 'Netzwerk-Fehler: ' + (err.message || 'Unbekannt');
+        } finally {
+          this.eve.loading = false;
+        }
       },
 
       async saveItem() {

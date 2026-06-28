@@ -26,6 +26,22 @@ Antworte NUR mit dem reinen Text des Hinweises — kein JSON, kein Markdown, kei
 Stil: freundlich, klar, praktisch. Maximal 80 Wörter.
 Typische Inhalte: Schlüsselrückgabe, Late-Checkout-Möglichkeit, Minibar, Gepäckaufbewahrung.
 Nutze den Hinweis des Nutzers als Basis.`,
+
+  location: `Du bist ein Hotel-Assistent. Beschreibe in einem kurzen Satz den Frühstücksort des Hotels auf Deutsch.
+Antworte NUR mit dem reinen Text — kein JSON, kein Markdown, keine Erklärungen.
+Beispiel: "Im lichtdurchfluteten Wintergarten, Erdgeschoss rechts." Maximal 50 Wörter.
+Nutze den Hinweis des Nutzers als Basis.`,
+
+  included: `Du bist ein Hotel-Assistent. Schreibe auf, was im Frühstück des Hotels inklusiv inbegriffen ist, auf Deutsch.
+Antworte NUR mit dem reinen Text — kein JSON, kein Markdown, keine Erklärungen.
+Stil: freundliche, ansprechende Auflistung. Beispiel: "Frische Backwaren, regionale Aufschnitte, Bio-Eier und hausgemachter Joghurt." Maximal 60 Wörter.
+Nutze den Hinweis des Nutzers als Basis.`,
+
+  allergen: `Du bist Lebensmittelexperte und Hotel-Assistent. Analysiere die genannten Frühstücks-Artikel auf ihre EU-Hauptallergene (LMIV Art. 9).
+Antworte NUR mit reinem Text — kein JSON, kein Markdown, keine Erklärungen.
+Format: Für jeden Artikel eine Zeile im Format "Artikelname: Allergen1, Allergen2" (oder "keine Hauptallergene").
+Die 14 EU-Hauptallergene: Gluten, Krebstiere, Eier, Fisch, Erdnüsse, Soja, Milch, Schalenfrüchte, Sellerie, Senf, Sesam, Schwefeldioxid/Sulfit, Lupinen, Weichtiere.
+Sei präzise auf Basis des Artikelnamens und ggf. der Beschreibung.`,
 };
 
 export const POST: APIRoute = async ({ cookies, request }) => {
