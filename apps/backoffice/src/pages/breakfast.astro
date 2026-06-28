@@ -226,54 +226,28 @@ textarea.s-input { resize: none; min-height: 72px; }
 /* iPad touch targets */
 .settings-page .toggle-row { min-height: 44px; }
 
-/* ── Setup-Flow Button (scaleX-Underline + Arrow) ─────────────────────── */
+/* ── Buttons ────────────────────────────────────────────────────────────── */
 .bf-cta {
-  --hover-dur: 850ms;
-  --hover-ease: cubic-bezier(.65, 0, .35, 1);
-  position: relative; display: inline-flex; align-items: center; gap: .7em;
-  padding: 14px 4px;
-  appearance: none; -webkit-appearance: none; border: none; background: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--petrol, #14616E); color: #fff;
+  padding: 10px 24px; border: none; border-radius: 8px;
   font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
-  letter-spacing: .16em; text-transform: uppercase;
-  color: var(--ink, #0A0A0A); cursor: pointer;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: filter 200ms ease;
   -webkit-tap-highlight-color: transparent;
-  transition: color var(--hover-dur) var(--hover-ease);
 }
-.bf-cta:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
-.bf-cta__arrow {
-  display: inline-block; color: var(--ink, #0A0A0A);
-  transition: transform var(--hover-dur) var(--hover-ease), color var(--hover-dur) var(--hover-ease);
-  will-change: transform;
+.bf-cta:hover:not(:disabled) { filter: brightness(1.1); }
+.bf-cta:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+.bf-cta--ghost {
+  background: transparent; color: var(--ink-muted, rgba(10,10,10,0.55));
+  border: 1px solid var(--border);
 }
-.bf-cta__line {
-  position: absolute; left: 4px; right: 4px; bottom: 8px; height: 1.5px;
-  background: var(--petrol, #14616E);
-  transform: scaleX(0); transform-origin: left center;
-  transition: transform var(--hover-dur) var(--hover-ease);
-  will-change: transform;
+.bf-cta--ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); filter: none; }
+.bf-cta--danger {
+  background: transparent; color: #991B1B;
+  border: 1px solid rgba(153,27,27,0.3);
 }
-@media (hover: hover) {
-  .bf-cta:not(:disabled):hover { color: var(--petrol, #14616E); }
-  .bf-cta:not(:disabled):hover .bf-cta__arrow { transform: translateX(6px); color: var(--petrol, #14616E); }
-  .bf-cta:not(:disabled):hover .bf-cta__line { transform: scaleX(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bf-cta, .bf-cta__arrow, .bf-cta__line { transition: none; }
-}
-.bf-cta--ghost { color: var(--ink-muted, rgba(10,10,10,0.55)); }
-.bf-cta--ghost .bf-cta__arrow { color: var(--ink-muted, rgba(10,10,10,0.55)); }
-.bf-cta--ghost .bf-cta__line { background: var(--ink-muted, rgba(10,10,10,0.55)); }
-@media (hover: hover) {
-  .bf-cta--ghost:not(:disabled):hover { color: var(--ink, #0A0A0A); }
-  .bf-cta--ghost:not(:disabled):hover .bf-cta__arrow { color: var(--ink, #0A0A0A); }
-}
-.bf-cta--danger { color: #991B1B; }
-.bf-cta--danger .bf-cta__arrow { color: #991B1B; }
-.bf-cta--danger .bf-cta__line { background: #991B1B; }
-@media (hover: hover) {
-  .bf-cta--danger:not(:disabled):hover { color: #7F1D1D; }
-  .bf-cta--danger:not(:disabled):hover .bf-cta__arrow { color: #7F1D1D; }
-}
+.bf-cta--danger:hover:not(:disabled) { background: rgba(153,27,27,0.06); border-color: #991B1B; filter: none; }
 
 /* ── Lite Locked Control ─────────────────────────────────────────────── */
 .bf-locked-ctrl {
@@ -522,11 +496,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       </div>
 
       <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button type="button" @click="copyMonToAll()" class="bf-cta bf-cta--ghost">
-          <span class="bf-cta__label">{bt('si.hours.copyall', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+        <button type="button" @click="copyMonToAll()" class="bf-cta bf-cta--ghost">{bt('si.hours.copyall', lang)}</button>
         <span class="bf-hint" style="margin-top:0">{bt('si.hours.copyallhint', lang)}</span>
       </div>
 
@@ -569,11 +539,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       </div>
 
       <div class="bf-card-foot">
-        <button type="button" @click="save()" :disabled="saving" class="bf-cta">
-          <span class="bf-cta__label">{bt('common.save', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+        <button type="button" @click="save()" :disabled="saving" class="bf-cta">{bt('common.save', lang)}</button>
       </div>
     </div>
 
@@ -588,11 +554,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         <span class="bf-hint">{bt('bf.location.hint', lang)}</span>
       </div>
       <div class="bf-card-foot">
-        <button type="button" @click="save()" :disabled="saving" class="bf-cta">
-          <span class="bf-cta__label">{bt('common.save', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+        <button type="button" @click="save()" :disabled="saving" class="bf-cta">{bt('common.save', lang)}</button>
       </div>
     </div>
 
@@ -609,11 +571,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         <span class="bf-hint">{bt('bf.included.hint', lang)}</span>
       </div>
       <div class="bf-card-foot">
-        <button type="button" @click="save()" :disabled="saving" class="bf-cta">
-          <span class="bf-cta__label">{bt('common.save', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+        <button type="button" @click="save()" :disabled="saving" class="bf-cta">{bt('common.save', lang)}</button>
       </div>
     </div>
 
@@ -634,11 +592,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         <span class="bf-hint">{bt('bf.price.hint', lang)}</span>
       </div>
       <div class="bf-card-foot">
-        <button type="button" @click="save()" :disabled="saving" class="bf-cta">
-          <span class="bf-cta__label">{bt('common.save', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+        <button type="button" @click="save()" :disabled="saving" class="bf-cta">{bt('common.save', lang)}</button>
       </div>
     </div>
 
@@ -700,11 +654,7 @@ textarea.s-input { resize: none; min-height: 72px; }
         </div>
 
         <div class="bf-card-foot">
-          <button type="button" @click="save()" :disabled="saving" class="bf-cta">
-          <span class="bf-cta__label">{bt('common.save', lang)}</span>
-          <span class="bf-cta__arrow" aria-hidden="true">→</span>
-          <span class="bf-cta__line" aria-hidden="true"></span>
-        </button>
+          <button type="button" @click="save()" :disabled="saving" class="bf-cta">{bt('common.save', lang)}</button>
         </div>
       </div>
     )}
@@ -719,29 +669,17 @@ textarea.s-input { resize: none; min-height: 72px; }
               <input type="hidden" name="_action" value="mews_import" />
               <button type="submit"
                 onclick={`return confirm(${JSON.stringify(bt('bf.menu.mewsconfirm', lang))})`}
-                class="bf-cta bf-cta--ghost">
-                <span class="bf-cta__label">{bt('bf.menu.frommews', lang)}</span>
-                <span class="bf-cta__arrow" aria-hidden="true">→</span>
-                <span class="bf-cta__line" aria-hidden="true"></span>
-              </button>
+                class="bf-cta bf-cta--ghost">{bt('bf.menu.frommews', lang)}</button>
             </form>
           )}
-          <button type="button" @click="openNew()" class="bf-cta">
-            <span class="bf-cta__label">{bt('bf.menu.new', lang)}</span>
-            <span class="bf-cta__arrow" aria-hidden="true">→</span>
-            <span class="bf-cta__line" aria-hidden="true"></span>
-          </button>
+          <button type="button" @click="openNew()" class="bf-cta">{bt('bf.menu.new', lang)}</button>
         </div>
       </div>
 
       <template x-if="groupedItems.length === 0">
         <div class="bp-empty">
           <p>{bt('bf.menu.empty', lang)}</p>
-          <button type="button" @click="openNew()" class="bf-cta" style="margin-top:14px">
-            <span class="bf-cta__label">{bt('bf.menu.first', lang)}</span>
-            <span class="bf-cta__arrow" aria-hidden="true">→</span>
-            <span class="bf-cta__line" aria-hidden="true"></span>
-          </button>
+          <button type="button" @click="openNew()" class="bf-cta" style="margin-top:14px">{bt('bf.menu.first', lang)}</button>
         </div>
       </template>
       <template x-if="groupedItems.length > 0">
@@ -902,23 +840,13 @@ textarea.s-input { resize: none; min-height: 72px; }
       <div class="bp-modal-foot">
         <div>
           <button type="button" x-show="!modalIsNew" x-cloak @click="deleteItem()"
-            :disabled="modalSaving" class="bf-cta bf-cta--danger">
-            <span class="bf-cta__label">{bt('nfc.delete', lang)}</span>
-            <span class="bf-cta__arrow" aria-hidden="true">→</span>
-            <span class="bf-cta__line" aria-hidden="true"></span>
-          </button>
+            :disabled="modalSaving" class="bf-cta bf-cta--danger">{bt('nfc.delete', lang)}</button>
         </div>
         <div style="display:flex;gap:8px">
-          <button type="button" @click="closeModal()" class="bf-cta bf-cta--ghost">
-            <span class="bf-cta__label">{bt('common.cancel', lang)}</span>
-            <span class="bf-cta__arrow" aria-hidden="true">→</span>
-            <span class="bf-cta__line" aria-hidden="true"></span>
-          </button>
+          <button type="button" @click="closeModal()" class="bf-cta bf-cta--ghost">{bt('common.cancel', lang)}</button>
           <button type="button" @click="saveItem()" :disabled="modalSaving" class="bf-cta">
-            <span class="bf-cta__label" x-show="!modalSaving">{bt('common.save', lang)}</span>
-            <span class="bf-cta__label" x-show="modalSaving" x-cloak>{bt('bf.modal.saving', lang)}</span>
-            <span class="bf-cta__arrow" aria-hidden="true">→</span>
-            <span class="bf-cta__line" aria-hidden="true"></span>
+            <span x-show="!modalSaving">{bt('common.save', lang)}</span>
+            <span x-show="modalSaving" x-cloak>{bt('bf.modal.saving', lang)}</span>
           </button>
         </div>
       </div>
