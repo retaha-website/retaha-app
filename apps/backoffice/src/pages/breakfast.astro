@@ -423,6 +423,24 @@ textarea.s-input { resize: none; min-height: 72px; }
 }
 @media (max-width: 834px) { .bp-modal { max-height: 92vh; } .bp-modal-grid-3 { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 600px) { .bp-allergen-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* ── Eve Aurora Button ──────────────────────────────────────────────────── */
+@keyframes bf-aurora-flow { to { background-position: 280% 0 } }
+@keyframes bf-aurora-twinkle { 0%,100%{transform:scale(1) rotate(0deg);opacity:1}50%{transform:scale(1.35) rotate(90deg);opacity:.7} }
+.bf-eve-btn {
+  border: 0; cursor: pointer; flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 8px 13px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(115deg, #14616E 0%, #1AA0B0 34%, #5B7CE0 68%, #14616E 100%);
+  background-size: 280% 100%;
+  animation: bf-aurora-flow 6s linear infinite;
+  box-shadow: 0 4px 14px rgba(20,97,110,.32);
+  transition: transform .15s, box-shadow .2s;
+}
+.bf-eve-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(45,91,208,.4); animation-duration: 2.2s; }
+.bf-eve-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; animation-play-state: paused; }
+.bf-eve-spk { animation: bf-aurora-twinkle 2.4s ease-in-out infinite; flex-shrink: 0; }
 </style>
 
 <div class="settings-page" x-data="bfPage()">
@@ -547,6 +565,10 @@ textarea.s-input { resize: none; min-height: 72px; }
     <div class="bf-card" x-data={`sectionSave({ initial: ${JSON.stringify({ location_de: locationDe })}, section: 'location' })`}>
       <div class="bf-card-head">
         <span class="bf-card-title">{bt('bf.location.title', lang)}</span>
+        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve', { target: 'location', field: 'location_de', comp: $data })">
+          <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+          Mit Eve hinzufügen
+        </button>
       </div>
       <div class="bf-field">
         <input type="text" id="bf-location" name="location_de" x-model="data.location_de"
@@ -562,6 +584,10 @@ textarea.s-input { resize: none; min-height: 72px; }
     <div class="bf-card" x-data={`sectionSave({ initial: ${JSON.stringify({ included_de: includedDe })}, section: 'included' })`}>
       <div class="bf-card-head">
         <span class="bf-card-title">{bt('bf.included.title', lang)}</span>
+        <button type="button" class="bf-eve-btn" @click="$dispatch('bf-eve', { target: 'included', field: 'included_de', comp: $data })">
+          <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+          Mit Eve hinzufügen
+        </button>
       </div>
       <div class="bf-field">
         <textarea id="bf-included" name="included_de" rows="3" x-model="data.included_de"
@@ -794,14 +820,21 @@ textarea.s-input { resize: none; min-height: 72px; }
 
         <!-- 14 Allergene -->
         <div class="bp-modal-section">
-          <div class="s-warning-row" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+            <span class="bp-modal-label" style="margin-bottom:0">14 Allergene</span>
+            <button type="button" class="bf-eve-btn" @click="allergenHint = !allergenHint">
+              <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+              Mit Eve suchen
+            </button>
+          </div>
+          <div x-show="allergenHint" x-cloak class="s-warning-row" style="margin-bottom:10px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 width="16" height="16" aria-hidden="true">
+                 width="16" height="16" aria-hidden="true" style="flex-shrink:0">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
             </svg>
-            <span set:html={bt('bf.modal.allergenwarn', lang)}></span>
+            <span set:html={bt('bf.lmiv', lang)}></span>
           </div>
           <div class="bp-allergen-grid">
             <template x-for="a in allergens" :key="a.key">
@@ -945,6 +978,7 @@ textarea.s-input { resize: none; min-height: 72px; }
       modalItem: {},
       modalSaving: false,
       modalError: '',
+      allergenHint: false,
       _toastTimer: null,
 
       // Drag & Drop state
@@ -981,6 +1015,7 @@ textarea.s-input { resize: none; min-height: 72px; }
           is_active: true, is_vegetarian: false, is_vegan: false, is_organic: false,
         }, defaults);
         this.modalError = '';
+        this.allergenHint = false;
         this.modalOpen = true;
       },
 
@@ -990,6 +1025,7 @@ textarea.s-input { resize: none; min-height: 72px; }
           price_eur: ((item.price_cents != null ? item.price_cents : 0) / 100).toFixed(2),
         });
         this.modalError = '';
+        this.allergenHint = false;
         this.modalOpen = true;
       },
 
