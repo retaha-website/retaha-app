@@ -5,7 +5,6 @@ import KeyMenu from './KeyMenu.astro';
 import Logo from '@retaha/ui/components/brand/Logo.astro';
 import UserMenu from './UserMenu.astro';
 import NotificationsDrawer from './NotificationsDrawer.astro';
-import { calculateTrialStatus } from '../../lib/trial-status';
 import type { UserProfile } from '../../lib/types/user';
 import { bt } from '@retaha/i18n';
 
@@ -26,13 +25,6 @@ const {
   hotelStars,
   hotelLogoUrl,
 } = Astro.props;
-
-// Testphasen-Status für das Banner im Benachrichtigungs-Drawer.
-const trial = calculateTrialStatus({
-  trial_started_at: user.hotel_trial_started_at,
-  trial_ends_at: user.hotel_trial_ends_at,
-  subscription_status: user.hotel_subscription_status,
-});
 
 // Setup übersprungen, aber nicht abgeschlossen → „Setup unvollständig"-Benachrichtigung.
 const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
@@ -88,7 +80,7 @@ const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
   </div>
 </header>
 
-<NotificationsDrawer trial={trial} qrNotifPending={user.hotel_qr_notif_pending} setupIncomplete={setupIncomplete} plan={user.hotel_plan} />
+<NotificationsDrawer qrNotifPending={user.hotel_qr_notif_pending} setupIncomplete={setupIncomplete} plan={user.hotel_plan} />
 
 <style>
   .head {
