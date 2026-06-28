@@ -38,6 +38,13 @@ const trial = calculateTrialStatus({
 const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
 ---
 
+{(user.hotel_plan === 'lite' || !user.hotel_plan) && (
+  <div class="head__notify">
+    <span>Du nutzt <b>Lite</b> — die volle Suite wartet auf dich.</span>
+    <a href="/subscription" class="head__notify-cta">Upgrade ansehen →</a>
+  </div>
+)}
+
 <header class="head">
   <div class="head__inner">
 
@@ -78,12 +85,6 @@ const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
       </div>
     </div>
 
-    {(user.hotel_plan === 'lite' || !user.hotel_plan) && (
-      <div class="head__strip">
-        <span>Du nutzt <b>Lite</b> — die volle Suite wartet auf dich.</span>
-        <a href="/subscription" class="head__strip-cta">Upgrade ansehen →</a>
-      </div>
-    )}
   </div>
 </header>
 
@@ -188,22 +189,22 @@ const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
   .head__plan-badge--pro:hover,
   .head__plan-badge--premium:hover { background: var(--bg-deep); }
 
-  /* Lite upgrade strip */
-  .head__strip {
-    display: flex; align-items: center; justify-content: center; gap: 16px;
-    padding: 7px 32px;
-    border-top: 1px solid rgba(255, 74, 130, 0.15);
-    background: rgba(255, 74, 130, 0.03);
+  /* Lite — Notification Bar (ganz oben, retaha petrol) */
+  .head__notify {
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    padding: 8px 24px;
+    background: var(--petrol, #14616E);
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.04em; color: var(--ink-muted);
+    letter-spacing: 0.04em; color: rgba(255,255,255,.85);
   }
-  .head__strip b { color: var(--ink); font-weight: 600; }
-  .head__strip-cta {
-    color: var(--pink, #FF4A82); text-decoration: none;
-    font-weight: 600; transition: opacity 150ms;
+  .head__notify b { color: #fff; font-weight: 600; }
+  .head__notify-cta {
+    color: #fff; text-decoration: underline;
+    text-underline-offset: 2px; font-weight: 600;
+    opacity: .85; transition: opacity 150ms; white-space: nowrap;
   }
-  .head__strip-cta:hover { opacity: 0.75; }
-  @media (max-width: 600px) { .head__strip { flex-direction: column; gap: 4px; text-align: center; } }
+  .head__notify-cta:hover { opacity: 1; }
+  @media (max-width: 600px) { .head__notify { flex-direction: column; gap: 4px; text-align: center; } }
 </style>
 
 <script>
