@@ -28,7 +28,10 @@ const lang = user.language;
 
   <!-- Hinweis-Punkt: offene QR-Benachrichtigung (DB, serverseitig) oder geparktes
        Setup (localStorage via Script). -->
+  <!-- Benachrichtigungs-Punkt (oben rechts, Petrol, pulsierend) -->
   <span class:list={['user-avatar-dot', { 'is-on': user.hotel_qr_notif_pending || (user.hotel_setup_skipped && !user.hotel_onboarding_done) }]} data-onb-dot aria-hidden="true"></span>
+  <!-- Online-Indikator (unten rechts, Sage, immer sichtbar) -->
+  <span class="user-online-dot" aria-hidden="true"></span>
 
   <UserDropdown user={user} />
 </div>
@@ -65,17 +68,31 @@ const lang = user.language;
     border-radius: var(--r-sm);
     cursor: pointer;
     border: none;
-    transition: all 200ms ease;
+    transition: background 200ms ease, box-shadow 180ms ease;
     position: relative;
     letter-spacing: 0;
+    box-shadow: 0 0 0 1px var(--border-strong, #E5E4E0);
   }
   .user-avatar:hover,
   .user-avatar.is-open {
     background: var(--petrol);
     color: #fff;
+    box-shadow: 0 0 0 2px var(--petrol);
   }
 
-  /* Profilfoto füllt den Avatar; Hover = Gelb-Ring statt Gelb-Fläche. */
+  /* Online-Punkt (unten rechts, immer sichtbar) */
+  .user-online-dot {
+    position: absolute;
+    bottom: -2px; right: -2px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--sage, #5C9070);
+    box-shadow: 0 0 0 2px var(--surface, #fff);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Profilfoto füllt den Avatar */
   .user-avatar.has-photo { background: transparent; overflow: hidden; }
   .user-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: var(--r-sm); }
   .user-avatar.has-photo:hover,
