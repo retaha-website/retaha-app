@@ -53,10 +53,30 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   const sb = createSupabaseServerInstance(cookies, request);
 
-  const { data: hotelLang } = await sb
-    .from('hotels').select('default_language')
+  const { data: hotelRow } = await sb
+    .from('hotels').select('default_language, plan')
     .eq('id', hotel.id).maybeSingle();
-  const defLang = asLanguageCode(hotelLang?.default_language);
+  const defLang = asLanguageCode(hotelRow?.default_language);
+
+  // Lite-Plan-Limit: nur bei INSERT (body.id === undefined) prüfen
+  if (!body.id) {
+    const currentPlan = (hotelRow?.plan as string | undefined) ?? 'lite';
+    const LITE_LIMIT = 3;
+    if (currentPlan === 'lite') {
+      const { count } = await sb
+        .from('hotel_action_cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('hotel_id', hotel.id);
+      if ((count ?? 0) >= LITE_LIMIT) {
+        return json({
+          ok: false,
+          error: `Limit erreicht: Im Lite-Plan sind maximal ${LITE_LIMIT} Action Cards erlaubt. Bitte eine Karte löschen oder auf Pro upgraden.`,
+          limitReached: true,
+        }, 403);
+      }
+    }
+  }
+
 
   const title    = (body.title    ?? '').toString().trim();
   const subtitle = (body.subtitle ?? '').toString().trim();

@@ -537,6 +537,7 @@ const acT = {
       },
 
       async applyAllSetCards() {
+        let saved = 0;
         for (const ec of this.eveSetCards) {
           const payload = {
             card_type:    ec.card_type    ?? 'info',
@@ -548,10 +549,18 @@ const acT = {
             subtitle:     ec.subtitle     ?? '',
             cta:          ec.cta          ?? '',
           };
-          await fetch('/api/action-cards/upsert', {
+          const res = await fetch('/api/action-cards/upsert', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
+          const data = await res.json();
+          if (data.limitReached) {
+            this.showToast(`Limit erreicht — ${saved} von ${this.eveSetCards.length} Karten gespeichert. Karte löschen oder auf Pro upgraden.`, 'error');
+            this.eveSetCards = [];
+            setTimeout(() => window.location.reload(), 1200);
+            return;
+          }
+          if (data.ok) saved++;
         }
         this.eveSetCards = [];
         this.showToast(this.t.saved, 'success');
