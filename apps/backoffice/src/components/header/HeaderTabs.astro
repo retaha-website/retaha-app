@@ -70,14 +70,19 @@ const tabs = [
 </nav>
 
 <style>
+  /* Container: weißes Kästchen mit Outline — wie ce-seg in Marketing */
   .header-tabs {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #E5E4E0);
+    border-radius: 10px;
+    padding: 3px;
   }
 
-  /* Gleitende Petrol-Markierung (liegt hinter der aktiven Kachel) */
+  /* Gleitende Petrol-Füllung liegt hinter der aktiven Kachel */
   .header-tabs__marker {
     position: absolute;
     top: 0;
@@ -85,19 +90,16 @@ const tabs = [
     height: 0;
     width: 0;
     background: var(--petrol);
-    border-radius: var(--r-sm);
+    border-radius: 7px;
     z-index: 0;
     opacity: 0;
     transform-origin: center;
     pointer-events: none;
-    /* Wechsel = sanftes Gleiten (left/width); der Reveal beim Laden läuft über das
-       Keyframe unten (Puls von innen), nicht über transform → kein Slide von links. */
     transition: left 320ms cubic-bezier(0.5, 0, 0.2, 1),
                 top 320ms cubic-bezier(0.5, 0, 0.2, 1),
                 width 320ms cubic-bezier(0.5, 0, 0.2, 1),
                 height 320ms cubic-bezier(0.5, 0, 0.2, 1);
   }
-  /* Reveal beim (erneuten) Laden: Farbe pulst von innen in die Kachel. */
   @keyframes marker-bloom {
     from { opacity: 0; transform: scale(0.32); }
     to   { opacity: 1; transform: scale(1); }
@@ -106,8 +108,7 @@ const tabs = [
     animation: marker-bloom 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--bloom-delay, 0ms) both;
   }
 
-  /* Kacheln: Ruhezustand = nur Icon. Die aktive Ansicht zeigt ihren Namen
-     (rechts vom Icon); beim Drüberfahren erscheinen die Namen der anderen. */
+  /* Kacheln: kein eigener Rahmen — nur der Container hat einen */
   .header-tabs__tab {
     position: relative;
     z-index: 1;
@@ -116,8 +117,8 @@ const tabs = [
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
-    height: 32px;
-    padding: 0 9px;
+    height: 30px;
+    padding: 0 10px;
     flex-shrink: 0;
     font-family: 'JetBrains Mono', monospace;
     font-size: 8.5px;
@@ -126,28 +127,28 @@ const tabs = [
     line-height: 1;
     color: var(--ink-muted);
     background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
+    border: none;
+    border-radius: 7px;
     cursor: pointer;
-    transition: color 200ms ease, border-color 200ms ease;
+    transition: color 120ms ease;
     text-transform: uppercase;
     text-decoration: none;
     white-space: nowrap;
     overflow: hidden;
   }
-  .header-tabs__tab:hover { color: var(--ink); border-color: var(--ink-faint); }
-  /* Aktiv: Inhalt weiß über der Markierung, kein eigener Rahmen */
-  .header-tabs__tab.is-active { color: #fff; border-color: transparent; }
+  .header-tabs__tab:hover:not(.is-active) { color: var(--petrol); }
+  .header-tabs__tab.is-active { color: #fff; }
 
   .header-tabs__tab svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
     color: var(--petrol);
+    transition: color 120ms ease;
   }
   .header-tabs__tab.is-active svg { color: #fff; }
 
-  /* Name rechts vom Icon — im Ruhezustand eingeklappt (max-width 0) */
+  /* Label rechts vom Icon — eingeklappt im Ruhezustand, aufgeklappt beim Hover */
   .header-tabs__lbl {
     display: block;
     max-width: 0;
@@ -158,15 +159,13 @@ const tabs = [
                 margin-left 320ms cubic-bezier(0.5, 0, 0.2, 1),
                 opacity 220ms ease;
   }
-  /* Name NUR beim Hovern zeigen — auch die aktive Kachel klappt nach dem Klick
-     wieder auf das Icon zu (der Petrol-Marker bleibt als Aktiv-Anzeige). */
   .header-tabs__tab:hover .header-tabs__lbl {
     max-width: 130px;
-    margin-left: 8px;
+    margin-left: 7px;
     opacity: 1;
   }
 
-  /* Erstes Login: Kacheln klappen gestaffelt aus der Marke (links) heraus */
+  /* Erstes Login: Kacheln klappen gestaffelt auf */
   @keyframes tab-unfold {
     from { opacity: 0; transform: translateX(-22px) scale(0.7); }
     to   { opacity: 1; transform: none; }
@@ -184,7 +183,7 @@ const tabs = [
   }
 
   @media (max-width: 900px) {
-    .header-tabs__tab { height: 30px; padding: 0 8px; }
+    .header-tabs__tab { height: 28px; padding: 0 8px; }
   }
 </style>
 
