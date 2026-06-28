@@ -2,13 +2,9 @@
 // Dashboard-Kopf à la Surfshark: großer Titel + Abo-/Testphasen-Status mit
 // „X Tage übrig" (Akzent) + Subtitle (stage-abhängig).
 import { bt, type LanguageCode } from '@retaha/i18n';
-import type { TrialStatus } from '../../lib/trial-status';
+interface Props { stage: string | number; lang: LanguageCode; }
+const { stage, lang } = Astro.props;
 
-interface Props { trial: TrialStatus; stage: string | number; lang: LanguageCode; }
-const { trial, stage, lang } = Astro.props;
-
-const expired = trial.urgencyLevel === 'expired';
-const daysLeftWord = bt(trial.daysRemaining === 1 ? 'dash.status.dayleft' : 'dash.status.daysleft', lang);
 ---
 
 <section class="dsub">
@@ -16,16 +12,6 @@ const daysLeftWord = bt(trial.daysRemaining === 1 ? 'dash.status.dayleft' : 'das
 
   <p class="dsub__sub">{bt(`hero.${stage}.sub`, lang)}</p>
 
-  {trial.isInTrial && !expired && (
-    <p class="dsub__status">
-      {bt('dash.status.trial', lang)} · <span class="dsub__accent">{trial.daysRemaining} {daysLeftWord}</span>
-    </p>
-  )}
-  {trial.isInTrial && expired && (
-    <p class="dsub__status">
-      {bt('dash.status.trial', lang)} · <span class="dsub__accent dsub__accent--warn">{bt('dash.status.expired', lang)}</span>
-    </p>
-  )}
 </section>
 
 <style>

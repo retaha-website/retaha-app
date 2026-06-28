@@ -3,22 +3,13 @@
 // zu navigieren. Oben (falls Testphase aktiv) ein Testphasen-Banner, darunter die
 // Benachrichtigungen in breit. Getriggert vom „Benachrichtigungen"-Eintrag im
 // Account-Dropdown ([data-open-notifications]) via Event.
-import type { TrialStatus } from '../../lib/trial-status';
-import { TRIAL_DURATION_DAYS } from '../../lib/trial-status';
-
-interface Props { trial: TrialStatus; qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; }
-const { trial, qrNotifPending = false, setupIncomplete = false, plan = 'lite' } = Astro.props;
+interface Props { qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; }
+const { qrNotifPending = false, setupIncomplete = false, plan = 'lite' } = Astro.props;
 
 // Shop-Mengenlogik: lite = 1 QR fürs ganze Haus, pro/premium/enterprise = 1 pro Zimmer.
 const qrQuantityHint = plan === 'lite'
   ? 'Für deinen Plan reicht 1 QR-Code fürs ganze Haus.'
   : 'Für deinen Plan: eine eigene Karte pro Zimmer.';
-
-const dayOf = trial.isInTrial
-  ? Math.min(TRIAL_DURATION_DAYS, Math.max(1, TRIAL_DURATION_DAYS - trial.daysRemaining + 1))
-  : 0;
-const pct = Math.min(100, Math.round((dayOf / TRIAL_DURATION_DAYS) * 100));
-const expired = trial.urgencyLevel === 'expired';
 ---
 
 <div class="nd" id="notifDrawer" aria-hidden="true" data-qr-pending={qrNotifPending ? '1' : '0'}>
@@ -32,21 +23,6 @@ const expired = trial.urgencyLevel === 'expired';
       </button>
     </header>
 
-    {trial.isInTrial && (
-      <div class:list={['nd__trial', { 'is-expired': expired, 'is-critical': trial.urgencyLevel === 'critical', 'is-warning': trial.urgencyLevel === 'warning' }]}>
-        <div class="nd__trial-top">
-          <span class="nd__trial-label">Testphase</span>
-          <span class="nd__trial-days">{expired ? 'abgelaufen' : `Tag ${dayOf} von ${TRIAL_DURATION_DAYS}`}</span>
-        </div>
-        <div class="nd__trial-bar"><span style={`width:${pct}%`}></span></div>
-        {!expired && (
-          <p class="nd__trial-sub">Noch {trial.daysRemaining} {trial.daysRemaining === 1 ? 'Tag' : 'Tage'} kostenlos testen.</p>
-        )}
-        {expired && (
-          <p class="nd__trial-sub">Deine Testphase ist vorbei — wähle deinen Plan, um weiterzumachen.</p>
-        )}
-      </div>
-    )}
 
     <div class="nd__body">
       <ul class="nd__list">
@@ -97,7 +73,7 @@ const expired = trial.urgencyLevel === 'expired';
             </span>
             <span class="nd__item-body">
               <span class="nd__item-title">Eve dauerhaft behalten</span>
-              <span class="nd__item-desc">Sichere dir Eve nach der Testphase mit einem Upgrade auf Pro oder Premium.</span>
+              <span class="nd__item-desc">Hol dir mehr aus Eve mit einem Upgrade auf Pro oder Premium.</span>
             </span>
             <span class="nd__item-arrow" aria-hidden="true">→</span>
           </a>
