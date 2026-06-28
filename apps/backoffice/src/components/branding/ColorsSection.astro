@@ -5,14 +5,23 @@ import type { BrandingData } from '@retaha/auth';
 import { computeBrandPalette } from '@retaha/auth';
 import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { branding: BrandingData; lang: LanguageCode; }
-const { branding, lang } = Astro.props;
+interface Props { branding: BrandingData; lang: LanguageCode; plan?: string; }
+const { branding, lang, plan = 'lite' } = Astro.props;
 
-const primary = branding.brand_primary ?? '#FF4A82';
+const isLite = plan === 'lite';
+const PETROL = '#14616E';
+const primary = isLite ? PETROL : (branding.brand_primary ?? PETROL);
 const palette = computeBrandPalette(primary);
 ---
 
 <BrandSection title={bt('brand.colors.title', lang)} num="02" lang={lang}>
+  {isLite && (
+    <div class="cs-lite-info">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Die Farbauswahl ist nur im <strong>Pro-Plan</strong> verfügbar. Im Lite-Plan wird Retaha Petrol verwendet. <a href="/subscription" class="cs-lite-link">Jetzt auf Pro upgraden →</a></span>
+    </div>
+  )}
+
   <form method="POST" id="colorsForm">
     <input type="hidden" name="_action" value="colors" />
 
@@ -21,11 +30,12 @@ const palette = computeBrandPalette(primary);
       <label class="field__label req" for="brand-primary">{bt('brand.colors.primary', lang)}</label>
       <div class="color-row">
         <input type="text" id="brand-primary" name="brand_primary" class="s-input color-hex"
-          value={primary} placeholder="#FF4A82" maxlength="7" />
-        <ColorPicker targetId="brand-primary" value={primary} ariaLabel={bt('brand.colors.pickeria', lang)} />
+          value={primary} placeholder="#14616E" maxlength="7"
+          disabled={isLite} readonly={isLite} />
+        {!isLite && <ColorPicker targetId="brand-primary" value={primary} ariaLabel={bt('brand.colors.pickeria', lang)} />}
       </div>
     </div>
-    <p class="field__hint">{bt('brand.colors.hint', lang)}</p>
+    {!isLite && <p class="field__hint">{bt('brand.colors.hint', lang)}</p>}
 
     <!-- Palette-Rollen -->
     <div class="variants">
@@ -50,13 +60,27 @@ const palette = computeBrandPalette(primary);
       </div>
     </div>
 
-    <div class="s-card__footer">
-      <button type="submit" class="brand-save-btn">{bt('common.save', lang)}</button>
-    </div>
+    {!isLite && (
+      <div class="s-card__footer">
+        <button type="submit" class="brand-save-btn">{bt('common.save', lang)}</button>
+      </div>
+    )}
   </form>
 </BrandSection>
 
 <style>
+  /* Lite-Plan Infobox */
+  .cs-lite-info {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: rgba(20, 97, 110, 0.06); border: 1px solid rgba(20, 97, 110, 0.18);
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; color: var(--ink-soft, rgba(10,10,10,0.65));
+    line-height: 1.45; margin-bottom: 16px;
+  }
+  .cs-lite-info svg { color: var(--petrol, #14616E); }
+  .cs-lite-link { color: var(--petrol, #14616E); font-weight: 600; text-decoration: none; }
+  .cs-lite-link:hover { text-decoration: underline; }
+
   form { display: flex; flex-direction: column; gap: 24px; }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field--row {
@@ -81,6 +105,7 @@ const palette = computeBrandPalette(primary);
     color: var(--ink); transition: all 150ms; flex: 1;
   }
   .s-input:focus { outline: none; border-color: var(--petrol, #14616E); box-shadow: 0 0 0 3px rgba(20,97,110,0.12); }
+  .s-input:disabled { opacity: 0.65; cursor: not-allowed; background: var(--bg-deep, #F0EFEA); }
 
   .variants { margin-top: 4px; }
   .variants__label {

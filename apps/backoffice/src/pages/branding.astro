@@ -29,6 +29,10 @@ if (Astro.request.method === 'POST') {
   const action = form.get('_action')?.toString() ?? '';
 
   if (action === 'colors') {
+    const currentPlan = ((hotel as any).plan as string | undefined) ?? 'lite';
+    if (currentPlan === 'lite') {
+      saved = { section: 'colors', ok: false, msg: 'Farbauswahl ist nur im Pro-Plan verfügbar.' };
+    } else {
     const brand_primary = form.get('brand_primary')?.toString().trim() || null;
     const { error } = await client.from('hotels')
       .update({ brand_primary })
@@ -36,6 +40,7 @@ if (Astro.request.method === 'POST') {
     saved = error
       ? { section: 'colors', ok: false, msg: error.message }
       : { section: 'colors', ok: true, msg: '✓ Farben gespeichert' };
+    }
 
   } else if (action === 'theme') {
     const brand_theme = form.get('brand_theme')?.toString();
@@ -98,7 +103,7 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 
       <div class="branding-sections">
         <LogoSection branding={branding} lang={lang} />
-        <ColorsSection branding={branding} lang={lang} />
+        <ColorsSection branding={branding} lang={lang} plan={((hotel as any).plan as string | undefined) ?? 'lite'} />
         <ThemeSection branding={branding} hotelName={hotel.name} lang={lang} />
         <AssetsSection branding={branding} lang={lang} />
       </div>
