@@ -133,11 +133,124 @@
 .v9-btn[disabled] { opacity: 0.28; cursor: default; pointer-events: none; }
 .v9-btn[data-loading] { opacity: 0.6; cursor: wait; pointer-events: none; }
 
+/* ── Primäre Aktion: Text-Button ohne Container ─────────────────────────────
+   Petrol-Unterstrich & Pfeil via pseudo-element; clip-path-Sweep für Hover
+   und Lade-Balken. Erfolg: .is-success per JS setzen. */
+
 .v9-btn.v9-btn--primary {
-  background: #14616E; color: #fff;
+  background: none;
+  color: var(--ink, #0A0A0A);
+  border-radius: 0;
+  border: none;
+  padding: 14px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  transition: color 280ms cubic-bezier(.4,0,.2,1), opacity 120ms ease;
 }
-.v9-btn.v9-btn--primary:hover:not(:disabled):not([data-loading]) {
-  background: #0e4d57; color: #fff;
+
+/* Pfeil-Glyph */
+.v9-btn.v9-btn--primary::after {
+  content: '→';
+  display: inline-block;
+  margin-left: 0.55em;
+  transition: transform 220ms cubic-bezier(.4,0,.2,1), opacity 180ms ease;
+  font-style: normal;
+}
+
+/* Petrol-Unterstrich (clip-path Sweep links → rechts) */
+.v9-btn.v9-btn--primary::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 1.5px;
+  background: var(--petrol, #14616E);
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 300ms cubic-bezier(.4,0,.2,1);
+}
+
+/* Hover (nur Desktop) */
+@media (hover: hover) {
+  .v9-btn.v9-btn--primary:not(:disabled):not([data-loading]):not(.is-success):hover {
+    background: none;
+    color: var(--petrol, #14616E);
+  }
+  .v9-btn.v9-btn--primary:not(:disabled):not([data-loading]):not(.is-success):hover::before {
+    clip-path: inset(0 0% 0 0);
+  }
+  .v9-btn.v9-btn--primary:not(:disabled):not([data-loading]):not(.is-success):hover::after {
+    transform: translateX(4px);
+  }
+}
+
+/* Gedrückt / Touch-Feedback */
+.v9-btn.v9-btn--primary:active:not(:disabled):not([data-loading]) {
+  background: none;
+  opacity: 0.5;
+}
+.v9-btn.v9-btn--primary:active:not(:disabled):not([data-loading])::after {
+  transform: translateX(2px);
+}
+
+/* Gesperrt */
+.v9-btn.v9-btn--primary:disabled,
+.v9-btn.v9-btn--primary[disabled] {
+  background: none;
+  color: var(--ink-faint, rgba(10,10,10,.28));
+  cursor: not-allowed;
+  opacity: 1;
+  pointer-events: none;
+}
+.v9-btn.v9-btn--primary:disabled::after,
+.v9-btn.v9-btn--primary[disabled]::after {
+  color: var(--ink-faint, rgba(10,10,10,.28));
+}
+
+/* Lädt — Pfeil weg, Petrol-Balken läuft */
+.v9-btn.v9-btn--primary[data-loading] {
+  background: none;
+  color: var(--ink, #0A0A0A);
+  cursor: wait;
+  opacity: 1;
+  pointer-events: none;
+}
+.v9-btn.v9-btn--primary[data-loading]::after {
+  opacity: 0;
+}
+.v9-btn.v9-btn--primary[data-loading]::before {
+  clip-path: none;
+  transition: none;
+  animation: v9-primary-load 1.1s cubic-bezier(.5,0,.5,1) infinite;
+}
+@keyframes v9-primary-load {
+  0%   { clip-path: inset(0 100% 0 0); }
+  45%  { clip-path: inset(0 0%   0 0); }
+  55%  { clip-path: inset(0 0%   0 0); }
+  100% { clip-path: inset(0 0% 0 100%); }
+}
+
+/* Erfolg — Sage via .is-success (JS setzt + entfernt nach ~1.7s) */
+.v9-btn.v9-btn--primary.is-success {
+  background: none;
+  color: var(--sage, #5C9070);
+}
+.v9-btn.v9-btn--primary.is-success::after {
+  content: '✓';
+  color: var(--sage, #5C9070);
+  transform: none;
+}
+.v9-btn.v9-btn--primary.is-success::before {
+  background: var(--sage, #5C9070);
+  clip-path: inset(0 0% 0 0);
+  transition: clip-path 420ms cubic-bezier(.4,0,.2,1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v9-btn.v9-btn--primary::before,
+  .v9-btn.v9-btn--primary::after { transition: none; animation: none; }
 }
 
 .v9-btn.v9-btn--ghost {
