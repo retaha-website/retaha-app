@@ -246,23 +246,41 @@ const acT = {
   <!-- ── Modal ─────────────────────────────────────────────────────────────── -->
   <div x-show="editorOpen" x-cloak class="ac-modal-backdrop" @click.self="closeEditor()">
     <div class="ac-modal" @click.stop>
+
       <header class="ac-modal-head">
-        <h3 x-text={`editorMode === 'new' ? ${JSON.stringify(bt('ac.modal.new', lang))} : ${JSON.stringify(bt('ac.modal.edit', lang))}`}></h3>
-        <button type="button" @click="closeEditor()" class="ac-modal-close">×</button>
+        <div class="ac-modal-head-l">
+          <span class="ac-modal-dot"></span>
+          <span class="ac-modal-title" x-text={`editorMode === 'new' ? ${JSON.stringify(bt('ac.modal.new', lang))} : ${JSON.stringify(bt('ac.modal.edit', lang))}`}></span>
+        </div>
+        <button type="button" @click="closeEditor()" class="ac-modal-close" aria-label="Schließen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </header>
 
       <div class="ac-modal-body">
-        <label class="ac-field">
-          <span class="ac-field-label">{bt('ac.modal.type', lang)}</span>
-          <select x-model="editor.card_type" @change="onTypeChange()" class="ac-input">
-            <option value="internal_action">{bt('ac.type.internal', lang)}</option>
-            <option value="external_link">{bt('ac.type.external', lang)}</option>
-            <option value="info">{bt('ac.type.info', lang)}</option>
-            <option value="phone">{bt('ac.type.phone', lang)}</option>
-            <option value="email">{bt('ac.type.email', lang)}</option>
-          </select>
-        </label>
 
+        <!-- Kartentyp -->
+        <div class="ac-field">
+          <span class="ac-field-label">{bt('ac.modal.type', lang)}</span>
+          <div class="ac-type-tabs">
+            {[
+              { val: 'internal_action', label: bt('ac.type.internal', lang) },
+              { val: 'external_link',   label: bt('ac.type.external', lang) },
+              { val: 'info',            label: bt('ac.type.info', lang) },
+              { val: 'phone',           label: bt('ac.type.phone', lang) },
+              { val: 'email',           label: bt('ac.type.email', lang) },
+            ].map(t => (
+              <button type="button"
+                class="ac-type-tab"
+                :class={`{'is-active': editor.card_type === '${t.val}'}`}
+                @click={`editor.card_type = '${t.val}'; onTypeChange()`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <!-- Ziel (je nach Typ) -->
         <div x-show="editor.card_type === 'internal_action'" class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.sheet', lang)}</span>
           <select x-model="editor.action_target" class="ac-input">
@@ -273,7 +291,7 @@ const acT = {
 
         <div x-show="editor.card_type === 'external_link'" class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.url', lang)}</span>
-          <input type="url" x-model="editor.action_target" placeholder="https://booking.gate-garden.de" class="ac-input" />
+          <input type="url" x-model="editor.action_target" placeholder="https://deinhotel.de/angebote" class="ac-input" />
         </div>
 
         <div x-show="editor.card_type === 'phone'" class="ac-field">
@@ -283,35 +301,21 @@ const acT = {
 
         <div x-show="editor.card_type === 'email'" class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.email', lang)}</span>
-          <input type="email" x-model="editor.action_target" placeholder="rezeption@gate-garden.de" class="ac-input" />
+          <input type="email" x-model="editor.action_target" placeholder="rezeption@deinhotel.de" class="ac-input" />
         </div>
 
-        <!-- Eve suggest (single card) -->
+        <!-- Eve -->
         <div class="ac-eve-inline">
           <div class="ac-eve-inline-head">
             <svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>
             <span>Eve schlägt Texte vor</span>
           </div>
           <div class="ac-eve-inline-row">
-            <input
-              type="text"
-              class="ac-input ac-eve-brief-input"
-              x-model="eveBriefModal"
-              placeholder={bt('ac.eve.brief.placeholder', lang)}
-              maxlength="300"
-            />
-            <button
-              type="button"
-              class="ac-eve-inline-btn"
-              :disabled="!eveBriefModal.trim() || busyCard"
-              @click="generateCard()"
-            >
-              <template x-if="!busyCard">
-                <span>{bt('ac.eve.single.btn', lang)}</span>
-              </template>
-              <template x-if="busyCard">
-                <span x-text="t.eveGeneratingCard"></span>
-              </template>
+            <input type="text" class="ac-input ac-eve-brief-input" x-model="eveBriefModal"
+              placeholder={bt('ac.eve.brief.placeholder', lang)} maxlength="300" />
+            <button type="button" class="ac-eve-inline-btn" :disabled="!eveBriefModal.trim() || busyCard" @click="generateCard()">
+              <template x-if="!busyCard"><span>{bt('ac.eve.single.btn', lang)}</span></template>
+              <template x-if="busyCard"><span x-text="t.eveGeneratingCard"></span></template>
             </button>
           </div>
           <template x-if="eveCardSuggestion">
@@ -340,53 +344,84 @@ const acT = {
           </template>
         </div>
 
+        <div class="ac-modal-divider"></div>
+
+        <!-- Texte -->
         <label class="ac-field">
-          <span class="ac-field-label">{bt('ac.modal.titlelabel', lang)} <span class="ac-required">*</span></span>
-          <input type="text" x-model="editor.title" required maxlength="60" class="ac-input" />
+          <span class="ac-field-label">{bt('ac.modal.titlelabel', lang)}</span>
+          <input type="text" x-model="editor.title" required maxlength="60" class="ac-input"
+            placeholder="z.B. Frühstück reservieren" />
         </label>
         <label class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.eyebrow', lang)} <span class="ac-optional">{bt('ac.modal.eyebrowhint', lang)}</span></span>
-          <input type="text" x-model="editor.eyebrow" maxlength="40" class="ac-input" />
+          <input type="text" x-model="editor.eyebrow" maxlength="40" class="ac-input"
+            placeholder="z.B. Täglich ab 7 Uhr" />
         </label>
         <label class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.subtitle', lang)} <span class="ac-optional">{bt('ac.modal.subtitlehint', lang)}</span></span>
-          <textarea x-model="editor.subtitle" rows="2" maxlength="200" class="ac-input"></textarea>
+          <textarea x-model="editor.subtitle" rows="2" maxlength="200" class="ac-input"
+            placeholder="z.B. Frisch & regional — im Wintergarten"></textarea>
         </label>
         <label class="ac-field">
-          <span class="ac-field-label">{bt('ac.modal.cta', lang)}</span>
-          <input type="text" x-model="editor.cta" maxlength="30" class="ac-input" placeholder="z.B. Tisch reservieren" />
+          <span class="ac-field-label">{bt('ac.modal.cta', lang)} <span class="ac-optional">{bt('ac.modal.eyebrowhint', lang)}</span></span>
+          <input type="text" x-model="editor.cta" maxlength="30" class="ac-input"
+            placeholder="z.B. Jetzt reservieren" />
         </label>
 
+        <div class="ac-modal-divider"></div>
+
+        <!-- Bild -->
         <div class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.image', lang)} <span class="ac-optional">{bt('ac.modal.imagehint', lang)}</span></span>
-          <div class="ac-image-row">
-            <div class="ac-image-preview">
-              <template x-if="editor.imagePreview || editor.image_url">
-                <img :src="editor.imagePreview || editor.image_url" alt="" />
-              </template>
-              <template x-if="!editor.imagePreview && !editor.image_url">
-                <span class="ac-image-placeholder">{bt('ac.modal.noimage', lang)}</span>
-              </template>
-            </div>
-            <div class="ac-image-actions">
-              <input type="file" accept="image/jpeg,image/png,image/webp" @change="onFileChange($event)" class="ac-input ac-input--file" />
-              <button type="button" x-show="editor.imagePreview || editor.image_url" @click="clearImage()" class="ly-btn ly-btn-ghost">{bt('ac.modal.removeimage', lang)}</button>
-            </div>
+          <label class="ac-dropzone" :class="{'has-image': editor.imagePreview || editor.image_url}">
+            <input type="file" accept="image/jpeg,image/png,image/webp" @change="onFileChange($event)" style="display:none" />
+            <template x-if="editor.imagePreview || editor.image_url">
+              <img :src="editor.imagePreview || editor.image_url" alt="" class="ac-dropzone-img" />
+            </template>
+            <template x-if="!editor.imagePreview && !editor.image_url">
+              <div class="ac-dropzone-empty">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                <span>Bild hochladen</span>
+                <span class="ac-dropzone-hint">JPG · PNG · WebP</span>
+              </div>
+            </template>
+          </label>
+          <button type="button" x-show="editor.imagePreview || editor.image_url" @click="clearImage()"
+            class="ac-remove-img-btn">{bt('ac.modal.removeimage', lang)}</button>
+        </div>
+
+        <div class="ac-modal-divider"></div>
+
+        <!-- Kartenstil -->
+        <div class="ac-field">
+          <span class="ac-field-label">{bt('ac.modal.style', lang)}</span>
+          <div class="ac-style-swatches">
+            <button type="button" class="ac-swatch" :class="{'is-active': editor.card_class === 'rec-anthrazit'}" @click="editor.card_class = 'rec-anthrazit'">
+              <span class="ac-swatch-color" style="background:#1C1C1E"></span>
+              <span>Anthrazit</span>
+            </button>
+            <button type="button" class="ac-swatch" :class="{'is-active': editor.card_class === 'rec-pink'}" @click="editor.card_class = 'rec-pink'">
+              <span class="ac-swatch-color" style="background:#14616E"></span>
+              <span>Petrol</span>
+            </button>
+            <button type="button" class="ac-swatch" :class="{'is-active': editor.card_class === 'rec-white'}" @click="editor.card_class = 'rec-white'">
+              <span class="ac-swatch-color" style="background:#F5F4F2;border:1px solid #E0DED8"></span>
+              <span>Hell</span>
+            </button>
           </div>
         </div>
 
-        <div class="ac-field-row">
-          <label class="ac-field">
-            <span class="ac-field-label">{bt('ac.modal.style', lang)}</span>
-            <select x-model="editor.card_class" class="ac-input">
-              {CARD_CLASSES.map(c => <option value={c.value}>{c.label}</option>)}
-            </select>
-          </label>
-          <label class="ac-field ac-field--checkbox">
-            <input type="checkbox" x-model="editor.is_published" />
-            <span>{bt('ac.modal.published', lang)}</span>
-          </label>
-        </div>
+        <!-- Veröffentlicht -->
+        <label class="ac-toggle-row">
+          <div class="ac-toggle" :class="{'is-on': editor.is_published}">
+            <input type="checkbox" x-model="editor.is_published" style="display:none" />
+            <span class="ac-toggle-track" @click="editor.is_published = !editor.is_published">
+              <span class="ac-toggle-thumb"></span>
+            </span>
+          </div>
+          <span class="ac-toggle-label" @click="editor.is_published = !editor.is_published">{bt('ac.modal.published', lang)}</span>
+        </label>
+
       </div>
 
       <footer class="ac-modal-foot">
@@ -620,9 +655,21 @@ const acT = {
         this.editor.image_url = null;
       },
 
+      friendlyError(raw: string): string {
+        if (raw.includes('title required') || raw.includes('titlerequired')) return 'Bitte gib einen Titel für die Karte ein.';
+        if (raw.includes('action_target required')) return 'Bitte wähle eine Retaha-Funktion aus.';
+        if (raw.includes('URL required') || raw.includes('Invalid URL') || raw.includes('http/https')) return 'Bitte gib eine gültige URL ein (z.B. https://deinhotel.de).';
+        if (raw.includes('Invalid phone')) return 'Bitte gib eine gültige Telefonnummer ein.';
+        if (raw.includes('Invalid email')) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
+        if (raw.includes('Limit erreicht')) return raw;
+        if (raw.includes('API ') || raw.includes('API:')) return 'Speichern fehlgeschlagen — bitte nochmal versuchen.';
+        if (raw.includes('Netzwerk') || raw.includes('network') || raw.includes('fetch')) return 'Keine Verbindung — bitte Internetverbindung prüfen.';
+        return raw;
+      },
+
       async saveEditor() {
         if (!this.editor.title?.trim()) {
-          this.saveError = this.t.titleRequired;
+          this.saveError = 'Bitte gib einen Titel für die Karte ein.';
           return;
         }
         this.isSaving = true;
@@ -644,7 +691,7 @@ const acT = {
             body: JSON.stringify(payload),
           });
           const data = await res.json();
-          if (!res.ok || !data.ok) { this.saveError = data.error || `API ${res.status}: ${res.statusText}`; return; }
+          if (!res.ok || !data.ok) { this.saveError = this.friendlyError(data.error || `API ${res.status}`); return; }
 
           if (this.editor.imageFile) {
             const fd = new FormData();
@@ -658,7 +705,7 @@ const acT = {
           this.editorOpen = false;
           setTimeout(() => window.location.reload(), 600);
         } catch (err: any) {
-          this.saveError = `${this.t.netErr}: ${err.message ?? err}`;
+          this.saveError = this.friendlyError(err.message ?? '');
         } finally {
           this.isSaving = false;
         }
@@ -953,25 +1000,95 @@ const acT = {
 
   /* ── Modal ───────────────────────────────────────────────────────────────── */
   .ac-modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
     display: flex; align-items: flex-start; justify-content: center;
     padding: 24px; z-index: 100; overflow-y: auto;
   }
   .ac-modal {
-    background: var(--surface); width: 100%; max-width: 640px;
+    background: var(--surface); width: 100%; max-width: 580px;
     max-height: calc(100vh - 48px); display: flex; flex-direction: column;
-    box-shadow: 0 12px 48px rgba(0,0,0,.2); border-radius: var(--r-sm, 12px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.22); border-radius: 16px;
+    border: 1px solid var(--border, rgba(10,10,10,0.10));
   }
   .ac-modal-head {
-    padding: 16px 20px; border-bottom: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
+    padding: 16px 20px; border-bottom: 1px solid var(--ly-line, rgba(10,10,10,0.10));
     display: flex; align-items: center; justify-content: space-between;
   }
-  .ac-modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
-  .ac-modal-close { background: transparent; border: none; font-size: 22px; cursor: pointer; line-height: 1; color: var(--ink-muted); border-radius: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-  .ac-modal-close:hover { background: var(--surface-raised, #f4f4f4); color: var(--ink); }
-  .ac-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-  .ac-modal-foot { padding: 12px 20px; border-top: 1px solid var(--ly-line, var(--border-medium, #e0e0e0)); display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-  .ac-error { flex: 1; font-size: 12px; color: #dc2626; }
+  .ac-modal-head-l { display: flex; align-items: center; gap: 10px; }
+  .ac-modal-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ly-ac, #14616E); flex-shrink: 0; }
+  .ac-modal-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ly-ink); }
+  .ac-modal-close {
+    background: transparent; border: none; cursor: pointer; color: var(--ink-muted);
+    border-radius: 7px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    transition: background 120ms, color 120ms;
+  }
+  .ac-modal-close:hover { background: var(--bg-deep, #F0EFEA); color: var(--ink); }
+  .ac-modal-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0; }
+  .ac-modal-divider { height: 1px; background: var(--border, rgba(10,10,10,0.08)); margin: 4px -20px 16px; }
+  .ac-modal-foot { padding: 12px 20px; border-top: 1px solid var(--ly-line, rgba(10,10,10,0.10)); display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .ac-error { flex: 1; font-size: 12px; color: #dc2626; line-height: 1.4; }
+
+  /* Type tabs */
+  .ac-type-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ac-type-tab {
+    padding: 5px 12px; border-radius: 7px; border: 1px solid var(--ly-line, rgba(10,10,10,0.12));
+    background: transparent; font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 500;
+    color: var(--ly-ink2); cursor: pointer; transition: all 120ms;
+  }
+  .ac-type-tab:hover { background: var(--bg-deep, #F0EFEA); color: var(--ly-ink); }
+  .ac-type-tab.is-active {
+    background: rgba(20,97,110,0.08); border-color: rgba(20,97,110,0.3);
+    color: var(--ly-ac, #14616E); font-weight: 600;
+  }
+
+  /* Style swatches */
+  .ac-style-swatches { display: flex; gap: 8px; }
+  .ac-swatch {
+    display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+    border: 1px solid var(--ly-line, rgba(10,10,10,0.12)); border-radius: 9px;
+    background: transparent; cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px; font-weight: 500; color: var(--ly-ink2); transition: all 120ms; flex: 1; justify-content: center;
+  }
+  .ac-swatch:hover { background: var(--bg-deep, #F0EFEA); color: var(--ly-ink); }
+  .ac-swatch.is-active { border-color: var(--ly-ac, #14616E); color: var(--ly-ac, #14616E); background: rgba(20,97,110,0.06); font-weight: 600; }
+  .ac-swatch-color { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Toggle */
+  .ac-toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; cursor: pointer; }
+  .ac-toggle { position: relative; flex-shrink: 0; }
+  .ac-toggle-track {
+    display: block; width: 36px; height: 20px; border-radius: 10px; cursor: pointer;
+    background: var(--bg-deep, #E0DED8); border: 1px solid var(--border-medium, rgba(10,10,10,0.15));
+    transition: background 200ms, border-color 200ms; position: relative;
+  }
+  .ac-toggle.is-on .ac-toggle-track { background: var(--ly-ac, #14616E); border-color: var(--ly-ac, #14616E); }
+  .ac-toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 200ms;
+  }
+  .ac-toggle.is-on .ac-toggle-thumb { transform: translateX(16px); }
+  .ac-toggle-label { font-size: 13px; font-family: 'Space Grotesk', sans-serif; color: var(--ly-ink); }
+
+  /* Image dropzone */
+  .ac-dropzone {
+    display: flex; align-items: center; justify-content: center;
+    height: 100px; border-radius: 10px; border: 1.5px dashed var(--ly-line, rgba(10,10,10,0.18));
+    background: var(--bg-deep, #F5F4F2); cursor: pointer; overflow: hidden;
+    transition: border-color 150ms, background 150ms;
+  }
+  .ac-dropzone:hover { border-color: var(--ly-ac, #14616E); background: rgba(20,97,110,0.04); }
+  .ac-dropzone.has-image { border-style: solid; height: 140px; }
+  .ac-dropzone-img { width: 100%; height: 100%; object-fit: cover; }
+  .ac-dropzone-empty { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--ly-ink3); }
+  .ac-dropzone-empty span { font-size: 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+  .ac-dropzone-hint { font-size: 10px !important; font-weight: 400 !important; color: var(--ly-ink3); font-family: 'JetBrains Mono', monospace !important; letter-spacing: 0.04em; }
+  .ac-remove-img-btn {
+    margin-top: 6px; background: transparent; border: none; cursor: pointer;
+    font-size: 11px; color: var(--ly-ink3); font-family: 'Space Grotesk', sans-serif; padding: 0;
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .ac-remove-img-btn:hover { color: #dc2626; }
 
   /* Eve inline (modal) */
   .ac-eve-inline {
@@ -1011,11 +1128,18 @@ const acT = {
   .ac-required { color: #dc2626; }
   .ac-optional { font-size: 10px; color: var(--ink-muted); text-transform: none; letter-spacing: normal; font-weight: 400; }
   .ac-input {
-    padding: 8px 10px; border: 1px solid var(--ly-line, var(--border-medium, #e0e0e0));
-    border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--ink); background: var(--surface); width: 100%;
+    padding: 9px 12px; border: 1px solid var(--ly-line, rgba(10,10,10,0.12));
+    border-radius: 9px; font-size: 13px; font-family: 'Space Grotesk', sans-serif;
+    color: var(--ink); background: var(--surface); width: 100%; box-sizing: border-box;
+    transition: border-color 150ms, box-shadow 150ms;
   }
-  .ac-input:focus { outline: none; border-color: var(--petrol, #14616E); }
-  .ac-input--file { padding: 4px; }
+  .ac-input:focus { outline: none; border-color: var(--petrol, #14616E); box-shadow: 0 0 0 3px rgba(20,97,110,0.10); }
+  select.ac-input {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px; cursor: pointer;
+  }
   textarea.ac-input { resize: vertical; }
 
   .ac-i18n-hint {
