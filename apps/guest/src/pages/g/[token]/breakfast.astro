@@ -25,7 +25,7 @@ if (isShowcaseToken(token)) {
   if (showcase) {
     const sbSr = createSupabaseServiceRoleInstance();
     const [{ data: hotelRow }, { data: settingsRow }] = await Promise.all([
-      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary, currency').eq('id', showcase.hotel_id).single(),
+      sbSr.from('hotels').select('id, name, default_language, enabled_languages, brand_primary, currency, plan').eq('id', showcase.hotel_id).single(),
       sbSr.from('hotel_settings').select('*').eq('hotel_id', showcase.hotel_id).single(),
     ]);
     if (hotelRow) {
@@ -78,8 +78,10 @@ const lk = lang;
 const startTime: string = (settings as any).breakfast_start_time || '07:30:00';
 const endTime: string   = (settings as any).breakfast_end_time   || '10:30:00';
 const slotMinutes: number = (settings as any).breakfast_slot_minutes || 30;
-const reservationEnabled: boolean = (settings as any).features?.breakfast !== false;
-const roomServiceEnabled: boolean = (settings as any).breakfast_room_service_enabled === true;
+const isLite: boolean = (hotel as any).plan === 'lite';
+// Lite = info-only: kein Slot-Picker, kein Room-Service
+const reservationEnabled: boolean = !isLite && (settings as any).features?.breakfast !== false;
+const roomServiceEnabled: boolean = !isLite && (settings as any).breakfast_room_service_enabled === true;
 const priceCents: number | null = (settings as any).breakfast_price_cents ?? null;
 const roomServiceFeeCents: number = (settings as any).breakfast_room_service_fee_cents ?? 0;
 const roomNumber: string | null = showcaseMode ? null : ((ctx as any).room?.room_number ?? null);

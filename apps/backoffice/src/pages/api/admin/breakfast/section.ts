@@ -40,6 +40,13 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     return json({ ok: false, error: 'section not allowed' }, 400);
   }
 
+  const isLite = (hotel as any).plan === 'lite';
+
+  // Server-Guard: Lite darf keine Buchungs-Features schreiben
+  if (isLite && section === 'room_service') {
+    return json({ ok: false, error: 'Nicht verfügbar im Lite-Plan' }, 403);
+  }
+
   const supabase = createSupabaseServiceRoleInstance();
   const ups = (fields: Record<string, unknown>) =>
     supabase.from('hotel_settings').upsert(
@@ -57,7 +64,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
         parsed[day] = { start: d?.start || '07:30', end: d?.end || '10:30', closed: d?.closed === true };
       }
       const slotMin = Math.max(5, Math.min(120, parseInt(String(body.breakfast_slot_minutes ?? '30')) || 30));
-      const { error } = await ups({ breakfast_hours: parsed, breakfast_slot_minutes: slotMin });
+      const hoursFields: Record<string, unknown> = { breakfast_hours: parsed };
+      if (!isLite) hoursFields.breakfast_slot_minutes = slotMin;
+      const { error } = await ups(hoursFields);
       if (error) { console.error('[breakfast/section hours]', error); return json({ ok: false, error: error.message }, 500); }
       return json({ ok: true });
     }
