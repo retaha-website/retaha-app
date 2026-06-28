@@ -1,0 +1,265 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getUser, getUserHotels } from '@retaha/auth';
+import { getLang, bt } from '../../lib/i18n';
+
+const lang = getLang(Astro.cookies, Astro.request);
+const user = await getUser(Astro.cookies, Astro.request);
+if (!user) return Astro.redirect('/admin/login');
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+if (!hotel) return Astro.redirect('/admin/login?error=no_hotel');
+
+const { modul } = Astro.params;
+
+type ModuleMeta = {
+  name: string;
+  desc: string;
+  requiredPlan: 'pro' | 'premium';
+  icon: string;
+};
+
+const MODULES: Record<string, ModuleMeta> = {
+  empfehlungen: {
+    name: 'Empfehlungen',
+    desc: 'Google-Places-Empfehlungen direkt in der Gäste-App — Restaurants, Sehenswürdigkeiten, Aktivitäten. Kuratiert, immer aktuell, ohne Pflege.',
+    requiredPlan: 'pro',
+    icon: '<circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>',
+  },
+  'nfc-tags': {
+    name: 'NFC-Tags & QR-Codes',
+    desc: 'Dynamische NFC-Tags und QR-Codes für jedes Zimmer. Gäste scannen und landen direkt in ihrer personalisierten Gäste-App — kein App-Download nötig.',
+    requiredPlan: 'pro',
+    icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',
+  },
+  wallet: {
+    name: 'Wallet-Pass & CRM',
+    desc: 'Apple Wallet & Google Wallet-Pässe für deine Gäste. Mit integriertem Wiederkommer-CRM: wer war wann da, wen kannst du reaktivieren.',
+    requiredPlan: 'premium',
+    icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',
+  },
+  'stay-push': {
+    name: 'Stay-Push-Trigger',
+    desc: 'Bis zu 9 automatische Push-Nachrichten während des Aufenthalts. Spa-Buchung, Frühstück-Reminder, Check-out-Info — vollautomatisch, zum richtigen Zeitpunkt.',
+    requiredPlan: 'premium',
+    icon: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  },
+  marketing: {
+    name: 'Marketing & Kampagnen',
+    desc: 'E-Mail-Drips, Kampagnen und Gäste-Segmentierung. Wiederkommer automatisch ansprechen, Direktbuchungen steigern — OTA-Abhängigkeit reduzieren.',
+    requiredPlan: 'premium',
+    icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  },
+  'email-domain': {
+    name: 'Eigene E-Mail-Domain',
+    desc: 'Sende Kampagnen von deiner eigenen Domain — kein „@retaha.de". Höhere Zustellrate, mehr Vertrauen, stärkere Marke.',
+    requiredPlan: 'premium',
+    icon: '<path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6z"/><path d="M22 10l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/>',
+  },
+  loyalty: {
+    name: 'Loyalty-Programm',
+    desc: 'Punkte, Prämien und Stammgast-Vorteile direkt in der Gäste-App. Bindet Gäste ans Hotel statt an OTAs — ohne eigene App.',
+    requiredPlan: 'premium',
+    icon: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
+  },
+  pms: {
+    name: 'PMS-Integration',
+    desc: 'Verbinde dein Property-Management-System. Check-in-Daten, Zimmerzuordnung und Gäste-Infos fließen automatisch — kein manuelles Übertragen.',
+    requiredPlan: 'premium',
+    icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  },
+  'booking-engine': {
+    name: 'Direktbuchungs-Engine',
+    desc: 'Eigener Buchungskalender direkt in der Gäste-App. Gäste buchen ohne OTA-Umweg — du behältst die Marge.',
+    requiredPlan: 'premium',
+    icon: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  },
+  'best-price': {
+    name: 'Best-Price-Garantie',
+    desc: 'Zeig Gästen in Echtzeit, dass Direktbuchen günstiger ist. OTA-Preisvergleich live — maximale Überzeugungskraft an der richtigen Stelle.',
+    requiredPlan: 'premium',
+    icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  },
+  'booking-recovery': {
+    name: 'Buchungs-Recovery',
+    desc: 'Sprich Gäste an, die eine Buchung abgebrochen haben — automatisch, zum richtigen Zeitpunkt. Mehr Konversion, weniger Leerstellen.',
+    requiredPlan: 'premium',
+    icon: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.62"/>',
+  },
+  'action-cards': {
+    name: 'Mehr Action-Cards',
+    desc: 'Mit Pro kannst du bis zu 10 Action-Cards anlegen statt 3. Zeig Gästen alles — Spa, Frühstück, Ausflüge, Events.',
+    requiredPlan: 'pro',
+    icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  },
+};
+
+const meta = modul ? MODULES[modul] : undefined;
+if (!meta) return Astro.redirect('/subscription');
+
+const planLabel = meta.requiredPlan === 'pro' ? 'Pro' : 'Premium';
+const iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${meta.icon}</svg>`;
+---
+
+<Layout title={`${meta.name} freischalten`} activeTab="backoffice" hotelName={hotel.name} hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}>
+
+<div class="up-page">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/subscription" class="breadcrumb__crumb">{bt('nav.subscription', lang)}</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__crumb breadcrumb__crumb--current">{meta.name}</span>
+  </nav>
+
+  <div class="up-card">
+    <div class="up-icon" aria-hidden="true" set:html={iconSvg}></div>
+
+    <span class="up-plan-chip">{bt('up.tier', lang).replace('{plan}', planLabel)}</span>
+
+    <h1 class="up-title">{meta.name}</h1>
+    <p class="up-desc">{meta.desc}</p>
+
+    <!-- Video/Animation-Slot (Taha füllt später aus) -->
+    <div class="up-preview-slot" aria-label="Modul-Vorschau">
+      <span class="up-preview-slot__label">Vorschau</span>
+    </div>
+
+    <!-- Upgrade CTA -->
+    <div
+      class="up-cta-area"
+      x-data="{ sent: false, loading: false, err: false }"
+    >
+      <button
+        type="button"
+        class="up-cta-btn"
+        x-show="!sent"
+        x-bind:disabled="loading"
+        x-bind:class="{ 'up-cta-btn--loading': loading }"
+        x-on:click={`
+          loading = true; err = false;
+          fetch('/api/subscription/request-upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: ${JSON.stringify(meta.requiredPlan)}, module: ${JSON.stringify(modul)} })
+          })
+          .then(function(r){ return r.json(); })
+          .then(function(d){ if (d.ok) { sent = true; } else { err = true; } })
+          .catch(function(){ err = true; })
+          .finally(function(){ loading = false; });
+        `}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+        </svg>
+        {bt('up.cta', lang)}
+      </button>
+
+      <div class="up-sent" x-show="sent" x-cloak>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {bt('up.sent', lang)}
+      </div>
+
+      <p class="up-err" x-show="err" x-cloak>{bt('up.err', lang)}</p>
+
+      <a href="/subscription" class="up-back">{bt('up.back', lang)}</a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .up-page {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 24px 64px;
+  }
+
+  .breadcrumb { padding-top: 36px; margin-bottom: 32px; }
+
+  .up-card {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    text-align: center;
+    padding: 40px 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .up-icon {
+    width: 44px; height: 44px;
+    color: var(--ink-muted);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px;
+  }
+  .up-icon :global(svg) { width: 100%; height: 100%; }
+
+  .up-plan-chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px;
+    border: 1px solid rgba(255, 74, 130, 0.35);
+    color: #C9215A; background: rgba(255, 74, 130, 0.06);
+  }
+
+  .up-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 600;
+    letter-spacing: -0.03em; color: var(--ink); margin: 0;
+  }
+
+  .up-desc {
+    font-size: 14px; line-height: 1.65; color: var(--ink-muted);
+    max-width: 420px; margin: 0;
+  }
+
+  /* Video/animation placeholder */
+  .up-preview-slot {
+    width: 100%; aspect-ratio: 16/9;
+    border: 1.5px dashed var(--border-medium);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-deep);
+    margin: 8px 0;
+  }
+  .up-preview-slot__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.12em; color: var(--ink-faint); text-transform: uppercase;
+  }
+
+  /* CTA area */
+  .up-cta-area {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    width: 100%;
+  }
+
+  .up-cta-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 22px; border-radius: var(--r-sm);
+    background: var(--petrol, #14616E); color: #fff;
+    border: none; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+    transition: opacity 150ms ease;
+  }
+  .up-cta-btn:hover { opacity: 0.88; }
+  .up-cta-btn:disabled, .up-cta-btn--loading { opacity: 0.55; cursor: not-allowed; }
+
+  .up-sent {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--petrol, #14616E);
+  }
+
+  .up-err {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--burgund, #8B1A1A); margin: 0;
+  }
+
+  .up-back {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.08em; color: var(--ink-muted);
+    text-decoration: none; transition: color 150ms;
+  }
+  .up-back:hover { color: var(--ink); }
+</style>
+</Layout>

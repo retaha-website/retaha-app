@@ -1651,7 +1651,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Sync fehlgeschlagen:',
     'pms.js.unknownerror': 'unbekannter Fehler',
     'pms.js.neterr': 'Netzwerk-Fehler:',
-    'pms.js.disconnectconfirm': 'Mews-Verbindung wirklich trennen? Bisher synchronisierte Daten bleiben erhalten, der Sync stoppt aber sofort.'
+    'pms.js.disconnectconfirm': 'Mews-Verbindung wirklich trennen? Bisher synchronisierte Daten bleiben erhalten, der Sync stoppt aber sofort.',
+    'up.tier': 'Verfügbar ab {plan}',
+    'up.cta': 'Vertrieb kontaktieren',
+    'up.sent': 'Anfrage gesendet — wir melden uns bald',
+    'up.err': 'Fehler — bitte erneut versuchen',
+    'up.back': 'Zurück zur Übersicht',
+    'up.ac.limit': 'Limit: {n} / {max} Action-Cards im Lite-Plan',
+    'up.ac.upgrade': 'Mit Pro freischalten →',
   },
   en: {
     'dd.profile': 'My Profile',
@@ -3282,7 +3289,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Sync failed:',
     'pms.js.unknownerror': 'unknown error',
     'pms.js.neterr': 'Network error:',
-    'pms.js.disconnectconfirm': 'Do you really want to disconnect from Mews? Any data that has been synced so far will be retained, but the sync will stop immediately.'
+    'pms.js.disconnectconfirm': 'Do you really want to disconnect from Mews? Any data that has been synced so far will be retained, but the sync will stop immediately.',
+    'up.tier': 'Available from {plan}',
+    'up.cta': 'Contact sales',
+    'up.sent': 'Request sent — we\'ll be in touch soon',
+    'up.err': 'Error — please try again',
+    'up.back': 'Back to overview',
+    'up.ac.limit': 'Limit: {n} / {max} Action Cards in Lite plan',
+    'up.ac.upgrade': 'Unlock with Pro →',
   },
   fr: {
     'dd.profile': 'Mon profil',
@@ -4913,7 +4927,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Échec de la synchronisation :',
     'pms.js.unknownerror': 'erreur inconnue',
     'pms.js.neterr': 'Erreur réseau :',
-    'pms.js.disconnectconfirm': 'Voulez-vous vraiment déconnecter Mews ? Les données synchronisées jusqu&#x27;à présent seront conservées, mais la synchronisation s&#x27;arrêtera immédiatement.'
+    'pms.js.disconnectconfirm': 'Voulez-vous vraiment déconnecter Mews ? Les données synchronisées jusqu&#x27;à présent seront conservées, mais la synchronisation s&#x27;arrêtera immédiatement.',
+    'up.tier': 'Disponible dès {plan}',
+    'up.cta': 'Contacter les ventes',
+    'up.sent': 'Demande envoyée — nous vous contacterons bientôt',
+    'up.err': 'Erreur — veuillez réessayer',
+    'up.back': 'Retour à l\'aperçu',
+    'up.ac.limit': 'Limite : {n} / {max} Action Cards dans le plan Lite',
+    'up.ac.upgrade': 'Débloquer avec Pro →',
   },
   es: {
     'dd.profile': 'Mi perfil',
@@ -6543,7 +6564,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Error de sincronización:',
     'pms.js.unknownerror': 'error desconocido',
     'pms.js.neterr': 'Errores de red:',
-    'pms.js.disconnectconfirm': '¿Se desconecta realmente la conexión Mews? Los datos sincronizados hasta ese momento se conservan, pero la sincronización se detiene de inmediato.'
+    'pms.js.disconnectconfirm': '¿Se desconecta realmente la conexión Mews? Los datos sincronizados hasta ese momento se conservan, pero la sincronización se detiene de inmediato.',
+    'up.tier': 'Disponible desde {plan}',
+    'up.cta': 'Contactar con ventas',
+    'up.sent': 'Solicitud enviada — nos pondremos en contacto pronto',
+    'up.err': 'Error — por favor, inténtelo de nuevo',
+    'up.back': 'Volver al resumen',
+    'up.ac.limit': 'Límite: {n} / {max} Action Cards en el plan Lite',
+    'up.ac.upgrade': 'Desbloquear con Pro →',
   },
   it: {
     'dd.profile': 'Il mio profilo',
@@ -8174,7 +8202,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Sincronizzazione non riuscita:',
     'pms.js.unknownerror': 'errore sconosciuto',
     'pms.js.neterr': 'Errore di rete:',
-    'pms.js.disconnectconfirm': 'Disconnettere definitivamente Mews? I dati sincronizzati fino a quel momento vengono conservati, ma la sincronizzazione si interrompe immediatamente.'
+    'pms.js.disconnectconfirm': 'Disconnettere definitivamente Mews? I dati sincronizzati fino a quel momento vengono conservati, ma la sincronizzazione si interrompe immediatamente.',
+    'up.tier': 'Disponibile da {plan}',
+    'up.cta': 'Contatta le vendite',
+    'up.sent': 'Richiesta inviata — ti contatteremo presto',
+    'up.err': 'Errore — riprova',
+    'up.back': 'Torna alla panoramica',
+    'up.ac.limit': 'Limite: {n} / {max} Action Card nel piano Lite',
+    'up.ac.upgrade': 'Sblocca con Pro →',
   },
   pt: {
     'dd.profile': 'Meu perfil',
@@ -9804,7 +9839,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Falha na sincronização:',
     'pms.js.unknownerror': 'erro desconhecido',
     'pms.js.neterr': 'Erro de rede:',
-    'pms.js.disconnectconfirm': 'Desligar definitivamente a ligação Mews? Os dados sincronizados até ao momento são mantidos, mas a sincronização é interrompida imediatamente.'
+    'pms.js.disconnectconfirm': 'Desligar definitivamente a ligação Mews? Os dados sincronizados até ao momento são mantidos, mas a sincronização é interrompida imediatamente.',
+    'up.tier': 'Disponível a partir de {plan}',
+    'up.cta': 'Contactar vendas',
+    'up.sent': 'Pedido enviado — entraremos em contacto em breve',
+    'up.err': 'Erro — por favor, tente novamente',
+    'up.back': 'Voltar à visão geral',
+    'up.ac.limit': 'Limite: {n} / {max} Action Cards no plano Lite',
+    'up.ac.upgrade': 'Desbloquear com Pro →',
   },
   nl: {
     'dd.profile': 'Mijn profiel',
@@ -11435,7 +11477,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Synchronisatie mislukt:',
     'pms.js.unknownerror': 'onbekende fout',
     'pms.js.neterr': 'Netwerkfout:',
-    'pms.js.disconnectconfirm': 'De Mews-verbinding echt verbreken? De tot nu toe gesynchroniseerde gegevens blijven behouden, maar de synchronisatie stopt onmiddellijk.'
+    'pms.js.disconnectconfirm': 'De Mews-verbinding echt verbreken? De tot nu toe gesynchroniseerde gegevens blijven behouden, maar de synchronisatie stopt onmiddellijk.',
+    'up.tier': 'Beschikbaar vanaf {plan}',
+    'up.cta': 'Neem contact op met verkoop',
+    'up.sent': 'Verzoek verzonden — we nemen snel contact op',
+    'up.err': 'Fout — probeer het opnieuw',
+    'up.back': 'Terug naar overzicht',
+    'up.ac.limit': 'Limiet: {n} / {max} Action Cards in het Lite-plan',
+    'up.ac.upgrade': 'Vrijspelen met Pro →',
   },
   ru: {
     'dd.profile': 'Мой профиль',
@@ -13065,7 +13114,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Синхронизация не удалась:',
     'pms.js.unknownerror': 'неизвестная ошибка',
     'pms.js.neterr': 'Сетевые ошибки:',
-    'pms.js.disconnectconfirm': 'Действительно ли разрывается соединение с Mews? Синхронизированные до этого момента данные сохраняются, но синхронизация немедленно прекращается.'
+    'pms.js.disconnectconfirm': 'Действительно ли разрывается соединение с Mews? Синхронизированные до этого момента данные сохраняются, но синхронизация немедленно прекращается.',
+    'up.tier': 'Доступно с {plan}',
+    'up.cta': 'Связаться с отделом продаж',
+    'up.sent': 'Запрос отправлен — мы свяжемся с вами в ближайшее время',
+    'up.err': 'Ошибка — пожалуйста, попробуйте снова',
+    'up.back': 'Назад к обзору',
+    'up.ac.limit': 'Лимит: {n} / {max} Action-Card в плане Lite',
+    'up.ac.upgrade': 'Разблокировать с Pro →',
   },
   ar: {
     'dd.profile': 'ملفي الشخصي',
@@ -14696,7 +14752,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'فشل المزامنة:',
     'pms.js.unknownerror': 'خطأ غير معروف',
     'pms.js.neterr': 'أخطاء الشبكة:',
-    'pms.js.disconnectconfirm': 'هل سيتم قطع اتصال Mews فعليًّا؟ ستبقى البيانات التي تمت مزامنتها حتى الآن محفوظة، لكن عملية المزامنة ستتوقف على الفور.'
+    'pms.js.disconnectconfirm': 'هل سيتم قطع اتصال Mews فعليًّا؟ ستبقى البيانات التي تمت مزامنتها حتى الآن محفوظة، لكن عملية المزامنة ستتوقف على الفور.',
+    'up.tier': 'متاح من {plan}',
+    'up.cta': 'التواصل مع المبيعات',
+    'up.sent': 'تم إرسال الطلب — سنتواصل معك قريبًا',
+    'up.err': 'خطأ — يرجى المحاولة مرة أخرى',
+    'up.back': 'العودة إلى نظرة عامة',
+    'up.ac.limit': 'الحد: {n} / {max} Action Card في خطة Lite',
+    'up.ac.upgrade': 'فتح مع Pro →',
   },
   zh: {
     'dd.profile': '我的资料',
@@ -16327,7 +16390,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': '同步失败：',
     'pms.js.unknownerror': '未知错误',
     'pms.js.neterr': '网络错误：',
-    'pms.js.disconnectconfirm': '是否真的要断开Mews连接？此前已同步的数据将保留，但同步操作会立即停止。'
+    'pms.js.disconnectconfirm': '是否真的要断开Mews连接？此前已同步的数据将保留，但同步操作会立即停止。',
+    'up.tier': '从 {plan} 起可用',
+    'up.cta': '联系销售',
+    'up.sent': '请求已发送 — 我们将尽快与您联系',
+    'up.err': '错误 — 请重试',
+    'up.back': '返回概览',
+    'up.ac.limit': '限制：Lite 计划中 {n} / {max} 张 Action-Card',
+    'up.ac.upgrade': '使用 Pro 解锁 →',
   },
   tr: {
     'dd.profile': 'Profilim',
@@ -17958,7 +18028,14 @@ export const BO_STRINGS: Partial<Record<LanguageCode, Record<string, string>>> =
     'pms.js.syncfail': 'Senkronizasyon başarısız:',
     'pms.js.unknownerror': 'bilinmeyen hata',
     'pms.js.neterr': 'Ağ hatası:',
-    'pms.js.disconnectconfirm': 'Mews bağlantısını gerçekten kesmek mi istiyorsunuz? Şimdiye kadar senkronize edilmiş veriler korunur, ancak senkronizasyon hemen durur.'
+    'pms.js.disconnectconfirm': 'Mews bağlantısını gerçekten kesmek mi istiyorsunuz? Şimdiye kadar senkronize edilmiş veriler korunur, ancak senkronizasyon hemen durur.',
+    'up.tier': '{plan} planından itibaren mevcut',
+    'up.cta': 'Satış ekibiyle iletişime geç',
+    'up.sent': 'İstek gönderildi — yakında sizinle iletişime geçeceğiz',
+    'up.err': 'Hata — lütfen tekrar deneyin',
+    'up.back': 'Genel bakışa dön',
+    'up.ac.limit': 'Sınır: Lite planında {n} / {max} Action Card',
+    'up.ac.upgrade': 'Pro ile aç →',
   }
 };
 

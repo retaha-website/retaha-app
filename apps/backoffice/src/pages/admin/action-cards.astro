@@ -30,6 +30,9 @@ if (cardsError) console.error('[action-cards] hotel_action_cards query error', {
 const cardList = (cards ?? []) as any[];
 const overFive = cardList.length > 5;
 
+const currentPlan = ((hotel as any).plan as string | undefined) ?? 'lite';
+const liteCardLimit = currentPlan === 'lite' ? 3 : 0;
+
 
 const INTERNAL_ACTIONS = [
   { value: 'open_breakfast',  label: bt('ac.action.breakfast', lang) },
@@ -82,6 +85,7 @@ const acT = {
     cardClasses: CARD_CLASSES,
     typeLabels: CARD_TYPE_LABELS,
     t: acT,
+    liteCardLimit,
   })})`}
 >
 
@@ -100,6 +104,13 @@ const acT = {
 
   {overFive && (
     <div class="ly-banner" set:html={bt('ac.hintbanner', lang).replace('{n}', String(cardList.length))}></div>
+  )}
+
+  {liteCardLimit > 0 && (
+    <div class="ly-banner ly-banner--lite-limit" x-show={`liteCardLimit > 0 && cards.length >= liteCardLimit`} x-cloak>
+      <span set:html={bt('up.ac.limit', lang).replace('{n}', `<span x-text="cards.length"></span>`).replace('{max}', String(liteCardLimit))}></span>
+      <a href="/freischalten/action-cards" class="ac-lite-upgrade-link">{bt('up.ac.upgrade', lang)}</a>
+    </div>
   )}
 
   <!-- ── Eve card ─────────────────────────────────────────────────────────── -->
@@ -163,7 +174,13 @@ const acT = {
         <b>Deine Action-Cards</b>
         <span class="ac-counter-badge" x-text="`${cards.length} ${cards.length === 1 ? ${JSON.stringify(bt('ac.card.one', lang))} : ${JSON.stringify(bt('ac.card.many', lang))}}`"></span>
       </div>
-      <button type="button" @click="openNew()" class="ly-btn ly-btn-outline">+ {bt('ac.new', lang).replace('+ ', '')}</button>
+      <button
+        type="button"
+        @click="liteCardLimit > 0 && cards.length >= liteCardLimit ? null : openNew()"
+        x-bind:disabled="liteCardLimit > 0 && cards.length >= liteCardLimit"
+        x-bind:title="liteCardLimit > 0 && cards.length >= liteCardLimit ? 'Plan-Limit erreicht — mit Pro freischalten' : ''"
+        class="ly-btn ly-btn-outline"
+      >+ {bt('ac.new', lang).replace('+ ', '')}</button>
     </div>
 
     <template x-if="cards.length === 0">
@@ -987,6 +1004,19 @@ const acT = {
   .ac-image-preview img { width: 100%; height: 100%; object-fit: cover; }
   .ac-image-placeholder { font-size: 11px; color: var(--ink-muted); font-style: italic; }
   .ac-image-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Lite plan limit banner */
+  .ly-banner--lite-limit {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap;
+    border-left-color: var(--pink, #FF4A82);
+    background: rgba(255, 74, 130, 0.04);
+  }
+  .ac-lite-upgrade-link {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+    color: var(--pink, #FF4A82); text-decoration: none; white-space: nowrap; font-weight: 600;
+  }
+  .ac-lite-upgrade-link:hover { opacity: 0.75; }
 </style>
 
 </Layout>

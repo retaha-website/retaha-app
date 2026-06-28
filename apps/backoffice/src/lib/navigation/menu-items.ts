@@ -5,6 +5,10 @@ export interface MenuItem {
   sub?: string;
   href: string;
   icon: string;
+  /** Plan required to access this item. undefined = accessible to all plans. */
+  requiredPlan?: 'pro' | 'premium';
+  /** Module key for /freischalten/[moduleKey] preview page. */
+  moduleKey?: string;
 }
 
 export interface MenuSection {
@@ -41,18 +45,24 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           label: bt('nav.marketing', lang),
           sub: bt('nav.marketing.sub', lang),
           href: '/marketing',
+          requiredPlan: 'premium',
+          moduleKey: 'marketing',
           icon: icon('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'),
         },
         {
           label: bt('nav.guests', lang),
           sub: bt('nav.guests.sub', lang),
           href: '/marketing/guests',
+          requiredPlan: 'premium',
+          moduleKey: 'marketing',
           icon: icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
         },
         {
           label: bt('nav.emaildomain', lang),
           sub: bt('nav.emaildomain.sub', lang),
           href: '/email-domain',
+          requiredPlan: 'premium',
+          moduleKey: 'email-domain',
           icon: icon('<path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6z"/><path d="M22 10l-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/>'),
         },
       ],
@@ -82,6 +92,8 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           label: bt('nav.places', lang),
           sub: bt('nav.places.sub', lang),
           href: '/places',
+          requiredPlan: 'pro',
+          moduleKey: 'empfehlungen',
           icon: icon('<circle cx="12" cy="11" r="3"/><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>'),
         },
         {
@@ -94,12 +106,16 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           label: bt('nav.wallet', lang),
           sub: bt('nav.wallet.sub', lang),
           href: '/wallet-keys',
+          requiredPlan: 'premium',
+          moduleKey: 'wallet',
           icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
         },
         {
           label: bt('nav.loyalty', lang),
           sub: bt('nav.loyalty.sub', lang),
           href: `${GUEST_APP}/loyalty`,
+          requiredPlan: 'premium',
+          moduleKey: 'loyalty',
           icon: icon('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'),
         },
         {
@@ -123,12 +139,16 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           label: bt('nav.staypushes', lang),
           sub: bt('nav.staypushes.sub', lang),
           href: '/stay-pushes',
+          requiredPlan: 'premium',
+          moduleKey: 'stay-push',
           icon: icon('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
         },
         {
           label: bt('nav.nfc', lang),
           sub: bt('nav.nfc.sub', lang),
           href: '/nfc-tags',
+          requiredPlan: 'pro',
+          moduleKey: 'nfc-tags',
           icon: icon('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>'),
         },
       ],
@@ -174,24 +194,32 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           label: bt('nav.pms', lang),
           sub: bt('nav.pms.sub', lang),
           href: '/pms',
+          requiredPlan: 'premium',
+          moduleKey: 'pms',
           icon: icon('<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
         },
         {
           label: bt('nav.bookingengine', lang),
           sub: bt('nav.bookingengine.sub', lang),
           href: '/booking-engine',
+          requiredPlan: 'premium',
+          moduleKey: 'booking-engine',
           icon: icon('<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>'),
         },
         {
           label: bt('nav.bestprice', lang),
           sub: bt('nav.bestprice.sub', lang),
           href: '/best-price',
+          requiredPlan: 'premium',
+          moduleKey: 'best-price',
           icon: icon('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
         },
         {
           label: bt('nav.bookingrecovery', lang),
           sub: bt('nav.bookingrecovery.sub', lang),
           href: '/booking-recovery',
+          requiredPlan: 'premium',
+          moduleKey: 'booking-recovery',
           icon: icon('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.62"/>'),
         },
         {

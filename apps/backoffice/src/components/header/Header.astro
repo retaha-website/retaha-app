@@ -68,12 +68,24 @@ const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
           </svg>
         </button>
 
-        <KeyMenu lang={user.language} />
+        {(() => {
+          const p = user.hotel_plan ?? 'lite';
+          if (p !== 'enterprise') {
+            return <a href="/subscription" class={`head__plan-badge head__plan-badge--${p}`} title={`Dein Plan: ${p.toUpperCase()} — Abonnement ansehen`}>{p.toUpperCase()}</a>;
+          }
+        })()}
+        <KeyMenu lang={user.language} plan={user.hotel_plan ?? 'lite'} />
 
         <UserMenu user={user} />
       </div>
     </div>
 
+    {(user.hotel_plan === 'lite' || !user.hotel_plan) && (
+      <div class="head__strip">
+        <span>Du nutzt <b>Lite</b> — die volle Suite wartet auf dich.</span>
+        <a href="/subscription" class="head__strip-cta">Upgrade ansehen →</a>
+      </div>
+    )}
   </div>
 </header>
 
@@ -153,6 +165,46 @@ const setupIncomplete = user.hotel_setup_skipped && !user.hotel_onboarding_done;
     color: #fff;
     border-color: var(--petrol);
   }
+
+  /* Plan badge */
+  .head__plan-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 0.16em; font-weight: 600;
+    padding: 3px 8px; border-radius: 99px;
+    border: 1px solid var(--border);
+    color: var(--ink-muted);
+    text-decoration: none; white-space: nowrap;
+    transition: all 150ms ease;
+    line-height: 1;
+  }
+  .head__plan-badge--lite {
+    border-color: rgba(255, 74, 130, 0.35);
+    color: #C9215A;
+    background: rgba(255, 74, 130, 0.06);
+  }
+  .head__plan-badge--lite:hover {
+    background: rgba(255, 74, 130, 0.12);
+    border-color: rgba(255, 74, 130, 0.55);
+  }
+  .head__plan-badge--pro:hover,
+  .head__plan-badge--premium:hover { background: var(--bg-deep); }
+
+  /* Lite upgrade strip */
+  .head__strip {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 7px 32px;
+    border-top: 1px solid rgba(255, 74, 130, 0.15);
+    background: rgba(255, 74, 130, 0.03);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.04em; color: var(--ink-muted);
+  }
+  .head__strip b { color: var(--ink); font-weight: 600; }
+  .head__strip-cta {
+    color: var(--pink, #FF4A82); text-decoration: none;
+    font-weight: 600; transition: opacity 150ms;
+  }
+  .head__strip-cta:hover { opacity: 0.75; }
+  @media (max-width: 600px) { .head__strip { flex-direction: column; gap: 4px; text-align: center; } }
 </style>
 
 <script>

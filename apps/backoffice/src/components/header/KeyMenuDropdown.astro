@@ -2,9 +2,12 @@
 import { getMenuSections } from '../../lib/navigation/menu-items';
 import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { lang: LanguageCode; }
-const { lang } = Astro.props;
+interface Props { lang: LanguageCode; plan: string; }
+const { lang, plan } = Astro.props;
 const menuSections = getMenuSections(lang);
+
+const TIER: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
+const rank = TIER[plan] ?? 0;
 ---
 
 <div class="key-menu-dropdown" id="keyMenuDropdown" role="menu" aria-hidden="true">
@@ -33,16 +36,35 @@ const menuSections = getMenuSections(lang);
       <div class="km-section">
         <span class="km-section__title">{section.title}</span>
         <div class="km-section__items">
-          {section.items.map(item => (
-            <a href={item.href} class="km-item" role="menuitem">
-              <span class="km-item__icon" aria-hidden="true" set:html={item.icon} />
-              <div class="km-item__text">
-                <span class="km-item__label">{item.label}</span>
-                {item.sub && <span class="km-item__sub">{item.sub}</span>}
-              </div>
-              <span class="km-item__arrow" aria-hidden="true">→</span>
-            </a>
-          ))}
+          {section.items.map(item => {
+            const locked = !!item.requiredPlan && rank < (TIER[item.requiredPlan] ?? 99);
+            const requiredLabel = item.requiredPlan === 'pro' ? 'Pro' : 'Premium';
+            const lockHref = `/freischalten/${item.moduleKey ?? item.href.replace(/^\//, '').replace(/\//g, '-')}`;
+            return locked ? (
+              <a href={lockHref} class="km-item km-item--locked" role="menuitem" aria-label={`${item.label} — ab ${requiredLabel}`}>
+                <span class="km-item__icon" aria-hidden="true" set:html={item.icon} />
+                <div class="km-item__text">
+                  <span class="km-item__label">{item.label}</span>
+                  <span class="km-item__sub km-item__sub--plan">ab {requiredLabel}</span>
+                </div>
+                <span class="km-item__lock" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="11" width="14" height="9" rx="2"/>
+                    <path d="M8 11V7a4 4 0 018 0v4"/>
+                  </svg>
+                </span>
+              </a>
+            ) : (
+              <a href={item.href} class="km-item" role="menuitem">
+                <span class="km-item__icon" aria-hidden="true" set:html={item.icon} />
+                <div class="km-item__text">
+                  <span class="km-item__label">{item.label}</span>
+                  {item.sub && <span class="km-item__sub">{item.sub}</span>}
+                </div>
+                <span class="km-item__arrow" aria-hidden="true">→</span>
+              </a>
+            );
+          })}
         </div>
       </div>
     ))}
@@ -135,6 +157,18 @@ const menuSections = getMenuSections(lang);
   .km-item:hover .km-item__icon { color: var(--ink); }
   .km-item:hover .km-item__arrow { color: var(--ink); transform: translateX(4px); }
 
+  /* Locked items */
+  .km-item--locked {
+    opacity: 0.5;
+  }
+  .km-item--locked:hover {
+    background: rgba(255, 74, 130, 0.04);
+    padding-left: 24px;
+    opacity: 0.72;
+  }
+  .km-item--locked:hover .km-item__icon { color: var(--ink-muted); }
+  .km-item--locked:hover .km-item__lock { color: var(--pink, #FF4A82); }
+
   .km-item__icon {
     width: 18px; height: 18px; flex-shrink: 0;
     color: var(--ink-muted); transition: color 150ms ease;
@@ -152,9 +186,18 @@ const menuSections = getMenuSections(lang);
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 0.08em; color: var(--ink-muted); text-transform: uppercase;
   }
+  .km-item__sub--plan {
+    color: var(--pink, #FF4A82);
+    letter-spacing: 0.12em;
+  }
   .km-item__arrow {
     color: var(--ink-faint); font-family: 'JetBrains Mono', monospace;
     font-size: 14px; transition: all 200ms ease; flex-shrink: 0;
+  }
+  .km-item__lock {
+    color: var(--ink-faint); flex-shrink: 0;
+    display: inline-flex; align-items: center;
+    transition: color 150ms ease;
   }
 
   /* Empty state */
