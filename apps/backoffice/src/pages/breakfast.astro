@@ -904,15 +904,23 @@ textarea.s-input { resize: none; min-height: 72px; }
       </div>
       <template x-if="!eve.result">
         <div>
-          <textarea class="s-input bf-eve-ta" x-model="eve.prompt"
-            :placeholder="eve.target === 'location' ? 'z.B. Heller Wintergarten, EG links' : eve.target === 'included' ? 'z.B. Backwaren, regionale Produkte, Bio-Eier' : 'z.B. Roggen-Brot, Bio-Eier, Honig, Müsli …'"
-            :disabled="eve.loading"
-            @keydown.meta.enter.prevent="runEve()"
-            @keydown.ctrl.enter.prevent="runEve()"></textarea>
-          <div class="bf-eve-err" x-show="eve.error" x-text="eve.error"></div>
+          <template x-if="eve.target !== 'allergen'">
+            <textarea class="s-input bf-eve-ta" x-model="eve.prompt"
+              :placeholder="eve.target === 'location' ? 'z.B. Heller Wintergarten, EG links' : 'z.B. Backwaren, regionale Produkte, Bio-Eier'"
+              :disabled="eve.loading"
+              @keydown.meta.enter.prevent="runEve()"
+              @keydown.ctrl.enter.prevent="runEve()"></textarea>
+          </template>
+          <template x-if="eve.target === 'allergen'">
+            <p style="font-size:13px;color:var(--ink-muted);line-height:1.55;margin:0 0 4px">
+              Eve analysiert alle Speisen auf Basis ihrer Namen und Beschreibungen und trägt die EU-Hauptallergene automatisch ein.
+            </p>
+          </template>
+          <div class="bf-eve-err" x-show="eve.error" x-cloak x-text="eve.error"></div>
           <div class="bf-eve-mft">
             <button type="button" class="bf-eve-cancel" @click="eve.open = false" :disabled="eve.loading">Abbrechen</button>
-            <button type="button" class="bf-eve-btn" @click="runEve()" :disabled="eve.loading || !eve.prompt.trim()">
+            <button type="button" class="bf-eve-btn" @click="runEve()"
+              :disabled="eve.loading || (eve.target !== 'allergen' && !eve.prompt.trim())">
               <svg class="bf-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
               <span x-text="eve.loading ? 'Eve denkt …' : 'Mit Eve generieren'"></span>
             </button>
@@ -1087,20 +1095,29 @@ textarea.s-input { resize: none; min-height: 72px; }
       },
 
       async runEve() {
-        if (!this.eve.prompt.trim() || this.eve.loading) return;
+        if (this.eve.loading) return;
+        if (this.eve.target !== 'allergen' && !this.eve.prompt.trim()) return;
         this.eve.loading = true;
         this.eve.error = '';
         try {
-          const res = await fetch('/api/admin/eve/generate-field', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ field: this.eve.target, prompt: this.eve.prompt }),
-          });
-          const d = await res.json();
-          if (!d.ok) { this.eve.error = d.message || 'Fehler bei der KI-Generierung.'; return; }
           if (this.eve.target === 'allergen') {
-            this.eve.result = d.text;
+            const res = await fetch('/api/admin/breakfast/eve-allergens', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            const d = await res.json();
+            if (!d.ok) { this.eve.error = d.message || 'Fehler bei der KI-Generierung.'; return; }
+            this.items = d.items || this.items;
+            this.eve.open = false;
+            (window as any).retahaToast?.(`Eve hat ${d.updated} Speise${d.updated === 1 ? '' : 'n'} mit Allergenen versehen`);
           } else {
+            const res = await fetch('/api/admin/eve/generate-field', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ field: this.eve.target, prompt: this.eve.prompt }),
+            });
+            const d = await res.json();
+            if (!d.ok) { this.eve.error = d.message || 'Fehler bei der KI-Generierung.'; return; }
             const fieldId = this.eve.target === 'location' ? 'bf-location' : 'bf-included';
             const el = document.getElementById(fieldId);
             if (el) { el.value = d.text; el.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -1222,22 +1239,24 @@ textarea.s-input { resize: none; min-height: 72px; }
         window.addEventListener('pointerup', this._ptrUpHandler);
         window.addEventListener('pointercancel', this._ptrUpHandler);
       },
-      _dndPerform(target) {
-        const fromIdx = this.items.findIndex(i => i.id === this.dragItem.id);
-        const toIdx = this.items.findIndex(i => i.id === target.id);
+      _dndPerform(target: any) {
+        const dragId = this.dragItem?.id;
+        if (!dragId) { this.dragItem = null; this.dragTarget = null; return; }
+        const fromIdx = this.items.findIndex((i: any) => i.id === dragId);
+        const toIdx = this.items.findIndex((i: any) => i.id === target.id);
         if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) {
           this.dragItem = null; this.dragTarget = null; return;
         }
         const newItems = [...this.items];
         const [moved] = newItems.splice(fromIdx, 1);
         newItems.splice(toIdx, 0, moved);
-        newItems.forEach((item, idx) => { item.display_order = idx; });
+        newItems.forEach((item: any, idx: number) => { item.display_order = idx; });
         this.items = newItems;
         this.dragItem = null;
         this.dragTarget = null;
-        this._saveOrder(newItems.map(i => i.id));
+        this._saveOrder(newItems.map((i: any) => i.id));
       },
-      async _saveOrder(ids) {
+      async _saveOrder(ids: string[]) {
         try {
           const res = await fetch('/api/admin/breakfast/item', {
             method: 'PATCH',
@@ -1251,8 +1270,8 @@ textarea.s-input { resize: none; min-height: 72px; }
         }
       },
 
-      showToast(msg, kind) {
-        window.retahaToast?.(msg, kind === 'err' || kind === 'error' ? 'error' : 'success');
+      showToast(msg: string, kind?: string) {
+        (window as any).retahaToast?.(msg, kind === 'err' || kind === 'error' ? 'error' : 'success');
       },
     }));
   });
