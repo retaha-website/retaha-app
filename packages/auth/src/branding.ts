@@ -10,7 +10,7 @@ export interface BrandPalette {
 /** Deterministisch aus Primärfarbe abgeleitet — keine DB-Spalte nötig. */
 export function computeBrandPalette(hex: string): BrandPalette {
   if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
-    return { hover: '#FFE600', soft: '#FFF9CC', onAccent: '#0A0A0A' };
+    return { hover: '#0e4d57', soft: 'rgba(20,97,110,0.12)', onAccent: '#ffffff' };
   }
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -85,7 +85,7 @@ export async function getBranding(
     logo_dark:         (d.logo_dark as string) ?? null,
     logo_print:        (d.logo_print as string) ?? null,
     logo_spacing:      ((d.logo_spacing as string) ?? 'normal') as 'tight' | 'normal' | 'loose',
-    brand_primary:     (d.brand_primary as string) ?? '#FF4A82',
+    brand_primary:     (d.brand_primary as string) ?? '#14616E',
     brand_theme:       ((d.brand_theme as string) ?? 'coffee') as 'coffee' | 'ocean' | 'forest' | 'custom',
     design_identity:   ((d.design_identity as string) ?? 'classic') as 'classic' | 'bauhaus' | 'editorial',
     splash_background: (d.splash_background as string) ?? null,

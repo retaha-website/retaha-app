@@ -1,0 +1,292 @@
+---
+/**
+ * Shared App-Switcher — "App / Steuerung / Admin"
+ * Switcher Option A: aktiver Tab = Icon + Label, inaktive = nur Icon, kein Auf-/Zugeh-Effekt.
+ *
+ * Wird in Backoffice, Gast-Vorschau und Dashboard identisch genutzt.
+ * Labels: Caller berechnet via bt() und übergibt; Fallback = Deutsch.
+ */
+
+type TabKey = 'gast' | 'backoffice' | 'admin';
+
+interface Props {
+  active: TabKey;
+  /** Ziel-URLs für jeden Tab */
+  guestUrl: string;
+  backofficeUrl: string;
+  dashboardUrl: string;
+  /** i18n-Labels — Fallback: Deutsch */
+  labels?: {
+    guest?: string;
+    backoffice?: string;
+    admin?: string;
+    here?: string;
+    switchTo?: string;
+  };
+}
+
+const {
+  active,
+  guestUrl,
+  backofficeUrl,
+  dashboardUrl,
+  labels = {},
+} = Astro.props;
+
+const L = {
+  guest:     labels.guest     ?? 'App',
+  backoffice: labels.backoffice ?? 'Steuerung',
+  admin:     labels.admin     ?? 'Admin',
+  here:      labels.here      ?? 'du bist hier',
+  switchTo:  labels.switchTo  ?? 'wechsle zu',
+};
+
+const tabs = [
+  { key: 'gast'       as const, label: L.guest,      href: guestUrl,      icon: 'phone'   },
+  { key: 'backoffice' as const, label: L.backoffice,  href: backofficeUrl, icon: 'sliders' },
+  { key: 'admin'      as const, label: L.admin,       href: dashboardUrl,  icon: 'grid'    },
+];
+---
+
+<nav class="header-tabs" id="viewSwitcher" aria-label="Ansicht wechseln">
+  <span class="header-tabs__marker" data-marker aria-hidden="true"></span>
+  {tabs.map((tab, i) => (
+    <a
+      href={tab.href}
+      data-tab
+      style={`--i: ${i}`}
+      class:list={['header-tabs__tab', { 'is-active': tab.key === active }]}
+      title={tab.key === active ? L.here : `${L.switchTo} ${tab.label}`}
+      aria-current={tab.key === active ? 'page' : undefined}
+    >
+      {tab.icon === 'phone' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="7" y="3" width="10" height="18" rx="2"/>
+          <path d="M11 18h2"/>
+        </svg>
+      )}
+      {tab.icon === 'sliders' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 6h11M19 6h1M4 12h3M11 12h9M4 18h7M15 18h5"/>
+          <circle cx="17" cy="6" r="2"/>
+          <circle cx="9"  cy="12" r="2"/>
+          <circle cx="13" cy="18" r="2"/>
+        </svg>
+      )}
+      {tab.icon === 'grid' && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="4"  y="4"  width="7" height="7" rx="1.5"/>
+          <rect x="13" y="4"  width="7" height="7" rx="1.5"/>
+          <rect x="4"  y="13" width="7" height="7" rx="1.5"/>
+          <rect x="13" y="13" width="7" height="7" rx="1.5"/>
+        </svg>
+      )}
+      <span class="header-tabs__lbl">{tab.label}</span>
+    </a>
+  ))}
+</nav>
+
+<style>
+  .header-tabs {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #E5E4E0);
+    border-radius: 10px;
+    padding: 3px;
+  }
+
+  .header-tabs__marker {
+    position: absolute;
+    top: 0; left: 0;
+    height: 0; width: 0;
+    background: var(--petrol, #14616E);
+    border-radius: 7px;
+    z-index: 0;
+    opacity: 0;
+    transform-origin: center;
+    pointer-events: none;
+    transition:
+      left   320ms cubic-bezier(0.5,0,0.2,1),
+      top    320ms cubic-bezier(0.5,0,0.2,1),
+      width  320ms cubic-bezier(0.5,0,0.2,1),
+      height 320ms cubic-bezier(0.5,0,0.2,1);
+  }
+  @keyframes marker-bloom {
+    from { opacity: 0; transform: scale(0.32); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .header-tabs__marker.is-blooming {
+    animation: marker-bloom 600ms cubic-bezier(0.22,1,0.36,1) var(--bloom-delay, 0ms) both;
+  }
+
+  @keyframes tab-sheen {
+    0%, 72% { left: -70%; }
+    100%     { left: 140%; }
+  }
+
+  .header-tabs__tab {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    height: 30px;
+    padding: 0 10px;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    color: var(--ink-muted, rgba(10,10,10,0.42));
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: color 120ms ease;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .header-tabs__tab:hover:not(.is-active) { color: var(--petrol, #14616E); }
+  .header-tabs__tab.is-active { color: #fff; }
+
+  /* Sheen sweep on active tab (3× mockup speed: 6.5s × 3 = 19.5s) */
+  .header-tabs__tab.is-active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -70%;
+    width: 45%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.36), transparent);
+    transform: skewX(-18deg);
+    pointer-events: none;
+    animation: tab-sheen 19.5s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .header-tabs__tab.is-active::after { animation: none; }
+  }
+
+  .header-tabs__tab svg {
+    width: 14px; height: 14px;
+    flex-shrink: 0;
+    color: var(--petrol, #14616E);
+    transition: color 120ms ease;
+  }
+  .header-tabs__tab.is-active svg { color: #fff; }
+
+  /* Option A: nur aktiver Tab zeigt Label — inaktive = Icon-only */
+  .header-tabs__lbl {
+    display: block;
+    max-width: 0;
+    margin-left: 0;
+    opacity: 0;
+    overflow: hidden;
+  }
+  .header-tabs__tab.is-active .header-tabs__lbl {
+    max-width: 120px;
+    margin-left: 7px;
+    opacity: 1;
+  }
+
+  /* Erstes Login: Kacheln klappen gestaffelt auf */
+  @keyframes tab-unfold {
+    from { opacity: 0; transform: translateX(-22px) scale(0.7); }
+    to   { opacity: 1; transform: none; }
+  }
+  .header-tabs.is-unfolding .header-tabs__tab {
+    animation: tab-unfold 400ms cubic-bezier(0.34,1.3,0.5,1) backwards;
+    animation-delay: calc(var(--i) * 100ms + 90ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .header-tabs__marker { transition: none; }
+    .header-tabs__marker.is-blooming { animation: none; opacity: 1; }
+    .header-tabs.is-unfolding .header-tabs__tab { animation: none; }
+  }
+
+  @media (max-width: 900px) {
+    .header-tabs__tab { height: 28px; padding: 0 8px; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var nav = document.getElementById('viewSwitcher');
+    if (!nav) return;
+    var marker = nav.querySelector('[data-marker]');
+    var tabs = Array.prototype.slice.call(nav.querySelectorAll('[data-tab]'));
+    if (!marker || !tabs.length) return;
+
+    function activeTab() { return nav.querySelector('[data-tab].is-active') || tabs[0]; }
+
+    function place(el) {
+      if (!el) return;
+      marker.style.width  = el.offsetWidth  + 'px';
+      marker.style.height = el.offsetHeight + 'px';
+      marker.style.left   = el.offsetLeft   + 'px';
+      marker.style.top    = el.offsetTop    + 'px';
+    }
+
+    var firstTime = false;
+    try {
+      if (!localStorage.getItem('retaha-switcher-seen')) {
+        firstTime = true;
+        localStorage.setItem('retaha-switcher-seen', '1');
+      }
+    } catch (e) {}
+    if (firstTime) nav.classList.add('is-unfolding');
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    requestAnimationFrame(function () {
+      marker.style.transition = 'none';
+      place(activeTab());
+      void marker.offsetWidth;
+      marker.style.transition = '';
+      if (reduce) { marker.style.opacity = '1'; return; }
+      if (firstTime) marker.style.setProperty('--bloom-delay', '480ms');
+      marker.classList.add('is-blooming');
+    });
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        marker.style.transition = 'none';
+        place(activeTab());
+        void marker.offsetWidth;
+        marker.style.transition = '';
+      });
+    }
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function (e) {
+        if (tab.classList.contains('is-active')) { return; }
+        e.preventDefault();
+        var href = tab.getAttribute('href');
+        tabs.forEach(function (t) { t.classList.remove('is-active'); });
+        tab.classList.add('is-active');
+        place(tab);
+        setTimeout(function () { if (href) window.location.href = href; }, reduce ? 0 : 320);
+      });
+    });
+
+    var rt;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        var prev = marker.style.transition;
+        marker.style.transition = 'none';
+        place(activeTab());
+        requestAnimationFrame(function () { marker.style.transition = prev; });
+      }, 120);
+    });
+  })();
+</script>
