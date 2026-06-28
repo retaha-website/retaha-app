@@ -107,9 +107,16 @@ const acT = {
   )}
 
   {liteCardLimit > 0 && (
+    <div class="ac-lite-info">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>In der <strong>Lite-Version</strong> kannst du bis zu <strong>{liteCardLimit} Action Cards</strong> hinzufügen. Für mehr Karten <a href="/freischalten/action-cards" class="ac-lite-info-link">jetzt auf Pro upgraden →</a></span>
+    </div>
+  )}
+
+  {liteCardLimit > 0 && (
     <div class="ly-banner ly-banner--lite-limit" x-show={`liteCardLimit > 0 && cards.length >= liteCardLimit`} x-cloak>
-      <span set:html={bt('up.ac.limit', lang).replace('{n}', `<span x-text="cards.length"></span>`).replace('{max}', String(liteCardLimit))}></span>
-      <a href="/freischalten/action-cards" class="ac-lite-upgrade-link">{bt('up.ac.upgrade', lang)}</a>
+      <span>Limit erreicht (<span x-text="cards.length"></span>/{liteCardLimit} Karten). Lösche eine Karte oder upgrade deinen Plan.</span>
+      <a href="/freischalten/action-cards" class="ac-lite-upgrade-link">Jetzt upgraden →</a>
     </div>
   )}
 
@@ -712,6 +719,7 @@ const acT = {
         });
         const data = await res.json();
         if (!res.ok || !data.ok) { this.showToast(data.error || `API ${res.status}: ${res.statusText}`, 'error'); return; }
+        this.cards = this.cards.filter((c: any) => c.id !== id);
         this.showToast(this.t.deleted, 'success');
         setTimeout(() => window.location.reload(), 400);
       },
@@ -1004,6 +1012,24 @@ const acT = {
   .ac-image-preview img { width: 100%; height: 100%; object-fit: cover; }
   .ac-image-placeholder { font-size: 11px; color: var(--ink-muted); font-style: italic; }
   .ac-image-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Lite info box (permanent, blau) */
+  .ac-lite-info {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: rgba(20, 97, 110, 0.07);
+    border: 1px solid rgba(20, 97, 110, 0.2);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--ink, #0A0A0A);
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .ac-lite-info svg { flex-shrink: 0; margin-top: 2px; color: var(--petrol, #14616E); }
+  .ac-lite-info-link {
+    color: var(--petrol, #14616E); font-weight: 600; text-decoration: none;
+  }
+  .ac-lite-info-link:hover { text-decoration: underline; }
 
   /* Lite plan limit banner */
   .ly-banner--lite-limit {
