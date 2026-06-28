@@ -20,12 +20,10 @@ for (const a of EU_ALLERGENS) {
   LABEL_TO_KEY[a.label_de.toLowerCase()] = a.key;
   LABEL_TO_KEY[a.label_en.toLowerCase()] = a.key;
 }
-// Zusätzliche Aliase
 const EXTRA: Record<string, string> = {
-  'gluten': 'gluten', 'weizen': 'gluten', 'dinkel': 'gluten', 'roggen': 'gluten',
-  'gerste': 'gluten', 'hafer': 'gluten', 'laktose': 'milk', 'käse': 'milk',
-  'butter': 'milk', 'sahne': 'milk', 'joghurt': 'milk', 'nüsse': 'nuts',
-  'mandeln': 'nuts', 'mandel': 'nuts', 'haselnüsse': 'nuts', 'haselnuss': 'nuts',
+  'weizen': 'gluten', 'dinkel': 'gluten', 'roggen': 'gluten', 'gerste': 'gluten', 'hafer': 'gluten',
+  'laktose': 'milk', 'käse': 'milk', 'butter': 'milk', 'sahne': 'milk', 'joghurt': 'milk',
+  'nüsse': 'nuts', 'mandeln': 'nuts', 'mandel': 'nuts', 'haselnüsse': 'nuts', 'haselnuss': 'nuts',
   'walnüsse': 'nuts', 'walnuss': 'nuts', 'cashews': 'nuts', 'erdnuss': 'peanuts',
   'sulfit': 'sulfites', 'schwefeldioxid': 'sulfites', 'sulphites': 'sulfites',
   'sulphur dioxide': 'sulfites', 'ei': 'eggs',
@@ -42,10 +40,20 @@ function parseAllergenKeys(list: string[]): string[] {
   return [...result];
 }
 
+function extractJson(raw: string): string {
+  // Strip markdown fences
+  const stripped = raw.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+  // Find outermost JSON array
+  const start = stripped.indexOf('[');
+  const end = stripped.lastIndexOf(']');
+  if (start >= 0 && end > start) return stripped.slice(start, end + 1);
+  return stripped;
+}
+
 export const POST: APIRoute = async ({ cookies, request }) => {
   const hotels = await getUserHotels(cookies, request);
   const hotel = hotels?.[0]?.hotel;
-  if (!hotel) return json({ ok: false, error: 'Unauthorized' }, 401);
+  if (!hotel) return json({ ok: false, error: 'Unauthorized', message: 'Nicht autorisiert.' }, 401);
 
   const apiKey = import.meta.env.ANTHROPIC_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'ai_not_configured', message: 'KI nicht konfiguriert.' }, 500);
@@ -57,24 +65,23 @@ export const POST: APIRoute = async ({ cookies, request }) => {
     .eq('hotel_id', (hotel as any).id)
     .order('display_order');
 
-  if (fetchErr) return json({ ok: false, error: fetchErr.message }, 500);
-  if (!rows || rows.length === 0) return json({ ok: false, error: 'no_items', message: 'Keine Speisen vorhanden.' }, 400);
-
-  const itemsForPrompt = rows.map(r => ({
-    id: r.id,
-    name: r.name_de || '',
-    desc: r.description_de || '',
-  }));
+  if (fetchErr) {
+    console.error('[eve-allergens] fetch error', fetchErr.message);
+    return json({ ok: false, error: fetchErr.code, message: fetchErr.message }, 500);
+  }
+  if (!rows || rows.length === 0) {
+    return json({ ok: false, error: 'no_items', message: 'Keine Speisen vorhanden.' }, 400);
+  }
 
   const systemPrompt = `Du bist Lebensmittelexperte (LMIV Art. 9). Analysiere Frühstücksartikel auf die 14 EU-Hauptallergene.
-Antworte NUR mit einem JSON-Array. Jedes Element hat "id" (String) und "allergens" (Array der englischen Key-Strings).
-Mögliche Keys: ${ALLERGEN_KEYS.join(', ')}.
-Leere allergens-Arrays sind erlaubt. Gib KEIN Markdown, KEINE Erklärungen — nur das JSON-Array.`;
+Antworte NUR mit einem JSON-Array ohne Markdown. Jedes Element: {"id":"<id>","allergens":["<key>",...]}
+Mögliche allergen-Keys: ${ALLERGEN_KEYS.join(', ')}.
+Leere allergens-Arrays sind erlaubt.`;
 
-  const userMsg = JSON.stringify(itemsForPrompt.map(i => ({
-    id: i.id,
-    name: i.name,
-    ...(i.desc ? { description: i.desc } : {}),
+  const userMsg = JSON.stringify(rows.map(r => ({
+    id: r.id,
+    name: r.name_de || '',
+    ...(r.description_de ? { description: r.description_de } : {}),
   })));
 
   let parsed: Array<{ id: string; allergens: string[] }>;
@@ -87,31 +94,36 @@ Leere allergens-Arrays sind erlaubt. Gib KEIN Markdown, KEINE Erklärungen — n
       messages: [{ role: 'user', content: userMsg }],
     });
     const raw = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : '';
-    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) throw new Error('not an array');
+    console.log('[eve-allergens] raw response:', raw.slice(0, 300));
+    parsed = JSON.parse(extractJson(raw));
+    if (!Array.isArray(parsed)) throw new Error('response is not an array');
   } catch (err: any) {
-    console.error('[eve-allergens] parse error', err?.message);
-    return json({ ok: false, error: 'ai_parse_error', message: 'Eve-Antwort konnte nicht verarbeitet werden.' }, 500);
+    console.error('[eve-allergens] parse error:', err?.message);
+    return json({ ok: false, error: 'ai_parse_error', message: 'Eve-Antwort konnte nicht verarbeitet werden: ' + (err?.message ?? '') }, 500);
   }
 
-  // Upsert allergen flags per item
-  const updates: Array<Record<string, unknown>> = [];
-  for (const entry of parsed) {
-    if (!entry.id || !Array.isArray(entry.allergens)) continue;
-    const allergenFlags: Record<string, boolean> = {};
-    for (const k of ALLERGEN_KEYS) allergenFlags[`contains_${k}`] = false;
-    for (const k of parseAllergenKeys(entry.allergens)) allergenFlags[`contains_${k}`] = true;
-    updates.push({ id: entry.id, ...allergenFlags, updated_at: new Date().toISOString() });
+  // Update each item's allergen flags via .update() (no hotel_id required in payload)
+  const now = new Date().toISOString();
+  const updateResults = await Promise.all(
+    parsed
+      .filter(entry => entry.id && Array.isArray(entry.allergens))
+      .map(entry => {
+        const flags: Record<string, boolean> = {};
+        for (const k of ALLERGEN_KEYS) flags[`contains_${k}`] = false;
+        for (const k of parseAllergenKeys(entry.allergens)) flags[`contains_${k}`] = true;
+        return supabase
+          .from('breakfast_items')
+          .update({ ...flags, updated_at: now })
+          .eq('id', entry.id)
+          .eq('hotel_id', (hotel as any).id);
+      })
+  );
+
+  const firstErr = updateResults.find(r => r.error);
+  if (firstErr?.error) {
+    console.error('[eve-allergens] update error:', firstErr.error.message);
+    return json({ ok: false, error: firstErr.error.code, message: firstErr.error.message }, 500);
   }
-
-  if (updates.length === 0) return json({ ok: false, error: 'no_updates' }, 400);
-
-  const { error: upErr } = await supabase
-    .from('breakfast_items')
-    .upsert(updates, { onConflict: 'id' });
-
-  if (upErr) return json({ ok: false, error: upErr.message }, 500);
 
   // Reload items to return fresh state
   const { data: fresh } = await supabase
@@ -120,5 +132,5 @@ Leere allergens-Arrays sind erlaubt. Gib KEIN Markdown, KEINE Erklärungen — n
     .eq('hotel_id', (hotel as any).id)
     .order('display_order');
 
-  return json({ ok: true, updated: updates.length, items: fresh ?? [] });
+  return json({ ok: true, updated: updateResults.length, items: fresh ?? [] });
 };
