@@ -88,10 +88,9 @@ for (const l of LOOKS) {
 
       <div class="lr-cta-row">
         <button type="button" class="lr-next">
-          <span class="word">Weiter</span>
-          <span class="ab"><span class="g base">→</span><span class="g fill">→</span><span class="g chk">✓</span></span>
-          <span class="uflow"></span>
-          <span class="loadbar"></span>
+          <span class="lr-next__label">Weiter</span>
+          <span class="lr-next__arrow" aria-hidden="true">→</span>
+          <span class="lr-next__line" aria-hidden="true"></span>
         </button>
         <button type="button" class="lr-skip" data-onb-action="skip">Setup überspringen</button>
       </div>
@@ -205,63 +204,37 @@ for (const l of LOOKS) {
   .lr-cta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   @media (max-width: 1280px) { .lr-cta-row { justify-content: center; } }
   .lr-next {
-    position: relative; display: inline-flex; align-items: center;
+    --hover-dur: 850ms;
+    --hover-ease: cubic-bezier(.65, 0, .35, 1);
+    position: relative; display: inline-flex; align-items: center; gap: .7em;
+    padding: 14px 4px;
     appearance: none; -webkit-appearance: none; border: none; background: none;
     font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
-    letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--ink, #0A0A0A); padding: 14px 8px;
-    cursor: pointer; overflow: visible;
-    transition: color 280ms cubic-bezier(.4,0,.2,1), opacity 120ms ease;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink, #0A0A0A); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--hover-dur) var(--hover-ease);
   }
-  .lr-next::before {
-    content: ''; position: absolute; bottom: 0; left: 0;
-    width: 100%; height: 1.5px;
+  .lr-next__arrow {
+    display: inline-block; color: var(--ink, #0A0A0A);
+    transition: transform var(--hover-dur) var(--hover-ease), color var(--hover-dur) var(--hover-ease);
+    will-change: transform;
+  }
+  .lr-next__line {
+    position: absolute; left: 4px; right: 4px; bottom: 8px; height: 1.5px;
     background: var(--petrol, #14616E);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 600ms cubic-bezier(.25,0,0,1);
+    transform: scaleX(0); transform-origin: left center;
+    transition: transform var(--hover-dur) var(--hover-ease);
+    will-change: transform;
   }
   @media (hover: hover) {
     .lr-next:hover { color: var(--petrol, #14616E); }
-    .lr-next:hover::before { clip-path: inset(0 0% 0 0); }
-    .lr-next:hover .g { transform: translateX(4px); }
+    .lr-next:hover .lr-next__arrow { transform: translateX(6px); color: var(--petrol, #14616E); }
+    .lr-next:hover .lr-next__line { transform: scaleX(1); }
   }
-  .lr-next:active { opacity: 0.5; }
-  .lr-next .ab {
-    position: relative; display: inline-block;
-    width: 1.1em; height: 1.1em; margin-left: 0.55em; flex-shrink: 0;
+  @media (prefers-reduced-motion: reduce) {
+    .lr-next, .lr-next__arrow, .lr-next__line { transition: none; }
   }
-  .lr-next .g {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center; line-height: 1;
-    transition: transform 220ms cubic-bezier(.4,0,.2,1), opacity 200ms ease;
-  }
-  .lr-next .fill {
-    color: var(--sage, #5C9070);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 420ms cubic-bezier(.4,0,.2,1), opacity 200ms ease;
-  }
-  .lr-next .chk {
-    color: var(--sage, #5C9070); opacity: 0; transform: scale(.4);
-    transition: opacity .2s ease, transform .4s cubic-bezier(.2,1.5,.4,1);
-  }
-  .lr-next .uflow {
-    position: absolute; bottom: 0; left: 0; width: 100%; height: 1.5px;
-    background: var(--sage, #5C9070);
-    clip-path: inset(0 100% 0 0);
-    transition: clip-path 420ms cubic-bezier(.4,0,.2,1);
-  }
-  .lr-next .loadbar {
-    position: absolute; bottom: 0; left: -42%; width: 42%; height: 1.5px;
-    background: var(--petrol, #14616E); display: none;
-  }
-  .lr-next.is-loading .loadbar { display: block; animation: lr-loadbar 1.05s cubic-bezier(.5,0,.5,1) infinite; }
-  @keyframes lr-loadbar { 0% { left: -42%; } 100% { left: 100%; } }
-  .lr-next.go .fill { clip-path: inset(0 0% 0 0); }
-  .lr-next.go .uflow { clip-path: inset(0 0% 0 0); }
-  .lr-next.done .word { color: var(--sage, #5C9070); }
-  .lr-next.done .base { opacity: 0; }
-  .lr-next.done .fill { opacity: 0; }
-  .lr-next.done .chk { opacity: 1; transform: scale(1); }
   .lr-skip {
     appearance: none; -webkit-appearance: none; border: none;
     font-family: 'Inter Tight', -apple-system, sans-serif;
@@ -476,13 +449,7 @@ for (const l of LOOKS) {
     var btn = root.querySelector('.lr-next');
     if (!btn) return;
     btn.addEventListener('click', function () {
-      if (btn.classList.contains('go')) return;
-      btn.classList.add('go');
-      setTimeout(function () { btn.classList.add('done'); }, 460);
-      setTimeout(function () {
-        if (typeof window.__onbGoto === 'function') window.__onbGoto(3);
-        btn.classList.remove('go', 'done');
-      }, 950);
+      if (typeof window.__onbGoto === 'function') window.__onbGoto(3);
     });
   })();
 </script>
