@@ -62,12 +62,17 @@ if (Astro.request.method === 'POST') {
     if (!design_identity || !validIdentities.includes(design_identity)) {
       saved = { section: 'identity', ok: false, msg: bt('brand.msg.invalididentity', lang) };
     } else {
-      const { error } = await client.from('hotels')
-        .update({ design_identity })
-        .eq('id', hotel.id);
-      saved = error
-        ? { section: 'identity', ok: false, msg: error.message }
-        : { section: 'identity', ok: true, msg: '✓ Design-Identität gespeichert' };
+      const currentPlan = ((hotel as any).plan as string | undefined) ?? 'lite';
+      if (currentPlan === 'lite' && design_identity !== 'bauhaus') {
+        saved = { section: 'identity', ok: false, msg: 'Nur Bauhaus ist im Lite-Plan verfügbar.' };
+      } else {
+        const { error } = await client.from('hotels')
+          .update({ design_identity })
+          .eq('id', hotel.id);
+        saved = error
+          ? { section: 'identity', ok: false, msg: error.message }
+          : { section: 'identity', ok: true, msg: '✓ Design-Identität gespeichert' };
+      }
     }
   }
 }
@@ -104,8 +109,8 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
       <div class="branding-sections">
         <LogoSection branding={branding} lang={lang} />
         <ColorsSection branding={branding} lang={lang} plan={((hotel as any).plan as string | undefined) ?? 'lite'} />
-        <ThemeSection branding={branding} hotelName={hotel.name} lang={lang} />
-        <AssetsSection branding={branding} lang={lang} />
+        <ThemeSection branding={branding} hotelName={hotel.name} lang={lang} plan={((hotel as any).plan as string | undefined) ?? 'lite'} />
+        <AssetsSection branding={branding} lang={lang} plan={((hotel as any).plan as string | undefined) ?? 'lite'} />
       </div>
 
       <div class="branding-col-right">
@@ -233,7 +238,6 @@ const demoUrl = await getOrCreateShowcaseUrl(hotel.id, user.id);
 
   const sections = document.querySelector<HTMLElement>('.branding-sections');
   const sidebar  = document.querySelector<HTMLElement>('.branding-sidebar');
-  const phoneEl  = document.querySelector<HTMLElement>('.brand-preview__phone');
 
   document.addEventListener('wheel', (e) => {
     if (!sections || !sidebar) return;

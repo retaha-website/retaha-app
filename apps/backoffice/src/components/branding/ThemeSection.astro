@@ -7,19 +7,25 @@ interface Props {
   branding: BrandingData;
   hotelName?: string;
   lang: LanguageCode;
+  plan?: string;
 }
 
-const { branding, lang } = Astro.props;
+const { branding, lang, plan = 'lite' } = Astro.props;
+const isLite = plan === 'lite';
 
-// Editorial + Maison im Theme-Picker aktiv (vom Guest unterstützt, im
-// Onboarding „Look + Reveal" angeboten — /branding deckungsgleich halten).
 const SHOW_ALL_IDENTITIES = true;
 
 const raw = branding.design_identity ?? 'bauhaus';
-const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus';
+const active = isLite ? 'bauhaus' : (['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus');
 ---
 
 <BrandSection title={bt('brand.theme.title', lang)} num="03" lang={lang}>
+  {isLite && (
+    <div class="di-lite-info">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Im Lite-Plan ist nur Bauhaus verfügbar. <a href="/subscription" class="di-lite-link">Jetzt auf Pro upgraden →</a></span>
+    </div>
+  )}
   <div
     x-data={`{ theme: '${active}' }`}
     x-init="$watch('theme', t => $dispatch('brand-theme-selected', { theme: t }))"
@@ -50,10 +56,11 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
         {SHOW_ALL_IDENTITIES && (
           <>
             <button
-              class="di-card"
+              class:list={['di-card', isLite && 'di-card--locked']}
               type="button"
               :class="theme === 'editorial' ? 'is-active' : ''"
-              @click="theme = 'editorial'"
+              @click={!isLite ? "theme = 'editorial'" : undefined}
+              disabled={isLite || undefined}
             >
               <div class="di-card__hint di-card__hint--editorial">
                 <span class="ed-name">Editorial</span>
@@ -63,13 +70,20 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
                 <div class="di-card__desc">Magazinhaft · Storytelling</div>
                 <div class="di-card__meta">Cormorant Garamond · Olive</div>
               </div>
+              {isLite && (
+                <span class="di-card__pro-badge">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+                  Pro
+                </span>
+              )}
             </button>
 
             <button
-              class="di-card"
+              class:list={['di-card', isLite && 'di-card--locked']}
               type="button"
               :class="theme === 'maison' ? 'is-active' : ''"
-              @click="theme = 'maison'"
+              @click={!isLite ? "theme = 'maison'" : undefined}
+              disabled={isLite || undefined}
             >
               <div class="di-card__hint di-card__hint--maison">
                 <span class="ms-name">MAISON</span>
@@ -80,6 +94,12 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
                 <div class="di-card__desc">Klassisch · Opulent</div>
                 <div class="di-card__meta">Bodoni Moda · Gold-Rauten</div>
               </div>
+              {isLite && (
+                <span class="di-card__pro-badge">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+                  Pro
+                </span>
+              )}
             </button>
           </>
         )}
@@ -93,17 +113,32 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
         <p>{bt('brand.theme.info', lang)}</p>
       </div>
 
-      <div class="s-card__footer">
-        <button type="submit" class="brand-save-btn">{bt('common.save', lang)}</button>
-      </div>
+      {!isLite && (
+        <div class="s-card__footer">
+          <button type="submit" class="brand-save-btn">{bt('common.save', lang)}</button>
+        </div>
+      )}
     </form>
   </div>
 </BrandSection>
 
 <style>
+  /* Lite info box */
+  .di-lite-info {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: rgba(20, 97, 110, 0.06); border: 1px solid rgba(20, 97, 110, 0.18);
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; color: var(--ink-soft, rgba(10,10,10,0.65));
+    line-height: 1.45; margin-bottom: 14px;
+  }
+  .di-lite-info svg { color: var(--petrol, #14616E); }
+  .di-lite-link { color: var(--petrol, #14616E); font-weight: 600; text-decoration: none; }
+  .di-lite-link:hover { text-decoration: underline; }
+
   .di-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 
   .di-card {
+    position: relative;
     display: flex; align-items: center;
     width: 100%; text-align: left; padding: 0;
     border: 1px solid var(--border); border-radius: var(--r);
@@ -120,6 +155,21 @@ const active = ['bauhaus', 'editorial', 'maison'].includes(raw) ? raw : 'bauhaus
   .di-card.is-active {
     border-color: var(--petrol, #14616E);
     box-shadow: 0 0 0 2px rgba(20,97,110,0.12);
+  }
+
+  .di-card--locked {
+    opacity: 0.45; cursor: not-allowed;
+  }
+  .di-card--locked:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+  .di-card__pro-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-right: 14px; flex-shrink: 0;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 7px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-muted);
   }
 
   /* Hint strip */
