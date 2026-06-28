@@ -1105,8 +1105,10 @@ textarea.s-input { resize: none; min-height: 72px; }
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
             });
-            const d = await res.json();
-            if (!d.ok) { this.eve.error = d.message || 'Fehler bei der KI-Generierung.'; return; }
+            const rawText = await res.text();
+            let d: any;
+            try { d = JSON.parse(rawText); } catch { d = { ok: false, message: `Server-Fehler ${res.status}: ${rawText.slice(0, 120)}` }; }
+            if (!d.ok) { this.eve.error = d.message || `Fehler (Status ${res.status})`; return; }
             this.items = d.items || this.items;
             this.eve.open = false;
             (window as any).retahaToast?.(`Eve hat ${d.updated} Speise${d.updated === 1 ? '' : 'n'} mit Allergenen versehen`);
