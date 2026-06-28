@@ -124,6 +124,23 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
     class="settings-page"
     x-data="{
       loading: '',
+      downgradeConfirm: false,
+      async downgradeLite() {
+        this.loading = 'lite';
+        try {
+          const res = await fetch('/api/subscription/downgrade-to-lite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || window.__SUB_T__.errTrial);
+          window.location.reload();
+        } catch(e) {
+          window.retahaToast?.(e.message, 'error');
+          this.loading = '';
+          this.downgradeConfirm = false;
+        }
+      },
       async requestSales(plan) {
         this.loading = plan;
         try {
@@ -204,8 +221,6 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
 
           <div class="sub-plans-grid">
             {PLANS.map(plan => {
-              const rank = TIER_RANK[plan.key] ?? 0;
-              const curRank = TIER_RANK[currentPlan] ?? 0;
               const isCurrent = plan.key === currentPlan;
 
               return (
@@ -257,9 +272,40 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
                         {bt('sub.btn.contact', lang)}
                       </a>
                     ) : plan.key === 'lite' ? (
-                      <a href="mailto:hallo@retaha.de" class="v9-btn v9-btn--ghost sub-plan-btn">
-                        {bt('sub.btn.toLite', lang)}
-                      </a>
+                      <div class="sub-plan-downgrade">
+                        <div x-show="!downgradeConfirm" style="display:none">
+                          <button
+                            type="button"
+                            class="v9-btn v9-btn--ghost sub-plan-btn"
+                            @click="downgradeConfirm = true"
+                            :disabled="loading !== ''"
+                          >
+                            {bt('sub.btn.toLite', lang)}
+                          </button>
+                        </div>
+                        <div x-show="downgradeConfirm" class="sub-plan-downgrade__confirm" style="display:none">
+                          <p class="sub-plan-downgrade__warning">{bt('sub.btn.toLite.warning', lang)}</p>
+                          <div class="sub-plan-downgrade__actions">
+                            <button
+                              type="button"
+                              class="v9-btn v9-btn--danger sub-plan-btn sub-plan-btn--sm"
+                              @click="downgradeLite()"
+                              :disabled="loading === 'lite'"
+                            >
+                              <span x-show="loading !== 'lite'">{bt('sub.btn.toLite.confirm', lang)}</span>
+                              <span x-show="loading === 'lite'" style="display:none">{bt('sub.btn.trial.preparing', lang)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="v9-btn v9-btn--ghost sub-plan-btn sub-plan-btn--sm"
+                              @click="downgradeConfirm = false"
+                              :disabled="loading === 'lite'"
+                            >
+                              {bt('common.cancel', lang)}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -462,6 +508,19 @@ const eveIncluded  = currentPlan === 'premium' || currentPlan === 'enterprise';
   }
   .sub-plan-btn--current { opacity: 0.6; cursor: not-allowed; }
   .sub-plan-btn--loading { opacity: 0.65; }
+  .sub-plan-btn--sm { font-size: 9px !important; padding: 7px 10px !important; }
+
+  .v9-btn--danger {
+    background: #c0392b; color: #fff; border-color: #c0392b;
+  }
+  .v9-btn--danger:hover:not(:disabled) { background: #a93226; border-color: #a93226; }
+
+  .sub-plan-downgrade { width: 100%; }
+  .sub-plan-downgrade__confirm { display: flex; flex-direction: column; gap: 8px; }
+  .sub-plan-downgrade__warning {
+    font-size: 10px; color: #c0392b; margin: 0; line-height: 1.4;
+  }
+  .sub-plan-downgrade__actions { display: flex; gap: 6px; }
 
   /* ── Eve Add-on card ────────────────────────────────────────────────────── */
   @keyframes sub-aurora-flow { to { background-position: 0 0, 240% 0; } }
