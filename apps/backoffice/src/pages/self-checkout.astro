@@ -68,6 +68,9 @@ const noteEn = note.en ?? '';
 
 const GUEST_APP_URL = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
 const scOn = scState !== 'off';
+
+const plan = ((hotel as any).plan as string | undefined) ?? 'lite';
+const isPremium = ['premium', 'enterprise'].includes(plan);
 ---
 
 <Layout title="Self-Checkout" activeTab="backoffice" hotelName={hotel.name} hotelLogoUrl={(hotel as any).logo_primary ?? (hotel as any).logo_dark}>
@@ -97,6 +100,33 @@ const scOn = scState !== 'off';
           <ModStatusLed on={scOn} />
           <a href={`${GUEST_APP_URL}/gast-vorschau`} target="_blank" rel="noopener" class="s-btn-link">{bt('si.mod.link', lang)}</a>
         </div>
+      </div>
+
+      <!-- Self-Checkout Feature (Premium) -->
+      <div class:list={['sc-card', !isPremium && 'sc-card--dim']}>
+        <div class="sc-card-head">
+          <span class="sc-card-title">{bt('sc.feature.title', lang)}</span>
+          {!isPremium && <span class="sc-plan-tag">ab Premium</span>}
+        </div>
+        <p class="sc-hint">{bt('sc.feature.hint', lang)}</p>
+
+        {!isPremium ? (
+          <div class="sc-lite-notice">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <span set:html={bt('sc.feature.lite.info', lang)}></span>
+              <a href="/freischalten/self-checkout" class="sc-unlock-link">{bt('sc.feature.unlock', lang)}</a>
+            </div>
+          </div>
+        ) : (
+          <div class="sc-feature-status">
+            <span class="sc-feature-dot" style={scState === 'self' ? 'background:var(--petrol,#14616E)' : 'background:var(--ink-faint,#ccc)'}></span>
+            <span class="sc-feature-state-label">
+              {scState === 'self' ? bt('sc.mod.on', lang) : bt('sc.mod.off', lang)}
+            </span>
+            <span class="sc-feature-toggle-hint">{bt('sc.mod.hint', lang)}</span>
+          </div>
+        )}
       </div>
 
       <!-- Check-in + Check-out nebeneinander -->
@@ -203,6 +233,41 @@ const scOn = scState !== 'off';
     }
     .sc-card-title::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--petrol, #14616E); flex-shrink: 0; }
     .sc-hint { display: block; font-size: 11px; color: var(--ink-muted); line-height: 1.45; margin-bottom: 16px; }
+
+    /* ── Feature-Card (Premium-Gate) ───────────────────────────────────────── */
+    .sc-card--dim { opacity: 0.65; }
+    .sc-plan-tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.12em;
+      text-transform: uppercase; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+      background: var(--petrol-soft, rgba(20,97,110,0.10)); color: var(--petrol, #14616E);
+      white-space: nowrap;
+    }
+    .sc-lite-notice {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: rgba(20,97,110,0.06); border: 1px solid rgba(20,97,110,0.18);
+      border-radius: 8px; padding: 10px 12px;
+      font-size: 12px; color: var(--ink-soft, rgba(10,10,10,0.65)); line-height: 1.5;
+    }
+    .sc-lite-notice svg { color: var(--petrol, #14616E); }
+    .sc-unlock-link {
+      display: inline-block; margin-top: 6px;
+      color: var(--petrol, #14616E); font-weight: 600; text-decoration: none; font-size: 11px;
+    }
+    .sc-unlock-link:hover { text-decoration: underline; }
+    .sc-feature-status {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 12px; background: var(--bg-deep, #F5F4F2); border-radius: 8px;
+    }
+    .sc-feature-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .sc-feature-state-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink);
+    }
+    .sc-feature-toggle-hint {
+      font-size: 10px; color: var(--ink-muted); margin-left: 4px;
+    }
 
     /* ── Zeiten nebeneinander ───────────────────────────────────────────────── */
     .sc-time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
