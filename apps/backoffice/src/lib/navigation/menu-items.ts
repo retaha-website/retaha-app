@@ -99,7 +99,7 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
         {
           label: bt('nav.checkout', lang),
           sub: bt('nav.checkout.sub', lang),
-          href: '/self-checkout',
+          href: '/checkout',
           icon: icon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
         },
         {
@@ -225,7 +225,7 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
         {
           label: bt('nav.checkout2', lang),
           sub: bt('nav.checkout2.sub', lang),
-          href: '/self-checkout',
+          href: '/checkout',
           requiredPlan: 'premium',
           moduleKey: 'self-checkout',
           icon: icon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
