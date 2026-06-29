@@ -1,14 +1,16 @@
 ---
-import type { UserProfile } from '../../lib/types/user';
-import { getInitials } from '../../lib/types/user';
+import type { HeaderUser } from '../../lib/header-user';
+import { getInitials } from '../../lib/header-user';
 import { bt } from '@retaha/i18n';
 import UserDropdown from './UserDropdown.astro';
 
 interface Props {
-  user: UserProfile;
+  user: HeaderUser;
+  /** Backoffice-Basis-URL ('' im Backoffice, https://backoffice.retaha.de in der Gast-App). */
+  bo?: string;
 }
 
-const { user } = Astro.props;
+const { user, bo = '' } = Astro.props;
 const firstInitial = getInitials(user).charAt(0);
 const lang = user.language;
 ---
@@ -33,7 +35,7 @@ const lang = user.language;
   <!-- Online-Indikator (unten rechts, Sage, immer sichtbar) -->
   <span class="user-online-dot" aria-hidden="true"></span>
 
-  <UserDropdown user={user} />
+  <UserDropdown user={user} bo={bo} />
 </div>
 
 <style>

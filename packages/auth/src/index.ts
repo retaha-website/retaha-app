@@ -38,6 +38,10 @@ export { encryptToken, decryptToken } from './encryption';
 // User-Profile-Helpers
 export { hotelOwnerFirstName } from './user-profile';
 
+// Geteilter Header-Profil-Lader (Backoffice + Gast-App, identische Navbar-Daten)
+export { getHeaderUser } from './header-user';
+export type { HeaderUserData } from './header-user';
+
 // Cross-Subdomain SSO-Cookie (Sprint F)
 export {
   SESSION_COOKIE_NAME,

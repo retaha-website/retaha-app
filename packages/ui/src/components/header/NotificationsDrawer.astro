@@ -3,8 +3,8 @@
 // zu navigieren. Oben (falls Testphase aktiv) ein Testphasen-Banner, darunter die
 // Benachrichtigungen in breit. Getriggert vom „Benachrichtigungen"-Eintrag im
 // Account-Dropdown ([data-open-notifications]) via Event.
-interface Props { qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; parkedCards?: string[]; }
-const { qrNotifPending = false, setupIncomplete = false, plan = 'lite', parkedCards = [] } = Astro.props;
+interface Props { qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; parkedCards?: string[]; bo?: string; }
+const { qrNotifPending = false, setupIncomplete = false, plan = 'lite', parkedCards = [], bo = '' } = Astro.props;
 
 // Shop-Mengenlogik: lite = 1 QR fürs ganze Haus, pro/premium/enterprise = 1 pro Zimmer.
 const qrQuantityHint = plan === 'lite'
@@ -28,7 +28,7 @@ const qrQuantityHint = plan === 'lite'
       <ul class="nd__list">
         <!-- Setup übersprungen, aber nicht abgeschlossen → weiter zum Onboarding. -->
         <li class="nd__item" data-notif="setup" hidden={!setupIncomplete}>
-          <a class="nd__item-link" href="/overview?resume=setup">
+          <a class="nd__item-link" href={`${bo}/overview?resume=setup`}>
             <span class="nd__item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             </span>
@@ -67,7 +67,7 @@ const qrQuantityHint = plan === 'lite'
         </li>
         <!-- Aus dem Dashboard geparkte Feature-Karte: Eve-Upgrade. -->
         <li class="nd__item" data-notif="card-eve" hidden={!parkedCards.includes('eve')}>
-          <a class="nd__item-link" href="/subscription">
+          <a class="nd__item-link" href={`${bo}/subscription`}>
             <span class="nd__item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
             </span>
@@ -171,7 +171,7 @@ const qrQuantityHint = plan === 'lite'
   .nd__empty { margin: 8px 2px 0; font-family: 'Inter Tight', sans-serif; font-size: 14px; color: var(--ink-muted); }
 </style>
 
-<script is:inline>
+<script is:inline define:vars={{ bo }}>
   (function () {
     var drawer = document.getElementById('notifDrawer');
     if (!drawer) return;
@@ -229,7 +229,7 @@ const qrQuantityHint = plan === 'lite'
     if (action) action.addEventListener('click', function () {
       try { localStorage.removeItem('retaha-qr-notif'); } catch (e) {}
       document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.remove('is-on'); });
-      try { fetch('/api/admin/notifications/qr-clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch (e) {}
+      try { fetch(bo + '/api/admin/notifications/qr-clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: '{}' }); } catch (e) {}
     });
   })();
 </script>

@@ -17,10 +17,11 @@ import '@retaha/ui/styles/components/menu.css';
 import '@retaha/ui/styles/components/settings.css';
 import '@retaha/ui/styles/components/status-markers.css';
 
-import Header from '../components/header/Header.astro';
+import Header from '@retaha/ui/components/header/Header.astro';
 import Footer from '@retaha/ui/components/shared/Footer.astro';
 import Toast from '@retaha/ui/components/shared/Toast.astro';
-import { getUser, getUserHotels } from '@retaha/auth';
+import { getHeaderUser } from '@retaha/auth';
+import { normalizeLanguage } from '@retaha/i18n';
 
 interface Props {
   title: string;
@@ -32,16 +33,29 @@ interface Props {
 const { title, activeTab, hotelName, hotelLogoUrl } = Astro.props;
 
 const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+const DASHBOARD  = import.meta.env.DASHBOARD_URL  ?? 'https://dashboard.retaha.de';
 
-const user = await getUser(Astro.cookies, Astro.request);
-if (!user) return Astro.redirect(`${BACKOFFICE}/admin/login`);
+// Sprach-Auflösung — identische Kette wie das Backoffice (getLang): ?lang → Cookie
+// `retaha_lang` → Accept-Language → 'de'. Cookie ist auf .retaha.de domainweit gesetzt.
+function resolveLang(): string {
+  try {
+    const urlLang = new URL(Astro.request.url).searchParams.get('lang');
+    if (urlLang) return normalizeLanguage(urlLang);
+  } catch { /* relative URL — ignorieren */ }
+  const cookieLang = Astro.cookies.get('retaha_lang')?.value;
+  if (cookieLang) return normalizeLanguage(cookieLang);
+  const accept = Astro.request.headers.get('accept-language') ?? '';
+  return normalizeLanguage(accept.split(',')[0]?.trim());
+}
 
-const hotels = await getUserHotels(Astro.cookies, Astro.request);
-const hotel = hotels?.[0]?.hotel;
-if (!hotel) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
+// Volles Header-Profil laden — dieselben Hotel-/User-Daten wie im Backoffice.
+const headerUser = await getHeaderUser(Astro.cookies, Astro.request, resolveLang());
+if (!headerUser) return Astro.redirect(`${BACKOFFICE}/admin/login`);
+if (!headerUser.hotel_id) return Astro.redirect(`${BACKOFFICE}/admin/login?error=no_hotel`);
 
-const displayName    = hotelName    ?? hotel.name;
-const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : (hotel.logo_primary ?? hotel.logo_dark ?? null);
+// Optionale Overrides aus den Layout-Props (sonst aus dem geladenen Profil).
+const displayName    = hotelName    ?? headerUser.hotel_name;
+const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : headerUser.hotel_logo_url;
 ---
 
 <!DOCTYPE html>
@@ -61,10 +75,12 @@ const displayLogoUrl = hotelLogoUrl !== undefined ? hotelLogoUrl : (hotel.logo_p
   <body>
     <Header
       activeTab={activeTab}
-      email={user.email ?? ''}
+      user={headerUser}
       hotelName={displayName}
       hotelLogoUrl={displayLogoUrl}
-      backofficeUrl={BACKOFFICE}
+      bo={BACKOFFICE}
+      guestBase=""
+      dashboardBase={DASHBOARD}
     />
     <main>
       <slot />
