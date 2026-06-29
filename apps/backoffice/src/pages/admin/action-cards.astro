@@ -269,8 +269,9 @@ const acT = {
         <!-- Kartentyp -->
         <div class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.type', lang)}</span>
-          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(CARD_TYPE_LABELS)}}`} @click.outside="open=false">
-            <button type="button" class="ac-type-dd-btn" @click="open=!open">
+          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(CARD_TYPE_LABELS)},ddId:'type'}`}
+            @click.outside="open=false" @ac-dd-open.window="if($event.detail.id!==ddId) open=false">
+            <button type="button" class="ac-type-dd-btn" @click="open=!open; if(open) $dispatch('ac-dd-open',{id:ddId})">
               <span x-text="labels[editor.card_type] || editor.card_type"></span>
               <svg class="ac-type-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -290,16 +291,13 @@ const acT = {
         <!-- Ziel (je nach Typ) -->
         <div x-show="editor.card_type === 'internal_action'" class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.sheet', lang)}</span>
-          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(Object.fromEntries(INTERNAL_ACTIONS.map(a => [a.value, a.label])))}}`} @click.outside="open=false">
-            <button type="button" class="ac-type-dd-btn" @click="open=!open">
-              <span x-text="editor.action_target ? (labels[editor.action_target] || editor.action_target) : ${JSON.stringify(bt('ac.modal.choose', lang))}"></span>
+          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(Object.fromEntries(INTERNAL_ACTIONS.map(a => [a.value, a.label])))},ddId:'sheet'}`}
+            @click.outside="open=false" @ac-dd-open.window="if($event.detail.id!==ddId) open=false">
+            <button type="button" class="ac-type-dd-btn" @click="open=!open; if(open) $dispatch('ac-dd-open',{id:ddId})">
+              <span x-text="labels[editor.action_target] || editor.action_target"></span>
               <svg class="ac-type-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="ac-type-dd-menu" x-show="open" style="display:none">
-              <button type="button" class="ac-type-dd-opt" :class="{'is-active': !editor.action_target}"
-                @click="editor.action_target = ''; open = false">
-                {bt('ac.modal.choose', lang)}
-              </button>
               {INTERNAL_ACTIONS.map(a => (
                 <button type="button" class="ac-type-dd-opt"
                   :class={`{'is-active': editor.action_target === '${a.value}'}`}
@@ -453,11 +451,13 @@ const acT = {
 <script>
   import { resizeImage } from '../../lib/storage/client-resize';
 
+  const DEFAULT_ACTION_TARGET = 'open_breakfast';
+
   function emptyEditor() {
     return {
       id: null,
       card_type: 'internal_action',
-      action_target: '',
+      action_target: DEFAULT_ACTION_TARGET,
       title: '', subtitle: '', eyebrow: '', cta: '',
       image_url: null,
       imageFile: null,
@@ -544,7 +544,11 @@ const acT = {
       },
 
       onTypeChange() {
-        if (this.editor.card_type === 'info') this.editor.action_target = '';
+        if (this.editor.card_type === 'internal_action') {
+          if (!this.editor.action_target) this.editor.action_target = DEFAULT_ACTION_TARGET;
+        } else {
+          this.editor.action_target = '';
+        }
         this.eveCardSuggestion = null;
       },
 
