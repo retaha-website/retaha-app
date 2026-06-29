@@ -23,11 +23,11 @@ const currentPlan: string = (hotel as any).plan ?? 'lite';
 const yes = { t: 'yes' as const };
 const no = { t: 'no' as const };
 const lim = (v: string, de = false) => ({ t: 'lim' as const, v, de });
-const MATRIX: { label: string; rows: { name: string; hint?: string; cells: any[] }[] }[] = [
+const MATRIX: { label: string; rows: { name: string; nameHtml?: string; hint?: string; cells: any[] }[] }[] = [
   { label: 'Eure digitale Gästemappe', rows: [
     { name: 'Digitale Gästemappe — nie wieder Mappen nachdrucken', cells: [yes, yes, yes, yes] },
     { name: 'WLAN, Hausinfos & Frühstückskarte für Gäste', cells: [yes, yes, yes, yes] },
-    { name: 'Digitaler Concierge (Eve) — beantwortet Gästefragen rund um die Uhr', cells: [yes, yes, yes, yes] },
+    { name: 'Digitaler Concierge (Eve) — beantwortet Gästefragen rund um die Uhr', nameHtml: 'Digitaler Concierge (<span class="eve-gradient pm-eve">Eve</span>) — beantwortet Gästefragen rund um die Uhr', cells: [yes, yes, yes, yes] },
     { name: 'Gästewünsche sammeln & Feedback nach dem Aufenthalt', cells: [yes, yes, yes, yes] },
     { name: 'Schnellzugriff-Kacheln auf der Startseite', cells: [lim('1'), lim('10'), lim('10'), lim('10')] },
   ] },
@@ -193,7 +193,7 @@ const TIERS = [
                 </tr>
                 {group.rows.map(row => (
                   <tr class="pm-row">
-                    <td class="pm-feat"><span class="pm-fl">{row.name}{row.hint && <span class="pm-hint">{row.hint}</span>}</span></td>
+                    <td class="pm-feat"><span class="pm-fl">{row.nameHtml ? <Fragment set:html={row.nameHtml} /> : row.name}{row.hint && <span class="pm-hint">{row.hint}</span>}</span></td>
                     {row.cells.map((cell, i) => (
                       <td class={i === 2 ? 'pm-col-prem' : undefined}>
                         {cell.t === 'yes' && (
@@ -483,6 +483,8 @@ const TIERS = [
   .pm-row:hover td.pm-col-prem { background: var(--pm-tint2); }
   .pm-fl { font-size: 14px; letter-spacing: -.005em; color: var(--pm-ink); }
   .pm-hint { display: block; font-size: 11px; color: var(--pm-muted); margin-top: 2px; line-height: 1.4; }
+  /* „Eve" wie in /eve hervorheben — Aurora-Gradient (global .eve-gradient) + Space Grotesk fett. */
+  .pm-eve { font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
 
   /* Zellen */
   .pm-yes { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--pm-petrol); color: #fff; }
