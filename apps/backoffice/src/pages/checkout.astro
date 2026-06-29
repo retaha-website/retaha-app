@@ -170,7 +170,7 @@ const isPremium = ['premium', 'enterprise'].includes(plan);
         <div class="sc-card-head">
           <span class="sc-card-title">{bt('sc.note.title', lang)}</span>
           <button type="button" class="sc-aurora-btn" @click="eveOpen = true" aria-label="Mit Eve schreiben">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+            <svg class="sc-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
             Mit Eve schreiben
           </button>
         </div>
@@ -186,7 +186,10 @@ const isPremium = ['premium', 'enterprise'].includes(plan);
         <div class="sc-eve-overlay" x-show="eveOpen" x-cloak @click.self="eveOpen=false" @keydown.escape.window="eveOpen=false">
           <div class="sc-eve-modal" @click.stop>
             <div class="sc-eve-mhd">
-              <span class="sc-eve-mhd-title">Mit Eve schreiben</span>
+              <span class="sc-eve-mhd-title">
+                <svg class="sc-eve-spk" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor" style="color:#14616E"/></svg>
+                Mit Eve schreiben
+              </span>
               <button type="button" class="sc-eve-close" @click="eveOpen=false" aria-label="Schließen">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
@@ -199,9 +202,9 @@ const isPremium = ['premium', 'enterprise'].includes(plan);
             <div class="sc-eve-mft">
               <button type="button" class="sc-eve-cancel" @click="eveOpen=false">{bt('common.cancel', lang)}</button>
               <button type="button" class="sc-aurora-btn" @click="generate()" :disabled="eveLoading || evePrompt.trim().length < 3">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-                <span x-show="!eveLoading">Generieren</span>
-                <span x-show="eveLoading" x-cloak>…</span>
+                <svg class="sc-eve-spk" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="currentColor"/></svg>
+                <span x-show="!eveLoading">Mit Eve generieren</span>
+                <span x-show="eveLoading" x-cloak>Eve denkt …</span>
               </button>
             </div>
           </div>
@@ -276,15 +279,19 @@ const isPremium = ['premium', 'enterprise'].includes(plan);
 
     /* ── Aurora-Button ──────────────────────────────────────────────────────── */
     .sc-aurora-btn {
-      display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-      font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 300; letter-spacing: 0.15em; text-transform: uppercase;
-      padding: 7px 13px; border-radius: 8px; border: none; cursor: pointer; color: #fff;
+      display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 300; letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 8px 13px; border-radius: 9px; border: none; cursor: pointer; color: #fff;
       background: linear-gradient(115deg, #14616E 0%, #1AA0B0 34%, #5B7CE0 68%, #14616E 100%);
       background-size: 280% 100%; animation: sc-aurora-flow 6s linear infinite;
-      transition: opacity .15s; white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(20,97,110,.32);
+      transition: transform .15s, box-shadow .2s; white-space: nowrap;
     }
-    .sc-aurora-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .sc-aurora-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(45,91,208,.4); animation-duration: 2.2s; }
+    .sc-aurora-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; animation-play-state: paused; }
+    .sc-eve-spk { animation: sc-eve-twinkle 2.4s ease-in-out infinite; flex-shrink: 0; }
     @keyframes sc-aurora-flow { 0%{background-position:100% 50%} 100%{background-position:0% 50%} }
+    @keyframes sc-eve-twinkle { 0%,100%{transform:scale(1) rotate(0deg);opacity:1} 50%{transform:scale(1.35) rotate(90deg);opacity:.7} }
 
     /* ── Eve-Popup ──────────────────────────────────────────────────────────── */
     .sc-eve-overlay {
@@ -296,7 +303,7 @@ const isPremium = ['premium', 'enterprise'].includes(plan);
       width: 100%; max-width: 480px; box-shadow: 0 24px 60px rgba(10,10,10,.18);
     }
     .sc-eve-mhd { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-    .sc-eve-mhd-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--ink); }
+    .sc-eve-mhd-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--petrol, #14616E); display: inline-flex; align-items: center; gap: 7px; }
     .sc-eve-close {
       width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
       border: none; background: none; cursor: pointer; color: var(--ink-muted); border-radius: 6px;
