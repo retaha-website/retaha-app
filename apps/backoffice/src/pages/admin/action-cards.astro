@@ -262,21 +262,21 @@ const acT = {
         <!-- Kartentyp -->
         <div class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.type', lang)}</span>
-          <div class="ac-type-tabs">
-            {[
-              { val: 'internal_action', label: bt('ac.type.internal', lang) },
-              { val: 'external_link',   label: bt('ac.type.external', lang) },
-              { val: 'info',            label: bt('ac.type.info', lang) },
-              { val: 'phone',           label: bt('ac.type.phone', lang) },
-              { val: 'email',           label: bt('ac.type.email', lang) },
-            ].map(t => (
-              <button type="button"
-                class="ac-type-tab"
-                :class={`{'is-active': editor.card_type === '${t.val}'}`}
-                @click={`editor.card_type = '${t.val}'; onTypeChange()`}>
-                {t.label}
-              </button>
-            ))}
+          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(CARD_TYPE_LABELS)}}`} @click.outside="open=false">
+            <button type="button" class="ac-type-dd-btn" @click="open=!open">
+              <span x-text="labels[editor.card_type] || editor.card_type"></span>
+              <svg class="ac-type-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="ac-type-dd-menu" x-show="open" style="display:none">
+              {Object.entries(CARD_TYPE_LABELS).map(([val, label]) => (
+                <button type="button" class="ac-type-dd-opt"
+                  :class={`{'is-active': editor.card_type === '${val}'}`}
+                  @click={`editor.card_type = '${val}'; onTypeChange(); open = false`}>
+                  {label}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" x-show={`editor.card_type === '${val}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -412,14 +412,12 @@ const acT = {
         </div>
 
         <!-- Veröffentlicht -->
-        <label class="ac-toggle-row">
-          <div class="ac-toggle" :class="{'is-on': editor.is_published}">
-            <input type="checkbox" x-model="editor.is_published" style="display:none" />
-            <span class="ac-toggle-track" @click="editor.is_published = !editor.is_published">
-              <span class="ac-toggle-thumb"></span>
-            </span>
-          </div>
-          <span class="ac-toggle-label" @click="editor.is_published = !editor.is_published">{bt('ac.modal.published', lang)}</span>
+        <label class="toggle-row" style="margin-top:4px; cursor:pointer">
+          <input type="checkbox" x-model="editor.is_published" class="sr-only" />
+          <span class="bt-visual" :class="{'is-checked': editor.is_published}">
+            <span class="bt-knob"></span>
+          </span>
+          <span class="toggle-label">{bt('ac.modal.published', lang)}</span>
         </label>
 
       </div>
@@ -1023,24 +1021,39 @@ const acT = {
     transition: background 120ms, color 120ms;
   }
   .ac-modal-close:hover { background: var(--bg-deep, #F0EFEA); color: var(--ink); }
-  .ac-modal-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0; }
+  .ac-modal-body { padding: 20px; overflow-y: auto; overflow-x: hidden; flex: 1; display: flex; flex-direction: column; gap: 0; }
   .ac-modal-divider { height: 1px; background: var(--border, rgba(10,10,10,0.08)); margin: 4px -20px 16px; }
   .ac-modal-foot { padding: 12px 20px; border-top: 1px solid var(--ly-line, rgba(10,10,10,0.10)); display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
   .ac-error { flex: 1; font-size: 12px; color: #dc2626; line-height: 1.4; }
 
-  /* Type tabs — outlined box, active = solid petrol fill */
-  .ac-type-tabs {
-    display: flex; flex-wrap: wrap; gap: 2px;
-    border: 1px solid var(--ly-line, rgba(10,10,10,0.12));
-    border-radius: 10px; padding: 3px; background: var(--surface);
+  /* Card type custom dropdown */
+  .ac-type-dd { position: relative; }
+  .ac-type-dd-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 9px 12px;
+    border: 1px solid var(--ly-line, rgba(10,10,10,0.12)); border-radius: 9px;
+    background: var(--surface); font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; color: var(--ink); cursor: pointer;
+    transition: border-color 150ms, box-shadow 150ms;
   }
-  .ac-type-tab {
-    padding: 5px 12px; border-radius: 7px; border: none;
-    background: transparent; font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 500;
-    color: var(--ly-ink2); cursor: pointer; transition: all 120ms;
+  .ac-type-dd-btn:hover, .ac-type-dd-btn:focus { outline: none; border-color: var(--petrol, #14616E); box-shadow: 0 0 0 3px rgba(20,97,110,0.10); }
+  .ac-type-dd-chevron { color: var(--ink-muted); flex-shrink: 0; transition: transform 150ms; }
+  .ac-type-dd-chevron.rotated { transform: rotate(180deg); }
+  .ac-type-dd-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+    background: var(--surface); border: 1px solid var(--ly-line, rgba(10,10,10,0.12));
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,.10);
   }
-  .ac-type-tab:hover { background: var(--bg-deep, #F0EFEA); color: var(--ly-ink); }
-  .ac-type-tab.is-active { background: var(--ly-ac, #14616E); color: #fff; font-weight: 600; }
+  .ac-type-dd-opt {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 10px 14px; border: none; background: transparent;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink);
+    cursor: pointer; text-align: left; transition: background 100ms;
+  }
+  .ac-type-dd-opt:hover { background: var(--bg-deep, #F0EFEA); }
+  .ac-type-dd-opt.is-active { color: var(--ly-ac, #14616E); font-weight: 600; }
+  .ac-type-dd-opt.is-active svg { color: var(--ly-ac, #14616E); }
 
   /* Style swatches */
   .ac-style-swatches { display: flex; gap: 8px; }
@@ -1054,22 +1067,6 @@ const acT = {
   .ac-swatch.is-active { border-color: var(--ly-ac, #14616E); color: var(--ly-ac, #14616E); background: rgba(20,97,110,0.06); font-weight: 600; }
   .ac-swatch-color { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
 
-  /* Toggle */
-  .ac-toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; cursor: pointer; }
-  .ac-toggle { position: relative; flex-shrink: 0; }
-  .ac-toggle-track {
-    display: block; width: 36px; height: 20px; border-radius: 10px; cursor: pointer;
-    background: var(--bg-deep, #E0DED8); border: 1px solid var(--border-medium, rgba(10,10,10,0.15));
-    transition: background 200ms, border-color 200ms; position: relative;
-  }
-  .ac-toggle.is-on .ac-toggle-track { background: var(--ly-ac, #14616E); border-color: var(--ly-ac, #14616E); }
-  .ac-toggle-thumb {
-    position: absolute; top: 2px; left: 2px;
-    width: 14px; height: 14px; border-radius: 50%; background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 200ms;
-  }
-  .ac-toggle.is-on .ac-toggle-thumb { transform: translateX(16px); }
-  .ac-toggle-label { font-size: 13px; font-family: 'Space Grotesk', sans-serif; color: var(--ly-ink); }
 
   /* Image dropzone */
   .ac-dropzone {
