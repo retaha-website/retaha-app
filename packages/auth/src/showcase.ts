@@ -5,13 +5,19 @@ const SHOWCASE_PREFIX = 'showcase_';
 const TTL_DAYS = 30;
 
 function makeToken(): string {
-  return SHOWCASE_PREFIX + randomBytes(16).toString('hex');
+  // 8 hex chars (4 bytes) — kurz genug für lesbare URLs, sicher genug für zeitlimitierte Sessions
+  return SHOWCASE_PREFIX + randomBytes(4).toString('hex');
 }
 
-function buildGuestUrl(hotelSlug: string | null | undefined, token: string): string {
+function buildGuestUrl(hotelSlug: string | null | undefined, token: string, isLite: boolean): string {
   const domain = import.meta.env.RETAHA_DOMAIN ?? 'retaha.de';
-  if (hotelSlug) {
+  if (!isLite && hotelSlug) {
+    // Pro/Premium: Hotelname als Subdomain
     return `https://${hotelSlug}.${domain}/g/${token}`;
+  }
+  if (isLite && hotelSlug) {
+    // Lite: kein Subdomain, aber Slug im Pfad → app.retaha.de/g/hotel-slug/token
+    return `https://app.${domain}/g/${hotelSlug}/${token}`;
   }
   return `https://app.${domain}/g/${token}`;
 }
@@ -35,12 +41,11 @@ export async function getOrCreateShowcaseUrl(
       .maybeSingle(),
   ]);
 
-  // Lite-Plan: immer app.retaha.de — kein Hotelname in der URL (Matrix §12 F)
   const isLite = ((hotel as any)?.plan ?? 'lite') === 'lite';
-  const slug = isLite ? null : ((hotel as any)?.slug ?? null);
+  const slug = (hotel as any)?.slug ?? null;
 
   if (existing?.token) {
-    return buildGuestUrl(slug, existing.token);
+    return buildGuestUrl(slug, existing.token, isLite);
   }
 
   const expiresAt = new Date(Date.now() + TTL_DAYS * 86_400_000).toISOString();
@@ -63,5 +68,5 @@ export async function getOrCreateShowcaseUrl(
     .single();
 
   if (error || !created?.token) return null;
-  return buildGuestUrl(slug, created.token);
+  return buildGuestUrl(slug, created.token, isLite);
 }
