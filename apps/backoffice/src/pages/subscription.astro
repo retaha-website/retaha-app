@@ -17,6 +17,50 @@ if (!billingRole || !hasPermission(billingRole, 'hotel.billing')) {
 }
 
 const currentPlan: string = (hotel as any).plan ?? 'lite';
+
+// ── Plan-Vergleichs-Matrix (Hotelier-Sprache, kuratiert aus der Modul-Matrix) ──
+// Zelltypen: yes = enthalten · no = nicht enthalten · lim(v) = Menge/Grenze (Mono).
+const yes = { t: 'yes' as const };
+const no = { t: 'no' as const };
+const lim = (v: string, de = false) => ({ t: 'lim' as const, v, de });
+const MATRIX: { label: string; rows: { name: string; hint?: string; cells: any[] }[] }[] = [
+  { label: 'Eure digitale Gästemappe', rows: [
+    { name: 'Digitale Gästemappe — nie wieder Mappen nachdrucken', cells: [yes, yes, yes, yes] },
+    { name: 'WLAN, Hausinfos & Frühstückskarte für Gäste', cells: [yes, yes, yes, yes] },
+    { name: 'Digitaler Concierge (Eve) — beantwortet Gästefragen rund um die Uhr', cells: [yes, yes, yes, yes] },
+    { name: 'Gästewünsche sammeln & Feedback nach dem Aufenthalt', cells: [yes, yes, yes, yes] },
+    { name: 'Schnellzugriff-Kacheln auf der Startseite', cells: [lim('1'), lim('10'), lim('10'), lim('10')] },
+  ] },
+  { label: 'Euer Auftritt & mehr Reichweite', rows: [
+    { name: 'Euer Look statt Vorlage — Logo, Farbe, Design', cells: [lim('Standard', true), yes, yes, lim('eigenes')] },
+    { name: 'Digitaler Concierge handelt — bucht & leitet an den Empfang weiter', cells: [no, yes, yes, yes] },
+    { name: 'Gästemappe in 10 Sprachen, automatisch', cells: [lim('nur DE', true), yes, yes, yes] },
+    { name: 'Empfehlungen aus der Umgebung für eure Gäste', cells: [no, yes, yes, yes] },
+    { name: 'Schon vor der Anreise mit Gästen sprechen', cells: [no, yes, yes, yes] },
+    { name: 'Auftritt ohne „Powered by retaha"', cells: [no, lim('dezent', true), yes, yes] },
+    { name: 'Eigene Gäste-App-Adresse', cells: [lim('retaha.de', true), lim('hotelname'), lim('eig. Domain'), lim('eig. Domain')] },
+  ] },
+  { label: 'Mehr Direktumsatz & Stammgäste', rows: [
+    { name: 'Direktbuchung — 15–25 % Portal-Provision bleibt im Haus', hint: 'Jede Buchung über Booking & Co. kostet euch Provision — bei Direktbuchung bleibt sie bei euch.', cells: [no, no, yes, yes] },
+    { name: 'Aus Gästen werden Stammgäste — Wallet & Treueprogramm', cells: [no, no, yes, yes] },
+    { name: 'Gäste zur Wiederkehr anstoßen — Nachrichten & Kampagnen', cells: [no, no, yes, yes] },
+    { name: 'Self-Check-out & Türöffnung per Handy', cells: [no, no, yes, yes] },
+    { name: 'Aufs Zimmer bestellen & auf die Zimmerrechnung buchen', cells: [no, no, yes, yes] },
+    { name: 'Eigene Hotel-Software (PMS)', cells: [no, lim('anbinden'), lim('inklusive'), lim('inklusive')] },
+  ] },
+  { label: 'Für Gruppen & Ketten', rows: [
+    { name: 'Eure eigene App im App Store (White-Label)', cells: [no, no, no, yes] },
+    { name: 'Mehrere Häuser zentral steuern', cells: [no, no, no, yes] },
+    { name: 'Anbindung an eure bestehenden Systeme (API)', cells: [no, no, no, yes] },
+    { name: 'Fester Ansprechpartner', cells: [no, no, no, yes] },
+  ] },
+];
+const TIERS = [
+  { key: 'lite',       name: 'Lite',       sub: 'Kostenlos' },
+  { key: 'pro',        name: 'Pro',        sub: 'Marke & Reichweite' },
+  { key: 'premium',    name: 'Premium',    sub: 'Zahlt sich aus' },
+  { key: 'enterprise', name: 'Enterprise', sub: 'Gruppen' },
+];
 ---
 
 <Layout
@@ -115,161 +159,94 @@ const currentPlan: string = (hotel as any).plan ?? 'lite';
     }"
   >
 
-    <!-- ── Wow-Abo-Page ──────────────────────────────────────────────────── -->
-    <div class="wow-page">
+    <!-- ── Plan-Vergleichs-Matrix ──────────────────────────────────────────── -->
+    <div class="pm-page">
 
-      <!-- Hero -->
-      <div class="wow-hero">
-        <div class="wow-eyebrow">retaha · Hospitality</div>
-        <h1 class="wow-h1">Startet kostenlos.<br>Wachst, <span class="wow-g">wenn es sich lohnt.</span></h1>
-        <p class="wow-sub">Kein Tarif-Dschungel, keine Preisschilder. Wählt, wie weit ihr gehen wollt — und seht, was jede Stufe für euch tut.</p>
-      </div>
+      <section class="pm-hero">
+        <div class="pm-eye">retaha · Hospitality</div>
+        <h1 class="pm-h1">Startet kostenlos.<br>Wachst, <span class="pm-em">wenn es sich lohnt.</span></h1>
+        <p class="pm-sub">Kein Tarif-Dschungel, keine Preisschilder. Seht Zeile für Zeile, was jede Stufe für euch tut.</p>
+      </section>
 
-      <!-- Plan Cards -->
-      <div class="wow-cards">
-
-        <!-- LITE -->
-        <div class={`wow-tier wow-tier--lite${currentPlan === 'lite' ? ' wow-tier--current' : ''}`}>
-          {currentPlan === 'lite' && <div class="wow-your-plan">Euer aktueller Plan</div>}
-          <div class="wow-tcap">Lite · Kostenlos</div>
-          <h2 class="wow-tier__h2">Kostenlos modern werden.</h2>
-          <div class="wow-frame">Eure Gästemappe wird digital — null Kosten, null Risiko.</div>
-          <ul class="wow-bl">
-            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Gästemappe digital — <b>nie wieder nachdrucken</b></span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Eve beantwortet Gästefragen 24/7</span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--sage">✓</span><span>Weniger Nachfragen am Empfang</span></li>
-          </ul>
-          <div class="wow-cta-wrap">
-            {currentPlan === 'lite' ? (
-              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
-            ) : (
-              <Fragment>
-                <div x-show="!downgradeConfirm" style="display:none">
-                  <button type="button" class="wow-cta wow-cta--free" @click="downgradeConfirm = true" :disabled="loading !== ''">Kostenlos starten</button>
-                </div>
-                <div x-show="downgradeConfirm" class="wow-downgrade" style="display:none">
-                  <p class="wow-downgrade__warn">{bt('sub.btn.toLite.warning', lang)}</p>
-                  <div class="wow-downgrade__btns">
-                    <button type="button" class="wow-cta wow-cta--danger" @click="downgradeLite()" :disabled="loading === 'lite'">
-                      <span x-show="loading !== 'lite'">Ja, wechseln</span>
-                      <span x-show="loading === 'lite'" style="display:none">…</span>
-                    </button>
-                    <button type="button" class="wow-cta wow-cta--ghost" @click="downgradeConfirm = false" :disabled="loading === 'lite'">Abbrechen</button>
+      <div class="pm-matwrap">
+        <table class="pm-mat">
+          <thead>
+            <tr>
+              <th class="pm-feat"></th>
+              {TIERS.map(tier => (
+                <th class={tier.key === 'premium' ? 'pm-col-prem' : undefined}>
+                  <div class="pm-th-inner">
+                    {tier.key === 'premium' && <span class="pm-prem-cap">Empfohlen</span>}
+                    <div class="pm-tier-name">{tier.name}</div>
+                    <div class="pm-tier-sub">{tier.sub}</div>
+                    {currentPlan === tier.key && <div class="pm-tier-now">Aktuell</div>}
                   </div>
-                </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {MATRIX.map(group => (
+              <Fragment>
+                <tr class="pm-grp">
+                  <td class="pm-feat"><span class="pm-gl">— {group.label}</span></td>
+                  <td></td><td></td><td class="pm-col-prem"></td><td></td>
+                </tr>
+                {group.rows.map(row => (
+                  <tr class="pm-row">
+                    <td class="pm-feat"><span class="pm-fl">{row.name}{row.hint && <span class="pm-hint">{row.hint}</span>}</span></td>
+                    {row.cells.map((cell, i) => (
+                      <td class={i === 2 ? 'pm-col-prem' : undefined}>
+                        {cell.t === 'yes' && (
+                          <span class="pm-yes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                        )}
+                        {cell.t === 'no' && <span class="pm-no"></span>}
+                        {cell.t === 'lim' && <span class={`pm-lim${cell.de ? ' pm-lim--de' : ''}`}>{cell.v}</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
               </Fragment>
-            )}
-          </div>
-        </div>
+            ))}
 
-        <!-- PRO -->
-        <div class={`wow-tier wow-tier--pro${currentPlan === 'pro' ? ' wow-tier--current' : ''}`}>
-          {currentPlan === 'pro' && <div class="wow-your-plan">Euer aktueller Plan</div>}
-          <div class="wow-tcap">Pro</div>
-          <h2 class="wow-tier__h2">Eure Marke, mehr Reichweite, weniger Arbeit.</h2>
-          <div class="wow-frame">Die Mappe sieht aus wie euer Haus — und Eve nimmt Arbeit ab.</div>
-          <ul class="wow-bl">
-            <li class="wow-b"><span class="wow-chk wow-chk--petrol">✓</span><span>Euer Branding statt Vorlage</span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--petrol">✓</span><span>10 Sprachen automatisch</span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--petrol">✓</span><span><b>Eve handelt</b>, nicht nur antworten</span></li>
-          </ul>
-          <div class="wow-cta-wrap">
-            {currentPlan === 'pro' ? (
-              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
-            ) : (
-              <button type="button" class="wow-cta" @click="openLeadModal('pro')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
-            )}
-          </div>
-        </div>
-
-        <!-- PREMIUM -->
-        <div class={`wow-tier wow-tier--prem${currentPlan === 'premium' ? ' wow-tier--current' : ''}`}>
-          <div class="wow-ribbon">{currentPlan === 'premium' ? 'Euer aktueller Plan' : 'Empfohlen · zahlt sich aus'}</div>
-          <div class="wow-sheen" aria-hidden="true"></div>
-          <div class="wow-tcap">Premium</div>
-          <h2 class="wow-tier__h2">Mehr Direktumsatz, Wiederkehrer, weniger Aufwand.</h2>
-          <div class="wow-frame">Die Stufe, die nicht nur kostet — sondern verdient.</div>
-          <ul class="wow-bl">
-            <li class="wow-b wow-b--money"><span class="wow-chk wow-chk--money">✓</span><span>Direkt buchen — <b>15–25 % OTA-Provision gespart</b></span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--money">✓</span><span>Erstgäste zu Stammgästen (Wallet, Loyalty)</span></li>
-            <li class="wow-b"><span class="wow-chk wow-chk--money">✓</span><span>Self-Check-out &amp; Tür per App</span></li>
-          </ul>
-          <div class="wow-cta-wrap">
-            {currentPlan === 'premium' ? (
-              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
-            ) : (
-              <button type="button" class="wow-cta wow-cta--prem" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
-            )}
-          </div>
-        </div>
-
-        <!-- ENTERPRISE -->
-        <div class={`wow-tier wow-tier--ent${currentPlan === 'enterprise' ? ' wow-tier--current' : ''}`}>
-          {currentPlan === 'enterprise' && <div class="wow-your-plan">Euer aktueller Plan</div>}
-          <div class="wow-tcap">Enterprise</div>
-          <h2 class="wow-tier__h2">Für Gruppen: eure eigene App, zentral.</h2>
-          <div class="wow-frame">Eure eigene Welt — für Ketten und Gruppen.</div>
-          <ul class="wow-bl">
-            <li class="wow-b"><span class="wow-chk">✓</span><span>Eure eigene <b>White-Label-App</b></span></li>
-            <li class="wow-b"><span class="wow-chk">✓</span><span>Mehrere Häuser zentral</span></li>
-            <li class="wow-b"><span class="wow-chk">✓</span><span>API + fester Ansprechpartner</span></li>
-          </ul>
-          <div class="wow-cta-wrap">
-            {currentPlan === 'enterprise' ? (
-              <span class="wow-cta wow-cta--current" aria-disabled="true">Euer Plan ✓</span>
-            ) : (
-              <button type="button" class="wow-cta" @click="openLeadModal('enterprise')" :disabled="loading !== ''">Kontakt aufnehmen</button>
-            )}
-          </div>
-        </div>
-
+            <tr class="pm-cta-row">
+              <td class="pm-feat"></td>
+              <td>
+                {currentPlan === 'lite' ? (
+                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
+                ) : (
+                  <button type="button" class="pm-cta pm-cta-out" @click="window.confirm('Zu Lite wechseln? Premium-Funktionen werden deaktiviert.') && downgradeLite()" :disabled="loading !== ''">Zu Lite →</button>
+                )}
+              </td>
+              <td>
+                {currentPlan === 'pro' ? (
+                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
+                ) : (
+                  <button type="button" class="pm-cta pm-cta-out" @click="openLeadModal('pro')" :disabled="loading !== ''">Vertrieb →</button>
+                )}
+              </td>
+              <td class="pm-col-prem pm-col-prem--foot">
+                {currentPlan === 'premium' ? (
+                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
+                ) : (
+                  <button type="button" class="pm-cta pm-cta-solid" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb →</button>
+                )}
+              </td>
+              <td>
+                {currentPlan === 'enterprise' ? (
+                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
+                ) : (
+                  <button type="button" class="pm-cta pm-cta-out" @click="openLeadModal('enterprise')" :disabled="loading !== ''">Kontakt →</button>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Eve Show / Wow Moment -->
-      <div class="wow-show">
-        <div class="wow-show__txt">
-          <span class="wow-tag">Zeigen statt aufzählen</span>
-          <h3 class="wow-show__h3">Tippe ein Feature an — sieh, was es <span class="wow-au">kann.</span></h3>
-          <p class="wow-show__p">Jedes gesperrte Modul zeigt eine kurze Live-Vorschau, statt nur einen Haken in einer Liste. Hier: ein Gast fragt, <b>Eve handelt</b> — und bucht direkt aufs Zimmer.</p>
-          <p class="wow-show__note">Der Unterschied zwischen „Microsite-Builder ✓" und dem Gefühl, zu <i>sehen</i>, wie der Umsatz reinkommt.</p>
-        </div>
-        <div class="wow-demo" aria-hidden="true">
-          <div class="wow-demo__aurora"></div>
-          <div class="wow-demo__scr">
-            <div class="wow-demo__head">
-              <span class="wow-demo__orb"></span>
-              <span class="wow-demo__lbl">Eve · live</span>
-            </div>
-            <div class="wow-bub wow-bub--guest">Können wir Spätabreise um 14 Uhr buchen?</div>
-            <div class="wow-bub wow-bub--eve">Erledige ich — Late Check-out bis 14:00, 25 €.</div>
-            <div class="wow-act">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4"><path d="M5 12l5 5L20 6"/></svg>
-              Auf Zimmer 204 gebucht
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Closing CTA -->
-      <div class="wow-close">
-        <h3 class="wow-close__h3">Fangt heute kostenlos an.</h3>
-        <p class="wow-close__p">Lite kostet nichts und ist in Minuten live. Wenn ihr mehr wollt, reden wir — kein Risiko, kein Abo-Zwang.</p>
-        <div class="wow-close__btns">
-          {currentPlan !== 'lite' && (
-            <button
-              type="button"
-              class="wow-cbtn wow-cbtn--light"
-              @click="window.confirm('Zu Lite wechseln? Premium-Funktionen werden deaktiviert.') && downgradeLite()"
-              :disabled="loading !== ''"
-            >
-              Kostenlos starten
-            </button>
-          )}
-          {currentPlan === 'lite' && (
-            <span class="wow-cbtn-curr">Euer Plan: Lite ✓</span>
-          )}
-          <button type="button" class="wow-cbtn wow-cbtn--outline" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
-        </div>
+      <div class="pm-foot">
+        <span class="pm-mono">Petrol = enthalten · — = nicht enthalten</span><br>
+        Premium bekommt alles außer den Gruppen-Funktionen — die Stufe, die nicht nur kostet, sondern verdient.
       </div>
 
     </div>
@@ -450,265 +427,80 @@ const currentPlan: string = (hotel as any).plan ?? 'lite';
   /* ── Wow-Abo-Page ───────────────────────────────────────────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-  .wow-page {
-    --sage: #5C9070; --sageBg: #E9F1EC;
-    
-    --purp: #5B4B8A; --purpLine: #D8CFE8; --purpBg: #F0EDF6;
-    --money: #2E6B4E; --moneyBg: #E6F1EA;
-    --auA: #14616E; --auB: #1AA0B0; --auC: #5B7CE0;
-    --w-ink: #0E0D0B; --w-ink2: #56524B; --w-ink3: #9E988E;
-    --w-card: #FFFFFF; --w-line: #E7E3DB; --w-line2: #F0ECE4;
-    --sg: 'Space Grotesk', sans-serif; --mn: 'JetBrains Mono', monospace;
-    padding: 46px 0 80px;
+  /* ── Plan-Vergleichs-Matrix ──────────────────────────────────────────────── */
+  .pm-page {
+    --pm-petrol: #14616E; --pm-petrol-d: #0e4d57;
+    --pm-ink: #0A0A0A; --pm-muted: rgba(10,10,10,.50); --pm-faint: rgba(10,10,10,.26);
+    --pm-border: rgba(10,10,10,.10); --pm-border-strong: #E5E4E0;
+    --pm-tint: rgba(20,97,110,.055); --pm-tint2: rgba(20,97,110,.09);
+    --pm-surface: #fff; --pm-sage: #5C9070;
+    --pm-sg: 'Space Grotesk', sans-serif; --pm-mn: 'JetBrains Mono', monospace;
+    padding: 40px 0 80px;
   }
 
   /* Hero */
-  .wow-hero { text-align: center; margin-bottom: 46px; }
-  .wow-eyebrow {
-    font-family: var(--mn); font-size: 10px; letter-spacing: .34em;
-    text-transform: uppercase; color: var(--w-ink3); margin-bottom: 16px;
-  }
-  .wow-h1 {
-    font-family: var(--sg); font-weight: 700; font-size: 40px;
-    line-height: 1.05; letter-spacing: -.03em;
-    color: var(--w-ink); margin: 0 0 14px;
-  }
-  .wow-g {
-    background: linear-gradient(100deg, var(--auA), var(--auB) 55%, var(--auC));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .wow-sub {
-    font-size: 15px; color: var(--w-ink2); max-width: 520px;
-    margin: 0 auto; line-height: 1.6;
-  }
+  .pm-hero { text-align: center; padding: 10px 0 4px; }
+  .pm-eye { font-family: var(--pm-mn); font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--pm-faint); margin-bottom: 18px; }
+  .pm-h1 { font-family: var(--pm-sg); font-size: 40px; line-height: 1.07; letter-spacing: -.035em; font-weight: 700; margin: 0 0 16px; color: var(--pm-ink); }
+  .pm-em { color: var(--pm-petrol); }
+  .pm-sub { font-size: 15px; color: var(--pm-muted); max-width: 540px; margin: 0 auto; line-height: 1.6; }
 
-  /* Cards grid */
-  .wow-cards {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 14px; align-items: stretch; margin-bottom: 54px;
-  }
-  @media (max-width: 960px)  { .wow-cards { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 520px)  { .wow-cards { grid-template-columns: 1fr; } }
+  /* Matrix */
+  .pm-matwrap { margin: 44px 0 24px; overflow-x: auto; }
+  .pm-mat { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 760px; }
+  .pm-mat th, .pm-mat td { padding: 0; text-align: center; vertical-align: middle; }
+  .pm-feat { text-align: left; width: 34%; padding: 0 18px; }
 
-  /* Single card */
-  .wow-tier {
-    position: relative; background: var(--w-card);
-    border: 1px solid var(--w-line); border-radius: 18px;
-    padding: 24px 22px; display: flex; flex-direction: column;
-    transition: transform .32s cubic-bezier(.2,.7,.3,1), box-shadow .32s;
-    overflow: hidden;
-  }
-  .wow-tier:hover { transform: translateY(-7px); box-shadow: 0 28px 50px -30px rgba(0,0,0,.38); }
-  .wow-tier--current { border-width: 2px; }
-  .wow-tier--lite.wow-tier--current    { border-color: var(--sage); }
-  .wow-tier--pro.wow-tier--current     { border-color: var(--pinkInk); }
-  .wow-tier--prem.wow-tier--current    { border-color: var(--purp); }
-  .wow-tier--ent.wow-tier--current     { border-color: var(--w-ink); }
+  .pm-mat thead th { padding-bottom: 8px; position: relative; }
+  .pm-th-inner { padding: 14px 10px 16px; }
+  .pm-tier-name { font-family: var(--pm-mn); font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--pm-ink); }
+  .pm-tier-sub { font-family: var(--pm-mn); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--pm-faint); margin-top: 5px; }
+  .pm-tier-now { display: inline-block; font-family: var(--pm-mn); font-size: 8px; letter-spacing: .14em; text-transform: uppercase; color: var(--pm-sage); border: 1px solid var(--pm-sage); border-radius: 6px; padding: 2px 7px; margin-top: 7px; }
 
-  /* Premium: elevated + ribbon */
-  .wow-tier--prem {
-    border-color: var(--purpLine);
-    box-shadow: 0 24px 48px -30px rgba(91,76,138,.45);
-    transform: translateY(-6px);
-    padding-top: 48px;
-  }
-  .wow-tier--prem:hover { transform: translateY(-13px); }
+  /* Premium-Spalte (Held) */
+  .pm-col-prem { background: var(--pm-tint); }
+  .pm-mat thead th.pm-col-prem .pm-th-inner { border-radius: 14px 14px 0 0; border-top: 1.5px solid var(--pm-petrol); border-left: 1.5px solid var(--pm-petrol); border-right: 1.5px solid var(--pm-petrol); position: relative; overflow: hidden; }
+  .pm-mat thead th.pm-col-prem .pm-th-inner::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(115deg,#14616E,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%); background-size: 220% 100%; animation: pm-aurora 5s linear infinite; }
+  @keyframes pm-aurora { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
+  .pm-mat td.pm-col-prem { border-left: 1.5px solid var(--pm-petrol); border-right: 1.5px solid var(--pm-petrol); }
+  .pm-col-prem--foot { border-bottom: 1.5px solid var(--pm-petrol); border-radius: 0 0 14px 14px; }
+  .pm-prem-cap { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); font-family: var(--pm-mn); font-size: 8px; letter-spacing: .16em; text-transform: uppercase; color: #fff; background: var(--pm-petrol); border-radius: 999px; padding: 4px 11px; white-space: nowrap; font-weight: 600; z-index: 2; }
 
-  .wow-ribbon {
-    position: absolute; top: 0; left: 0; right: 0; height: 34px;
-    background: var(--purp); display: flex; align-items: center; justify-content: center;
-    font-family: var(--mn); font-size: 8.5px; letter-spacing: .14em;
-    text-transform: uppercase; color: #fff;
-  }
+  /* Gruppen + Zeilen */
+  .pm-grp td { padding: 26px 18px 9px; text-align: left; }
+  .pm-gl { font-family: var(--pm-mn); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--pm-petrol); }
+  .pm-row td { border-top: 1px solid var(--pm-border); height: 52px; }
+  .pm-row:hover td { background: rgba(10,10,10,.015); }
+  .pm-row:hover td.pm-col-prem { background: var(--pm-tint2); }
+  .pm-fl { font-size: 14px; letter-spacing: -.005em; color: var(--pm-ink); }
+  .pm-hint { display: block; font-size: 11px; color: var(--pm-muted); margin-top: 2px; line-height: 1.4; }
 
-  @keyframes wow-sheen { 0%,72%{left:-60%} 100%{left:130%} }
-  .wow-sheen {
-    position: absolute; top: 0; left: -60%; width: 45%; height: 100%;
-    background: linear-gradient(100deg,transparent,rgba(255,255,255,.46),transparent);
-    transform: skewX(-18deg);
-    animation: wow-sheen 6.5s ease-in-out infinite;
-    pointer-events: none;
-  }
+  /* Zellen */
+  .pm-yes { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--pm-petrol); color: #fff; }
+  .pm-no { display: inline-block; width: 24px; height: 2px; border-radius: 2px; background: var(--pm-faint); vertical-align: middle; }
+  .pm-lim { font-family: var(--pm-mn); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--pm-petrol); }
+  .pm-lim--de { color: var(--pm-muted); font-weight: 500; }
 
-  /* "Your plan" bar for non-premium cards */
-  .wow-your-plan {
-    position: absolute; top: 0; left: 0; right: 0; height: 30px;
-    background: #0E0D0B; display: flex; align-items: center; justify-content: center;
-    font-family: var(--mn); font-size: 8px; letter-spacing: .14em;
-    text-transform: uppercase; color: #fff;
-    margin-bottom: 18px;
-  }
-  .wow-tier--lite .wow-your-plan  { background: var(--sage); }
-  .wow-tier--pro  .wow-your-plan  { background: var(--pinkInk); }
-  .wow-tier--ent  .wow-your-plan  { background: #0E0D0B; }
-  /* add top padding when your-plan bar is present */
-  .wow-tier--current:not(.wow-tier--prem) { padding-top: 44px; }
+  /* CTA-Zeile */
+  .pm-cta-row td { padding-top: 18px; }
+  .pm-cta { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 14px; border-radius: 10px; font-family: var(--pm-mn); font-weight: 600; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; text-decoration: none; white-space: nowrap; border: none; transition: transform .07s, background .2s, filter .2s; }
+  .pm-cta:active:not([aria-disabled]) { transform: translateY(1px); }
+  .pm-cta:disabled { opacity: .5; cursor: not-allowed; }
+  .pm-cta-out { border: 1.5px solid var(--pm-petrol); color: var(--pm-petrol); background: rgba(20,97,110,.05); }
+  .pm-cta-out:hover:not(:disabled) { background: var(--pm-tint2); }
+  .pm-cta-solid { background: var(--pm-petrol); color: #fff; }
+  .pm-cta-solid:hover:not(:disabled) { background: var(--pm-petrol-d); }
+  .pm-cta-now { color: var(--pm-muted); border: 1px solid var(--pm-border-strong); background: transparent; cursor: default; }
 
-  .wow-tcap {
-    font-family: var(--mn); font-size: 9.5px; letter-spacing: .14em;
-    text-transform: uppercase; margin-bottom: 14px; color: var(--w-ink3);
-  }
-  .wow-tier--lite .wow-tcap { color: var(--sage); }
-  .wow-tier--pro  .wow-tcap { color: var(--pinkInk); }
-  .wow-tier--prem .wow-tcap { color: var(--purp); }
+  /* Foot */
+  .pm-foot { text-align: center; color: var(--pm-muted); font-size: 12.5px; padding: 8px 0 0; line-height: 1.6; }
+  .pm-mono { font-family: var(--pm-mn); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--pm-faint); }
 
-  .wow-tier__h2 {
-    font-family: var(--sg); font-weight: 700; font-size: 20px;
-    line-height: 1.15; letter-spacing: -.02em;
-    color: var(--w-ink); margin: 0 0 9px; min-height: 60px;
-  }
-  .wow-frame {
-    font-size: 12px; color: var(--w-ink2); line-height: 1.5;
-    margin-bottom: 16px; padding-bottom: 15px;
-    border-bottom: 1px solid var(--w-line2);
-  }
-
-  /* Benefit list */
-  .wow-bl { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-  .wow-b  { display: flex; gap: 9px; font-size: 12.5px; color: var(--w-ink2); line-height: 1.4; }
-  .wow-b--money { color: var(--money); font-weight: 600; }
-  .wow-chk       { flex-shrink: 0; font-weight: 700; color: var(--w-ink); }
-  .wow-chk--sage  { color: var(--sage); }
-  .wow-chk--petrol { color: var(--petrol, #14616E); }
-  .wow-chk--money { color: var(--money); }
-
-  /* CTA buttons */
-  .wow-cta-wrap { margin-top: auto; }
-  .wow-cta {
-    display: block; width: 100%; text-align: center;
-    font-family: var(--mn); font-size: 8.5px; font-weight: 300; letter-spacing: .1em; text-transform: uppercase;
-    padding: 13px; border-radius: 11px; cursor: pointer;
-    border: 1px solid var(--w-ink); color: var(--w-ink); background: none;
-    transition: background .2s, color .2s;
-  }
-  .wow-cta:hover:not(:disabled):not([aria-disabled]) { background: var(--w-ink); color: #fff; }
-  .wow-cta:disabled { opacity: .55; cursor: not-allowed; }
-  .wow-cta--free   { border-color: var(--sage); color: var(--sage); }
-  .wow-cta--free:hover:not(:disabled)   { background: var(--sage); color: #fff; }
-  .wow-cta--prem   { background: var(--purp); border-color: var(--purp); color: #fff; }
-  .wow-cta--prem:hover:not(:disabled)  { filter: brightness(1.12); }
-  .wow-cta--danger { background: #c0392b; border-color: #c0392b; color: #fff; }
-  .wow-cta--danger:hover:not(:disabled) { background: #a93226; }
-  .wow-cta--ghost  { border-color: var(--w-line); color: var(--w-ink3); }
-  .wow-cta--ghost:hover:not(:disabled)  { background: var(--w-line2); color: var(--w-ink); }
-  .wow-cta--current { border-color: transparent; background: rgba(0,0,0,.04); color: var(--w-ink3); cursor: default; }
-
-  .wow-downgrade { display: flex; flex-direction: column; gap: 8px; }
-  .wow-downgrade__warn { font-size: 10px; color: #c0392b; margin: 0; line-height: 1.4; }
-  .wow-downgrade__btns { display: flex; gap: 6px; }
-  .wow-downgrade__btns .wow-cta { padding: 10px; font-size: 8.5px; }
-
-  /* Eve show / demo */
-  .wow-show {
-    display: grid; grid-template-columns: 1.05fr .95fr;
-    gap: 30px; align-items: center;
-    background: var(--w-card); border: 1px solid var(--w-line);
-    border-radius: 22px; padding: 34px;
-    margin-bottom: 48px; position: relative; overflow: hidden;
-  }
-  .wow-show::before {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(90% 120% at 100% 0%, rgba(91,124,224,.07), transparent 55%);
-    pointer-events: none;
-  }
-  @media (max-width: 780px) { .wow-show { grid-template-columns: 1fr; gap: 24px; } }
-
-  .wow-tag {
-    font-family: var(--mn); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--auA); background: #E6F0F0; border: 1px solid #BBD9DD;
-    border-radius: 999px; padding: 6px 12px; display: inline-block; margin-bottom: 12px;
-  }
-  .wow-show__h3 {
-    font-family: var(--sg); font-weight: 700; font-size: 24px;
-    letter-spacing: -.02em; line-height: 1.15; margin: 0 0 12px; color: var(--w-ink);
-  }
-  .wow-au {
-    background: linear-gradient(100deg, var(--auA), var(--auB), var(--auC));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .wow-show__p    { font-size: 13.5px; color: var(--w-ink2); line-height: 1.6; margin: 0 0 10px; }
-  .wow-show__note { font-size: 12px; color: var(--w-ink3); font-style: italic; margin: 0; }
-
-  /* Phone demo */
-  @keyframes wow-spin { to{transform:rotate(360deg)} }
-  @keyframes wow-b1 { 0%,4%{opacity:0;transform:translateY(6px)} 9%,30%{opacity:1;transform:none} 37%,100%{opacity:0} }
-  @keyframes wow-b2 { 0%,36%{opacity:0;transform:translateY(6px)} 43%,66%{opacity:1;transform:none} 73%,100%{opacity:0} }
-  @keyframes wow-b3 { 0%,68%{opacity:0;transform:translateY(6px) scale(.96)} 75%,93%{opacity:1;transform:none} 100%{opacity:0} }
-
-  .wow-demo {
-    justify-self: center; width: 280px; height: 290px;
-    background: #0E0D0B; border-radius: 26px; padding: 16px;
-    position: relative;
-    box-shadow: 0 30px 60px -28px rgba(0,0,0,.55);
-    overflow: hidden;
-  }
-  .wow-demo::after {
-    content: ''; position: absolute; inset: 0; border-radius: 26px;
-    border: 1px solid rgba(255,255,255,.08); pointer-events: none;
-  }
-  .wow-demo__aurora {
-    position: absolute; inset: 0;
-    background: radial-gradient(80% 60% at 20% 0%, rgba(26,160,176,.22), transparent 60%),
-                radial-gradient(80% 60% at 100% 100%, rgba(91,124,224,.20), transparent 60%);
-  }
-  .wow-demo__scr {
-    position: relative; height: 100%;
-    display: flex; flex-direction: column; gap: 9px; padding: 6px 4px;
-  }
-  .wow-demo__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .wow-demo__orb {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: conic-gradient(from 200deg,#14616E,#1AA0B0,#5B7CE0,#14616E);
-    animation: wow-spin 9s linear infinite; flex-shrink: 0;
-  }
-  .wow-demo__lbl { font-family: var(--mn); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: #cfe6ea; }
-  .wow-bub {
-    max-width: 82%; font-size: 11.5px; line-height: 1.4;
-    padding: 9px 12px; border-radius: 14px; opacity: 0;
-  }
-  .wow-bub--guest {
-    align-self: flex-end; background: rgba(255,255,255,.12); color: #F4F1EC;
-    border-bottom-right-radius: 4px; animation: wow-b1 9s ease infinite;
-  }
-  .wow-bub--eve {
-    align-self: flex-start; background: #fff; color: #161514;
-    border-bottom-left-radius: 4px; animation: wow-b2 9s ease infinite;
-  }
-  .wow-act {
-    align-self: flex-start; display: flex; align-items: center; gap: 7px;
-    font-family: var(--mn); font-size: 9px; letter-spacing: .04em; color: #fff;
-    background: linear-gradient(100deg, #1AA0B0, #5B7CE0);
-    padding: 8px 12px; border-radius: 999px;
-    opacity: 0; animation: wow-b3 9s ease infinite;
-  }
-
-  /* Closing CTA section */
-  .wow-close {
-    text-align: center; background: #0E0D0B;
-    border-radius: 22px; padding: 44px 30px;
-    color: #fff; position: relative; overflow: hidden;
-  }
-  .wow-close__h3 {
-    font-family: var(--sg); font-weight: 700; font-size: 26px;
-    letter-spacing: -.02em; margin: 0 0 10px;
-  }
-  .wow-close__p {
-    font-size: 13.5px; color: #D8D3CB;
-    max-width: 460px; margin: 0 auto 24px; line-height: 1.6;
-  }
-  .wow-close__btns { display: inline-flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-  .wow-cbtn {
-    font-family: var(--mn); font-size: 9px; font-weight: 300; letter-spacing: .1em; text-transform: uppercase;
-    padding: 14px 26px; border-radius: 12px; cursor: pointer; border: none;
-    transition: filter .2s, opacity .15s;
-  }
-  .wow-cbtn:disabled { opacity: .55; cursor: not-allowed; }
-  .wow-cbtn--light   { background: #fff; color: #0E0D0B; }
-  .wow-cbtn--light:hover:not(:disabled) { filter: brightness(.92); }
-  .wow-cbtn--outline { background: none; color: #fff; border: 1px solid rgba(255,255,255,.4); }
-  .wow-cbtn--outline:hover:not(:disabled) { background: rgba(255,255,255,.1); }
-  .wow-cbtn-curr {
-    font-family: var(--mn); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
-    color: rgba(255,255,255,.55); padding: 14px 0; align-self: center;
+  /* Mobil: Zeilennamen-Spalte sticky + horizontal scrollen */
+  @media (max-width: 720px) {
+    .pm-h1 { font-size: 30px; }
+    .pm-mat { min-width: 660px; }
+    .pm-feat { position: sticky; left: 0; z-index: 1; width: 50%; background: var(--pm-surface); }
+    .pm-grp .pm-feat, .pm-cta-row .pm-feat { background: var(--pm-surface); }
   }
 </style>
