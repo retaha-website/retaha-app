@@ -1,0 +1,404 @@
+---
+// Lite-Übersicht (Dashboard) — Seitenkopf, 4 Kennzahlen, Aktivitäts-Feed,
+// Schnellzugriff (1 Lite-Kachel) und gesperrte Teaser. Echte Daten kommen aus
+// overview.astro (Frontmatter-Queries); diese Komponente rendert nur.
+//
+// Stil = bestehendes Backoffice (Petrol/Sage/Messing, Space Grotesk + JetBrains
+// Mono). Aurora bleibt Eve vorbehalten (.eve-gradient). Sperr-Muster wie /breakfast.
+import { bt, type LanguageCode } from '@retaha/i18n';
+import { hasPlanAccess } from '../../lib/auth/plan-gate';
+
+export type TrendDir = 'up' | 'down' | 'flat' | 'new' | 'none';
+export interface Trend { dir: TrendDir; pct: number; }
+export interface ActivityItem {
+  kind: 'request' | 'eve' | 'feedback';
+  text: string;
+  ts: string;            // ISO
+  status: 'open' | 'seen' | 'done' | 'answered';
+  href?: string;
+  stars?: number;        // nur feedback
+}
+export interface QuickCard { title: string; eyebrow?: string; cardClass?: string; }
+
+interface Props {
+  lang: LanguageCode;
+  hotelName: string;
+  plan: string;
+  summaryCount: number;        // neue Gästewünsche seit gestern
+  opens: { n: number; trend: Trend };
+  eve: { n: number; trend: Trend };
+  requests: { n: number; open: number; trend: Trend };
+  rating: { avg: number; count: number };
+  activity: ActivityItem[];
+  quick: QuickCard | null;
+  links: {
+    eve: string; requests: string; feedback: string;
+    packages: string; actionCards: string;
+  };
+}
+
+const { lang, hotelName, plan, summaryCount, opens, eve, requests, rating, activity, quick, links } = Astro.props;
+
+const t = (k: string) => bt(k, lang);
+const tn = (k: string, n: number) => t(k).replace('{n}', String(n));
+
+// Lokalisierter Zeitstempel — i18n-sicher ohne manuelle Übersetzung.
+const dtf = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function fmtTs(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : dtf.format(d);
+}
+
+// Datum für den Seitenkopf.
+const today = new Intl.DateTimeFormat(lang, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+
+// Zusammenfassungs-Zeile.
+const summaryText = summaryCount === 0
+  ? t('dash.ov.summary.zero')
+  : summaryCount === 1 ? t('dash.ov.summary.one') : tn('dash.ov.summary.many', summaryCount);
+
+// Sterne (gefüllt bis r, Messing) — für die Rating-Karte + Feedback-Zeilen.
+function starsArr(r: number): boolean[] {
+  const filled = Math.round(r);
+  return [1, 2, 3, 4, 5].map(i => i <= filled);
+}
+
+// Status-Chip-Klasse + Label.
+function statusLabel(s: ActivityItem['status']): string {
+  if (s === 'open') return t('dash.ov.status.open');
+  if (s === 'seen') return t('dash.ov.status.seen');
+  if (s === 'answered') return t('dash.ov.status.answered');
+  return t('dash.ov.status.done');
+}
+
+// Trend-Pille (↑/↓ % vs. Vorwoche). 'new' = letzte Woche 0, jetzt >0. 'flat'/'none' = nichts.
+function trendHtml(tr: Trend): string {
+  if (tr.dir === 'up')   return `<span class="dl-trend dl-trend--up">▲ ${tr.pct}%</span>`;
+  if (tr.dir === 'down') return `<span class="dl-trend dl-trend--down">▼ ${tr.pct}%</span>`;
+  if (tr.dir === 'new')  return `<span class="dl-trend dl-trend--new">▲ ${t('dash.ov.trend.new')}</span>`;
+  return '';
+}
+
+// Gesperrte Teaser — Plan-Gate wie auf den Modul-Seiten. „Belegung & Buchungen"
+// und „Direktbuchungen" ab Premium, „Bewertungs-Funnel" ab Pro.
+const teasers = [
+  { key: 'pms',    required: 'premium' as const, title: t('dash.ov.unlock.pms.title'),    desc: t('dash.ov.unlock.pms.desc') },
+  { key: 'direct', required: 'premium' as const, title: t('dash.ov.unlock.direct.title'), desc: t('dash.ov.unlock.direct.desc') },
+  { key: 'funnel', required: 'pro' as const,     title: t('dash.ov.unlock.funnel.title'), desc: t('dash.ov.unlock.funnel.desc') },
+].filter(x => !hasPlanAccess(plan, x.required)); // nur zeigen, was der Plan nicht hat
+---
+
+<section class="dl">
+
+  <!-- 1 · Seitenkopf -->
+  <header class="dl-head">
+    <p class="dl-eyebrow">{t('dash.ov.eyebrow')}</p>
+    <h1 class="dl-title">{hotelName}</h1>
+    <p class="dl-sub"><span class="dl-sub-date">{today}</span><span class="dl-sub-dot">·</span><span>{summaryText}</span></p>
+  </header>
+
+  <!-- 2 · Kennzahlen -->
+  <div class="dl-kpis">
+    <!-- Gästemappe geöffnet -->
+    <div class="dl-kpi">
+      <p class="dl-kpi-label">{t('dash.ov.kpi.opens')}</p>
+      <p class="dl-kpi-value">{opens.n > 0 ? opens.n : '—'}</p>
+      <div class="dl-kpi-foot">
+        <span class="dl-kpi-sub">{t('dash.ov.kpi.opens.sub')}</span>
+        <Fragment set:html={trendHtml(opens.trend)} />
+      </div>
+    </div>
+
+    <!-- Eve-Gespräche -->
+    <a class="dl-kpi dl-kpi--link" href={links.eve}>
+      <p class="dl-kpi-label"><span class="eve-gradient">Eve</span>-{t('dash.ov.kpi.eve')}</p>
+      <p class="dl-kpi-value">{eve.n > 0 ? eve.n : '—'}</p>
+      <div class="dl-kpi-foot">
+        <span class="dl-kpi-sub">{t('dash.ov.kpi.eve.sub')}</span>
+        <Fragment set:html={trendHtml(eve.trend)} />
+      </div>
+    </a>
+
+    <!-- Gästewünsche -->
+    <a class="dl-kpi dl-kpi--link" href={links.requests}>
+      <p class="dl-kpi-label">{t('dash.ov.kpi.requests')}</p>
+      <p class="dl-kpi-value">{requests.n}</p>
+      <div class="dl-kpi-foot">
+        <span class="dl-kpi-sub">{requests.open === 0 ? t('dash.ov.kpi.requests.sub.zero') : (requests.open === 1 ? t('dash.ov.kpi.requests.sub.one') : tn('dash.ov.kpi.requests.sub.many', requests.open))}</span>
+        <Fragment set:html={trendHtml(requests.trend)} />
+      </div>
+    </a>
+
+    <!-- Ø Feedback -->
+    <a class="dl-kpi dl-kpi--link" href={links.feedback}>
+      <p class="dl-kpi-label">{t('dash.ov.kpi.rating')}</p>
+      {rating.count > 0 ? (
+        <p class="dl-kpi-value dl-kpi-value--rating">
+          {rating.avg.toFixed(1)}
+          <span class="dl-stars" aria-hidden="true">
+            {starsArr(rating.avg).map(on => (
+              <svg viewBox="0 0 24 24" class={on ? 'is-on' : ''} fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21l1.2-6.6L2.5 9.1l6.6-.9z"/></svg>
+            ))}
+          </span>
+        </p>
+      ) : (
+        <p class="dl-kpi-value">—</p>
+      )}
+      <div class="dl-kpi-foot">
+        <span class="dl-kpi-sub">{rating.count === 0 ? t('dash.ov.kpi.rating.empty') : (rating.count === 1 ? t('dash.ov.kpi.rating.sub.one') : tn('dash.ov.kpi.rating.sub.many', rating.count))}</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- 3 · Letzte Aktivität -->
+  <section class="dl-act">
+    <div class="dl-act-head">
+      <h2 class="dl-h2">{t('dash.ov.act.title')}</h2>
+      {activity.length > 0 && <a class="dl-act-all" href={links.requests}>{t('dash.ov.act.all')} →</a>}
+    </div>
+
+    {activity.length === 0 ? (
+      <p class="dl-empty">{t('dash.ov.act.empty')}</p>
+    ) : (
+      <ul class="dl-feed">
+        {activity.map(item => {
+          const isEve = item.kind === 'eve';
+          const typeLabel = item.kind === 'request' ? t('dash.ov.act.type.request')
+            : isEve ? t('dash.ov.act.type.eve') : t('dash.ov.act.type.feedback');
+          const Tag = item.href ? 'a' : 'div';
+          return (
+            <li class="dl-feed-item">
+              <Tag class="dl-feed-link" {...(item.href ? { href: item.href } : {})}>
+                <span class={`dl-feed-icon dl-feed-icon--${item.kind}`} aria-hidden="true">
+                  {item.kind === 'request' && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}
+                  {item.kind === 'eve' && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>}
+                  {item.kind === 'feedback' && <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21l1.2-6.6L2.5 9.1l6.6-.9z"/></svg>}
+                </span>
+                <span class="dl-feed-body">
+                  <span class="dl-feed-type">{isEve ? <Fragment><span class="eve-gradient">Eve</span>-{t('dash.ov.act.type.eve.suffix')}</Fragment> : typeLabel}</span>
+                  <span class="dl-feed-text">{item.text}</span>
+                </span>
+                <span class="dl-feed-meta">
+                  <span class={`dl-chip dl-chip--${item.status}`}>{statusLabel(item.status)}</span>
+                  <span class="dl-feed-ts">{fmtTs(item.ts)}</span>
+                </span>
+              </Tag>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </section>
+
+  <!-- 4 · Schnellzugriff (1 Lite-Kachel) -->
+  <section class="dl-quick">
+    <div class="dl-act-head">
+      <h2 class="dl-h2">{t('dash.ov.qa.title')}</h2>
+    </div>
+    {quick ? (
+      <a class="dl-tile" href={links.actionCards}>
+        <span class={`dl-tile-art ${quick.cardClass ?? 'rec-anthrazit'}`} aria-hidden="true"></span>
+        <span class="dl-tile-body">
+          {quick.eyebrow && <span class="dl-tile-eyebrow">{quick.eyebrow}</span>}
+          <span class="dl-tile-title">{quick.title}</span>
+        </span>
+        <span class="dl-tile-edit">{t('dash.ov.qa.edit')} →</span>
+      </a>
+    ) : (
+      <a class="dl-tile dl-tile--empty" href={links.actionCards}>
+        <span class="dl-tile-body">
+          <span class="dl-tile-title">{t('dash.ov.qa.empty')}</span>
+        </span>
+        <span class="dl-tile-edit">{t('dash.ov.qa.empty.cta')} →</span>
+      </a>
+    )}
+    <p class="dl-hint">
+      {t('dash.ov.qa.hint')} <a href={links.packages}>{t('dash.ov.qa.hint.link')} →</a>
+    </p>
+  </section>
+
+  <!-- 5 · Mehr freischalten (gesperrte Teaser) -->
+  {teasers.length > 0 && (
+    <section class="dl-unlock">
+      <div class="dl-act-head">
+        <h2 class="dl-h2">{t('dash.ov.unlock.title')}</h2>
+      </div>
+      <div class="dl-unlock-list">
+        {teasers.map(x => (
+          <a class="dl-lock" href={links.packages} aria-label={`${x.title} — ${x.required === 'pro' ? 'Pro' : 'Premium'}`}>
+            <span class="dl-lock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <span class="dl-lock-body">
+              <span class="dl-lock-title">{x.title}</span>
+              <span class="dl-lock-desc">{x.desc}</span>
+            </span>
+            <span class="dl-lock-chip">{x.required === 'pro' ? 'Pro' : 'Premium'}</span>
+          </a>
+        ))}
+      </div>
+      <a class="dl-unlock-cta" href={links.packages}>{t('dash.ov.unlock.cta')} →</a>
+    </section>
+  )}
+
+</section>
+
+<style>
+  .dl { max-width: 1080px; margin: 0 auto; padding: 8px 0 0; }
+
+  /* Seitenkopf */
+  .dl-head { margin: 8px 0 28px; }
+  .dl-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--ink-muted); margin: 0 0 8px;
+  }
+  .dl-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 500;
+    letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; line-height: 1.1;
+  }
+  .dl-sub {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0;
+    font-family: 'Inter Tight', sans-serif; font-size: 14px; color: var(--ink-soft, rgba(10,10,10,0.6));
+  }
+  .dl-sub-date { font-weight: 500; color: var(--ink); }
+  .dl-sub-dot { color: var(--ink-faint); }
+
+  /* Kennzahlen */
+  .dl-kpis {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 32px;
+  }
+  @media (min-width: 860px) { .dl-kpis { grid-template-columns: repeat(4, 1fr); } }
+  .dl-kpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px;
+    text-decoration: none; color: inherit; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  }
+  .dl-kpi--link:hover {
+    border-color: var(--petrol); box-shadow: 0 10px 26px rgba(20,97,110,.08); transform: translateY(-2px);
+  }
+  .dl-kpi-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-muted); margin: 0;
+  }
+  .dl-kpi-value {
+    font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 500; line-height: 1;
+    color: var(--ink); margin: 0; font-variant-numeric: tabular-nums;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .dl-kpi-value--rating { align-items: center; }
+  .dl-stars { display: inline-flex; gap: 2px; }
+  .dl-stars svg { width: 14px; height: 14px; color: var(--border-strong, #e5e4e0); }
+  .dl-stars svg.is-on { color: #C8973F; }
+  .dl-kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+  .dl-kpi-sub { font-family: 'Inter Tight', sans-serif; font-size: 12px; color: var(--ink-soft, rgba(10,10,10,0.55)); }
+
+  /* Trend-Pille */
+  .dl-trend {
+    display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .dl-trend--up { color: var(--sage, #5C9070); }
+  .dl-trend--down { color: var(--ink-muted); }
+  .dl-trend--new { color: var(--petrol); }
+  .dl-trend--flat { color: var(--ink-faint); }
+
+  /* Aktivität + Schnellzugriff + Unlock — gemeinsame Kopfzeile */
+  .dl-act-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+  .dl-h2 { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 500; color: var(--ink); margin: 0; }
+  .dl-act-all { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--petrol); text-decoration: none; }
+  .dl-act-all:hover { text-decoration: underline; }
+  .dl-empty {
+    background: var(--surface); border: 1px dashed var(--border-strong, #e5e4e0); border-radius: var(--r);
+    padding: 22px; margin: 0; text-align: center;
+    font-family: 'Inter Tight', sans-serif; font-size: 13.5px; color: var(--ink-muted);
+  }
+
+  .dl-act { margin-bottom: 32px; }
+  .dl-feed { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--surface); }
+  .dl-feed-item + .dl-feed-item { border-top: 1px solid var(--border); }
+  .dl-feed-link {
+    display: flex; align-items: center; gap: 14px; padding: 13px 16px; text-decoration: none; color: inherit;
+    transition: background .14s ease;
+  }
+  a.dl-feed-link:hover { background: var(--petrol-soft, rgba(20,97,110,0.06)); }
+  .dl-feed-icon {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--bg-deep); color: var(--ink-muted);
+  }
+  .dl-feed-icon svg { width: 17px; height: 17px; }
+  .dl-feed-icon--feedback { color: #C8973F; }
+  .dl-feed-icon--request { color: var(--petrol); }
+  .dl-feed-icon--eve { color: var(--petrol); }
+  .dl-feed-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .dl-feed-type {
+    font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted);
+  }
+  .dl-feed-text {
+    font-family: 'Inter Tight', sans-serif; font-size: 13.5px; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+  }
+  .dl-feed-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+  .dl-feed-ts { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-faint); white-space: nowrap; }
+
+  /* Status-Chip */
+  .dl-chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 3px 7px; border-radius: 6px; white-space: nowrap;
+  }
+  .dl-chip--open { background: rgba(20,97,110,0.1); color: var(--petrol); }
+  .dl-chip--seen { background: rgba(10,10,10,0.06); color: var(--ink-muted); }
+  .dl-chip--done { background: rgba(92,144,112,0.14); color: var(--sage, #5C9070); }
+  .dl-chip--answered { background: rgba(92,144,112,0.14); color: var(--sage, #5C9070); }
+
+  /* Schnellzugriff-Kachel */
+  .dl-quick { margin-bottom: 32px; }
+  .dl-tile {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  }
+  .dl-tile:hover { border-color: var(--petrol); box-shadow: 0 10px 26px rgba(20,97,110,.08); transform: translateY(-2px); }
+  .dl-tile-art {
+    flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px;
+    background: var(--ink); /* rec-anthrazit default */
+  }
+  .dl-tile-art.rec-pink { background: var(--burgund, #8C2128); }
+  .dl-tile-art.rec-white { background: var(--bg-deep); border: 1px solid var(--border); }
+  .dl-tile-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .dl-tile-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
+  .dl-tile-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500; color: var(--ink); }
+  .dl-tile-edit { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--petrol); }
+  .dl-tile--empty { border-style: dashed; }
+  .dl-hint {
+    margin: 12px 2px 0; font-family: 'Inter Tight', sans-serif; font-size: 12.5px; color: var(--ink-muted);
+  }
+  .dl-hint a { color: var(--petrol); text-decoration: none; font-weight: 500; }
+  .dl-hint a:hover { text-decoration: underline; }
+
+  /* Mehr freischalten (gesperrte Teaser) */
+  .dl-unlock { margin-bottom: 8px; }
+  .dl-unlock-list { display: flex; flex-direction: column; gap: 10px; }
+  .dl-lock {
+    position: relative; display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px dashed rgba(20,97,110,0.35); border-radius: var(--r);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .dl-lock:hover { border-color: var(--petrol); background: var(--petrol-soft, rgba(20,97,110,0.05)); }
+  .dl-lock-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-deep); color: var(--ink-muted); }
+  .dl-lock-icon svg { width: 16px; height: 16px; }
+  .dl-lock-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .dl-lock-title { font-family: 'Space Grotesk', sans-serif; font-size: 14.5px; font-weight: 500; color: var(--ink); }
+  .dl-lock-desc { font-family: 'Inter Tight', sans-serif; font-size: 12.5px; color: var(--ink-soft, rgba(10,10,10,0.55)); }
+  .dl-lock-chip {
+    flex-shrink: 0; align-self: flex-start;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--petrol); background: var(--surface); border: 1px solid var(--petrol); border-radius: 6px; padding: 3px 8px;
+  }
+  .dl-unlock-cta {
+    display: inline-block; margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+    color: var(--petrol); text-decoration: none; font-weight: 600;
+  }
+  .dl-unlock-cta:hover { text-decoration: underline; }
+</style>
