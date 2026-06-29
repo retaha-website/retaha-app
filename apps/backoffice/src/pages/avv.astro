@@ -1,0 +1,73 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getUserHotels } from '@retaha/auth';
+
+const hotels = await getUserHotels(Astro.cookies, Astro.request);
+const hotel = hotels?.[0]?.hotel;
+---
+
+<Layout title="AVV · retaha" activeTab="backoffice" hotelName={hotel?.name} hotelLogoUrl={(hotel as any)?.logo_primary ?? (hotel as any)?.logo_dark}>
+
+  <div class="settings-page" style="padding-top:0">
+    <nav class="breadcrumb" style="padding-top:36px" aria-label="Breadcrumb">
+      <a href="/overview" class="breadcrumb__crumb">Backoffice</a>
+      <span class="breadcrumb__sep">/</span>
+      <span class="breadcrumb__crumb breadcrumb__crumb--current">AVV</span>
+    </nav>
+
+    <section class="settings-hero">
+      <h1 class="settings-hero__title">AVV<span class="dot-pink">.</span></h1>
+      <p class="settings-hero__sub">Auftragsverarbeitungsvertrag gemäß Art. 28 DSGVO</p>
+    </section>
+
+    <div class="lg-body">
+      <div class="lg-card lg-card--placeholder">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--ink-faint)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <p class="lg-placeholder-title">Inhalt wird in Kürze ergänzt</p>
+        <p class="lg-placeholder-sub">Der Auftragsverarbeitungsvertrag zwischen deinem Hotel und der retaha GmbH wird hier bereitgestellt.</p>
+        <a href="mailto:hallo@retaha.de" class="lg-placeholder-link">AVV anfragen → hallo@retaha.de</a>
+      </div>
+
+      <div class="lg-nav">
+        <a href="/datenschutz">Datenschutz</a>
+        <a href="/agb">AGB</a>
+        <a href="/impressum">Impressum</a>
+      </div>
+    </div>
+  </div>
+
+</Layout>
+
+<style>
+  .lg-body { max-width: 680px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 64px; }
+
+  .lg-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px;
+  }
+  .lg-card--placeholder {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; padding: 48px 32px; gap: 10px;
+  }
+  .lg-placeholder-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 500;
+    color: var(--ink); margin: 4px 0 0;
+  }
+  .lg-placeholder-sub {
+    font-size: 13px; color: var(--ink-muted); line-height: 1.6; max-width: 380px; margin: 0;
+  }
+  .lg-placeholder-link {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    color: var(--petrol, #14616E); text-decoration: none; margin-top: 4px;
+    letter-spacing: 0.04em;
+  }
+  .lg-placeholder-link:hover { text-decoration: underline; }
+
+  .lg-nav {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+    padding-top: 4px;
+  }
+  .lg-nav a { color: var(--ink-muted); text-decoration: none; transition: color 150ms; }
+  .lg-nav a:hover { color: var(--petrol, #14616E); }
+</style>

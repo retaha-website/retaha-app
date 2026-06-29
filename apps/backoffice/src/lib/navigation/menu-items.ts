@@ -174,6 +174,12 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           href: '/profil/sicherheit',
           icon: icon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
         },
+        {
+          label: bt('nav.support', lang),
+          sub: bt('nav.support.sub', lang),
+          href: '/support',
+          icon: icon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+        },
       ],
     },
     {
@@ -229,26 +235,6 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           requiredPlan: 'premium',
           moduleKey: 'self-checkout',
           icon: icon('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'),
-        },
-      ],
-    },
-    {
-      title: bt('nav.sec.legal', lang),
-      items: [
-        {
-          label: bt('nav.agb', lang),
-          href: '/agb',
-          icon: icon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'),
-        },
-        {
-          label: bt('nav.privacy', lang),
-          href: '/datenschutz',
-          icon: icon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
-        },
-        {
-          label: bt('nav.imprint', lang),
-          href: '/impressum',
-          icon: icon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'),
         },
       ],
     },
