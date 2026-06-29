@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>retaha · Navbar Export</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design Tokens ─────────────────────────────────────────────────── */
+    :root {
+      --petrol:        #14616E;
+      --petrol-hover:  #0e4d57;
+      --r-sm:          8px;
+      --r:             12px;
+    }
+    [data-theme="light"] {
+      --bg:            #fafaf8;
+      --surface:       #ffffff;
+      --border:        rgba(10,10,10,0.10);
+      --border-strong: rgba(10,10,10,0.14);
+      --ink:           #0A0A0A;
+      --ink-muted:     rgba(10,10,10,0.42);
+      --ink-faint:     rgba(10,10,10,0.24);
+    }
+    [data-theme="dark"] {
+      --bg:            #0f0f0f;
+      --surface:       #1a1a1a;
+      --border:        rgba(255,255,255,0.10);
+      --border-strong: rgba(255,255,255,0.14);
+      --ink:           #f0f0f0;
+      --ink-muted:     rgba(240,240,240,0.45);
+      --ink-faint:     rgba(240,240,240,0.25);
+    }
+
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Lite-Notify-Banner ────────────────────────────────────────────── */
+    .head__notify {
+      display: flex; align-items: center; justify-content: center; gap: 18px;
+      padding: 8px 24px;
+      background: var(--petrol);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.04em; color: rgba(255,255,255,.85);
+    }
+    .head__notify b { color: #fff; font-weight: 600; }
+    .head__notify-cta {
+      color: #fff; text-decoration: underline;
+      text-underline-offset: 2px; font-weight: 600;
+      opacity: .85; transition: opacity 150ms; white-space: nowrap; cursor: pointer;
+    }
+    .head__notify-cta:hover { opacity: 1; }
+
+    /* ── Header Shell ──────────────────────────────────────────────────── */
+    .head {
+      border-bottom: 1px solid var(--border-strong);
+      background: var(--surface);
+    }
+    .head__inner { max-width: 1680px; margin: 0 auto; }
+    .head__top {
+      padding: 16px 32px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 24px;
+      align-items: center;
+    }
+
+    /* ── Left: retaha Brand Logo ───────────────────────────────────────── */
+    .head__brand { justify-self: start; display: flex; align-items: center; }
+
+    .brand-logo {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--ink); transition: color 200ms ease;
+    }
+    .brand-logo:hover { color: var(--petrol); }
+    .brand-logo__mark { display: block; flex-shrink: 0; height: 28px; width: auto; }
+    .brand-logo__wordmark {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 400;
+      font-size: 16px; letter-spacing: 0.01em; line-height: 1;
+      color: var(--ink-muted);
+      transition: color 200ms ease;
+    }
+    .brand-logo:hover .brand-logo__wordmark { color: var(--petrol); }
+
+    /* ── Center: Hotel logo + divider + Switcher ───────────────────────── */
+    .head__nav {
+      display: flex; align-items: center; gap: 16px; justify-self: center;
+    }
+    .head__nav-divider {
+      flex-shrink: 0; width: 1px; height: 20px;
+      background: var(--ink-muted);
+      opacity: 0.22;
+    }
+
+    /* Hotel Logo */
+    .hotel-logo {
+      display: inline-flex; align-items: center; gap: 10px;
+      height: 32px; text-decoration: none; color: var(--ink);
+      transition: opacity 200ms ease;
+    }
+    .hotel-logo:hover { opacity: 0.6; }
+    .hotel-logo__mark { width: 28px; height: 28px; flex-shrink: 0; }
+    .hotel-logo__text { display: flex; flex-direction: column; line-height: 1.15; }
+    .hotel-logo__name {
+      font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+      font-weight: 500; letter-spacing: -0.005em; color: var(--ink);
+    }
+    .hotel-logo__loc {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.14em; color: var(--ink-muted);
+      text-transform: uppercase; margin-top: 2px;
+    }
+
+    /* ── App Switcher (HeaderTabs) ─────────────────────────────────────── */
+    .header-tabs {
+      position: relative; display: inline-flex; align-items: center;
+      gap: 2px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px; padding: 3px;
+    }
+    .header-tabs__marker {
+      position: absolute; top: 0; left: 0; height: 0; width: 0;
+      background: var(--petrol); border-radius: 7px;
+      z-index: 0; opacity: 0; pointer-events: none;
+      transition: left 320ms cubic-bezier(.5,0,.2,1),
+                  top 320ms cubic-bezier(.5,0,.2,1),
+                  width 320ms cubic-bezier(.5,0,.2,1),
+                  height 320ms cubic-bezier(.5,0,.2,1);
+    }
+    @keyframes marker-bloom {
+      from { opacity: 0; transform: scale(.32); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .header-tabs__marker.is-blooming {
+      animation: marker-bloom 600ms cubic-bezier(.22,1,.36,1) both;
+    }
+    .header-tabs__tab {
+      position: relative; z-index: 1;
+      display: inline-flex; align-items: center; justify-content: flex-start;
+      height: 30px; padding: 0 10px; flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace; font-size: 8.5px;
+      font-weight: 500; letter-spacing: 0.05em; line-height: 1;
+      color: var(--ink-muted); background: transparent; border: none;
+      border-radius: 7px; cursor: pointer; transition: color 120ms ease;
+      text-transform: uppercase; text-decoration: none; white-space: nowrap; overflow: hidden;
+    }
+    .header-tabs__tab:hover:not(.is-active) { color: var(--petrol); }
+    .header-tabs__tab.is-active {
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(20,97,110,.40), inset 0 1px 0 rgba(255,255,255,.22);
+    }
+    .header-tabs__tab svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--petrol); transition: color 120ms ease; }
+    .header-tabs__tab.is-active svg { color: #fff; }
+    .header-tabs__lbl { display: block; max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; }
+    .header-tabs__tab.is-active .header-tabs__lbl { max-width: 120px; margin-left: 7px; opacity: 1; }
+
+    /* ── Right: Controls ───────────────────────────────────────────────── */
+    .head__controls {
+      display: flex; align-items: center; gap: 10px; justify-self: end;
+    }
+
+    /* Plan badge */
+    .head__plan-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 8px;
+      letter-spacing: 0.16em; font-weight: 600; padding: 3px 8px;
+      border-radius: 99px; border: 1px solid var(--border);
+      color: var(--ink-muted); text-decoration: none; white-space: nowrap;
+      transition: all 150ms ease; line-height: 1; cursor: pointer;
+    }
+    .head__plan-badge--lite {
+      border-color: transparent; background: transparent;
+      color: var(--petrol); padding: 4px 9px; border-radius: 99px;
+    }
+    .head__plan-badge--lite:hover {
+      background: rgba(20,97,110,0.10);
+      border-color: rgba(20,97,110,0.20);
+    }
+
+    /* Theme + generic icon button */
+    .head__btn {
+      background: transparent; border: 1px solid var(--border);
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink); cursor: pointer; transition: all 150ms ease;
+      border-radius: var(--r-sm);
+    }
+    .head__btn:hover { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+
+    /* Key Menu button */
+    .key-menu {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: transparent; border: 1px solid var(--border);
+      padding: 6px 14px 6px 10px; cursor: pointer; color: var(--ink);
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.1em; transition: all 150ms ease; border-radius: var(--r-sm);
+    }
+    .key-menu:hover { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+    .key-menu__icon { width: 18px; height: 18px; flex-shrink: 0; transition: transform 250ms ease; }
+    .key-menu:hover .key-menu__icon { transform: rotate(-18deg); }
+
+    /* User avatar wrapper */
+    .user-avatar-wrap { position: relative; }
+
+    /* User avatar */
+    .user-avatar {
+      width: 32px; height: 32px;
+      background: var(--ink); color: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      font-weight: 500; border-radius: var(--r-sm); cursor: pointer;
+      border: none; transition: background 200ms ease, box-shadow 180ms ease;
+      position: relative;
+      box-shadow: 0 0 0 1px var(--border-strong, #E5E4E0);
+    }
+    .user-avatar:hover { background: var(--petrol); color: #fff; box-shadow: 0 0 0 2px var(--petrol); }
+
+    /* Online dot (Sage, unten rechts) */
+    .user-online-dot {
+      position: absolute; bottom: -2px; right: -2px;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--sage, #5C9070);
+      box-shadow: 0 0 0 2px var(--surface, #fff);
+      pointer-events: none;
+    }
+
+    /* ── Demo info ─────────────────────────────────────────────────────── */
+    .demo-info {
+      max-width: 1680px; margin: 0 auto;
+      padding: 24px 32px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--ink-muted); letter-spacing: 0.08em;
+      display: flex; gap: 24px; align-items: center;
+    }
+    .demo-info span { opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+  <!-- Lite upgrade banner (optional — comment out to hide) -->
+  <div class="head__notify">
+    <span>Du nutzt <b>LITE</b> — die volle Suite wartet auf dich.</span>
+    <span class="head__notify-cta">Upgrade ansehen →</span>
+  </div>
+
+  <header class="head">
+    <div class="head__inner">
+      <div class="head__top">
+
+        <!-- LEFT: retaha Logo -->
+        <div class="head__brand">
+          <a href="#" class="brand-logo" aria-label="retaha – Zur Übersicht">
+            <!-- Specht-Bildmarke -->
+            <svg class="brand-logo__mark" viewBox="326 177 121 176" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                transform="matrix(1,0,0,-1,437.2943,193.7768)"
+                fill="currentColor" fill-rule="evenodd"
+                d="M0 0C-9.489-.492-18.979-.934-28.419-1.377-28.419-1.377-46.021 8.949-60.722 4.819-75.423 .738-83.339 1.819-83.339 1.819-79.068-1.627-74.784-5.072-70.501-8.518-66.2-5.463-56.165-.825-35.647-1.967-35.647-1.967-58.593-4.806-66.425-11.798-63.144-14.438-59.865-17.077-56.592-19.717-56.592-19.717-15.193-54.677-68.687-83.884-68.687-83.884-30.533-47.646-59.985-30.141-70.162-53.939-80.291-77.688-90.469-101.487-88.01-100.798-85.503-100.061-83.044-99.372-88.748-116.434-94.5-133.496-100.204-150.558-100.204-150.558-74.489-146.92-68.245-97.848-68.245-97.848 2.213-66.527-34.86-20.307-41.055-12.883-23.846-5.36 0 0"
+              />
+            </svg>
+            <span class="brand-logo__wordmark">retaha</span>
+          </a>
+        </div>
+
+        <!-- CENTER: Hotel-Logo + Divider + App-Switcher -->
+        <div class="head__nav">
+
+          <!-- Hotel Logo (Fallback: SVG-Icon wenn kein Bild-Asset) -->
+          <a href="#" class="hotel-logo" title="Hotel-Einstellungen">
+            <svg class="hotel-logo__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <!-- Sterne (4-Sterne-Hotel) -->
+              <circle cx="11" cy="4" r="0.9" fill="currentColor"/>
+              <circle cx="14" cy="3" r="0.9" fill="currentColor"/>
+              <circle cx="18" cy="4" r="0.9" fill="currentColor"/>
+              <circle cx="21" cy="3" r="0.9" fill="currentColor"/>
+              <!-- Gebäude -->
+              <path d="M6 26 L6 14 Q6 8 16 8 Q26 8 26 14 L26 26"
+                    stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <line x1="11" y1="13" x2="11" y2="26" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+              <line x1="21" y1="13" x2="21" y2="26" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+              <line x1="4" y1="28" x2="28" y2="28" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M9 28 Q9 25 11 25" stroke="currentColor" stroke-width="0.8" fill="none"/>
+              <path d="M23 28 Q23 25 21 25" stroke="currentColor" stroke-width="0.8" fill="none"/>
+            </svg>
+            <div class="hotel-logo__text">
+              <span class="hotel-logo__name">The Gate Garden</span>
+              <span class="hotel-logo__loc">Berlin</span>
+            </div>
+          </a>
+
+          <span class="head__nav-divider" aria-hidden="true"></span>
+
+          <!-- App Switcher -->
+          <nav class="header-tabs" id="viewSwitcher" aria-label="Ansicht wechseln">
+            <span class="header-tabs__marker" data-marker aria-hidden="true"></span>
+
+            <!-- Tab: App (Gast) -->
+            <a href="#" data-tab class="header-tabs__tab" title="wechsle zu App">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>
+              </svg>
+              <span class="header-tabs__lbl">App</span>
+            </a>
+
+            <!-- Tab: Steuerung (Backoffice) — AKTIV -->
+            <a href="#" data-tab class="header-tabs__tab is-active" aria-current="page" title="du bist hier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h11M19 6h1M4 12h3M11 12h9M4 18h7M15 18h5"/>
+                <circle cx="17" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="13" cy="18" r="2"/>
+              </svg>
+              <span class="header-tabs__lbl">Steuerung</span>
+            </a>
+
+            <!-- Tab: Admin (Dashboard) -->
+            <a href="#" data-tab class="header-tabs__tab" title="wechsle zu Admin">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/>
+                <rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>
+              </svg>
+              <span class="header-tabs__lbl">Admin</span>
+            </a>
+          </nav>
+        </div>
+
+        <!-- RIGHT: Plan badge + Theme toggle + Key Menu + Avatar -->
+        <div class="head__controls">
+
+          <span class="head__plan-badge head__plan-badge--lite">LITE</span>
+
+          <!-- Theme toggle -->
+          <button class="head__btn" id="themeBtn" type="button" aria-label="Theme wechseln">
+            <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="display:none" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+          </button>
+
+          <!-- Key Menu -->
+          <button class="key-menu" type="button" aria-label="Menü öffnen">
+            <svg class="key-menu__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="5" r="3" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="5" r="1" fill="currentColor"/>
+              <line x1="12" y1="8" x2="12" y2="14" stroke="currentColor" stroke-width="2"/>
+              <line x1="12" y1="15" x2="18" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+              <line x1="12" y1="18" x2="16" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+              <line x1="12" y1="21" x2="18" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+            </svg>
+            <span>MENU</span>
+          </button>
+
+          <!-- User Avatar -->
+          <div class="user-avatar-wrap">
+            <button class="user-avatar" type="button" aria-label="Profil öffnen">T</button>
+            <span class="user-online-dot" aria-hidden="true"></span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="demo-info">
+    <span>navbar-export.html · retaha backoffice header · active: Steuerung</span>
+  </div>
+
+  <script>
+    /* ── App Switcher ────────────────────────────────────────────────── */
+    (function () {
+      var nav = document.getElementById('viewSwitcher');
+      if (!nav) return;
+      var marker = nav.querySelector('[data-marker]');
+      var tabs = Array.prototype.slice.call(nav.querySelectorAll('[data-tab]'));
+      if (!marker || !tabs.length) return;
+
+      function activeTab() { return nav.querySelector('[data-tab].is-active') || tabs[0]; }
+
+      function place(el) {
+        if (!el) return;
+        marker.style.width  = el.offsetWidth  + 'px';
+        marker.style.height = el.offsetHeight + 'px';
+        marker.style.left   = el.offsetLeft   + 'px';
+        marker.style.top    = el.offsetTop    + 'px';
+      }
+
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      requestAnimationFrame(function () {
+        marker.style.transition = 'none';
+        place(activeTab());
+        void marker.offsetWidth;
+        marker.style.transition = '';
+        if (reduce) { marker.style.opacity = '1'; return; }
+        marker.classList.add('is-blooming');
+      });
+
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          marker.style.transition = 'none';
+          place(activeTab());
+          void marker.offsetWidth;
+          marker.style.transition = '';
+        });
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function (e) {
+          e.preventDefault();
+          if (tab.classList.contains('is-active')) return;
+          tabs.forEach(function (t) { t.classList.remove('is-active'); t.removeAttribute('aria-current'); });
+          tab.classList.add('is-active');
+          tab.setAttribute('aria-current', 'page');
+          place(tab);
+        });
+      });
+
+      var rt;
+      window.addEventListener('resize', function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () {
+          var prev = marker.style.transition;
+          marker.style.transition = 'none';
+          place(activeTab());
+          requestAnimationFrame(function () { marker.style.transition = prev; });
+        }, 120);
+      });
+    })();
+
+    /* ── Theme toggle ────────────────────────────────────────────────── */
+    (function () {
+      var btn   = document.getElementById('themeBtn');
+      var moon  = document.getElementById('iconMoon');
+      var sun   = document.getElementById('iconSun');
+      var html  = document.documentElement;
+      var theme = 'light';
+
+      function apply(t) {
+        html.setAttribute('data-theme', t);
+        if (moon && sun) {
+          moon.style.display = t === 'light' ? 'block' : 'none';
+          sun.style.display  = t === 'dark'  ? 'block' : 'none';
+        }
+      }
+
+      apply(theme);
+      btn && btn.addEventListener('click', function () {
+        theme = theme === 'light' ? 'dark' : 'light';
+        apply(theme);
+      });
+    })();
+  </script>
+</body>
+</html>
