@@ -38,6 +38,7 @@ import {
   isMfaMarkerConfigured,
   verifyMfaMarker,
 } from '@retaha/auth/mfa';
+import { findRouteGate, hasPlanAccess } from './lib/auth/plan-gate';
 
 const PUBLIC_PATTERNS = [
   /^\/api\/webhooks\//,
@@ -138,6 +139,32 @@ export const onRequest = defineMiddleware(async (context, next) => {
       ) {
         const mfaUrl = `${AUTH_APP_URL}/mfa?return_to=${encodeURIComponent(url.toString())}`;
         return Response.redirect(mfaUrl, 302);
+      }
+    }
+  }
+
+  // ── PLAN-GATE — Modul-Routen serverseitig nach Plan sperren (Produkt-Matrix §12).
+  // Das Drawer-Ausblenden ist Kosmetik; DIES verhindert den direkten URL-/API-Zugriff
+  // (z. B. „/marketing" eintippen trotz Lite). Quelle: hotels.plan (inkl. Trial).
+  // Seiten → Redirect auf die Upgrade-Vorschau; APIs → 403 plan_required.
+  if (roles.length > 0) {
+    const gate = findRouteGate(url.pathname);
+    if (gate) {
+      const hotelId = memberships[0]?.hotel_id as string | undefined;
+      let plan = 'lite';
+      if (hotelId) {
+        const svc = createSupabaseServiceRoleInstance();
+        const { data: planRow } = await svc.from('hotels').select('plan').eq('id', hotelId).single();
+        plan = (planRow?.plan as string | undefined) ?? 'lite';
+      }
+      if (!hasPlanAccess(plan, gate.required)) {
+        if (url.pathname.startsWith('/api/')) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'plan_required', required: gate.required, module: gate.module }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return Response.redirect(new URL(`/freischalten/${gate.module}`, url.origin).toString(), 302);
       }
     }
   }
