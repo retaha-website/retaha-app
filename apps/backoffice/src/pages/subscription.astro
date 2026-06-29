@@ -46,6 +46,7 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
     class="settings-page"
     x-data="{
       loading: '',
+      showAllPlans: false,
       downgradeConfirm: false,
       leadModal: false,
       leadPlan: '',
@@ -145,7 +146,7 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
         )}
       </header>
 
-      <section class="pm-plans" id="pm-pakete">
+      <section class="pm-plans" id="pm-pakete" :class="{ 'pm-plans--all': showAllPlans }">
 
         <!-- LITE -->
         <div class="pm-card pm-card--lite">
@@ -168,8 +169,8 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
           </div>
         </div>
 
-        <!-- PRO -->
-        <div class="pm-card pm-card--pro">
+        <!-- PRO (nur in der vollen Ansicht) -->
+        <div class="pm-card pm-card--pro" x-show="showAllPlans" style="display:none">
           <div class="pm-card-name">Pro</div>
           <div class="pm-card-price">Auf Anfrage</div>
           <div class="pm-card-pq">Marke & Reichweite</div>
@@ -202,8 +203,25 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
             <button type="button" class="pm-cta pm-cta-white" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
           )}
           <p class="pm-card-desc">Aus der Gästemappe wird ein komplettes System — inkl. eigenem PMS.</p>
-          <div class="pm-card-fh">Alles aus Pro, plus:</div>
-          <div class="pm-feat">
+
+          <!-- Kompakt (nur Lite + Premium sichtbar): Pro-Inhalte mit aufgelistet -->
+          <div class="pm-card-fh" x-show="!showAllPlans">Alles aus Lite, plus:</div>
+          <div class="pm-feat" x-show="!showAllPlans">
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Euer Look — Logo, Farbe, Design</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span class="eve-gradient">Eve</span> handelt — bucht & leitet weiter</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>10 Sprachen, automatisch</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Empfehlungen & Bewertungs-Funnel</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Pre-Stay — vor der Anreise erreichen</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Direktbuchung — Provision bleibt im Haus</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Stammgäste — Wallet & Treue</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Self-Check-out & Tür per Handy</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Eigenes PMS — inklusive</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Wiederkehr anstoßen</div>
+          </div>
+
+          <!-- Voll (alle Pakete sichtbar): Pro ist eigene Karte → nur Premium-Inhalte -->
+          <div class="pm-card-fh" x-show="showAllPlans" style="display:none">Alles aus Pro, plus:</div>
+          <div class="pm-feat" x-show="showAllPlans" style="display:none">
             <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Direktbuchung — Provision bleibt im Haus</div>
             <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Stammgäste — Wallet & Treue</div>
             <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Self-Check-out & Tür per Handy</div>
@@ -212,8 +230,8 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
           </div>
         </div>
 
-        <!-- ENTERPRISE -->
-        <div class="pm-card pm-card--ent">
+        <!-- ENTERPRISE (nur in der vollen Ansicht) -->
+        <div class="pm-card pm-card--ent" x-show="showAllPlans" style="display:none">
           <div class="pm-card-name">Enterprise</div>
           <div class="pm-card-price">Auf Anfrage</div>
           <div class="pm-card-pq">Für Gruppen</div>
@@ -233,6 +251,10 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
         </div>
 
       </section>
+
+      <div class="pm-allbtn-wrap">
+        <button type="button" class="pm-allbtn" @click="showAllPlans = !showAllPlans" x-text="showAllPlans ? 'Weniger anzeigen ↑' : 'Alle Pakete ansehen ↓'">Alle Pakete ansehen ↓</button>
+      </div>
 
     </div>
 
@@ -462,7 +484,8 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
   }
 
   /* Pakete — Karten (Tonwert-Verlauf hell → dunkel) */
-  .pm-plans { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: stretch; }
+  .pm-plans { margin: 30px auto 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: stretch; max-width: 660px; }
+  .pm-plans--all { grid-template-columns: repeat(4, 1fr); max-width: none; }
   .pm-card { border-radius: 22px; padding: 24px 22px; display: flex; flex-direction: column; position: relative; }
   .pm-card--lite { background: linear-gradient(180deg, #FFFFFF, #F4F4F1); border: 1px solid var(--pm-border); }
   .pm-card--pro { background: linear-gradient(180deg, #E6EEEE, #D8E4E5); border: 1px solid rgba(20,97,110,.14); }
@@ -498,7 +521,12 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
   .pm-cta-glass:hover:not(:disabled) { background: rgba(255,255,255,.2); }
   .pm-cta-now { background: #EEEEEB; color: var(--pm-muted); cursor: default; }
 
-  @media (max-width: 920px) { .pm-plans { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 960px) { .pm-plans--all { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 720px) { .pm-h1 { font-size: 30px; } }
-  @media (max-width: 540px) { .pm-plans { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .pm-plans, .pm-plans--all { grid-template-columns: 1fr; max-width: 420px; } }
+
+  /* „Alle Pakete ansehen"-Umschalter */
+  .pm-allbtn-wrap { display: flex; justify-content: center; margin-top: 22px; }
+  .pm-allbtn { background: transparent; border: 1px solid var(--pm-border-strong); color: var(--pm-ink); font-family: var(--pm-mn); font-weight: 600; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 11px 20px; border-radius: 11px; cursor: pointer; transition: background .2s, border-color .2s, color .2s; }
+  .pm-allbtn:hover { background: var(--pm-tint); border-color: var(--pm-petrol); color: var(--pm-petrol); }
 </style>
