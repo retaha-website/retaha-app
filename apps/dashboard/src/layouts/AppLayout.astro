@@ -9,10 +9,16 @@
 // darunter horizontal scrollbare Tab-Bar. Auf Desktop: Tab-Bar zentriert
 // neben Hotel-Name.
 
+// Geteilte Header-Vars (Petrol/Tokens) + Theme-Mapping, damit die geteilte Navbar
+// identisch zu Backoffice/Gast aussieht.
+import '@retaha/ui/styles/themes.css';
+import '@retaha/ui/styles/v9-colors.css';
+import '@retaha/ui/styles/tokens.css';
 import '@retaha/ui/styles/global.css';
-import KeyMenu from '../components/header/KeyMenu.astro';
+import Header from '@retaha/ui/components/header/Header.astro';
 import Toast from '@retaha/ui/components/shared/Toast.astro';
-import AppSwitcher from '@retaha/ui/components/header/HeaderTabs.astro';
+import { getHeaderUser } from '@retaha/auth';
+import { normalizeLanguage } from '@retaha/i18n';
 
 interface Props {
   title: string;
@@ -22,6 +28,25 @@ interface Props {
 
 const { title, hotel, user } = Astro.props;
 const currentPath = Astro.url.pathname;
+
+const BACKOFFICE = import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de';
+const GUEST_APP  = import.meta.env.GUEST_APP_URL  ?? 'https://app.retaha.de';
+
+// Sprache identisch zur Backoffice-Kette auflösen: ?lang → Cookie retaha_lang →
+// Accept-Language → 'de'.
+function resolveLang(): string {
+  try {
+    const urlLang = new URL(Astro.request.url).searchParams.get('lang');
+    if (urlLang) return normalizeLanguage(urlLang);
+  } catch { /* relative URL */ }
+  const cookieLang = Astro.cookies.get('retaha_lang')?.value;
+  if (cookieLang) return normalizeLanguage(cookieLang);
+  const accept = Astro.request.headers.get('accept-language') ?? '';
+  return normalizeLanguage(accept.split(',')[0]?.trim());
+}
+
+// Volles Header-Profil — dieselben Hotel-/User-Daten wie Backoffice + Gast-App.
+const headerUser = await getHeaderUser(Astro.cookies, Astro.request, resolveLang());
 
 interface NavItem { href: string; label: string; matchPrefix?: boolean }
 const NAV: NavItem[] = [
@@ -61,45 +86,33 @@ function isActive(item: NavItem): boolean {
     />
   </head>
   <body class="app-body">
-    <!-- Top-Bar -->
-    <header class="app-header">
-      <div class="app-header-inner">
-        <a href="/app" class="app-brand" aria-label={`${hotel.name} · Operations`}>
-          {(hotel.logo_primary ?? hotel.logo_dark) ? (
-            <img src={hotel.logo_primary ?? hotel.logo_dark!} alt={hotel.name} class="app-brand-logo" />
-          ) : (
-            <span class="app-brand-text">{hotel.name}</span>
-          )}
-          <span class="app-brand-eyebrow">operations</span>
-        </a>
+    <!-- Geteilte App-Navbar (1:1 wie Backoffice/Gast) — Admin-Tab aktiv. -->
+    {headerUser && (
+      <Header
+        activeTab="admin"
+        user={headerUser}
+        hotelName={hotel.name}
+        hotelLogoUrl={hotel.logo_primary ?? hotel.logo_dark ?? null}
+        bo={BACKOFFICE}
+        guestBase={GUEST_APP}
+        dashboardBase="/app"
+      />
+    )}
 
-        <AppSwitcher
-          active="admin"
-          guestUrl={`${import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de'}/gast-vorschau`}
-          backofficeUrl={`${import.meta.env.BACKOFFICE_URL ?? 'https://backoffice.retaha.de'}/overview`}
-          dashboardUrl="/app"
-        />
-
-        <div class="app-header-right">
-          <KeyMenu />
-        </div>
+    <!-- Operations-Sub-Navigation (Dashboard-spezifisch, horizontal scrollbar auf mobile) -->
+    <nav class="app-nav" aria-label="Operations-Navigation">
+      <div class="app-nav-inner">
+        {NAV.map(item => (
+          <a
+            href={item.href}
+            class={`app-nav-tab${isActive(item) ? ' is-active' : ''}`}
+            aria-current={isActive(item) ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        ))}
       </div>
-
-      <!-- Tab-Nav (horizontal scrollbar auf mobile) -->
-      <nav class="app-nav" aria-label="Operations-Navigation">
-        <div class="app-nav-inner">
-          {NAV.map(item => (
-            <a
-              href={item.href}
-              class={`app-nav-tab${isActive(item) ? ' is-active' : ''}`}
-              aria-current={isActive(item) ? 'page' : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
-        </div>
-      </nav>
-    </header>
+    </nav>
 
     <!-- Page-Content -->
     <main class="app-main">
@@ -131,9 +144,9 @@ function isActive(item: NavItem): boolean {
       }
       .app-body {
         min-height: 100vh;
-        background: #fafafa;
+        background: var(--bg-deep, #fafafa);
         font-family: 'Space Grotesk', system-ui, sans-serif;
-        color: #1A1A1A;
+        color: var(--ink, #1A1A1A);
         margin: 0;
         display: flex;
         flex-direction: column;
@@ -141,58 +154,10 @@ function isActive(item: NavItem): boolean {
       }
       [x-cloak] { display: none !important; }
 
-      /* Header */
-      .app-header {
-        background: #fff;
-        border-bottom: 1px solid #e8e8e8;
-        position: sticky;
-        top: 0;
-        z-index: 30;
-      }
-      .app-header-inner {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 14px 20px;
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        align-items: center;
-        gap: 16px;
-      }
-      .app-brand {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        text-decoration: none;
-        color: #1A1A1A;
-        min-width: 0;
-      }
-      .app-brand-logo {
-        height: 24px;
-        width: auto;
-        object-fit: contain;
-      }
-      .app-brand-text {
-        font-size: 17px;
-        font-weight: 400;
-        letter-spacing: -0.01em;
-        line-height: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .app-brand-eyebrow {
-        font-size: 9px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        color: var(--theme-accent);
-        font-weight: 500;
-        line-height: 1;
-      }
-      .app-header-right { display: flex; align-items: center; gap: 12px; justify-self: end; }
-
-      /* Tab-Nav */
+      /* Operations-Sub-Nav — eigenständige Leiste unter der geteilten Navbar */
       .app-nav {
-        border-top: 1px solid #f0f0f0;
+        background: var(--surface, #fff);
+        border-bottom: 1px solid var(--border, #e8e8e8);
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
@@ -209,17 +174,17 @@ function isActive(item: NavItem): boolean {
         flex-shrink: 0;
         padding: 12px 16px;
         font-size: 13px;
-        color: rgba(26, 26, 26, 0.55);
+        color: var(--ink-muted, rgba(26, 26, 26, 0.55));
         text-decoration: none;
         border-bottom: 2px solid transparent;
         transition: color 0.15s, border-color 0.15s;
         margin-bottom: -1px;
         white-space: nowrap;
       }
-      .app-nav-tab:hover { color: #1A1A1A; }
+      .app-nav-tab:hover { color: var(--ink, #1A1A1A); }
       .app-nav-tab.is-active {
-        color: #1A1A1A;
-        border-bottom-color: var(--theme-accent);
+        color: var(--ink, #1A1A1A);
+        border-bottom-color: var(--petrol, var(--theme-accent));
         font-weight: 500;
       }
 
