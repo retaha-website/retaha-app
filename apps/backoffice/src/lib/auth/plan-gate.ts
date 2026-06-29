@@ -18,7 +18,7 @@ export function hasPlanAccess(plan: string | null | undefined, required: Require
 }
 
 export interface RouteGate {
-  /** Modul-Key für /freischalten/[modul] (Upgrade-Vorschau). */
+  /** Modul-Key für /unlock/[modul] (Upgrade-Vorschau). */
   module: string;
   /** Mindest-Plan laut Produkt-Matrix §12. */
   required: RequiredPlan;

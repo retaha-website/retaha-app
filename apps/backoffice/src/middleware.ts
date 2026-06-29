@@ -164,7 +164,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
             { status: 403, headers: { 'Content-Type': 'application/json' } },
           );
         }
-        return Response.redirect(new URL(`/freischalten/${gate.module}`, url.origin).toString(), 302);
+        return Response.redirect(new URL(`/unlock/${gate.module}`, url.origin).toString(), 302);
       }
     }
   }

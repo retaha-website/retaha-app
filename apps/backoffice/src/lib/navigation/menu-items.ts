@@ -7,7 +7,7 @@ export interface MenuItem {
   icon: string;
   /** Plan required to access this item. undefined = accessible to all plans. */
   requiredPlan?: 'pro' | 'premium';
-  /** Module key for /freischalten/[moduleKey] preview page. */
+  /** Module key for /unlock/[moduleKey] preview page. */
   moduleKey?: string;
 }
 
