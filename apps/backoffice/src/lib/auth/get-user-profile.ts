@@ -42,10 +42,21 @@ export async function getUserProfileForLayout(
       qr_notif_pending?: boolean;
       onboarding_done?: boolean;
       setup_skipped?: boolean;
+      dismissed_dash_cards?: string[] | null;
     } | null;
   } | null;
 
   const h = hotelUser?.hotels;
+
+  // dismissed_dash_cards separat + fehlertolerant laden — die Spalte wird erst mit der
+  // Migration angelegt; fehlt sie noch, bleibt es leer (kein Profil-Abbruch im Layout).
+  let dismissedCards: string[] = [];
+  if (h?.id) {
+    const { data: dcRow } = await supabase
+      .from('hotels').select('dismissed_dash_cards').eq('id', h.id).maybeSingle();
+    if (Array.isArray((dcRow as any)?.dismissed_dash_cards)) dismissedCards = (dcRow as any).dismissed_dash_cards;
+  }
+
   return {
     id: user.id,
     email: user.email ?? '',
@@ -62,6 +73,7 @@ export async function getUserProfileForLayout(
     hotel_qr_notif_pending: h?.qr_notif_pending ?? false,
     hotel_onboarding_done: h?.onboarding_done ?? false,
     hotel_setup_skipped: h?.setup_skipped ?? false,
+    hotel_dismissed_dash_cards: dismissedCards,
     hotel_theme: h?.theme ?? null,
     avatar_url: ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null,
     language: getLang(cookies, request),

@@ -3,8 +3,8 @@
 // zu navigieren. Oben (falls Testphase aktiv) ein Testphasen-Banner, darunter die
 // Benachrichtigungen in breit. Getriggert vom „Benachrichtigungen"-Eintrag im
 // Account-Dropdown ([data-open-notifications]) via Event.
-interface Props { qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; }
-const { qrNotifPending = false, setupIncomplete = false, plan = 'lite' } = Astro.props;
+interface Props { qrNotifPending?: boolean; setupIncomplete?: boolean; plan?: string; parkedCards?: string[]; }
+const { qrNotifPending = false, setupIncomplete = false, plan = 'lite', parkedCards = [] } = Astro.props;
 
 // Shop-Mengenlogik: lite = 1 QR fürs ganze Haus, pro/premium/enterprise = 1 pro Zimmer.
 const qrQuantityHint = plan === 'lite'
@@ -53,7 +53,7 @@ const qrQuantityHint = plan === 'lite'
           </a>
         </li>
         <!-- Aus dem Dashboard geparkte Feature-Karte: NFC-/QR-Shop. -->
-        <li class="nd__item" data-notif="card-nfc" hidden>
+        <li class="nd__item" data-notif="card-nfc" hidden={!parkedCards.includes('nfc')}>
           <a class="nd__item-link" href="https://retaha.de/shop" target="_blank" rel="noopener">
             <span class="nd__item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -66,7 +66,7 @@ const qrQuantityHint = plan === 'lite'
           </a>
         </li>
         <!-- Aus dem Dashboard geparkte Feature-Karte: Eve-Upgrade. -->
-        <li class="nd__item" data-notif="card-eve" hidden>
+        <li class="nd__item" data-notif="card-eve" hidden={!parkedCards.includes('eve')}>
           <a class="nd__item-link" href="/subscription">
             <span class="nd__item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
@@ -79,7 +79,7 @@ const qrQuantityHint = plan === 'lite'
           </a>
         </li>
       </ul>
-      <p class="nd__empty" data-notif-empty hidden={qrNotifPending || setupIncomplete}>Keine neuen Benachrichtigungen.</p>
+      <p class="nd__empty" data-notif-empty hidden={qrNotifPending || setupIncomplete || parkedCards.length > 0}>Keine neuen Benachrichtigungen.</p>
     </div>
 
   </aside>
@@ -215,14 +215,11 @@ const qrQuantityHint = plan === 'lite'
     // „Setup unvollständig" ist rein serverseitig gerendert.
     var hasSetup = setup ? !setup.hidden : false;
 
-    // Aus dem Dashboard geparkte Feature-Karten (per X) anzeigen.
+    // Aus dem Dashboard geparkte Feature-Karten — account-wide (DB), serverseitig gerendert.
     var anyCard = false;
     ['nfc', 'eve'].forEach(function (id) {
-      var parked = false;
-      try { parked = localStorage.getItem('retaha-card-' + id) === '1'; } catch (e) {}
       var item = drawer.querySelector('[data-notif="card-' + id + '"]');
-      if (item) item.hidden = !parked;
-      if (parked) anyCard = true;
+      if (item && !item.hidden) anyCard = true;
     });
 
     // Leer-Hinweis nur wenn gar keine Benachrichtigung sichtbar ist.

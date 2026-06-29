@@ -18,6 +18,7 @@ export interface UserProfile {
   hotel_qr_notif_pending: boolean;
   hotel_onboarding_done: boolean;
   hotel_setup_skipped: boolean;
+  hotel_dismissed_dash_cards: string[];
   hotel_theme: string | null;
   avatar_url: string | null;
   language: LanguageCode;

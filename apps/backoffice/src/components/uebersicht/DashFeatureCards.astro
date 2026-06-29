@@ -1,11 +1,11 @@
 ---
 // Zwei schließbare Upsell-/Add-on-Karten (à la Surfshark): Icon + X, Kategorie,
-// Titel, Beschreibung, „Mehr erfahren" + CTA. Schließen bleibt pro Gerät
-// (localStorage) erhalten; sind beide weg, verschwindet die Sektion.
+// Titel, Beschreibung, „Mehr erfahren" + CTA. Schließen wird account-wide (DB,
+// park-card) gespeichert; sind beide weg, verschwindet die Sektion.
 import { bt, type LanguageCode } from '@retaha/i18n';
 
-interface Props { plan: string; lang: LanguageCode; }
-const { plan, lang } = Astro.props;
+interface Props { plan: string; lang: LanguageCode; parked?: string[]; }
+const { plan, lang, parked = [] } = Astro.props;
 
 const SHOP = 'https://retaha.de/shop';
 const svg = (path: string) =>
@@ -44,7 +44,7 @@ const cards = [
 <section class="dfc" data-dfc>
   <div class="dfc__grid">
     {cards.map((c) => (
-      <article class="dfc__card" data-dfc-card={c.id}>
+      <article class="dfc__card" data-dfc-card={c.id} hidden={parked.includes(c.id)}>
         <div class="dfc__top">
           <span class="dfc__icon" set:html={c.icon}></span>
           <button class="dfc__x" type="button" data-dfc-dismiss={c.id} aria-label="Ausblenden">
@@ -74,13 +74,7 @@ const cards = [
       section.style.display = anyVisible ? '' : 'none';
     }
 
-    // Geparkte Karten (per X in die Benachrichtigungen verschoben) ausblenden.
-    cards.forEach(function (card) {
-      var id = card.getAttribute('data-dfc-card');
-      var parked = false;
-      try { parked = localStorage.getItem('retaha-card-' + id) === '1'; } catch (e) {}
-      card.hidden = parked;
-    });
+    // Geparkte Karten sind account-wide (DB) bereits serverseitig ausgeblendet.
     syncSection();
 
     // X = in den Benachrichtigungs-Drawer parken (statt verschwinden).
@@ -97,7 +91,7 @@ const cards = [
     section.querySelectorAll('[data-dfc-dismiss]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var id = btn.getAttribute('data-dfc-dismiss');
-        try { localStorage.setItem('retaha-card-' + id, '1'); } catch (e) {}
+        try { fetch('/api/admin/notifications/park-card', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ card: id }) }); } catch (e) {}
         var card = section.querySelector('[data-dfc-card="' + id + '"]');
         if (card) card.hidden = true;
         syncSection();
