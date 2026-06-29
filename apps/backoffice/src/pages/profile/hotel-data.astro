@@ -1,7 +1,7 @@
 ---
-// retaha Account — Hotel-Daten /profil/settings. In den Hub absorbiert.
+// retaha Account — Hotel-Daten /profile/hotel-data. In den Hub absorbiert.
 // Sidebar/Header via AccountShell; s-card-Sektionen (admin-page.css ist global).
-// Check-in lebt jetzt im Self-Checkout-Modul, Team-Sicherheit unter /profil/sicherheit.
+// Check-in lebt jetzt im Self-Checkout-Modul, Team-Sicherheit unter /profile/security.
 import Layout from '../../layouts/Layout.astro';
 import AccountShell from '../../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
@@ -135,9 +135,6 @@ const { data: h } = await client.from('hotels').select(`
 
 const d = (h ?? {}) as Record<string, unknown>;
 function val(key: string, fallback = '') { return (d[key] as string) ?? fallback; }
-function isSelected(key: string, value: string, fallback = '') {
-  return (d[key] as string ?? fallback) === value;
-}
 
 // ─── Hub-Shell-Daten (User-Mini) ───────────────────────────────────────────
 const ROLE_LABELS: Record<string, string> = { owner: bt('role.owner', lang), manager: bt('role.manager', lang), staff: bt('role.staff', lang) };
@@ -150,6 +147,39 @@ const fullName  = [firstName, lastName].filter(Boolean).join(' ');
 const currentEmail = user.email ?? '';
 const initials  = (firstName.charAt(0) || currentEmail.charAt(0)).toUpperCase();
 const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined) ?? null;
+
+// ─── Dropdown-Optionen (als Objekte für Alpine x-data) ─────────────────────
+const hotelTypeOpts = JSON.stringify({
+  city:     bt('set.type.city', lang),
+  resort:   bt('set.type.resort', lang),
+  wellness: bt('set.type.wellness', lang),
+  business: bt('set.type.business', lang),
+  boutique: bt('set.type.boutique', lang),
+});
+const currencyOpts = JSON.stringify({
+  EUR: bt('set.currency.eur', lang),
+  CHF: bt('set.currency.chf', lang),
+});
+const countryOpts = JSON.stringify({
+  DE: bt('set.country.de', lang),
+  AT: bt('set.country.at', lang),
+  CH: bt('set.country.ch', lang),
+  LU: bt('set.country.lu', lang),
+});
+const legalFormOpts = JSON.stringify({
+  '':                   bt('set.business.choose', lang),
+  'GmbH':               'GmbH',
+  'GmbH & Co. KG':      'GmbH & Co. KG',
+  'UG':                 'UG (haftungsbeschränkt)',
+  'AG':                 'AG',
+  'KG':                 'KG',
+  'OHG':                'OHG',
+  'GbR':                'GbR',
+  'Einzelunternehmen':  'Einzelunternehmen',
+});
+
+const chevronSvg = `<svg class="st-dd-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+const checkSvg   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>`;
 ---
 
 <Layout title="retaha Account · Hotel-Daten" activeTab="backoffice">
@@ -195,26 +225,43 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
               </div>
             </div>
 
+            <!-- Hotel-Typ Dropdown -->
             <div class="field field--row">
-              <label class="field__label" for="hotel-type">{bt('set.identity.type', lang)}</label>
-              <div class="s-select-wrap">
-                <select id="hotel-type" name="hotel_type" class="s-select">
-                  <option value="city"     selected={isSelected('hotel_type','city')}>{bt('set.type.city', lang)}</option>
-                  <option value="resort"   selected={isSelected('hotel_type','resort')}>{bt('set.type.resort', lang)}</option>
-                  <option value="wellness" selected={isSelected('hotel_type','wellness')}>{bt('set.type.wellness', lang)}</option>
-                  <option value="business" selected={isSelected('hotel_type','business')}>{bt('set.type.business', lang)}</option>
-                  <option value="boutique" selected={isSelected('hotel_type','boutique')}>{bt('set.type.boutique', lang)}</option>
-                </select>
+              <label class="field__label">{bt('set.identity.type', lang)}</label>
+              <div x-data={`{open:false,val:'${val('hotel_type','city')}',opts:${hotelTypeOpts}}`} class="st-dd" @click.outside="open=false">
+                <input type="hidden" name="hotel_type" x-bind:value="val" />
+                <button type="button" class="st-dd-btn" @click="open=!open">
+                  <span x-text="opts[val]"></span>
+                  <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="st-dd-menu" x-show="open" x-cloak>
+                  {(['city','resort','wellness','business','boutique'] as const).map((v) => (
+                    <button type="button" class="st-dd-opt" :class={`{'is-active':val==='${v}'}`} @click={`val='${v}';open=false`}>
+                      <span>{({'city':bt('set.type.city',lang),'resort':bt('set.type.resort',lang),'wellness':bt('set.type.wellness',lang),'business':bt('set.type.business',lang),'boutique':bt('set.type.boutique',lang)} as Record<string,string>)[v]}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val==='${v}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
+            <!-- Währung Dropdown -->
             <div class="field field--row">
-              <label class="field__label" for="hotel-currency">{bt('set.identity.currency', lang)}</label>
-              <div class="s-select-wrap">
-                <select id="hotel-currency" name="currency" class="s-select">
-                  <option value="EUR" selected={isSelected('currency','EUR','EUR')}>{bt('set.currency.eur', lang)}</option>
-                  <option value="CHF" selected={isSelected('currency','CHF')}>{bt('set.currency.chf', lang)}</option>
-                </select>
+              <label class="field__label">{bt('set.identity.currency', lang)}</label>
+              <div x-data={`{open:false,val:'${val('currency','EUR')}',opts:${currencyOpts}}`} class="st-dd" @click.outside="open=false">
+                <input type="hidden" name="currency" x-bind:value="val" />
+                <button type="button" class="st-dd-btn" @click="open=!open">
+                  <span x-text="opts[val]"></span>
+                  <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="st-dd-menu" x-show="open" x-cloak>
+                  {(['EUR','CHF'] as const).map((v) => (
+                    <button type="button" class="st-dd-opt" :class={`{'is-active':val==='${v}'}`} @click={`val='${v}';open=false`}>
+                      <span>{({'EUR':bt('set.currency.eur',lang),'CHF':bt('set.currency.chf',lang)} as Record<string,string>)[v]}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val==='${v}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -250,15 +297,23 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
               </div>
             </div>
 
+            <!-- Land Dropdown -->
             <div class="field field--row">
-              <label class="field__label" for="address-country">{bt('set.address.country', lang)}</label>
-              <div class="s-select-wrap">
-                <select id="address-country" name="country" class="s-select">
-                  <option value="DE" selected={isSelected('country','DE','DE')}>{bt('set.country.de', lang)}</option>
-                  <option value="AT" selected={isSelected('country','AT')}>{bt('set.country.at', lang)}</option>
-                  <option value="CH" selected={isSelected('country','CH')}>{bt('set.country.ch', lang)}</option>
-                  <option value="LU" selected={isSelected('country','LU')}>{bt('set.country.lu', lang)}</option>
-                </select>
+              <label class="field__label">{bt('set.address.country', lang)}</label>
+              <div x-data={`{open:false,val:'${val('country','DE')}',opts:${countryOpts}}`} class="st-dd" @click.outside="open=false">
+                <input type="hidden" name="country" x-bind:value="val" />
+                <button type="button" class="st-dd-btn" @click="open=!open">
+                  <span x-text="opts[val]"></span>
+                  <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="st-dd-menu" x-show="open" x-cloak>
+                  {(['DE','AT','CH','LU'] as const).map((v) => (
+                    <button type="button" class="st-dd-opt" :class={`{'is-active':val==='${v}'}`} @click={`val='${v}';open=false`}>
+                      <span>{({'DE':bt('set.country.de',lang),'AT':bt('set.country.at',lang),'CH':bt('set.country.ch',lang),'LU':bt('set.country.lu',lang)} as Record<string,string>)[v]}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val==='${v}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -299,15 +354,23 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
           <form method="POST" class="s-card__body">
             <input type="hidden" name="_action" value="business_data" />
 
+            <!-- Rechtsform Dropdown -->
             <div class="field field--row">
-              <label class="field__label" for="legal-form">{bt('set.business.legalform', lang)}</label>
-              <div class="s-select-wrap">
-                <select id="legal-form" name="legal_form" class="s-select">
-                  <option value="">{bt('set.business.choose', lang)}</option>
-                  {[['GmbH','GmbH'],['GmbH & Co. KG','GmbH & Co. KG'],['UG','UG (haftungsbeschränkt)'],['AG','AG'],['KG','KG'],['OHG','OHG'],['GbR','GbR'],['Einzelunternehmen','Einzelunternehmen']].map(([v,l]) => (
-                    <option value={v} selected={val('legal_form') === v}>{l}</option>
+              <label class="field__label">{bt('set.business.legalform', lang)}</label>
+              <div x-data={`{open:false,val:${JSON.stringify(val('legal_form',''))},opts:${legalFormOpts}}`} class="st-dd" @click.outside="open=false">
+                <input type="hidden" name="legal_form" x-bind:value="val" />
+                <button type="button" class="st-dd-btn" @click="open=!open">
+                  <span x-text="opts[val]"></span>
+                  <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="st-dd-menu" x-show="open" x-cloak>
+                  {([['',''],['GmbH','GmbH'],['GmbH & Co. KG','GmbH & Co. KG'],['UG','UG (haftungsbeschränkt)'],['AG','AG'],['KG','KG'],['OHG','OHG'],['GbR','GbR'],['Einzelunternehmen','Einzelunternehmen']] as [string,string][]).map(([v, label]) => (
+                    <button type="button" class="st-dd-opt" :class={`{'is-active':val===${JSON.stringify(v)}}`} @click={`val=${JSON.stringify(v)};open=false`}>
+                      <span>{v === '' ? bt('set.business.choose', lang) : label}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val===${JSON.stringify(v)}`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
 
@@ -387,15 +450,23 @@ const avatarUrl = ((user.user_metadata as Record<string, unknown> | undefined)?.
                 </div>
               </div>
 
+              <!-- Rechnungsadresse Land Dropdown -->
               <div class="field field--row">
-                <label class="field__label" for="billing-country">{bt('set.address.country', lang)}</label>
-                <div class="s-select-wrap">
-                  <select id="billing-country" name="billing_country" class="s-select">
-                    <option value="DE" selected={isSelected('billing_country','DE','DE')}>{bt('set.country.de', lang)}</option>
-                    <option value="AT" selected={isSelected('billing_country','AT')}>{bt('set.country.at', lang)}</option>
-                    <option value="CH" selected={isSelected('billing_country','CH')}>{bt('set.country.ch', lang)}</option>
-                    <option value="LU" selected={isSelected('billing_country','LU')}>{bt('set.country.lu', lang)}</option>
-                  </select>
+                <label class="field__label">{bt('set.address.country', lang)}</label>
+                <div x-data={`{open:false,val:'${val('billing_country','DE')}',opts:${countryOpts}}`} class="st-dd" @click.outside="open=false">
+                  <input type="hidden" name="billing_country" x-bind:value="val" />
+                  <button type="button" class="st-dd-btn" @click="open=!open">
+                    <span x-text="opts[val]"></span>
+                    <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <div class="st-dd-menu" x-show="open" x-cloak>
+                    {(['DE','AT','CH','LU'] as const).map((v) => (
+                      <button type="button" class="st-dd-opt" :class={`{'is-active':val==='${v}'}`} @click={`val='${v}';open=false`}>
+                        <span>{({'DE':bt('set.country.de',lang),'AT':bt('set.country.at',lang),'CH':bt('set.country.ch',lang),'LU':bt('set.country.lu',lang)} as Record<string,string>)[v]}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val==='${v}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
