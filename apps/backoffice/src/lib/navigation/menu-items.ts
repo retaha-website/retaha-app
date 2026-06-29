@@ -157,9 +157,9 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
       title: bt('nav.sec.hotel', lang),
       items: [
         {
-          label: bt('nav.general', lang),
+          label: bt('hub.hoteldata', lang),
           sub: bt('nav.general.sub', lang),
-          href: '/admin/settings',
+          href: '/profile/hotel-data',
           icon: icon('<circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/>'),
         },
         {
@@ -179,28 +179,6 @@ export function getMenuSections(lang: LanguageCode): MenuSection[] {
           sub: bt('nav.account.sub', lang),
           href: '/profile',
           icon: icon('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
-        },
-      ],
-    },
-    {
-      title: bt('nav.sec.support', lang),
-      items: [
-        {
-          label: bt('nav.support', lang),
-          sub: bt('nav.support.sub', lang),
-          href: '/support',
-          icon: icon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
-        },
-      ],
-    },
-    {
-      title: bt('nav.sec.billing', lang),
-      items: [
-        {
-          label: bt('nav.subscription', lang),
-          sub: bt('nav.subscription.sub', lang),
-          href: '/subscription',
-          icon: icon('<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>'),
         },
       ],
     },
