@@ -20,6 +20,20 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   if (!body.id) return json({ ok: false, error: 'id required' }, 400);
 
   const sb = createSupabaseServerInstance(cookies, request);
+
+  // Lite: nur 1 Karte darf aktiv sein — alle anderen deaktivieren wenn diese aktiviert wird
+  if (body.is_published !== false) {
+    const { data: hotelRow } = await sb.from('hotels').select('plan').eq('id', hotel.id).maybeSingle();
+    const plan = (hotelRow?.plan as string | undefined) ?? 'lite';
+    if (plan === 'lite') {
+      await sb
+        .from('hotel_action_cards')
+        .update({ is_published: false })
+        .eq('hotel_id', hotel.id)
+        .neq('id', body.id);
+    }
+  }
+
   const { data, error } = await sb
     .from('hotel_action_cards')
     .update({ is_published: body.is_published !== false })

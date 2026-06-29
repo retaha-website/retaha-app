@@ -119,6 +119,14 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   };
   for (const k of Object.keys(fields)) if (fields[k] === undefined) delete fields[k];
 
+  // Lite: nur 1 Karte darf aktiv sein — alle anderen deaktivieren wenn diese gespeichert wird
+  const savingPlan = (hotelRow?.plan as string | undefined) ?? 'lite';
+  if (savingPlan === 'lite' && fields.is_published === true) {
+    let q = sb.from('hotel_action_cards').update({ is_published: false }).eq('hotel_id', hotel.id);
+    if (body.id) q = q.neq('id', body.id);
+    await q;
+  }
+
   if (body.id) {
     const { data, error } = await sb
       .from('hotel_action_cards')

@@ -109,7 +109,7 @@ const acT = {
   {liteCardLimit > 0 && (
     <div class="ac-lite-info">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>In der <strong>Lite-Version</strong> kannst du bis zu <strong>{liteCardLimit} Action Cards</strong> hinzufügen. Für mehr Karten <a href="/subscription" class="ac-lite-info-link">jetzt auf Pro upgraden →</a></span>
+      <span>In der <strong>Lite-Version</strong> kannst du bis zu <strong>{liteCardLimit} Action Cards</strong> speichern, aber nur <strong>1 Karte</strong> kann gleichzeitig in der Gäste-App aktiv sein. Für mehr Karten &amp; Features <a href="/subscription" class="ac-lite-info-link">jetzt auf Pro upgraden →</a></span>
     </div>
   )}
 
@@ -789,16 +789,35 @@ const acT = {
       },
 
       async togglePublished(card: any) {
+        const activating = card.is_published === false;
         const prev = card.is_published;
-        card.is_published = prev === false ? true : false;
+        card.is_published = activating;
+
+        // Lite: optimistisch alle anderen deaktivieren wenn diese aktiviert wird
+        const deactivated: any[] = [];
+        if (activating && this.liteCardLimit > 0) {
+          for (const c of this.cards) {
+            if (c.id !== card.id && c.is_published !== false) {
+              deactivated.push(c);
+              c.is_published = false;
+            }
+          }
+        }
+
         try {
           const res = await fetch('/api/action-cards/set-published', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: card.id, is_published: card.is_published }),
           });
           const data = await res.json();
-          if (!res.ok || !data.ok) card.is_published = prev;
-        } catch { card.is_published = prev; }
+          if (!res.ok || !data.ok) {
+            card.is_published = prev;
+            for (const c of deactivated) c.is_published = true;
+          }
+        } catch {
+          card.is_published = prev;
+          for (const c of deactivated) c.is_published = true;
+        }
       },
 
       async deleteCard(id: string) {
