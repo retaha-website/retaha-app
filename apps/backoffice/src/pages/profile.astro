@@ -192,7 +192,7 @@ const openTile = pendingEmail ? 'email' : errorTile;
 ---
 
 <Layout title="retaha Account" activeTab="backoffice">
-  <AccountShell active="konto" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel} avatarUrl={avatarUrl} lang={lang}>
+  <AccountShell active="profile" initials={initials} displayName={fullName || currentEmail} roleLabel={roleLabel} avatarUrl={avatarUrl} lang={lang}>
 
     <section class="acct__section" id="konto">
       <div class="acct__section-head">
@@ -200,78 +200,57 @@ const openTile = pendingEmail ? 'email' : errorTile;
         <p class="acct__section-desc">{bt('prof.section.desc', lang)}</p>
       </div>
 
-      <div class="acct-tiles" x-data={`{ open: ${JSON.stringify(openTile)}, pwCurrent: '' }`}>
+      <div class="settings-sections">
 
-        <!-- NAME -->
-        <div class="acct-tile acct-tile--editable" x-bind:class="{ 'is-open': open === 'name' }">
-          <button
-            type="button" class="acct-tile__face"
-            x-show="open !== 'name'"
-            x-bind:aria-expanded="(open === 'name').toString()" aria-controls="ed-name"
-            x-on:click="open = 'name'; $nextTick(() => document.getElementById('first_name')?.focus())"
-          >
-            <span class="acct-tile__corner">
-              <svg class="acct-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-            </span>
-            <span class="acct-tile__label">{bt('prof.name.label', lang)}</span>
-            <span class={`acct-tile__value${fullName ? '' : ' acct-tile__value--empty'}`}>{fullName || bt('prof.name.empty', lang)}</span>
-          </button>
-          <div class="acct-tile__editor" id="ed-name" x-show="open === 'name'" x-cloak>
-            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label={bt('common.close', lang)}>✕</button>
-            <span class="acct-tile__label">{bt('prof.name.edit', lang)}</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="save_profile" />
-              <div class="acct-row2">
-                <div class="field">
-                  <label class="field__label field__label--req" for="first_name">{bt('prof.name.first', lang)}</label>
-                  <div class="field__input-wrap">
-                    <input type="text" id="first_name" name="first_name" value={firstName} required maxlength="60" autocomplete="given-name" class="s-input" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label class="field__label field__label--req" for="last_name">{bt('prof.name.last', lang)}</label>
-                  <div class="field__input-wrap">
-                    <input type="text" id="last_name" name="last_name" value={lastName} required maxlength="60" autocomplete="family-name" class="s-input" />
-                  </div>
-                </div>
-              </div>
-              <span class="field__hint">{bt('prof.name.hint', lang)}</span>
-              <div class="acct-editor__actions">
-                <button type="submit" class="v9-btn v9-btn--primary">{bt('common.save', lang)}</button>
-              </div>
-            </form>
+        <!-- 01 Name -->
+        <section class="s-card" id="profile-name">
+          <div class="s-card__head">
+            <h2 class="s-card__title">{bt('prof.name.label', lang)}</h2>
+            <span class="s-card__num">01</span>
           </div>
-        </div>
+          <form method="POST" class="s-card__body">
+            <input type="hidden" name="_action" value="save_profile" />
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="first_name">{bt('prof.name.first', lang)}</label>
+              <div class="field__input-wrap">
+                <input type="text" id="first_name" name="first_name" value={firstName} required maxlength="60" autocomplete="given-name" class="s-input" />
+              </div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="last_name">{bt('prof.name.last', lang)}</label>
+              <div class="field__input-wrap">
+                <input type="text" id="last_name" name="last_name" value={lastName} required maxlength="60" autocomplete="family-name" class="s-input" />
+              </div>
+            </div>
+            <div class="s-card__footer">
+              <button type="submit" class="v9-btn v9-btn--primary">{bt('common.save', lang)}</button>
+            </div>
+          </form>
+        </section>
 
-        <!-- E-MAIL -->
-        <div class="acct-tile acct-tile--editable" x-bind:class="{ 'is-open': open === 'email' }">
-          <button
-            type="button" class="acct-tile__face"
-            x-show="open !== 'email'"
-            x-bind:aria-expanded="(open === 'email').toString()" aria-controls="ed-email"
-            x-on:click="open = 'email'; $nextTick(() => document.getElementById('email')?.focus())"
-          >
-            <span class="acct-tile__corner">
-              <svg class="acct-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-            </span>
-            <span class="acct-tile__label">{bt('prof.email.label', lang)}</span>
-            <span class="acct-tile__value">{currentEmail}</span>
-          </button>
-          <div class="acct-tile__editor" id="ed-email" x-show="open === 'email'" x-cloak>
-            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label={bt('common.close', lang)}>✕</button>
-            <span class="acct-tile__label">{bt('prof.email.edit', lang)}</span>
+        <!-- 02 E-Mail -->
+        <section class="s-card" id="profile-email">
+          <div class="s-card__head">
+            <h2 class="s-card__title">{bt('prof.email.label', lang)}</h2>
+            <span class="s-card__num">02</span>
+          </div>
+          <div class="s-card__body">
 
             {pendingEmail && pendingEmail.purpose === 'primary' ? (
               <form method="POST">
                 <input type="hidden" name="_action" value="verify_email_code" />
+                <div class="field field--row">
+                  <span class="field__label">{bt('prof.email.current', lang)}</span>
+                  <div class="pr-readonly"><span>{currentEmail}</span></div>
+                </div>
                 <p class="acct-codehint" set:html={bt('prof.email.codesent', lang).replace('{email}', `<strong>${pendingEmail.email}</strong>`)}></p>
-                <div class="field">
+                <div class="field field--row">
                   <label class="field__label" for="email_code">{bt('prof.email.code', lang)}</label>
                   <div class="field__input-wrap">
                     <input type="text" id="email_code" name="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" class="s-input acct-code-input" />
                   </div>
                 </div>
-                <div class="acct-editor__actions">
+                <div class="s-card__footer">
                   <button type="submit" form="cancel-primary" class="v9-btn v9-btn--ghost">{bt('prof.email.otheraddr', lang)}</button>
                   <button type="submit" class="v9-btn v9-btn--primary">{bt('common.confirm', lang)}</button>
                 </div>
@@ -280,29 +259,27 @@ const openTile = pendingEmail ? 'email' : errorTile;
               <form method="POST">
                 <input type="hidden" name="_action" value="send_email_code" />
                 <input type="hidden" name="purpose" value="primary" />
-                <div class="acct-row2">
-                  <div class="field">
-                    <span class="field__label">{bt('prof.email.current', lang)}</span>
-                    <div class="pr-readonly"><span>{currentEmail}</span></div>
-                  </div>
-                  <div class="field">
-                    <label class="field__label" for="email">{bt('prof.email.new', lang)}</label>
-                    <div class="field__input-wrap">
-                      <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
-                    </div>
+                <div class="field field--row">
+                  <span class="field__label">{bt('prof.email.current', lang)}</span>
+                  <div class="pr-readonly"><span>{currentEmail}</span></div>
+                </div>
+                <div class="field field--row">
+                  <label class="field__label" for="email">{bt('prof.email.new', lang)}</label>
+                  <div class="field__input-wrap">
+                    <input type="email" id="email" name="email" placeholder="neu@beispiel.de" autocomplete="email" class="s-input" />
                   </div>
                 </div>
                 <span class="field__hint">{bt('prof.email.newhint', lang)}</span>
-                <div class="acct-editor__actions">
+                <div class="s-card__footer">
                   <button type="submit" class="v9-btn v9-btn--primary">{bt('prof.email.sendcode', lang)}</button>
                 </div>
               </form>
             )}
 
-            <div class="acct-divider"></div>
+            <div class="ts-divider"></div>
 
             {secondaryEmail ? (
-              <div class="field">
+              <div class="field field--row">
                 <span class="field__label">{bt('prof.email.sec', lang)}</span>
                 <div class="acct-added-row">
                   <span class="acct-added"><span class="acct-added__check">✓</span> {secondaryEmail} · {bt('prof.email.sec.added', lang)}</span>
@@ -316,13 +293,13 @@ const openTile = pendingEmail ? 'email' : errorTile;
               <form method="POST">
                 <input type="hidden" name="_action" value="verify_email_code" />
                 <p class="acct-codehint" set:html={bt('prof.email.codesent', lang).replace('{email}', `<strong>${pendingEmail.email}</strong>`)}></p>
-                <div class="field">
+                <div class="field field--row">
                   <label class="field__label" for="sec_code">{bt('prof.email.code', lang)}</label>
                   <div class="field__input-wrap">
                     <input type="text" id="sec_code" name="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" class="s-input acct-code-input" />
                   </div>
                 </div>
-                <div class="acct-editor__actions">
+                <div class="s-card__footer">
                   <button type="submit" form="cancel-secondary" class="v9-btn v9-btn--ghost">{bt('common.cancel', lang)}</button>
                   <button type="submit" class="v9-btn v9-btn--primary">{bt('common.confirm', lang)}</button>
                 </div>
@@ -331,81 +308,73 @@ const openTile = pendingEmail ? 'email' : errorTile;
               <form method="POST">
                 <input type="hidden" name="_action" value="send_email_code" />
                 <input type="hidden" name="purpose" value="secondary" />
-                <div class="field">
+                <div class="field field--row">
                   <label class="field__label" for="secondary_email">{bt('prof.email.sec', lang)}</label>
                   <div class="field__input-wrap">
                     <input type="email" id="secondary_email" name="email" placeholder="backup@beispiel.de" autocomplete="email" class="s-input" />
                   </div>
                   <span class="field__hint">{bt('prof.email.sec.hint', lang)}</span>
                 </div>
-                <div class="acct-editor__actions">
+                <div class="s-card__footer">
                   <button type="submit" class="v9-btn v9-btn--primary">{bt('prof.email.sec.add', lang)}</button>
                 </div>
               </form>
             )}
-          </div>
-        </div>
 
-        <!-- PASSWORT -->
-        <div class="acct-tile acct-tile--editable" x-bind:class="{ 'is-open': open === 'password' }">
-          <button
-            type="button" class="acct-tile__face"
-            x-show="open !== 'password'"
-            x-bind:aria-expanded="(open === 'password').toString()" aria-controls="ed-password"
-            x-on:click="open = 'password'; pwCurrent = ''; $nextTick(() => document.getElementById('current_password')?.focus())"
-          >
-            <span class="acct-tile__corner">
-              <svg class="acct-tile__edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-            </span>
-            <span class="acct-tile__label">{bt('prof.pw.label', lang)}</span>
-            <span class="acct-tile__value acct-tile__value--mask">••••••••</span>
-          </button>
-          <div class="acct-tile__editor" id="ed-password" x-show="open === 'password'" x-cloak>
-            <button type="button" class="acct-tile__close" x-on:click="open = null" aria-label={bt('common.close', lang)}>✕</button>
-            <span class="acct-tile__label">{bt('prof.pw.edit', lang)}</span>
-            <form method="POST">
-              <input type="hidden" name="_action" value="change_password" />
-              <div class="field">
-                <label class="field__label field__label--req" for="current_password">{bt('prof.pw.current', lang)}</label>
-                <div class="field__input-wrap">
-                  <input type="password" id="current_password" name="current_password" autocomplete="current-password" class="s-input" x-model="pwCurrent" />
-                </div>
+          </div>
+        </section>
+
+        <!-- 03 Passwort -->
+        <section class="s-card" id="profile-password" x-data="{ pwCurrent: '' }">
+          <div class="s-card__head">
+            <h2 class="s-card__title">{bt('prof.pw.label', lang)}</h2>
+            <span class="s-card__num">03</span>
+          </div>
+          <form method="POST" class="s-card__body">
+            <input type="hidden" name="_action" value="change_password" />
+            <div class="field field--row">
+              <label class="field__label field__label--req" for="current_password">{bt('prof.pw.current', lang)}</label>
+              <div class="field__input-wrap">
+                <input type="password" id="current_password" name="current_password" autocomplete="current-password" class="s-input" x-model="pwCurrent" />
                 <span class="field__hint">{bt('prof.pw.currenthint', lang)}</span>
               </div>
-              <div class="acct-row2">
-                <div class="field">
-                  <label class="field__label" for="password">{bt('prof.pw.new', lang)}</label>
-                  <div class="field__input-wrap">
-                    <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label class="field__label" for="password_confirm">{bt('prof.pw.repeat', lang)}</label>
-                  <div class="field__input-wrap">
-                    <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
-                  </div>
-                </div>
+            </div>
+            <div class="field field--row">
+              <label class="field__label" for="password">{bt('prof.pw.new', lang)}</label>
+              <div class="field__input-wrap">
+                <input type="password" id="password" name="password" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
               </div>
-              <span class="field__hint">{bt('prof.pw.newhint', lang)}</span>
-              <div class="acct-editor__actions">
-                <button type="submit" class="v9-btn v9-btn--primary" x-bind:disabled="!pwCurrent">{bt('prof.pw.edit', lang)}</button>
+            </div>
+            <div class="field field--row">
+              <label class="field__label" for="password_confirm">{bt('prof.pw.repeat', lang)}</label>
+              <div class="field__input-wrap">
+                <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password" class="s-input" x-bind:disabled="!pwCurrent" />
               </div>
-            </form>
-          </div>
-        </div>
+            </div>
+            <span class="field__hint">{bt('prof.pw.newhint', lang)}</span>
+            <div class="s-card__footer">
+              <button type="submit" class="v9-btn v9-btn--primary" x-bind:disabled="!pwCurrent">{bt('prof.pw.edit', lang)}</button>
+            </div>
+          </form>
+        </section>
 
-        <!-- ROLLE (read-only) -->
-        <div class="acct-tile acct-tile--readonly">
-          <div class="acct-tile__face acct-tile__face--static">
-            <span class="acct-tile__label">{bt('prof.role.label', lang)}</span>
-            <span class="acct-tile__value">{roleLabel}</span>
-            <span class="acct-tile__hint" set:html={bt('prof.role.hint', lang).replace('{link}', `<a href="/team" class="acct-tile__hint-link">${bt('prof.role.teamlink', lang)}</a>`)}></span>
+        <!-- 04 Rolle (read-only) -->
+        <section class="s-card" id="profile-role">
+          <div class="s-card__head">
+            <h2 class="s-card__title">{bt('prof.role.label', lang)}</h2>
+            <span class="s-card__num">04</span>
           </div>
-        </div>
+          <div class="s-card__body">
+            <div class="field field--row">
+              <span class="field__label">{bt('prof.role.label', lang)}</span>
+              <div class="pr-readonly"><span>{roleLabel}</span></div>
+            </div>
+            <span class="field__hint" set:html={bt('prof.role.hint', lang).replace('{link}', `<a href="/team" class="field__hint-link">${bt('prof.role.teamlink', lang)}</a>`)}></span>
+          </div>
+        </section>
 
       </div>
 
-      <!-- Abbrechen-Formulare für die Code-Schritte (außerhalb, um verschachtelte Forms zu vermeiden) -->
       {pendingEmail && (
         <form method="POST" id={pendingEmail.purpose === 'primary' ? 'cancel-primary' : 'cancel-secondary'} hidden>
           <input type="hidden" name="_action" value="cancel_email_code" />
@@ -421,74 +390,48 @@ const openTile = pendingEmail ? 'email' : errorTile;
 </Layout>
 
 <style>
-  /* ── Konto-Kacheln (Zustand-zuerst, einspaltig + schmal) ── */
-  .acct-tiles { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  /* ── bf-cta overrides ──────────────────────────────────────────────────── */
+  .v9-btn { min-height: auto !important; }
+  .v9-btn.v9-btn--primary {
+    background: var(--petrol, #14616E) !important; color: #fff !important;
+    border: none !important; border-radius: 7px !important; padding: 7px 16px !important;
+    font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important;
+    font-weight: 600 !important; letter-spacing: 0.14em !important;
+    text-transform: uppercase !important; position: static !important;
+    display: inline-flex !important; align-items: center !important;
+    transition: filter 150ms ease !important;
+  }
+  .v9-btn.v9-btn--primary::before,
+  .v9-btn.v9-btn--primary::after { display: none !important; }
+  .v9-btn.v9-btn--primary:hover:not(:disabled) { filter: brightness(1.1) !important; }
+  .v9-btn.v9-btn--primary:disabled { opacity: 0.45 !important; cursor: not-allowed !important; }
+  .v9-btn.v9-btn--ghost {
+    background: transparent !important; color: var(--ink-muted) !important;
+    border: 1px solid var(--border-medium, rgba(10,10,10,.16)) !important;
+    border-radius: 7px !important; padding: 7px 16px !important;
+    font-family: 'JetBrains Mono', monospace !important; font-size: 11px !important;
+    font-weight: 600 !important; letter-spacing: 0.14em !important; text-transform: uppercase !important;
+  }
+  .v9-btn.v9-btn--ghost:hover:not(:disabled) { color: var(--ink) !important; border-color: var(--ink) !important; }
 
-  .acct-tile {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r); overflow: hidden; transition: border-color 150ms ease;
-  }
-  .acct-tile.is-open { border-color: #14616E; }
+  /* ── Divider ─────────────────────────────────────────────────────────── */
+  .ts-divider { height: 1px; background: var(--border); margin: 16px 0; }
 
-  .acct-tile__face {
-    position: relative; display: flex; flex-direction: column; gap: 7px;
-    width: 100%; text-align: left; padding: 18px 24px 20px;
-    background: transparent; border: none; font: inherit; color: inherit;
-    transition: background 150ms ease;
+  /* ── Readonly-Feld ────────────────────────────────────────────────────── */
+  .pr-readonly {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink);
+    word-break: break-word;
   }
-  button.acct-tile__face { cursor: pointer; }
-  .acct-tile--editable:hover { border-color: rgba(20,97,110,.4); }
-  .acct-tile--editable:hover .acct-tile__face { background: rgba(20,97,110,.05); }
-  .acct-tile--editable:hover .acct-tile__edit { color: #14616E; }
-  .acct-tile__face:focus-visible {
-    outline: none; background: rgba(20,97,110,.05);
-    box-shadow: inset 0 0 0 2px #14616E;
-  }
-  .acct-tile__face--static { cursor: default; }
 
-  .acct-tile__corner { position: absolute; top: 18px; right: 22px; display: inline-flex; align-items: center; gap: 8px; }
-  .acct-tile__edit { width: 15px; height: 15px; color: var(--ink-faint); transition: color 150ms ease; }
-  .acct-tile__label {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted);
-  }
-  .acct-tile__value {
-    font-family: 'Inter Tight', sans-serif; font-size: 17px; font-weight: 500;
-    letter-spacing: -0.01em; color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 28px;
-  }
-  .acct-tile__value--empty { color: var(--ink-muted); font-weight: 400; }
-  .acct-tile__value--mask { letter-spacing: 0.18em; }
-  .acct-tile__hint {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.06em; color: var(--ink-faint); margin-top: 2px;
-  }
-  .acct-tile__hint-link { color: var(--ink-muted); text-decoration: underline; text-underline-offset: 2px; }
-  .acct-tile__hint-link:hover { color: var(--ink); }
-
-  /* Editor (Inline-Aufklappen) */
-  .acct-tile__editor { position: relative; display: flex; flex-direction: column; gap: 20px; padding: 22px 24px 24px; }
-  /* Felder innerhalb eines Editor-Formulars gleichmäßig (wie s-card__body) */
-  .acct-tile__editor form { display: flex; flex-direction: column; gap: 18px; }
-  /* Trailing-Hint (direktes Form-Kind nach einer Zeile) genauso eng an die Zeile
-     wie ein feld-interner Hint: Form-Gap 18px − 7px = 11px (= .field-gap 6 + margin 5). */
-  .acct-tile__editor form > .field__hint { margin-top: -7px; }
-  .acct-tile__close {
-    position: absolute; top: 14px; right: 16px;
-    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
-    background: transparent; border: none; border-radius: var(--r-sm); cursor: pointer;
-    color: var(--ink-muted); font-size: 15px; line-height: 1; transition: background 150ms ease, color 150ms ease;
-  }
-  .acct-tile__close:hover { background: var(--bg-deep); color: var(--ink); }
-  .acct-tile__editor .field__label { padding-top: 0; }
-  .acct-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-  @media (max-width: 560px) { .acct-row2 { grid-template-columns: 1fr; } }
-  .acct-editor__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2px; }
-  .acct-divider { height: 1px; background: var(--border); margin: 2px 0; }
-
-  .acct-codehint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); margin: 0; }
+  /* ── Code-Input ───────────────────────────────────────────────────────── */
+  .acct-codehint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-muted); margin: 0 0 12px; }
   .acct-codehint strong { color: var(--ink); }
   .acct-code-input { max-width: 160px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; text-align: center; }
+
+  /* ── Sekundär-E-Mail hinzugefügt ─────────────────────────────────────── */
   .acct-added-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .acct-added {
     display: inline-flex; align-items: center; gap: 8px;
@@ -498,48 +441,7 @@ const openTile = pendingEmail ? 'email' : errorTile;
   }
   .acct-added__check { color: var(--sage-strong, #4a7a5c); font-weight: 600; }
 
-  /* Read-only-Feld im V9-Stil (E-Mail „Aktuell") */
-  .pr-readonly {
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    background: var(--bg-deep); border: 1px solid var(--border);
-    border-radius: var(--r-sm); padding: 10px 14px;
-    font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink);
-    word-break: break-word;
-  }
-
-  /* bf-cta overrides for profil page */
-  .v9-btn { min-height: auto !important; }
-  .v9-btn.v9-btn--primary {
-    background: var(--petrol, #14616E) !important;
-    color: #fff !important;
-    border: none !important;
-    border-radius: 7px !important;
-    padding: 7px 16px !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.14em !important;
-    text-transform: uppercase !important;
-    position: static !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    transition: filter 150ms ease !important;
-  }
-  .v9-btn.v9-btn--primary::before,
-  .v9-btn.v9-btn--primary::after { display: none !important; }
-  .v9-btn.v9-btn--primary:hover:not(:disabled) { filter: brightness(1.1) !important; background: var(--petrol, #14616E) !important; color: #fff !important; }
-
-  .v9-btn.v9-btn--ghost {
-    background: transparent !important;
-    color: var(--ink-muted) !important;
-    border: 1px solid var(--border-medium, rgba(10,10,10,.16)) !important;
-    border-radius: 7px !important;
-    padding: 7px 16px !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.14em !important;
-    text-transform: uppercase !important;
-  }
-  .v9-btn.v9-btn--ghost:hover:not(:disabled) { color: var(--ink) !important; border-color: var(--ink) !important; background: transparent !important; }
+  /* ── Link-Hint ────────────────────────────────────────────────────────── */
+  .field__hint-link { color: var(--ink-muted); text-decoration: underline; text-underline-offset: 2px; }
+  .field__hint-link:hover { color: var(--ink); }
 </style>
