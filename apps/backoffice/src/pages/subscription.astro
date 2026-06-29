@@ -18,47 +18,6 @@ if (!billingRole || !hasPermission(billingRole, 'hotel.billing')) {
 
 const currentPlan: string = (hotel as any).plan ?? 'lite';
 
-// ── Plan-Vergleichs-Matrix (Hotelier-Sprache, kuratiert aus der Modul-Matrix) ──
-// Zelltypen: yes = enthalten · no = nicht enthalten · lim(v) = Menge/Grenze (Mono).
-const yes = { t: 'yes' as const };
-const no = { t: 'no' as const };
-const lim = (v: string, de = false) => ({ t: 'lim' as const, v, de });
-const MATRIX: { label: string; rows: { name: string; nameHtml?: string; hint?: string; cells: any[] }[] }[] = [
-  { label: 'Eure digitale Gästemappe', rows: [
-    { name: 'Digitale Gästemappe', cells: [yes, yes, yes, yes] },
-    { name: 'WLAN, Hausinfos & Karten', cells: [yes, yes, yes, yes] },
-    { name: 'Digitaler Concierge Eve', nameHtml: 'Digitaler Concierge <span class="eve-gradient pm-eve">Eve</span>', hint: 'antwortet Gästen rund um die Uhr', cells: [yes, yes, yes, yes] },
-    { name: 'Gästewünsche & Feedback', cells: [yes, yes, yes, yes] },
-    { name: 'Schnellzugriff-Kacheln', cells: [lim('1'), lim('10'), lim('10'), lim('10')] },
-  ] },
-  { label: 'Auftritt & Reichweite', rows: [
-    { name: 'Euer Look — Logo, Farbe, Design', cells: [lim('Standard', true), yes, yes, lim('eigenes')] },
-    { name: 'Eve handelt für euch', nameHtml: '<span class="eve-gradient pm-eve">Eve</span> handelt für euch', hint: 'bucht & leitet an den Empfang', cells: [no, yes, yes, yes] },
-    { name: '10 Sprachen, automatisch', cells: [lim('nur DE', true), yes, yes, yes] },
-    { name: 'Empfehlungen aus der Umgebung', cells: [no, yes, yes, yes] },
-    { name: 'Bewertungs-Funnel', hint: 'Gäste → Google / Tripadvisor', cells: [no, yes, yes, yes] },
-    { name: 'Vor der Anreise erreichen', cells: [no, yes, yes, yes] },
-  ] },
-  { label: 'Direktumsatz & Stammgäste', rows: [
-    { name: 'Direktbuchung', hint: '15–25 % Provision bleibt im Haus', cells: [no, no, yes, yes] },
-    { name: 'Stammgäste — Wallet & Treue', cells: [no, no, yes, yes] },
-    { name: 'Wiederkehr anstoßen', cells: [no, no, yes, yes] },
-    { name: 'Self-Check-out & Tür per Handy', cells: [no, no, yes, yes] },
-    { name: 'Aufs Zimmer & Zimmerrechnung', cells: [no, no, yes, yes] },
-    { name: 'Eigene Hotel-Software (PMS)', cells: [no, lim('anbinden'), lim('inkl.'), lim('inkl.')] },
-  ] },
-  { label: 'Für Gruppen', rows: [
-    { name: 'Eigene App im App Store', cells: [no, no, no, yes] },
-    { name: 'Mehrere Häuser zentral', cells: [no, no, no, yes] },
-    { name: 'Fester Ansprechpartner', cells: [no, no, no, yes] },
-  ] },
-];
-const TIERS = [
-  { key: 'lite',       name: 'Lite',       sub: 'Kostenlos' },
-  { key: 'pro',        name: 'Pro',        sub: 'Reichweite' },
-  { key: 'premium',    name: 'Premium',    sub: 'Zahlt sich aus' },
-  { key: 'enterprise', name: 'Enterprise', sub: 'Gruppen' },
-];
 const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
   : currentPlan === 'pro' ? 'Pro'
   : currentPlan === 'premium' ? 'Premium' : 'Enterprise';
@@ -186,86 +145,94 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
         )}
       </header>
 
-      <div class="pm-matwrap" id="pm-pakete">
-        <table class="pm-mat">
-          <thead>
-            <tr>
-              <th class="pm-feat"></th>
-              {TIERS.map(tier => (
-                <th class={tier.key === 'premium' ? 'pm-col-prem' : undefined}>
-                  <div class="pm-th-inner">
-                    {tier.key === 'premium' && <span class="pm-prem-cap">Empfohlen</span>}
-                    <div class="pm-tier-name">{tier.name}</div>
-                    <div class="pm-tier-sub">{tier.sub}</div>
-                    {currentPlan === tier.key && <div class="pm-tier-now">Aktuell</div>}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {MATRIX.map(group => (
-              <Fragment>
-                <tr class="pm-grp">
-                  <td class="pm-feat"><span class="pm-gl">{group.label}</span></td>
-                  <td></td><td></td><td class="pm-col-prem"></td><td></td>
-                </tr>
-                {group.rows.map(row => (
-                  <tr class="pm-row">
-                    <td class="pm-feat"><span class="pm-fl">{row.nameHtml ? <Fragment set:html={row.nameHtml} /> : row.name}{row.hint && <span class="pm-hint">{row.hint}</span>}</span></td>
-                    {row.cells.map((cell, i) => (
-                      <td class={i === 2 ? 'pm-col-prem' : undefined}>
-                        {cell.t === 'yes' && (
-                          <span class="pm-yes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                        )}
-                        {cell.t === 'no' && <span class="pm-no"></span>}
-                        {cell.t === 'lim' && <span class={`pm-lim${cell.de ? ' pm-lim--de' : ''}`}>{cell.v}</span>}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </Fragment>
-            ))}
+      <section class="pm-plans" id="pm-pakete">
 
-            <tr class="pm-cta-row">
-              <td class="pm-feat"></td>
-              <td>
-                {currentPlan === 'lite' ? (
-                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
-                ) : (
-                  <button type="button" class="pm-cta pm-cta-out" @click="window.confirm('Zu Lite wechseln? Premium-Funktionen werden deaktiviert.') && downgradeLite()" :disabled="loading !== ''">Zu Lite →</button>
-                )}
-              </td>
-              <td>
-                {currentPlan === 'pro' ? (
-                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
-                ) : (
-                  <button type="button" class="pm-cta pm-cta-out" @click="openLeadModal('pro')" :disabled="loading !== ''">Vertrieb →</button>
-                )}
-              </td>
-              <td class="pm-col-prem pm-col-prem--foot">
-                {currentPlan === 'premium' ? (
-                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
-                ) : (
-                  <button type="button" class="pm-cta pm-cta-solid" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb →</button>
-                )}
-              </td>
-              <td>
-                {currentPlan === 'enterprise' ? (
-                  <span class="pm-cta pm-cta-now">Euer Plan ✓</span>
-                ) : (
-                  <button type="button" class="pm-cta pm-cta-out" @click="openLeadModal('enterprise')" :disabled="loading !== ''">Kontakt →</button>
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- LITE -->
+        <div class="pm-card pm-card--lite">
+          <div class="pm-card-name">Lite</div>
+          <div class="pm-card-price">Kostenlos</div>
+          <div class="pm-card-pq">für immer</div>
+          {currentPlan === 'lite' ? (
+            <span class="pm-cta pm-cta-now">Aktueller Plan</span>
+          ) : (
+            <button type="button" class="pm-cta pm-cta-solid" @click="window.confirm('Zu Lite wechseln? Premium-Funktionen werden deaktiviert.') && downgradeLite()" :disabled="loading !== ''">Zu Lite wechseln</button>
+          )}
+          <p class="pm-card-desc">Eure digitale Gästemappe — kostenlos starten und Gäste begeistern.</p>
+          <div class="pm-card-fh">Lite enthält:</div>
+          <div class="pm-feat">
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Digitale Gästemappe</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>WLAN, Hausinfos & Karten</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Concierge <span class="eve-gradient">Eve</span> — rund um die Uhr</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Gästewünsche & Feedback</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>1 Schnellzugriff-Kachel</div>
+          </div>
+        </div>
 
-      <div class="pm-foot">
-        <span class="pm-mono">Petrol = enthalten · — = nicht enthalten</span><br>
-        Premium bekommt alles außer den Gruppen-Funktionen.
-      </div>
+        <!-- PRO -->
+        <div class="pm-card pm-card--pro">
+          <div class="pm-card-name">Pro</div>
+          <div class="pm-card-price">Auf Anfrage</div>
+          <div class="pm-card-pq">Marke & Reichweite</div>
+          {currentPlan === 'pro' ? (
+            <span class="pm-cta pm-cta-now">Aktueller Plan</span>
+          ) : (
+            <button type="button" class="pm-cta pm-cta-solid" @click="openLeadModal('pro')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
+          )}
+          <p class="pm-card-desc">Euer eigener Auftritt und mehr Reichweite für direkte Gäste.</p>
+          <div class="pm-card-fh">Alles aus Lite, plus:</div>
+          <div class="pm-feat">
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Euer Look — Logo, Farbe, Design</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span class="eve-gradient">Eve</span> handelt — bucht & leitet weiter</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>10 Sprachen, automatisch</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Empfehlungen & Bewertungs-Funnel</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Pre-Stay — vor der Anreise erreichen</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>10 Schnellzugriff-Kacheln</div>
+          </div>
+        </div>
+
+        <!-- PREMIUM -->
+        <div class="pm-card pm-card--prem">
+          <span class="pm-rectag">Empfohlen</span>
+          <div class="pm-card-name">Premium</div>
+          <div class="pm-card-price">Auf Anfrage</div>
+          <div class="pm-card-pq">Zahlt sich aus</div>
+          {currentPlan === 'premium' ? (
+            <span class="pm-cta pm-cta-now">Aktueller Plan</span>
+          ) : (
+            <button type="button" class="pm-cta pm-cta-white" @click="openLeadModal('premium')" :disabled="loading !== ''">Vertrieb kontaktieren</button>
+          )}
+          <p class="pm-card-desc">Aus der Gästemappe wird ein komplettes System — inkl. eigenem PMS.</p>
+          <div class="pm-card-fh">Alles aus Pro, plus:</div>
+          <div class="pm-feat">
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Direktbuchung — Provision bleibt im Haus</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Stammgäste — Wallet & Treue</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Self-Check-out & Tür per Handy</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Eigenes PMS — inklusive</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Wiederkehr anstoßen</div>
+          </div>
+        </div>
+
+        <!-- ENTERPRISE -->
+        <div class="pm-card pm-card--ent">
+          <div class="pm-card-name">Enterprise</div>
+          <div class="pm-card-price">Auf Anfrage</div>
+          <div class="pm-card-pq">Für Gruppen</div>
+          {currentPlan === 'enterprise' ? (
+            <span class="pm-cta pm-cta-now">Aktueller Plan</span>
+          ) : (
+            <button type="button" class="pm-cta pm-cta-glass" @click="openLeadModal('enterprise')" :disabled="loading !== ''">Kontakt aufnehmen</button>
+          )}
+          <p class="pm-card-desc">Für mehrere Häuser — zentral verwaltet, individuell angebunden.</p>
+          <div class="pm-card-fh">Alles aus Premium, plus:</div>
+          <div class="pm-feat">
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Eigene App im App Store</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Mehrere Häuser zentral</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Anbindung an eure Systeme</div>
+            <div class="pm-frow"><span class="pm-fchk"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>Fester Ansprechpartner</div>
+          </div>
+        </div>
+
+      </section>
 
     </div>
 
@@ -494,64 +461,44 @@ const CURRENT_LABEL = currentPlan === 'lite' ? 'Lite — Kostenlos'
     .pm-glyph { width: 52px; height: 52px; }
   }
 
-  /* Matrix */
-  .pm-matwrap { margin: 44px 0 24px; overflow-x: auto; }
-  .pm-mat { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 760px; }
-  .pm-mat th, .pm-mat td { padding: 0; text-align: center; vertical-align: middle; }
-  .pm-mat .pm-feat { text-align: left; width: 34%; padding: 0 18px; }
+  /* Pakete — Karten (Tonwert-Verlauf hell → dunkel) */
+  .pm-plans { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: stretch; }
+  .pm-card { border-radius: 22px; padding: 24px 22px; display: flex; flex-direction: column; position: relative; }
+  .pm-card--lite { background: linear-gradient(180deg, #FFFFFF, #F4F4F1); border: 1px solid var(--pm-border); }
+  .pm-card--pro { background: linear-gradient(180deg, #E6EEEE, #D8E4E5); border: 1px solid rgba(20,97,110,.14); }
+  .pm-card--prem { background: radial-gradient(440px 260px at 78% -12%, rgba(44,138,155,.34), transparent 62%), linear-gradient(165deg, #176674, #0B3F49); color: #fff; box-shadow: 0 32px 64px -32px rgba(14,77,87,.55); }
+  .pm-card--ent { background: radial-gradient(440px 260px at 78% -12%, rgba(44,138,155,.18), transparent 62%), linear-gradient(165deg, #132B31, #07171B); color: #fff; box-shadow: 0 32px 64px -34px rgba(8,22,25,.6); }
 
-  .pm-mat thead th { padding-bottom: 8px; position: relative; }
-  .pm-th-inner { padding: 14px 10px 16px; }
-  .pm-tier-name { font-family: var(--pm-mn); font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--pm-ink); }
-  .pm-tier-sub { font-family: var(--pm-mn); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--pm-faint); margin-top: 5px; }
-  .pm-tier-now { display: inline-block; font-family: var(--pm-mn); font-size: 8px; letter-spacing: .14em; text-transform: uppercase; color: var(--pm-sage); border: 1px solid var(--pm-sage); border-radius: 6px; padding: 2px 7px; margin-top: 7px; }
+  .pm-rectag { position: absolute; top: -11px; left: 22px; font-family: var(--pm-mn); font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--pm-petrol); background: #fff; padding: 4px 11px; border-radius: 999px; font-weight: 600; box-shadow: 0 5px 14px -4px rgba(0,0,0,.3); }
 
-  /* Premium-Spalte (Held) */
-  .pm-col-prem { background: var(--pm-tint); }
-  .pm-mat thead th.pm-col-prem .pm-th-inner { border-radius: 14px 14px 0 0; border-top: 1.5px solid var(--pm-petrol); border-left: 1.5px solid var(--pm-petrol); border-right: 1.5px solid var(--pm-petrol); position: relative; overflow: hidden; }
-  .pm-mat thead th.pm-col-prem .pm-th-inner::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(115deg,#14616E,#1AA0B0 34%,#5B7CE0 68%,#14616E 100%); background-size: 220% 100%; animation: pm-aurora 5s linear infinite; }
-  @keyframes pm-aurora { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
-  .pm-mat td.pm-col-prem { border-left: 1.5px solid var(--pm-petrol); border-right: 1.5px solid var(--pm-petrol); }
-  .pm-col-prem--foot { border-bottom: 1.5px solid var(--pm-petrol); border-radius: 0 0 14px 14px; }
-  .pm-prem-cap { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); font-family: var(--pm-mn); font-size: 8px; letter-spacing: .16em; text-transform: uppercase; color: #fff; background: var(--pm-petrol); border-radius: 999px; padding: 4px 11px; white-space: nowrap; font-weight: 600; z-index: 2; }
+  .pm-card-name { font-family: var(--pm-sg); font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+  .pm-card-price { font-family: var(--pm-sg); font-size: 25px; font-weight: 700; letter-spacing: -.03em; margin-top: 13px; line-height: 1; }
+  .pm-card-pq { font-size: 12px; margin-top: 8px; font-family: var(--pm-mn); letter-spacing: .02em; color: var(--pm-muted); }
+  .pm-card--prem .pm-card-pq, .pm-card--ent .pm-card-pq { color: rgba(255,255,255,.62); }
 
-  /* Gruppen + Zeilen */
-  .pm-grp td { padding: 26px 18px 9px; text-align: left; }
-  .pm-gl { font-family: var(--pm-mn); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--pm-petrol); }
-  .pm-row td { border-top: 1px solid var(--pm-border); height: 52px; }
-  .pm-row:hover td { background: rgba(10,10,10,.015); }
-  .pm-row:hover td.pm-col-prem { background: var(--pm-tint2); }
-  .pm-fl { font-size: 14px; letter-spacing: -.005em; color: var(--pm-ink); }
-  .pm-hint { display: block; font-size: 11px; color: var(--pm-muted); margin-top: 2px; line-height: 1.4; }
-  /* „Eve" wie in /eve hervorheben — Aurora-Gradient (global .eve-gradient) + Space Grotesk fett. */
-  .pm-eve { font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+  .pm-card-desc { font-size: 12px; line-height: 1.5; color: var(--pm-muted); margin: 16px 0 0; }
+  .pm-card--prem .pm-card-desc, .pm-card--ent .pm-card-desc { color: rgba(255,255,255,.66); }
+  .pm-card-fh { font-size: 12px; font-weight: 600; margin: 20px 0 13px; }
 
-  /* Zellen */
-  .pm-yes { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--pm-petrol); color: #fff; }
-  .pm-no { display: inline-block; width: 24px; height: 2px; border-radius: 2px; background: var(--pm-faint); vertical-align: middle; }
-  .pm-lim { font-family: var(--pm-mn); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--pm-petrol); }
-  .pm-lim--de { color: var(--pm-muted); font-weight: 500; }
+  .pm-feat { display: flex; flex-direction: column; gap: 11px; }
+  .pm-frow { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.35; }
+  .pm-card--prem .pm-frow, .pm-card--ent .pm-frow { color: rgba(255,255,255,.9); }
+  .pm-fchk { flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; background: var(--pm-petrol); display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .pm-fchk svg { stroke: #fff; stroke-width: 3.2; fill: none; }
+  .pm-card--prem .pm-fchk, .pm-card--ent .pm-fchk { background: #1AA0B0; }
 
-  /* CTA-Zeile */
-  .pm-cta-row td { padding-top: 18px; }
-  .pm-cta { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 14px; border-radius: 10px; font-family: var(--pm-mn); font-weight: 600; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; text-decoration: none; white-space: nowrap; border: none; transition: transform .07s, background .2s, filter .2s; }
-  .pm-cta:active:not([aria-disabled]) { transform: translateY(1px); }
-  .pm-cta:disabled { opacity: .5; cursor: not-allowed; }
-  .pm-cta-out { border: 1.5px solid var(--pm-petrol); color: var(--pm-petrol); background: rgba(20,97,110,.05); }
-  .pm-cta-out:hover:not(:disabled) { background: var(--pm-tint2); }
+  /* Karten-CTA */
+  .pm-cta { margin-top: 18px; display: flex; align-items: center; justify-content: center; padding: 12px; border-radius: 12px; font-family: var(--pm-mn); font-weight: 600; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; text-decoration: none; cursor: pointer; text-align: center; line-height: 1.2; border: none; transition: background .2s, opacity .2s; }
+  .pm-cta:disabled { cursor: default; opacity: 1; }
   .pm-cta-solid { background: var(--pm-petrol); color: #fff; }
   .pm-cta-solid:hover:not(:disabled) { background: var(--pm-petrol-d); }
-  .pm-cta-now { color: var(--pm-muted); border: 1px solid var(--pm-border-strong); background: transparent; cursor: default; }
+  .pm-cta-white { background: #fff; color: var(--pm-ink); }
+  .pm-cta-white:hover:not(:disabled) { opacity: .9; }
+  .pm-cta-glass { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.24); }
+  .pm-cta-glass:hover:not(:disabled) { background: rgba(255,255,255,.2); }
+  .pm-cta-now { background: #EEEEEB; color: var(--pm-muted); cursor: default; }
 
-  /* Foot */
-  .pm-foot { text-align: center; color: var(--pm-muted); font-size: 12.5px; padding: 8px 0 0; line-height: 1.6; }
-  .pm-mono { font-family: var(--pm-mn); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--pm-faint); }
-
-  /* Mobil: Zeilennamen-Spalte sticky + horizontal scrollen */
-  @media (max-width: 720px) {
-    .pm-h1 { font-size: 30px; }
-    .pm-mat { min-width: 660px; }
-    .pm-feat { position: sticky; left: 0; z-index: 1; width: 50%; background: var(--bg-deep); }
-    .pm-grp .pm-feat, .pm-cta-row .pm-feat { background: var(--bg-deep); }
-  }
+  @media (max-width: 920px) { .pm-plans { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px) { .pm-h1 { font-size: 30px; } }
+  @media (max-width: 540px) { .pm-plans { grid-template-columns: 1fr; } }
 </style>
