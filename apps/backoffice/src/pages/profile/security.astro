@@ -126,17 +126,22 @@ const activeCount = team.length - pendingCount;
             </div>
 
             <div class="field field--row">
-              <label class="field__label" for="session-timeout">{bt('sec.team.timeout', lang)}</label>
+              <label class="field__label">{bt('sec.team.timeout', lang)}</label>
               <div class="field__input-wrap">
-                <div class="s-select-wrap">
-                  <select id="session-timeout" name="session_timeout_hours" class="s-select">
-                    <option value="1"  selected={sessionTimeout === '1'}>{bt('sec.timeout.1h', lang)}</option>
-                    <option value="2"  selected={sessionTimeout === '2'}>{bt('sec.timeout.2h', lang)}</option>
-                    <option value="4"  selected={sessionTimeout === '4'}>{bt('sec.timeout.4h', lang)}</option>
-                    <option value="8"  selected={sessionTimeout === '8'}>{bt('sec.timeout.8h', lang)}</option>
-                    <option value="24" selected={sessionTimeout === '24'}>{bt('sec.timeout.24h', lang)}</option>
-                    <option value="0"  selected={sessionTimeout === '0'}>{bt('sec.timeout.none', lang)}</option>
-                  </select>
+                <div x-data={`{open:false,val:'${sessionTimeout}',opts:${JSON.stringify({'1':bt('sec.timeout.1h',lang),'2':bt('sec.timeout.2h',lang),'4':bt('sec.timeout.4h',lang),'8':bt('sec.timeout.8h',lang),'24':bt('sec.timeout.24h',lang),'0':bt('sec.timeout.none',lang)})}}`} class="st-dd" @click.outside="open=false">
+                  <input type="hidden" name="session_timeout_hours" x-bind:value="val" />
+                  <button type="button" class="st-dd-btn" @click="open=!open">
+                    <span x-text="opts[val]"></span>
+                    <svg class="st-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <div class="st-dd-menu" x-show="open" x-cloak>
+                    {[['1', bt('sec.timeout.1h',lang)],['2', bt('sec.timeout.2h',lang)],['4', bt('sec.timeout.4h',lang)],['8', bt('sec.timeout.8h',lang)],['24', bt('sec.timeout.24h',lang)],['0', bt('sec.timeout.none',lang)]].map(([v, label]) => (
+                      <button type="button" class="st-dd-opt" :class={`{'is-active': val==='${v}'}`} @click={`val='${v}'; open=false`}>
+                        {label}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" x-show={`val==='${v}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <span class="field__hint">{bt('sec.team.timeout.hint', lang)}</span>
               </div>
@@ -242,5 +247,34 @@ const activeCount = team.length - pendingCount;
     .ts-enforce { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 18px; padding: 14px 16px; background: var(--bg-deep); border-left: 3px solid var(--petrol, #14616E); border-radius: var(--r-sm); }
     .ts-enforce__text { font-size: 13px; color: var(--ink); margin: 0; line-height: 1.5; }
     .ts-enforce__text strong { font-weight: 600; }
+
+    /* Session-timeout custom dropdown (matches ac-type-dd from action-cards) */
+    .st-dd { position: relative; width: 100%; }
+    .st-dd-btn {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 12px; background: var(--surface);
+      border: 1px solid rgba(10,10,10,0.12); border-radius: 9px;
+      font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink);
+      cursor: pointer; transition: border-color 150ms;
+    }
+    .st-dd-btn:hover { border-color: var(--petrol, #14616E); }
+    .st-dd-chevron { flex-shrink: 0; color: var(--ink-muted); transition: transform 200ms; }
+    .st-dd-chevron.rotated { transform: rotate(180deg); }
+    .st-dd-menu {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: var(--surface); border: 1px solid rgba(10,10,10,0.12);
+      border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+      overflow: hidden;
+    }
+    .st-dd-opt {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: transparent;
+      border: none; border-bottom: 1px solid rgba(10,10,10,0.06);
+      font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink);
+      cursor: pointer; text-align: left; transition: background 100ms;
+    }
+    .st-dd-opt:last-child { border-bottom: none; }
+    .st-dd-opt:hover { background: rgba(20,97,110,0.04); }
+    .st-dd-opt.is-active { color: var(--petrol, #14616E); font-weight: 600; background: rgba(20,97,110,0.05); }
   </style>
 </Layout>
