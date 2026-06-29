@@ -211,13 +211,25 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
                   <span class="tm-field-label">{bt('prof.email.label', lang)}</span>
                   <input type="email" id="tm-invite-email" placeholder="kollege@hotel.de" class="s-input" />
                 </label>
-                <label class="tm-field">
+                <div class="tm-field">
                   <span class="tm-field-label">{bt('prof.role.label', lang)}</span>
-                  <select id="tm-invite-role" class="s-select">
-                    <option value="manager">{bt('team.modal.role.manager', lang)}</option>
-                    <option value="staff">{bt('team.modal.role.staff', lang)}</option>
-                  </select>
-                </label>
+                  <div class="tm-dd" id="tm-invite-role-dd">
+                    <button type="button" class="tm-dd-btn" id="tm-invite-role-btn" aria-haspopup="listbox" aria-expanded="false">
+                      <span class="tm-dd-val" id="tm-invite-role-val" data-value="manager">{bt('team.modal.role.manager', lang)}</span>
+                      <svg class="tm-dd-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="tm-dd-menu" id="tm-invite-role-menu" role="listbox" hidden>
+                      <button type="button" class="tm-dd-opt is-active" data-value="manager" role="option">
+                        {bt('team.modal.role.manager', lang)}
+                        <svg class="tm-dd-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      </button>
+                      <button type="button" class="tm-dd-opt" data-value="staff" role="option">
+                        {bt('team.modal.role.staff', lang)}
+                        <svg class="tm-dd-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <p class="tm-hint">{bt('team.modal.hint', lang)}</p>
               </div>
               <div class="bp-modal-foot">
@@ -348,6 +360,30 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 .v9-btn.v9-btn--primary::before,
 .v9-btn.v9-btn--primary::after { display: none !important; }
 .v9-btn.v9-btn--primary:hover:not(:disabled) { filter: brightness(1.1) !important; background: var(--petrol, #14616E) !important; color: #fff !important; }
+
+/* Ghost-Button (Abbrechen) gleiche Geometrie wie der Primary daneben — Outline nicht größer. */
+.v9-btn.v9-btn--ghost {
+  background: transparent !important; color: var(--ink-muted) !important;
+  border: 1px solid var(--border-medium, rgba(10,10,10,.16)) !important;
+  border-radius: 7px !important; padding: 7px 16px !important;
+  font-family: 'JetBrains Mono', monospace !important; font-size: 10px !important;
+  font-weight: 300 !important; letter-spacing: 0.14em !important; text-transform: uppercase !important;
+}
+.v9-btn.v9-btn--ghost:hover:not(:disabled) { color: var(--ink) !important; border-color: var(--ink) !important; background: transparent !important; }
+
+/* Rollen-Dropdown im Einladen-Popup — Vorbild: /action-cards „Welches Sheet öffnen?" (.ac-type-dd). */
+.tm-dd { position: relative; }
+.tm-dd-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 12px; border: 1px solid var(--border, rgba(10,10,10,0.12)); border-radius: 9px; background: var(--surface); font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink); cursor: pointer; transition: border-color 150ms, box-shadow 150ms; }
+.tm-dd-btn:hover, .tm-dd-btn.is-open { outline: none; border-color: var(--petrol, #14616E); box-shadow: 0 0 0 3px rgba(20,97,110,0.10); }
+.tm-dd-chevron { color: var(--ink-muted); flex-shrink: 0; transition: transform 150ms; }
+.tm-dd-btn.is-open .tm-dd-chevron { transform: rotate(180deg); }
+.tm-dd-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200; background: var(--surface); border: 1px solid var(--border, rgba(10,10,10,0.12)); border-radius: 10px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.10); }
+.tm-dd-menu[hidden] { display: none; }
+.tm-dd-opt { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; border: none; background: transparent; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink); cursor: pointer; text-align: left; transition: background 100ms; }
+.tm-dd-opt:hover { background: rgba(20,97,110,0.07); color: var(--petrol, #14616E); }
+.tm-dd-opt.is-active { color: var(--petrol, #14616E); font-weight: 600; background: rgba(20,97,110,0.05); }
+.tm-dd-check { color: var(--petrol, #14616E); flex-shrink: 0; opacity: 0; }
+.tm-dd-opt.is-active .tm-dd-check { opacity: 1; }
 </style>
 
 <script>
@@ -411,10 +447,31 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
     const modal = document.getElementById('tm-invite-modal');
     if (!openBtn || !modal) return;
     const emailInput = document.getElementById('tm-invite-email') as HTMLInputElement | null;
-    const roleSelect = document.getElementById('tm-invite-role') as HTMLSelectElement | null;
+    const roleDd = document.getElementById('tm-invite-role-dd');
+    const roleBtn = document.getElementById('tm-invite-role-btn');
+    const roleMenu = document.getElementById('tm-invite-role-menu');
+    const roleVal = document.getElementById('tm-invite-role-val');
     const sendBtn = document.getElementById('tm-invite-send') as HTMLButtonElement | null;
     const errorBox = document.getElementById('tm-invite-error');
     const errorMsg = errorBox ? errorBox.querySelector('p') : null;
+
+    // Rollen-Dropdown (Custom, Vorbild /action-cards) — reines Vanilla-JS.
+    const roleOpts = roleMenu ? Array.from(roleMenu.querySelectorAll<HTMLButtonElement>('.tm-dd-opt')) : [];
+    const setRoleOpen = (o: boolean) => {
+      if (!roleMenu || !roleBtn) return;
+      roleMenu.hidden = !o;
+      roleBtn.classList.toggle('is-open', o);
+      roleBtn.setAttribute('aria-expanded', String(o));
+    };
+    roleBtn?.addEventListener('click', (e) => { e.stopPropagation(); setRoleOpen(!!roleMenu?.hidden); });
+    roleOpts.forEach((opt) => {
+      opt.addEventListener('click', () => {
+        if (roleVal) { roleVal.textContent = (opt.textContent || '').trim(); roleVal.dataset.value = opt.dataset.value || 'manager'; }
+        roleOpts.forEach((o) => o.classList.toggle('is-active', o === opt));
+        setRoleOpen(false);
+      });
+    });
+    document.addEventListener('click', (e) => { if (roleDd && !roleDd.contains(e.target as Node)) setRoleOpen(false); });
 
     const showError = (msg: string) => {
       if (errorBox && errorMsg) { errorMsg.textContent = msg; errorBox.hidden = false; }
@@ -429,7 +486,7 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 
     sendBtn?.addEventListener('click', async () => {
       const email = (emailInput?.value || '').trim();
-      const role = roleSelect?.value || 'staff';
+      const role = roleVal?.dataset.value || 'manager';
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError(T.emailInvalid); return; }
       sendBtn.disabled = true;
       const orig = sendBtn.textContent;
