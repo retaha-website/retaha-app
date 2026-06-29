@@ -23,7 +23,6 @@ let rawProgress: number | null = null;
 let onboardingDone = false;
 let setupSkipped = false;
 let hotelPlan = 'lite';
-let dismissedCards: string[] = [];
 try {
   const { data } = await supabase
     .from('hotels')
@@ -34,9 +33,6 @@ try {
   onboardingDone = (data as any)?.onboarding_done === true;
   setupSkipped = (data as any)?.setup_skipped === true;
   hotelPlan = (data as any)?.plan ?? 'lite';
-  // Separat + fehlertolerant (Spalte ggf. noch nicht migriert → bleibt []).
-  const { data: dcRow } = await supabase.from('hotels').select('dismissed_dash_cards').eq('id', hotel.id).maybeSingle();
-  dismissedCards = Array.isArray((dcRow as any)?.dismissed_dash_cards) ? (dcRow as any).dismissed_dash_cards : [];
 
   const hotelName    = (data as any)?.name;
   const logoSet      = !!((data as any)?.logo_primary);
