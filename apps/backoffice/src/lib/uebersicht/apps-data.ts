@@ -26,5 +26,5 @@ export const APPS: SetupApp[] = [
   { id: 6, num: '06', label: 'app.6.label',  sub: 'app.6.sub',
     activeAt: 71, doneAt: 100, sticker: { todo: '0/6',  active: 'START', done: '6/6 ON' }, href: '/admin/nfc-tags'    },
   { id: 7, num: '07', label: 'app.7.label',  sub: 'app.7.sub',
-    activeAt: -1, doneAt: 100, sticker: { todo: 'SOLO', active: 'START', done: '3 USR'  }, href: '/team'              },
+    activeAt: -1, doneAt: 100, sticker: { todo: 'SOLO', active: 'START', done: '3 USR'  }, href: '/profile/team'      },
 ];

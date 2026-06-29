@@ -1,19 +1,19 @@
 ---
-// Team-Verwaltung — jetzt als Untermenü des „retaha Account"-Hubs (AccountShell),
-// gleiche Shell/Design wie /profil, /profil/sicherheit, /profil/settings.
-// URL bleibt /team (überall referenziert: Hauptnav, Übersicht, Onboarding, Setup).
+// Team-Verwaltung — Untermenü des „retaha Account"-Hubs (AccountShell),
+// gleiche Shell/Design wie /profile, /profile/security, /profile/hotel-data.
+// URL: /profile/team (Verweise: Hauptnav, Übersicht, Account-Hub, /admin/team-Redirect).
 //
 // Liste aller hotel_users für das eingeloggte Hotel:
 //   - aktive Mitglieder (accepted_at NOT NULL)
 //   - offene Einladungen (accepted_at IS NULL)
 // Owner sieht Rollen-Dropdown + Entfernen + Einladen. (team.* ist Owner-only.)
 
-import Layout from '../layouts/Layout.astro';
-import AccountShell from '../components/account/AccountShell.astro';
+import Layout from '../../layouts/Layout.astro';
+import AccountShell from '../../components/account/AccountShell.astro';
 import { getUser, getUserHotels, createSupabaseServiceRoleInstance } from '@retaha/auth';
 import { getUserRole } from '@retaha/auth';
 import { hasPermission } from '@retaha/auth';
-import { getLang, bt } from '../lib/i18n';
+import { getLang, bt } from '../../lib/i18n';
 
 const lang = getLang(Astro.cookies, Astro.request);
 const user = await getUser(Astro.cookies, Astro.request);
@@ -97,7 +97,6 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
           <section class="s-card">
             <div class="s-card__head">
               <h2 class="s-card__title">{bt('team.active.title', lang)}</h2>
-              <span class="s-card__num">01</span>
             </div>
             <div class="s-card__body">
               <div class="tm-list">
@@ -159,7 +158,6 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
             <section class="s-card">
               <div class="s-card__head">
                 <h2 class="s-card__title">{bt('team.pending.title', lang)}</h2>
-                <span class="s-card__num">02</span>
               </div>
               <div class="s-card__body">
                 <div class="tm-list">
@@ -278,8 +276,8 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
   border: 1px solid transparent;
 }
 .tm-badge--owner {
-  background: rgba(192, 106, 60, 0.1); color: var(--accent, #C06A3C);
-  border-color: rgba(192, 106, 60, 0.2);
+  background: rgba(140, 33, 40, 0.08); color: var(--burgund, #8C2128);
+  border-color: rgba(140, 33, 40, 0.24);
 }
 .tm-badge--pending {
   background: var(--surface); color: var(--ink-muted);
@@ -323,6 +321,33 @@ const hubRoleLabel = HUB_ROLE[myRole] ?? myRole;
 .tm-field:last-child { margin-bottom: 0; }
 .tm-field-label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--ink-muted); text-transform: uppercase; }
 .tm-hint { font-size: 12px; color: var(--ink-muted); margin: 10px 0 0; font-style: italic; }
+
+/* Boxen rechteckiger wirken lassen — kleinerer Radius (an den Buttons orientiert),
+   aber weiterhin gerundet. Innenliegende Member-Rows mit angleichen. */
+.tm-root .s-card { border-radius: var(--r-sm); }
+.tm-root .tm-row { border-radius: var(--r-sm); }
+
+/* Primary-Buttons exakt wie /profile/hotel-data (Größe, Form, Mono-Caps, Petrol, 7px). */
+.v9-btn { min-height: auto !important; }
+.v9-btn.v9-btn--primary {
+  background: var(--petrol, #14616E) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 7px !important;
+  padding: 7px 16px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  transition: filter 150ms ease !important;
+}
+.v9-btn.v9-btn--primary::before,
+.v9-btn.v9-btn--primary::after { display: none !important; }
+.v9-btn.v9-btn--primary:hover:not(:disabled) { filter: brightness(1.1) !important; background: var(--petrol, #14616E) !important; color: #fff !important; }
 </style>
 
 <script>
