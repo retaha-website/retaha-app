@@ -235,6 +235,12 @@ const acT = {
                x-text="pickI18nClient(c.subtitle_i18n, defaultLang) || c.subtitle_de"></p>
           </div>
           <div class="ac-row-actions">
+            <button type="button" class="ac-row-pub-toggle" @click.stop="togglePublished(c)"
+              :title="c.is_published !== false ? 'Für Gäste verbergen' : 'In der Gäste-App anzeigen'">
+              <span class="bt-visual" :class="{'is-checked': c.is_published !== false}">
+                <span class="bt-knob"></span>
+              </span>
+            </button>
             <button type="button" @click="openEdit(c.id)" class="ac-icon-btn" title={bt('si.items.edit', lang)}>✎</button>
             <button type="button" @click="deleteCard(c.id)" class="ac-icon-btn ac-icon-btn--danger" title={bt('nfc.delete', lang)}>×</button>
           </div>
@@ -283,10 +289,26 @@ const acT = {
         <!-- Ziel (je nach Typ) -->
         <div x-show="editor.card_type === 'internal_action'" class="ac-field">
           <span class="ac-field-label">{bt('ac.modal.sheet', lang)}</span>
-          <select x-model="editor.action_target" class="ac-input">
-            <option value="">{bt('ac.modal.choose', lang)}</option>
-            {INTERNAL_ACTIONS.map(a => <option value={a.value}>{a.label}</option>)}
-          </select>
+          <div class="ac-type-dd" x-data={`{open:false,labels:${JSON.stringify(Object.fromEntries(INTERNAL_ACTIONS.map(a => [a.value, a.label])))}}`} @click.outside="open=false">
+            <button type="button" class="ac-type-dd-btn" @click="open=!open">
+              <span x-text="editor.action_target ? (labels[editor.action_target] || editor.action_target) : ${JSON.stringify(bt('ac.modal.choose', lang))}"></span>
+              <svg class="ac-type-dd-chevron" :class="{'rotated':open}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="ac-type-dd-menu" x-show="open" style="display:none">
+              <button type="button" class="ac-type-dd-opt" :class="{'is-active': !editor.action_target}"
+                @click="editor.action_target = ''; open = false">
+                {bt('ac.modal.choose', lang)}
+              </button>
+              {INTERNAL_ACTIONS.map(a => (
+                <button type="button" class="ac-type-dd-opt"
+                  :class={`{'is-active': editor.action_target === '${a.value}'}`}
+                  @click={`editor.action_target = '${a.value}'; open = false`}>
+                  {a.label}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" x-show={`editor.action_target === '${a.value}'`} style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div x-show="editor.card_type === 'external_link'" class="ac-field">
@@ -411,14 +433,6 @@ const acT = {
           </div>
         </div>
 
-        <!-- Veröffentlicht -->
-        <label class="toggle-row" style="margin-top:4px; cursor:pointer">
-          <input type="checkbox" x-model="editor.is_published" class="sr-only" />
-          <span class="bt-visual" :class="{'is-checked': editor.is_published}">
-            <span class="bt-knob"></span>
-          </span>
-          <span class="toggle-label">{bt('ac.modal.published', lang)}</span>
-        </label>
 
       </div>
 
@@ -769,6 +783,19 @@ const acT = {
         }
       },
 
+      async togglePublished(card: any) {
+        const prev = card.is_published;
+        card.is_published = prev === false ? true : false;
+        try {
+          const res = await fetch('/api/action-cards/upsert', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: card.id, is_published: card.is_published }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) card.is_published = prev;
+        } catch { card.is_published = prev; }
+      },
+
       async deleteCard(id: string) {
         if (!confirm(this.t.deleteConfirm)) return;
         const res = await fetch('/api/action-cards/delete', {
@@ -1051,9 +1078,16 @@ const acT = {
     font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink);
     cursor: pointer; text-align: left; transition: background 100ms;
   }
-  .ac-type-dd-opt:hover { background: var(--bg-deep, #F0EFEA); }
-  .ac-type-dd-opt.is-active { color: var(--ly-ac, #14616E); font-weight: 600; }
+  .ac-type-dd-opt:hover { background: rgba(20,97,110,0.07); color: var(--ly-ac, #14616E); }
+  .ac-type-dd-opt.is-active { color: var(--ly-ac, #14616E); font-weight: 600; background: rgba(20,97,110,0.05); }
   .ac-type-dd-opt.is-active svg { color: var(--ly-ac, #14616E); }
+
+  /* Published toggle in row */
+  .ac-row-pub-toggle {
+    background: none; border: none; padding: 0 8px 0 0; cursor: pointer;
+    display: flex; align-items: center; flex-shrink: 0;
+  }
+  .ac-row-pub-toggle .bt-visual { cursor: pointer; }
 
   /* Style swatches */
   .ac-style-swatches { display: flex; gap: 8px; }
