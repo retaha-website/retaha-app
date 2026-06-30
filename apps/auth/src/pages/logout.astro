@@ -3,49 +3,62 @@ import AuthLayout from '../layouts/AuthLayout.astro';
 import { clearSessionCookie } from '@retaha/auth';
 import { clearMfaMarkerCookie } from '@retaha/auth/mfa';
 
-// Logout via GET ist OK weil Idempotent (Cookie löschen).
+// Logout via GET ist OK weil idempotent (Cookie löschen).
 // Für CSRF-strikten Flow gibt es zusätzlich /api/auth/logout POST.
 clearSessionCookie(Astro.cookies);
 clearMfaMarkerCookie(Astro.cookies);
 ---
 
-<AuthLayout title="abgemeldet" eyebrow="bis bald">
+<AuthLayout title="abgemeldet" eyebrow="bis bald" eyebrowFlank={false}>
   <h1 class="lo-headline">
     Abgemeldet<span class="h-dot">.</span>
   </h1>
   <p class="lo-sub">
-    Dein Cookie ist gelöscht. Willst du dich erneut anmelden?
+    Ihr Cookie ist gelöscht. Möchten Sie sich erneut anmelden?
   </p>
-  <a href="/login" class="lo-link">→ Zur Anmeldung</a>
+  <a href="/login" class="lo-link">Zur Anmeldung</a>
+
+  <!-- Pink-Akzent (Theme-Default) auf der Logout-Seite durch Petrol ersetzen —
+       wirkt auf Eyebrow, Satzpunkt und die Bauhaus-Fußformen. -->
+  <style is:global>
+    html[data-theme="bauhaus_manufaktur"] body { --theme-accent: #14616E; }
+  </style>
 
   <style>
+    /* „Abgemeldet" im selben Font wie „Anmelden" auf der Hauptseite (Space Grotesk 500 / 28px). */
     .lo-headline {
-      font-family: var(--theme-font-headline);
-      font-size: 32px;
-      font-weight: 300;
-      letter-spacing: -0.02em;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.018em;
+      line-height: 1.2;
       margin: 0 0 12px;
       text-align: center;
     }
+    .lo-headline .h-dot { color: #14616E; }
     .lo-sub {
       text-align: center;
       color: var(--theme-text-secondary);
-      margin: 0 0 24px;
+      font-size: 14px;
+      line-height: 1.55;
+      margin: 0 0 28px;
     }
+    /* Button wie der Primary-Button der Hauptseite: anthrazit gefüllt, 3px Radius. */
     .lo-link {
       display: block;
       text-align: center;
-      color: var(--theme-accent);
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
       font-size: 14px;
+      font-weight: 500;
       text-decoration: none;
-      padding: 12px;
-      border: 1px solid var(--theme-border);
-      border-radius: var(--theme-radius-button);
-      transition: background 0.15s ease, color 0.15s ease;
+      padding: 15px 24px;
+      border: none;
+      border-radius: 3px;
+      transition: background 0.2s ease, transform 0.12s ease;
     }
-    .lo-link:hover {
-      background: var(--theme-accent);
-      color: var(--theme-text-on-accent);
-    }
+    .lo-link:hover { background: #2A2A2A; transform: translateY(-2px); }
+    .lo-link:active { transform: translateY(0); }
   </style>
 </AuthLayout>
