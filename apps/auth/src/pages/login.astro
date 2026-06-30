@@ -42,10 +42,10 @@ const t = {
   de: {
     hero_line1: 'Willkommen',
     hero_line2: 'zurück',
-    hero_tagline: 'Manufaktur-Handwerk für Premium-Hotels.',
+    hero_tagline: 'Präzision für inhabergeführte Hotels.',
     title: 'Anmelden',
-    sub_magic: 'Gib deine E-Mail-Adresse ein. Wir senden dir einen Einmal-Link.',
-    sub_password: 'Gib deine E-Mail und dein Passwort ein.',
+    sub_magic: 'Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Anmelde-Link.',
+    sub_password: 'Geben Sie Ihre E-Mail-Adresse und Ihr Passwort ein.',
     label_email: 'E-Mail',
     label_password: 'Passwort',
     placeholder_email: 'hotelier@example.com',
@@ -55,6 +55,7 @@ const t = {
     btn_loading_magic: 'wird gesendet...',
     btn_loading_password: 'anmelden...',
     toggle_to_password: '→ stattdessen mit passwort anmelden',
+    toggle_to_magic: '→ stattdessen mit magic-link anmelden',
     aria_close_password: 'Passwort-Eingabe schliessen',
     err_email_empty: 'Bitte E-Mail-Adresse eingeben.',
     err_email_invalid: 'Ungültige E-Mail-Adresse.',
@@ -112,6 +113,7 @@ const t = {
     btn_loading_magic: 'sending...',
     btn_loading_password: 'signing in...',
     toggle_to_password: '→ use password instead',
+    toggle_to_magic: '→ use magic link instead',
     aria_close_password: 'Close password input',
     err_email_empty: 'Please enter your email address.',
     err_email_invalid: 'Invalid email address.',
@@ -169,6 +171,7 @@ const t = {
     btn_loading_magic: 'envoi...',
     btn_loading_password: 'connexion...',
     toggle_to_password: '→ utiliser un mot de passe',
+    toggle_to_magic: '→ utiliser le lien magique',
     aria_close_password: 'Fermer la saisie du mot de passe',
     err_email_empty: 'Saisis ton adresse e-mail.',
     err_email_invalid: 'Adresse e-mail invalide.',
@@ -226,6 +229,7 @@ const t = {
     btn_loading_magic: 'enviando...',
     btn_loading_password: 'iniciando sesión...',
     toggle_to_password: '→ usar contraseña',
+    toggle_to_magic: '→ usar enlace mágico',
     aria_close_password: 'Cerrar entrada de contraseña',
     err_email_empty: 'Introduce tu correo.',
     err_email_invalid: 'Correo no válido.',
@@ -283,6 +287,7 @@ const t = {
     btn_loading_magic: 'gönderiliyor...',
     btn_loading_password: 'giriş yapılıyor...',
     toggle_to_password: '→ bunun yerine şifreyle giriş yap',
+    toggle_to_magic: '→ bunun yerine sihirli bağlantıyla giriş yap',
     aria_close_password: 'Şifre girişini kapat',
     err_email_empty: 'Lütfen e-posta adresini gir.',
     err_email_invalid: 'Geçersiz e-posta adresi.',
@@ -362,7 +367,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
     <main
       class="auth-layout"
       x-data={`{
-        passwordExpanded: false,
+        passwordExpanded: true,
         email: '',
         password: '',
         emailError: '',
@@ -614,19 +619,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
 
               <div class="password-section" :data-visible="passwordExpanded">
                 <div class="field">
-                  <div class="field-header">
-                    <label class="field-label" for="password-input" x-text="t('label_password')"></label>
-                    <button
-                      type="button"
-                      class="field-close"
-                      @click="togglePassword()"
-                      :aria-label="t('aria_close_password')"
-                    >
-                      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                        <path d="M3 3 L11 11 M11 3 L3 11" />
-                      </svg>
-                    </button>
-                  </div>
+                  <label class="field-label" for="password-input" x-text="t('label_password')"></label>
                   <input
                     id="password-input"
                     x-ref="passwordInput"
@@ -665,8 +658,8 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
                 </span>
               </button>
 
-              <div class="form-toggle" :data-hidden="passwordExpanded">
-                <button type="button" class="toggle-link" @click="togglePassword()" x-text="t('toggle_to_password')"></button>
+              <div class="form-toggle">
+                <button type="button" class="toggle-link" @click="togglePassword()" x-text="passwordExpanded ? t('toggle_to_magic') : t('toggle_to_password')"></button>
               </div>
             </form>
 
@@ -954,25 +947,6 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       }
       .field-input.is-error { border-color: var(--color-petrol, #14616E); }
 
-      .field-header {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 8px;
-      }
-      .field-header .field-label { margin-bottom: 0; }
-      .field-close {
-        background: transparent; border: none; cursor: pointer;
-        padding: 4px; border-radius: 50%;
-        color: rgba(26, 26, 26, 0.4);
-        transition: all 350ms var(--ease-out-expo);
-        display: flex; align-items: center; justify-content: center;
-      }
-      .field-close:hover {
-        color: var(--color-petrol, #14616E);
-        background: var(--color-pink-soft);
-        transform: rotate(90deg);
-      }
-      .field-close svg { width: 14px; height: 14px; }
-
       .field-error {
         margin-top: 8px; font-size: 12px; color: var(--color-petrol, #14616E);
         display: flex; align-items: center; gap: 8px;
@@ -1075,21 +1049,23 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       }
       .toggle-link:hover { background: var(--color-pink-soft); }
 
+      /* Passwort ist jetzt Default → Box standardmäßig OFFEN (kein Auf-Flackern beim
+         Laden). Wechsel auf Magic-Link (data-visible="false") klappt sie animiert zu. */
       .password-section {
         overflow: hidden;
-        max-height: 0; opacity: 0;
+        max-height: 240px; opacity: 1;
         transition:
           max-height var(--duration-very-slow) var(--ease-out-expo),
           opacity var(--duration-slow) var(--ease-out-expo);
       }
-      .password-section[data-visible="true"] { max-height: 240px; opacity: 1; }
+      .password-section[data-visible="false"] { max-height: 0; opacity: 0; }
       .password-section .field {
-        transform: translateY(12px); opacity: 0;
+        transform: translateY(0); opacity: 1;
         transition:
-          transform var(--duration-slow) var(--ease-out-expo) 350ms,
-          opacity var(--duration-slow) var(--ease-out-expo) 350ms;
+          transform var(--duration-slow) var(--ease-out-expo),
+          opacity var(--duration-slow) var(--ease-out-expo);
       }
-      .password-section[data-visible="true"] .field { transform: translateY(0); opacity: 1; }
+      .password-section[data-visible="false"] .field { transform: translateY(12px); opacity: 0; }
 
       .form-footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(26, 26, 26, 0.08); }
       .footer-support { font-size: 12px; color: rgba(26, 26, 26, 0.5); line-height: 1.6; }
@@ -1298,7 +1274,6 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
           font-size: 15px;
         }
         .toggle-link { padding: 12px 16px; }
-        .field-close { width: 36px; height: 36px; }
 
         /* BRAND-FOOTER zeigen — alle Marken-Infos in weiß-Sektion unten */
         .brand-footer {
