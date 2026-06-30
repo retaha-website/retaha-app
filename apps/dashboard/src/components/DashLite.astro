@@ -1,12 +1,17 @@
 ---
-// Lite-Übersicht (Dashboard) — Seitenkopf, 4 Kennzahlen, Aktivitäts-Feed,
+// Lite-Übersicht (Dashboard/Admin) — Seitenkopf, 4 Kennzahlen, Aktivitäts-Feed,
 // Schnellzugriff (1 Lite-Kachel) und gesperrte Teaser. Echte Daten kommen aus
-// overview.astro (Frontmatter-Queries); diese Komponente rendert nur.
+// index.astro (Frontmatter-Queries); diese Komponente rendert nur.
 //
 // Stil = bestehendes Backoffice (Petrol/Sage/Messing, Space Grotesk + JetBrains
 // Mono). Aurora bleibt Eve vorbehalten (.eve-gradient). Sperr-Muster wie /breakfast.
 import { bt, type LanguageCode } from '@retaha/i18n';
-import { hasPlanAccess } from '../../lib/auth/plan-gate';
+
+// Plan-Rang inline (deckungsgleich mit apps/backoffice plan-gate.ts).
+const PLAN_RANK: Record<string, number> = { lite: 0, pro: 1, premium: 2, enterprise: 3 };
+function hasPlanAccess(plan: string | null | undefined, required: 'pro' | 'premium'): boolean {
+  return (PLAN_RANK[plan ?? 'lite'] ?? 0) >= (PLAN_RANK[required] ?? 99);
+}
 
 export type TrendDir = 'up' | 'down' | 'flat' | 'new' | 'none';
 export interface Trend { dir: TrendDir; pct: number; }

@@ -4,8 +4,12 @@ import OnboardingHero from '../components/uebersicht/OnboardingHero.astro';
 import OnboardingStep2 from '../components/uebersicht/OnboardingStep2.astro';
 import OnboardingStep3 from '../components/uebersicht/OnboardingStep3.astro';
 import OnboardingStep5 from '../components/uebersicht/OnboardingStep5.astro';
-import DashLite from '../components/uebersicht/DashLite.astro';
+import DashSubscription from '../components/uebersicht/DashSubscription.astro';
+import DashToolkit from '../components/uebersicht/DashToolkit.astro';
+import DashFeatureCards from '../components/uebersicht/DashFeatureCards.astro';
+import QuickAccess from '../components/uebersicht/QuickAccess.astro';
 import { getUser, getUserHotels, createSupabaseServerInstance } from '@retaha/auth';
+import { normalizeStage } from '../lib/uebersicht/setup-stage';
 import { getLang } from '../lib/i18n';
 const lang = getLang(Astro.cookies, Astro.request);
 
@@ -23,6 +27,7 @@ let rawProgress: number | null = null;
 let onboardingDone = false;
 let setupSkipped = false;
 let hotelPlan = 'lite';
+let dismissedCards: string[] = [];
 try {
   const { data } = await supabase
     .from('hotels')
@@ -33,6 +38,9 @@ try {
   onboardingDone = (data as any)?.onboarding_done === true;
   setupSkipped = (data as any)?.setup_skipped === true;
   hotelPlan = (data as any)?.plan ?? 'lite';
+  // Separat + fehlertolerant (Spalte ggf. noch nicht migriert → bleibt []).
+  const { data: dcRow } = await supabase.from('hotels').select('dismissed_dash_cards').eq('id', hotel.id).maybeSingle();
+  dismissedCards = Array.isArray((dcRow as any)?.dismissed_dash_cards) ? (dcRow as any).dismissed_dash_cards : [];
 
   const hotelName    = (data as any)?.name;
   const logoSet      = !!((data as any)?.logo_primary);
@@ -68,110 +76,10 @@ if (Astro.url.searchParams.get('resume') === 'setup') {
 // über die Benachrichtigung (?resume=setup) zurück — sonst bleibt er account-weit weg.
 const flowHidden = onboardingDone || setupSkipped;
 
+const stage = normalizeStage(rawProgress);
+
 // User-Initial für Avatar (erster Buchstabe der Email)
 const userInitial = (user.email ?? 'K').charAt(0).toUpperCase();
-
-// ── Lite-Übersicht: echte Kennzahlen + Aktivität (eingeloggtes Haus) ──────────
-const DASHBOARD = import.meta.env.DASHBOARD_URL ?? 'https://dashboard.retaha.de';
-const _now = Date.now();
-const WEEK = 7 * 86_400_000;
-const weekStartIso = new Date(_now - WEEK).toISOString();
-const prevStartIso = new Date(_now - 2 * WEEK).toISOString();
-const dayStartIso  = new Date(_now - 86_400_000).toISOString();
-
-type TrendObj = { dir: 'up' | 'down' | 'flat' | 'new' | 'none'; pct: number };
-function calcTrend(thisN: number, prevN: number): TrendObj {
-  if (thisN === 0 && prevN === 0) return { dir: 'none', pct: 0 };
-  if (prevN === 0) return { dir: 'new', pct: 0 };
-  const pct = Math.round(((thisN - prevN) / prevN) * 100);
-  if (pct > 0) return { dir: 'up', pct };
-  if (pct < 0) return { dir: 'down', pct: Math.abs(pct) };
-  return { dir: 'flat', pct: 0 };
-}
-const trunc = (s: string, n = 120) => (s && s.length > n ? s.slice(0, n - 1) + '…' : (s ?? ''));
-
-// Defaults — bleiben bei Query-Fehler (z. B. Tabelle fehlt) leer, ohne die Seite zu brechen.
-let dl = {
-  summaryCount: 0,
-  opens:    { n: 0, trend: { dir: 'none', pct: 0 } as TrendObj },
-  eve:      { n: 0, trend: { dir: 'none', pct: 0 } as TrendObj },
-  requests: { n: 0, open: 0, trend: { dir: 'none', pct: 0 } as TrendObj },
-  rating:   { avg: 0, count: 0 },
-  activity: [] as any[],
-  quick:    null as any,
-  links: {
-    eve: '/eve/knowledge',
-    requests: `${DASHBOARD}/service`,
-    feedback: `${DASHBOARD}/feedback`,
-    packages: '/subscription',
-    actionCards: '/admin/action-cards',
-  },
-};
-
-try {
-  const [chatRes, reqRes, fbRes, fbAllRes, quickRes] = await Promise.all([
-    supabase.from('chat_messages').select('stay_id, role, content, created_at').eq('hotel_id', hotel.id).gte('created_at', prevStartIso).order('created_at', { ascending: false }),
-    supabase.from('stay_requests').select('id, stay_id, status, note, chips, occasion, created_at').eq('hotel_id', hotel.id).gte('created_at', prevStartIso).order('created_at', { ascending: false }),
-    supabase.from('stay_feedback').select('stay_id, rating, comment, created_at').eq('hotel_id', hotel.id).gte('created_at', prevStartIso).order('created_at', { ascending: false }),
-    supabase.from('stay_feedback').select('rating').eq('hotel_id', hotel.id),
-    supabase.from('hotel_action_cards').select('title_de, title_i18n, eyebrow_de, eyebrow_i18n, card_class, sort_order').eq('hotel_id', hotel.id).eq('is_published', true).order('sort_order', { ascending: true }).limit(1),
-  ]);
-
-  const chat = (chatRes.data ?? []) as any[];
-  const reqs = (reqRes.data ?? []) as any[];
-  const fbs  = (fbRes.data ?? []) as any[];
-
-  const thisChat = chat.filter(r => r.created_at >= weekStartIso);
-  const prevChat = chat.filter(r => r.created_at <  weekStartIso);
-  const thisReq  = reqs.filter(r => r.created_at >= weekStartIso);
-  const prevReq  = reqs.filter(r => r.created_at <  weekStartIso);
-  const thisFb   = fbs.filter(r => r.created_at >= weekStartIso);
-  const prevFb   = fbs.filter(r => r.created_at <  weekStartIso);
-
-  // Gästemappe „geöffnet" = distinkte Gäste (stay_id) mit irgendeiner Mappen-Aktivität
-  // (Chat/Wunsch/Feedback) — echte Untergrenze ohne zusätzliche Tracking-Tabelle.
-  const distinct = (...sets: any[][]) => {
-    const s = new Set<string>();
-    sets.flat().forEach(r => { if (r.stay_id) s.add(r.stay_id); });
-    return s.size;
-  };
-  const opensThis = distinct(thisChat, thisReq, thisFb);
-  const opensPrev = distinct(prevChat, prevReq, prevFb);
-
-  const eveThis = new Set(thisChat.map(r => r.stay_id)).size;
-  const evePrev = new Set(prevChat.map(r => r.stay_id)).size;
-
-  const reqOpen = thisReq.filter(r => r.status === 'open').length;
-
-  const allRatings = ((fbAllRes.data ?? []) as any[]).map(r => r.rating).filter((n: any) => typeof n === 'number');
-  const ratingAvg = allRatings.length ? allRatings.reduce((a: number, b: number) => a + b, 0) / allRatings.length : 0;
-
-  // Aktivitäts-Feed (gemischt, chronologisch, neueste zuerst).
-  const reqText = (r: any) => r.note || (Array.isArray(r.chips) && r.chips.length ? r.chips.join(', ') : (r.occasion || 'Gästewunsch'));
-  const feed = [
-    ...reqs.map(r => ({ kind: 'request', text: trunc(reqText(r)), ts: r.created_at, status: (r.status === 'done' ? 'done' : r.status === 'seen' ? 'seen' : 'open'), href: `${DASHBOARD}/service` })),
-    ...chat.filter(r => r.role === 'user').map(r => ({ kind: 'eve', text: trunc(r.content), ts: r.created_at, status: 'answered', href: '/eve/knowledge' })),
-    ...fbs.map(r => ({ kind: 'feedback', text: trunc(r.comment || ''), ts: r.created_at, status: 'done', stars: r.rating, href: `${DASHBOARD}/feedback` })),
-  ].sort((a, b) => (a.ts < b.ts ? 1 : -1)).slice(0, 7);
-
-  const qc = ((quickRes.data ?? []) as any[])[0];
-  const quick = qc ? {
-    title: (qc.title_i18n && qc.title_i18n[lang]) || qc.title_de || (qc.title_i18n && qc.title_i18n.de) || 'Kachel',
-    eyebrow: (qc.eyebrow_i18n && qc.eyebrow_i18n[lang]) || qc.eyebrow_de || undefined,
-    cardClass: qc.card_class || 'rec-anthrazit',
-  } : null;
-
-  dl = {
-    ...dl,
-    summaryCount: reqs.filter(r => r.created_at >= dayStartIso).length,
-    opens:    { n: opensThis, trend: calcTrend(opensThis, opensPrev) },
-    eve:      { n: eveThis,   trend: calcTrend(eveThis, evePrev) },
-    requests: { n: thisReq.length, open: reqOpen, trend: calcTrend(thisReq.length, prevReq.length) },
-    rating:   { avg: ratingAvg, count: allRatings.length },
-    activity: feed,
-    quick,
-  };
-} catch { /* Tabelle fehlt o. ä. — Defaults (Leerzustände) greifen */ }
 ---
 
 <Layout
@@ -190,19 +98,10 @@ try {
   </div>
 
   <div data-dashboard>
-    <DashLite
-      lang={lang}
-      hotelName={hotel.name}
-      plan={hotelPlan}
-      summaryCount={dl.summaryCount}
-      opens={dl.opens}
-      eve={dl.eve}
-      requests={dl.requests}
-      rating={dl.rating}
-      activity={dl.activity}
-      quick={dl.quick}
-      links={dl.links}
-    />
+    <DashSubscription stage={stage} lang={lang} />
+    <DashToolkit lang={lang} />
+    <DashFeatureCards plan={hotelPlan} lang={lang} parked={dismissedCards} />
+    <QuickAccess lang={lang} />
   </div>
 
   {!onboardingDone && (

@@ -1,0 +1,161 @@
+---
+// Zwei schließbare Upsell-/Add-on-Karten (à la Surfshark): Icon + X, Kategorie,
+// Titel, Beschreibung, „Mehr erfahren" + CTA. Schließen wird account-wide (DB,
+// park-card) gespeichert; sind beide weg, verschwindet die Sektion.
+import { bt, type LanguageCode } from '@retaha/i18n';
+
+interface Props { plan: string; lang: LanguageCode; parked?: string[]; }
+const { plan, lang, parked = [] } = Astro.props;
+
+const SHOP = 'https://retaha.de/shop';
+const svg = (path: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+
+const qtyHint = plan === 'lite'
+  ? bt('dash.dfc.qty.lite', lang)
+  : bt('dash.dfc.qty.room', lang);
+
+const cards = [
+  {
+    id: 'nfc',
+    cat: bt('dash.dfc.nfc.cat', lang),
+    title: bt('dash.dfc.nfc.title', lang),
+    desc: `${bt('dash.dfc.nfc.desc', lang)} ${qtyHint}`,
+    learnHref: SHOP,
+    ctaHref: SHOP,
+    cta: bt('dash.dfc.nfc.cta', lang),
+    external: true,
+    icon: svg('<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
+  },
+  {
+    id: 'eve',
+    cat: bt('dash.dfc.eve.cat', lang),
+    title: bt('dash.dfc.eve.title', lang),
+    desc: bt('dash.dfc.eve.desc', lang),
+    learnHref: '/subscription',
+    ctaHref: '/subscription',
+    cta: bt('dash.dfc.eve.cta', lang),
+    external: false,
+    icon: svg('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>'),
+  },
+];
+---
+
+<section class="dfc" data-dfc>
+  <div class="dfc__grid">
+    {cards.map((c) => (
+      <article class="dfc__card" data-dfc-card={c.id} hidden={parked.includes(c.id)}>
+        <div class="dfc__top">
+          <span class="dfc__icon" set:html={c.icon}></span>
+          <button class="dfc__x" type="button" data-dfc-dismiss={c.id} aria-label="Ausblenden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <span class="dfc__cat">{c.cat}</span>
+        <h3 class="dfc__title">{c.title}</h3>
+        <p class="dfc__desc">{c.desc}</p>
+        <div class="dfc__actions">
+          <a class="dfc__learn" href={c.learnHref} {...(c.external ? { target: '_blank', rel: 'noopener' } : {})}>{bt('dash.dfc.learn', lang)}</a>
+          <a class="dfc__cta" href={c.ctaHref} {...(c.external ? { target: '_blank', rel: 'noopener' } : {})}>{c.cta}</a>
+        </div>
+      </article>
+    ))}
+  </div>
+</section>
+
+<script is:inline>
+  (function () {
+    var section = document.querySelector('[data-dfc]');
+    if (!section) return;
+    var cards = Array.prototype.slice.call(section.querySelectorAll('[data-dfc-card]'));
+
+    function syncSection() {
+      var anyVisible = cards.some(function (c) { return !c.hidden; });
+      section.style.display = anyVisible ? '' : 'none';
+    }
+
+    // Geparkte Karten sind account-wide (DB) bereits serverseitig ausgeblendet.
+    syncSection();
+
+    // X = in den Benachrichtigungs-Drawer parken (statt verschwinden).
+    function parkInDrawer(id) {
+      document.querySelectorAll('[data-onb-dot]').forEach(function (d) { d.classList.add('is-on'); });
+      var drawer = document.getElementById('notifDrawer');
+      if (!drawer) return;
+      var item = drawer.querySelector('[data-notif="card-' + id + '"]');
+      if (item) item.hidden = false;
+      var empty = drawer.querySelector('[data-notif-empty]');
+      if (empty) empty.hidden = true;
+    }
+
+    section.querySelectorAll('[data-dfc-dismiss]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-dfc-dismiss');
+        try { fetch('/api/admin/notifications/park-card', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ card: id }) }); } catch (e) {}
+        var card = section.querySelector('[data-dfc-card="' + id + '"]');
+        if (card) card.hidden = true;
+        syncSection();
+        parkInDrawer(id);
+      });
+    });
+  })();
+</script>
+
+<style>
+  .dfc { max-width: 1680px; margin: 28px auto 0; padding: 0 32px; }
+  @media (max-width: 768px) { .dfc { padding: 0 20px; } }
+
+  .dfc__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .dfc__grid { grid-template-columns: 1fr; gap: 16px; } }
+
+  .dfc__card {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, rgba(10,10,10,0.08));
+    border-radius: var(--r-lg, 16px);
+    padding: 22px 24px 24px;
+    display: flex; flex-direction: column;
+  }
+
+  .dfc__top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .dfc__icon {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--bg-deep, #f0efea); color: var(--ink, #0a0a0a);
+  }
+  .dfc__icon :global(svg) { width: 22px; height: 22px; }
+  .dfc__x {
+    appearance: none; -webkit-appearance: none; border: none; background: transparent;
+    width: 30px; height: 30px; border-radius: var(--r-sm, 8px); color: var(--ink-muted, rgba(10,10,10,0.45));
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .dfc__x:hover { background: var(--bg-deep, #f0efea); color: var(--ink, #0a0a0a); }
+  .dfc__x svg { width: 17px; height: 17px; }
+
+  .dfc__cat {
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--petrol); font-weight: 500;
+  }
+  .dfc__title {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 19px;
+    color: var(--ink, #0a0a0a); margin: 8px 0 8px;
+  }
+  .dfc__desc {
+    font-family: 'Inter Tight', sans-serif; font-size: 14px; line-height: 1.55;
+    color: var(--ink-soft, rgba(10,10,10,0.6)); margin: 0 0 20px;
+  }
+
+  .dfc__actions { display: flex; align-items: center; gap: 10px; margin-top: auto; flex-wrap: wrap; }
+  .dfc__learn {
+    font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink, #0a0a0a); text-decoration: none; padding: 10px 14px;
+    border-radius: var(--r-sm, 8px); transition: background 0.15s ease;
+  }
+  .dfc__learn:hover { background: var(--bg-deep, #f0efea); }
+  .dfc__cta {
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 500;
+    color: #fff; background: var(--petrol); text-decoration: none;
+    padding: 10px 18px; border-radius: var(--r-sm, 8px);
+    transition: filter 0.15s ease;
+  }
+  .dfc__cta:hover { filter: brightness(1.08); }
+</style>
