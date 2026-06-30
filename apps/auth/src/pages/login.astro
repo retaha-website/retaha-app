@@ -66,8 +66,10 @@ const t = {
     err_rate_limit: 'Zu viele Anfragen. Versuche es in einer Stunde erneut.',
     err_send_failed: 'Fehler beim Senden. Versuche es erneut.',
     err_network: 'Netzwerk-Fehler. Versuche es erneut.',
-    support_text_1: 'Kein Zugang? Kontaktiere den retaha-Support unter',
-    support_text_2: 'oder bitte deinen Admin um eine Einladung.',
+    support_text_1: 'Kein Zugang? Wenden Sie sich an den retaha-Support unter',
+    support_text_2: 'oder bitten Sie Ihren Administrator um eine Einladung.',
+    signup_q: 'Noch kein Konto?',
+    signup_link: 'Kostenlos einrichten.',
     success_eyebrow: 'gesendet',
     success_title: 'Check dein Postfach',
     success_message: 'Wir haben dir einen Einmal-Link an',
@@ -126,6 +128,8 @@ const t = {
     err_network: 'Network error. Please try again.',
     support_text_1: 'No access? Contact retaha support at',
     support_text_2: 'or ask your admin for an invitation.',
+    signup_q: 'No account yet?',
+    signup_link: 'Set up for free.',
     success_eyebrow: 'sent',
     success_title: 'Check your inbox',
     success_message: 'We sent a one-time link to',
@@ -184,6 +188,8 @@ const t = {
     err_network: 'Erreur réseau. Réessaie.',
     support_text_1: 'Pas d\'accès ? Contacte le support retaha à',
     support_text_2: 'ou demande une invitation à ton admin.',
+    signup_q: 'Pas encore de compte ?',
+    signup_link: 'Créer gratuitement.',
     success_eyebrow: 'envoyé',
     success_title: 'Vérifie ta boîte mail',
     success_message: 'Nous avons envoyé un lien unique à',
@@ -242,6 +248,8 @@ const t = {
     err_network: 'Error de red. Intenta de nuevo.',
     support_text_1: '¿Sin acceso? Contacta a soporte retaha en',
     support_text_2: 'o pide a tu admin una invitación.',
+    signup_q: '¿Aún no tienes cuenta?',
+    signup_link: 'Crear gratis.',
     success_eyebrow: 'enviado',
     success_title: 'Revisa tu bandeja',
     success_message: 'Te enviamos un enlace único a',
@@ -300,6 +308,8 @@ const t = {
     err_network: 'Ağ hatası. Tekrar dene.',
     support_text_1: 'Erişimin yok mu? retaha desteğine yaz:',
     support_text_2: 'veya yöneticinden davet iste.',
+    signup_q: 'Hesabınız yok mu?',
+    signup_link: 'Ücretsiz oluşturun.',
     success_eyebrow: 'gönderildi',
     success_title: 'Gelen kutunu kontrol et',
     success_message: 'Tek kullanımlık bir bağlantı gönderdik:',
@@ -664,6 +674,10 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
             </form>
 
             <div class="form-footer">
+              <p class="footer-signup">
+                <span x-text="t('signup_q')"></span>
+                <a href="/enrollment" x-text="t('signup_link')"></a>
+              </p>
               <p class="footer-support">
                 <span x-text="t('support_text_1')"></span>
                 <a href="mailto:support@retaha.de">support@retaha.de</a>
@@ -728,8 +742,8 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
     <style>
       :root {
         --color-petrol: #14616E;
-        --color-pink-glow: rgba(255, 74, 130, 0.18);
-        --color-pink-soft: rgba(255, 74, 130, 0.08);
+        --color-petrol-glow: rgba(20, 97, 110, 0.18);
+        --color-petrol-soft: rgba(20, 97, 110, 0.08);
         --color-anthrazit: #1A1A1A;
         --color-anthrazit-soft: #2A2A2A;
         --color-anthrazit-card: #242424;
@@ -817,6 +831,8 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       .auth-hero :global(.brand-logo) {
         margin-bottom: 48px;
         transition: opacity 200ms ease;
+        /* Logo-Hover petrol statt Theme-Pink (durchgängig petrol) */
+        --theme-accent: var(--color-petrol, #14616E);
       }
       .auth-hero :global(.brand-logo:hover),
       .auth-hero :global(.brand-logo:focus-visible) {
@@ -902,7 +918,9 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         right: 32px;
         z-index: 2;
       }
-      @media (min-width: 768px) { .lang-switcher { top: 32px; right: 40px; } }
+      /* Desktop: Switcher auf gleiche Höhe wie das Logo (Hero-Padding-Top 56px) —
+         beide 36px hoch, also Top-Bündigkeit = Mittel-Bündigkeit. */
+      @media (min-width: 768px) { .lang-switcher { top: 56px; right: 40px; } }
 
       .form-container { max-width: 400px; width: 100%; }
 
@@ -943,7 +961,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       .field-input::placeholder { color: rgba(26, 26, 26, 0.3); }
       .field-input:focus {
         outline: none; border-color: var(--color-petrol, #14616E);
-        box-shadow: 0 0 0 4px var(--color-pink-soft);
+        box-shadow: 0 0 0 4px var(--color-petrol-soft);
       }
       .field-input.is-error { border-color: var(--color-petrol, #14616E); }
 
@@ -960,7 +978,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
 
       .form-error {
         margin-bottom: 16px; padding: 12px 16px;
-        background: rgba(255, 74, 130, 0.08);
+        background: rgba(20, 97, 110, 0.08);
         border-left: 3px solid var(--color-petrol, #14616E);
         border-radius: 3px; font-size: 13px; color: var(--color-anthrazit);
       }
@@ -979,7 +997,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       .btn-primary:hover:not(:disabled) {
         background: var(--color-anthrazit-soft);
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px var(--color-pink-glow);
+        box-shadow: 0 8px 24px var(--color-petrol-glow);
       }
       .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
       .btn-primary.is-loading { pointer-events: none; opacity: 0.85; }
@@ -1047,7 +1065,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         padding: 8px 12px; border-radius: var(--radius);
         transition: background 250ms ease;
       }
-      .toggle-link:hover { background: var(--color-pink-soft); }
+      .toggle-link:hover { background: var(--color-petrol-soft); }
 
       /* Passwort ist jetzt Default → Box standardmäßig OFFEN (kein Auf-Flackern beim
          Laden). Wechsel auf Magic-Link (data-visible="false") klappt sie animiert zu. */
@@ -1068,6 +1086,12 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       .password-section[data-visible="false"] .field { transform: translateY(12px); opacity: 0; }
 
       .form-footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(26, 26, 26, 0.08); }
+      .footer-signup { font-size: 13px; color: rgba(26, 26, 26, 0.65); line-height: 1.6; margin-bottom: 14px; }
+      .footer-signup a {
+        color: var(--color-petrol, #14616E); font-weight: 500; text-decoration: none;
+        border-bottom: 1px solid rgba(20, 97, 110, 0.3); transition: all 200ms ease;
+      }
+      .footer-signup a:hover { border-bottom-color: var(--color-petrol, #14616E); }
       .footer-support { font-size: 12px; color: rgba(26, 26, 26, 0.5); line-height: 1.6; }
       .footer-support a {
         color: var(--color-anthrazit);
@@ -1105,7 +1129,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       }
       @keyframes trianglePulse {
         0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
-        50% { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--color-pink-glow)); }
+        50% { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--color-petrol-glow)); }
       }
       .success-eyebrow {
         font-family: 'JetBrains Mono', monospace; font-size: 10px;
@@ -1156,7 +1180,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
       .btn-secondary:hover {
         border-color: var(--color-petrol, #14616E);
         color: var(--color-petrol, #14616E);
-        background: var(--color-pink-soft);
+        background: var(--color-petrol-soft);
       }
       .resend-link {
         font-size: 12px; color: rgba(26, 26, 26, 0.5); margin-top: 16px;
@@ -1169,7 +1193,7 @@ for (const lang of ['it', 'pt', 'nl', 'ru', 'ar', 'zh'] as const) {
         padding: 4px 8px; border-radius: var(--radius);
         transition: background 200ms ease;
       }
-      .resend-link button:hover:not(:disabled) { background: var(--color-pink-soft); }
+      .resend-link button:hover:not(:disabled) { background: var(--color-petrol-soft); }
       .resend-link button:disabled {
         color: rgba(26, 26, 26, 0.3); cursor: not-allowed;
       }
