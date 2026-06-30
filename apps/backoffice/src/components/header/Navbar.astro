@@ -1,0 +1,332 @@
+---
+// Backoffice Top-Navbar — eigenständig (auth.retaha.de-Ästhetik): freistehend auf
+// Weiß, Mono-Versal-Labels, EIN gefüllter Aktiv-Block (Anthrazit), Teal nur als Punkt.
+// Nur im Backoffice. Section-Nav (KeyMenu-Drawer) bleibt erhalten (wird später durch
+// eine Sidebar ersetzt). Logo + Drawer-Inhalt aus @retaha/ui wiederverwendet.
+import Logo from '@retaha/ui/components/brand/Logo.astro';
+import KeyMenuDropdown from '@retaha/ui/components/header/KeyMenuDropdown.astro';
+import { LANGUAGES, LANGUAGE_LABELS } from '@retaha/i18n';
+import type { UserProfile } from '../../lib/types/user';
+import { getInitials, getDisplayName } from '../../lib/types/user';
+
+interface Props {
+  activeTab: 'gast' | 'backoffice' | 'admin';
+  user: UserProfile;
+}
+const { activeTab, user } = Astro.props;
+const lang = user.language;
+const plan = user.hotel_plan ?? 'lite';
+const initials = getInitials(user);
+const name = getDisplayName(user);
+
+const GUEST_APP = import.meta.env.GUEST_APP_URL ?? 'https://app.retaha.de';
+const DASHBOARD = import.meta.env.DASHBOARD_URL ?? 'https://dashboard.retaha.de';
+
+const tabs = [
+  { key: 'admin',      label: 'Admin',         href: DASHBOARD },
+  { key: 'backoffice', label: 'Backoffice',    href: '/overview' },
+  { key: 'gast',       label: 'Gast-Vorschau', href: `${GUEST_APP}/gast-vorschau` },
+];
+---
+
+<header class="nv">
+  <div class="nv__inner">
+
+    <!-- LINKS: Logo (Specht) + Brand-Punkt -->
+    <div class="nv__brand">
+      <Logo variant="dark" size="sm" href="/overview" ariaLabel="retaha — zur Übersicht" class="nv__logo" />
+      <span class="nv__brand-dot" aria-hidden="true"></span>
+    </div>
+
+    <!-- MITTE: App-Switcher (freistehende Mono-Labels, aktiv = gefüllter Block) -->
+    <nav class="nv__switch" aria-label="App wechseln">
+      {tabs.map(t => (
+        <a
+          href={t.href}
+          class:list={['nv__tab', { 'is-active': t.key === activeTab }]}
+          aria-current={t.key === activeTab ? 'page' : undefined}
+        >{t.label}</a>
+      ))}
+    </nav>
+
+    <!-- RECHTS: Drawer (Section-Nav) + Sprache + Konto -->
+    <div class="nv__controls">
+
+      <!-- Section-Nav-Drawer (bleibt erhalten; Sidebar ersetzt ihn später) -->
+      <div class="nv__pop" id="nvDrawer">
+        <button type="button" class="nv__ctrl" id="nvDrawerBtn" aria-haspopup="menu" aria-expanded="false">Menü</button>
+        <KeyMenuDropdown lang={lang} plan={plan} base="" guestBase={GUEST_APP} />
+      </div>
+
+      <!-- Sprache -->
+      <div class="nv__pop" id="nvLang">
+        <button type="button" class="nv__ctrl nv__lang-btn" id="nvLangBtn" aria-haspopup="menu" aria-expanded="false">{lang.toUpperCase()}</button>
+        <div class="nv__menu nv__menu--lang" id="nvLangMenu" role="menu" aria-hidden="true">
+          {LANGUAGES.map(l => (
+            <button type="button" class:list={['nv__lang-opt', { 'is-current': l === lang }]} data-lang={l} role="menuitemradio" aria-checked={l === lang ? 'true' : 'false'}>
+              <span class="nv__lang-code">{l.toUpperCase()}</span>
+              <span class="nv__lang-name">{LANGUAGE_LABELS[l]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <!-- Konto: Teal-Präsenzpunkt + Initialen -->
+      <div class="nv__pop" id="nvAcct">
+        <button type="button" class="nv__acct-btn" id="nvAcctBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Konto">
+          <span class="nv__acct-dot" aria-hidden="true"></span>
+          <span class="nv__acct-ini">{initials}</span>
+        </button>
+        <div class="nv__menu nv__menu--acct" id="nvAcctMenu" role="menu" aria-hidden="true">
+          <div class="nv__acct-head">
+            <span class="nv__acct-name">{name}</span>
+            <span class="nv__acct-meta">{user.role}{user.hotel_name ? ` · ${user.hotel_name}` : ''}</span>
+          </div>
+          <a class="nv__item" href="/profile" role="menuitem">Profil</a>
+          <a class="nv__item" href="/profile/security" role="menuitem">Sicherheit</a>
+          <a class="nv__item" href="/account/benachrichtigungen" role="menuitem">Benachrichtigungen</a>
+          <a class="nv__item" href="/support" role="menuitem">Support</a>
+          <a class="nv__item" href="/subscription" role="menuitem">Plan &amp; Pakete</a>
+          <form class="nv__logout" action="/admin/auth/logout" method="POST">
+            <button type="submit" class="nv__item nv__item--logout" role="menuitem">Abmelden</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<style>
+  .nv {
+    --nv-ink: #1C2026;        /* Anthrazit — Aktiv-Fill + Haupttext */
+    --nv-teal: #1AA0B0;       /* Akzent NUR als Punkt */
+    --nv-off: #F4F3EF;        /* Off-White auf Anthrazit */
+    --nv-mute: rgba(28,32,38,0.42);
+    --nv-mute-2: rgba(28,32,38,0.7);
+    background: transparent;  /* freistehend, kein umschließender Kasten */
+  }
+  .nv__inner {
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 18px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* LINKS: Brand */
+  .nv__brand { justify-self: start; display: inline-flex; align-items: center; gap: 9px; }
+  .nv__brand :global(.brand-logo__wordmark) { color: var(--nv-ink); }
+  .nv__brand :global(.brand-logo:hover .brand-logo__wordmark) { color: var(--nv-ink); opacity: 0.7; }
+  .nv__brand-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--nv-teal); flex-shrink: 0;
+  }
+
+  /* MITTE: App-Switcher — freistehende Mono-Versal-Labels */
+  .nv__switch { justify-self: center; display: inline-flex; align-items: center; gap: 4px; }
+  .nv__tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--nv-mute);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 3px;
+    transition: color 150ms ease, background 150ms ease;
+    white-space: nowrap;
+  }
+  .nv__tab:hover { color: var(--nv-mute-2); }
+  /* Aktiv = einziger gefüllter Block */
+  .nv__tab.is-active {
+    background: var(--nv-ink);
+    color: var(--nv-off);
+  }
+  .nv__tab.is-active:hover { color: var(--nv-off); }
+
+  /* RECHTS: Controls */
+  .nv__controls { justify-self: end; display: inline-flex; align-items: center; gap: 6px; }
+  .nv__pop { position: relative; }
+
+  .nv__ctrl {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--nv-mute);
+    padding: 8px 12px;
+    border-radius: 3px;
+    transition: color 150ms ease, background 150ms ease;
+  }
+  .nv__ctrl:hover,
+  .nv__ctrl[aria-expanded="true"] { color: var(--nv-mute-2); background: rgba(28,32,38,0.05); }
+
+  /* Konto-Trigger: Teal-Punkt + Initialen (Mono) */
+  .nv__acct-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; border: none; cursor: pointer;
+    padding: 6px 10px; border-radius: 3px;
+    transition: background 150ms ease;
+  }
+  .nv__acct-btn:hover,
+  .nv__acct-btn[aria-expanded="true"] { background: rgba(28,32,38,0.05); }
+  .nv__acct-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--nv-teal); flex-shrink: 0;
+  }
+  .nv__acct-ini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--nv-ink); font-weight: 500;
+  }
+
+  /* Dropdown-Panels (Sprache + Konto) — eckige Struktur, 3px Radius */
+  .nv__menu {
+    position: absolute; top: calc(100% + 10px); right: 0;
+    min-width: 200px;
+    background: #FFFFFF;
+    border: 1px solid rgba(28,32,38,0.1);
+    border-radius: 3px;
+    box-shadow: 0 14px 40px rgba(28,32,38,0.14), 0 4px 12px rgba(28,32,38,0.08);
+    padding: 6px;
+    opacity: 0; visibility: hidden; transform: translateY(-6px);
+    transition: opacity 160ms ease, transform 160ms ease, visibility 0ms 160ms;
+    z-index: 120;
+  }
+  .nv__menu.is-open { opacity: 1; visibility: visible; transform: translateY(0); transition: opacity 160ms ease, transform 160ms ease, visibility 0ms 0ms; }
+
+  .nv__menu--lang { min-width: 184px; max-height: min(420px, 70vh); overflow-y: auto; }
+  .nv__lang-opt {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: transparent; border: none; cursor: pointer; text-align: left;
+    padding: 8px 10px; border-radius: 3px;
+    transition: background 140ms ease;
+  }
+  .nv__lang-opt:hover { background: rgba(28,32,38,0.05); }
+  .nv__lang-opt.is-current { background: rgba(26,160,176,0.08); }
+  .nv__lang-code {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+    color: var(--nv-ink); font-weight: 500; width: 22px; flex-shrink: 0;
+  }
+  .nv__lang-name { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: rgba(28,32,38,0.7); }
+
+  /* Konto-Menü */
+  .nv__menu--acct { min-width: 224px; }
+  .nv__acct-head { padding: 8px 10px 10px; border-bottom: 1px solid rgba(28,32,38,0.08); margin-bottom: 4px; display: flex; flex-direction: column; gap: 3px; }
+  .nv__acct-name { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 500; color: var(--nv-ink); }
+  .nv__acct-meta {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: rgba(28,32,38,0.45);
+  }
+  .nv__item {
+    display: block; width: 100%; text-align: left;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--nv-ink);
+    text-decoration: none; background: transparent; border: none; cursor: pointer;
+    padding: 9px 10px; border-radius: 3px;
+    transition: background 140ms ease;
+  }
+  .nv__item:hover { background: rgba(28,32,38,0.05); }
+  .nv__logout { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(28,32,38,0.08); }
+  .nv__item--logout { color: #8C2128; }
+  .nv__item--logout:hover { background: rgba(140,33,40,0.07); }
+
+  /* Drawer-Panel (KeyMenuDropdown) hängt rechts unter dem „Menü"-Trigger */
+  .nv__pop :global(.key-menu-dropdown) { right: 0; }
+
+  @media (max-width: 900px) {
+    .nv__inner { grid-template-columns: 1fr auto; gap: 12px; padding: 14px 18px; }
+    .nv__switch { display: none; }  /* App-Switcher auf schmalen Screens ausgeblendet (V1) */
+  }
+</style>
+
+<script>
+  (function () {
+    const drawerBtn = document.getElementById('nvDrawerBtn');
+    const drawer    = document.getElementById('keyMenuDropdown');
+    const langBtn   = document.getElementById('nvLangBtn');
+    const langMenu  = document.getElementById('nvLangMenu');
+    const acctBtn   = document.getElementById('nvAcctBtn');
+    const acctMenu  = document.getElementById('nvAcctMenu');
+
+    type Pop = { btn: HTMLElement | null; panel: HTMLElement | null; openClass: string };
+    const pops: Pop[] = [
+      { btn: drawerBtn, panel: drawer,   openClass: 'is-open' },
+      { btn: langBtn,   panel: langMenu, openClass: 'is-open' },
+      { btn: acctBtn,   panel: acctMenu, openClass: 'is-open' },
+    ];
+
+    function closeAll(except?: Pop) {
+      for (const p of pops) {
+        if (p === except || !p.btn || !p.panel) continue;
+        p.panel.classList.remove(p.openClass);
+        p.btn.setAttribute('aria-expanded', 'false');
+        if (p.panel.getAttribute('role') === 'menu') p.panel.setAttribute('aria-hidden', 'true');
+      }
+    }
+    function toggle(p: Pop) {
+      if (!p.btn || !p.panel) return;
+      const open = p.panel.classList.contains(p.openClass);
+      closeAll(p);
+      if (open) {
+        p.panel.classList.remove(p.openClass);
+        p.btn.setAttribute('aria-expanded', 'false');
+        if (p.panel.getAttribute('role') === 'menu') p.panel.setAttribute('aria-hidden', 'true');
+      } else {
+        p.panel.classList.add(p.openClass);
+        p.btn.setAttribute('aria-expanded', 'true');
+        p.panel.removeAttribute('aria-hidden');
+        if (p === pops[0]) {
+          const search = p.panel.querySelector('input[type="search"]') as HTMLInputElement | null;
+          if (search) setTimeout(() => search.focus(), 80);
+        }
+      }
+    }
+
+    pops.forEach(p => p.btn?.addEventListener('click', (e) => { e.stopPropagation(); toggle(p); }));
+
+    // Außenklick + Escape schließen alles.
+    document.addEventListener('click', (e) => {
+      const t = e.target as Node;
+      const inside = pops.some(p => p.btn?.parentElement?.contains(t));
+      if (!inside) closeAll();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+
+    // Sprachwahl: Cookie + ?lang setzen, neu laden (DE = Standard, ohne Param).
+    langMenu?.querySelectorAll<HTMLButtonElement>('.nv__lang-opt').forEach((opt) => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const l = opt.getAttribute('data-lang');
+        if (!l) return;
+        document.cookie = `retaha_lang=${l}; path=/; max-age=31536000; samesite=lax`;
+        const url = new URL(window.location.href);
+        if (l === 'de') url.searchParams.delete('lang'); else url.searchParams.set('lang', l);
+        window.location.href = url.toString();
+      });
+    });
+
+    // Drawer-Suche (Filter) — identisch zur geteilten KeyMenu-Logik.
+    if (drawer) {
+      const search = drawer.querySelector('input[type="search"]') as HTMLInputElement | null;
+      function filterItems(query: string) {
+        const q = query.toLowerCase().trim();
+        drawer!.querySelectorAll('.km-section').forEach((section) => {
+          let visible = 0;
+          section.querySelectorAll('.km-item').forEach((item) => {
+            const label = item.querySelector('.km-item__label')?.textContent?.toLowerCase() ?? '';
+            const sub = item.querySelector('.km-item__sub')?.textContent?.toLowerCase() ?? '';
+            const match = q === '' || label.includes(q) || sub.includes(q);
+            (item as HTMLElement).hidden = !match;
+            if (match) visible++;
+          });
+          (section as HTMLElement).hidden = visible === 0;
+        });
+        const empty = drawer!.querySelector('.km-empty') as HTMLElement | null;
+        if (empty) empty.hidden = drawer!.querySelectorAll('.km-item:not([hidden])').length > 0;
+      }
+      search?.addEventListener('input', () => filterItems(search.value));
+    }
+  })();
+</script>
